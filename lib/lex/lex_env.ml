@@ -1,8 +1,4 @@
 
-module Parse_error = struct
-  type t = int
-end
-
 type t = {
   lex_source: File_key.t option;
   lex_lb: Sedlexing.lexbuf;
@@ -19,7 +15,7 @@ and bol = {
   offset: int;
 }
 
-and lex_state = { lex_errors_acc: (Loc.t * Parse_error.t) list }
+and lex_state = { lex_errors_acc: (Loc.t * Lex_error.t) list }
 
 let empty_lex_state = { lex_errors_acc = [] }
 
@@ -43,4 +39,24 @@ let line env = env.lex_bol.line
 
 let source env = env.lex_source
 
+let get_and_clear_state env =
+  let state = env.lex_state in
+  let env =
+    if state != empty_lex_state then
+      { env with lex_state = empty_lex_state }
+    else
+      env
+  in
+  (env, state)
+
 let bol_offset env = env.lex_bol.offset
+
+let is_in_comment_syntax env = env.lex_in_comment_syntax
+
+let is_comment_syntax_enabled env = env.lex_enable_comment_syntax
+
+let in_comment_syntax is_in env =
+  if is_in <> env.lex_in_comment_syntax then
+    { env with lex_in_comment_syntax = is_in }
+  else
+    env
