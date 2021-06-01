@@ -1,0 +1,4 @@
+(executable
+ (public_name midlang)
+ (name main)
+ (libraries midlang))
