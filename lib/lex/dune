@@ -1,4 +1,4 @@
 (library
- (name midlang_lex)
+ (name waterlang_lex)
  (libraries sedlex wtf8)
  (preprocess (pps ppx_deriving.show sedlex.ppx)))

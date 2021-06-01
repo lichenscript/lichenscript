@@ -1,4 +1,6 @@
 (executable
- (public_name midlang)
+ (public_name waterlang)
  (name main)
- (libraries midlang_lex))
+ (libraries
+  waterlang_lex
+  waterlang_parsing))
