@@ -1,0 +1,4 @@
+
+type program = {
+  path: string,
+}
