@@ -12,6 +12,8 @@ type t = {
 }
 [@@deriving show]
 
+let none = { source = None; start = { line = 0; column = 0 }; _end = { line = 0; column = 0 } }
+
 let mk_pos line column =
   { line; column }
 

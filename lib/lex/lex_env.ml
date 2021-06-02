@@ -39,6 +39,10 @@ let line env = env.lex_bol.line
 
 let source env = env.lex_source
 
+let clone env =
+  let lex_lb = env.lex_lb |> Obj.repr |> Obj.dup |> Obj.obj in
+  { env with lex_lb }
+
 let get_and_clear_state env =
   let state = env.lex_state in
   let env =

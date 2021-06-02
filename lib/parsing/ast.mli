@@ -91,3 +91,19 @@ and _function = {
 and function_body =
   | Pfun_block_body of block
   | Pfun_expression_body of expression
+
+and _class = {
+   pcls_id:       Identifier.t option;
+   pcls_loc:      Loc.t;
+   pcls_body:     class_body;
+   pcls_comments: Loc.t Waterlang_lex.Comment.t list;
+}
+
+and class_body =
+  | Pcls_method
+  | Pcls_property
+
+and program = {
+   pprogram_statements: statement list;
+   pprogram_comments: Loc.t Waterlang_lex.Comment.t list;
+}

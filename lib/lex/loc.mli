@@ -10,6 +10,8 @@ type t = {
   _end:  position;
 }
 
+val none : t
+
 val mk_pos: int -> int -> position
 
 val source : t -> File_key.t option

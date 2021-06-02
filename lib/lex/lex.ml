@@ -1789,7 +1789,7 @@ let template_tail = wrap template_tail
 
 let type_token = wrap type_token
 
-let token = wrap token
+let wrapped_token = wrap token
 
 let is_valid_identifier_name lexbuf =
   match%sedlex lexbuf with
