@@ -9,6 +9,10 @@ val source: env -> Waterlang_lex.File_key.t option
 
 val errors: env -> (Waterlang_lex.Loc.t * Parse_error.t) list
 
+val error : env -> Parse_error.t -> unit
+
+val error_unexpected : ?expected:string -> env -> unit
+
 module Peek : sig
 
   val token : env -> Waterlang_lex.Token.t

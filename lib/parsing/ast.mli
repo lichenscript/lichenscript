@@ -44,6 +44,7 @@ and expression = {
 
 and expression_desc =
   | Pexp_constant of constant
+  | Pexp_identifier of Identifier.t
   | Pexp_lambda of _function
 
 and statement = {
@@ -54,6 +55,7 @@ and statement = {
 }
 
 and statement_desc =
+  | Pstmt_class of _class
   | Pstmt_expression of expression
   | Pstmt_function of _function
   | Pstmt_if of
