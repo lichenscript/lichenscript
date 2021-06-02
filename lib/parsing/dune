@@ -1,5 +1,5 @@
 (library
  (name waterlang_parsing)
  (libraries waterlang_lex)
- (modules_without_implementation ast asttypes)
+ (modules_without_implementation ast asttypes identifier)
  (preprocess (pps ppx_deriving.show)))

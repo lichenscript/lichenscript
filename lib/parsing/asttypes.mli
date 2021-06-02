@@ -10,7 +10,7 @@ type constant =
 | Const_int64 of int64
 | Const_nativeint of nativeint
 
-type arg_label =
-    Nolabel
-  | Labelled of string (*  label:T -> ... *)
-  | Optional of string (* ?label:T -> ... *)
+type 'a loc = {
+  txt : 'a;
+  loc : Loc.t;
+}
