@@ -1,2 +1,6 @@
 (test
- (name waterlang))
+ (name waterlang)
+ (libraries
+  waterlang_lex
+  waterlang_parsing
+  ounit2))

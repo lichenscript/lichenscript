@@ -5,9 +5,20 @@ open Waterlang_lex
 
 let rec parse_string source content = 
   let env = Parser_env.init_env source content in
-  parse_program env
+  let program = parse_program env in
+  let errs = errors env in
+  if List.length errs > 0 then
+    List.iter
+      (fun (_, err) ->
+        let msg = Parse_error.PP.error err in
+        print_endline msg)
+      errs
+  else 
+    print_endline "no errors"
+  ;
+  program
 
-and parse_program env =
+and parse_program env : program =
   let stmt = parse_statement env in
   {
     pprogram_statements = [
@@ -96,7 +107,7 @@ and parse_expression env : expression =
     pexp_attributes = [];
   }
 
-and parse_pattern env : pattern =
+and _parse_pattern env : pattern =
   let ppat_loc = Peek.loc env in
   let next = Peek.token env in
   let ppat_desc =
