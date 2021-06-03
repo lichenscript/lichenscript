@@ -105,6 +105,21 @@ and class_body =
   | Pcls_method
   | Pcls_property
 
+and _type = {
+   pty_desc: type_desc;
+   pty_loc: Loc.t;
+}
+
+and type_desc =
+  | Pty_any
+  | Pty_var of string
+  | Pty_ctor of Identifier.t * type_desc list
+    (* List<int> *)
+
+  | Pty_arrow of
+    _type list *  (* params*)
+    _type         (* result *)
+
 and program = {
    pprogram_statements: statement list;
    pprogram_comments: Loc.t Waterlang_lex.Comment.t list;

@@ -95,3 +95,17 @@ and parse_expression env : expression =
     pexp_loc_stack = [];
     pexp_attributes = [];
   }
+
+and parse_pattern env : pattern =
+  let ppat_loc = Peek.loc env in
+  let next = Peek.token env in
+  let ppat_desc =
+    match next with
+    | Token.T_IDENTIFIER _ ->
+      let ident = parse_identifier env in
+      Ppat_identifier ident
+
+    | _ -> failwith "not implemented"
+  in
+
+  { ppat_loc; ppat_desc; }
