@@ -99,7 +99,7 @@ type token_sink_result = {
 }
 
 type env = {
-  errors: (Loc.t * Parse_error.t) list ref;
+  errors: Parse_error.t list ref;
   comments: Loc.t Comment.t list ref;
   error_callback: (env -> Parse_error.t -> unit) option;
   lex_env: Lex_env.t ref;
@@ -118,7 +118,9 @@ let init_env source content =
   let (lb, errors) =
   try (Sedlexing.Utf8.from_string content, [])
     with Sedlexing.MalFormed ->
-      (Sedlexing.Utf8.from_string "", [({ Loc.none with Loc.source }, Parse_error.MalformedUnicode)])
+      (Sedlexing.Utf8.from_string "", [
+        { Parse_error. perr_loc = Loc.none; perr_spec = Parse_error.MalformedUnicode}
+      ])
   in
   let lex_env = Lex_env.new_lex_env source lb ~enable_types_in_comments:true in
   {
@@ -154,7 +156,7 @@ module Peek = struct
 
   let lex_error_to_parse err =
     let (loc, lex_err) = err in
-    (loc, Parse_error.LexError lex_err)
+    { Parse_error. perr_loc = loc; perr_spec = Parse_error.LexError lex_err; }
 
   let errors env =
     let tmp_result = ith_errors ~i:0 env in
@@ -168,11 +170,11 @@ end
 
 
 (* mutators: *)
-let error_at env (loc, e) =
-  env.errors := (loc, e) :: !(env.errors);
+let error_at env err =
+  env.errors := err :: !(env.errors);
   match env.error_callback with
   | None -> ()
-  | Some callback -> callback env e
+  | Some callback -> callback env err
 
 (* other helper functions: *)
 let error_list env = List.iter (error_at env)
@@ -211,7 +213,7 @@ end
 
 let error env e =
   let loc = Peek.loc env in
-  error_at env (loc, e)
+  error_at env { Parse_error. perr_loc = loc; perr_spec = e; }
 
 let get_unexpected_error ?expected token =
   let unexpected = Token.explanation_of_token token in

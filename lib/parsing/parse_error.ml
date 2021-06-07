@@ -1,16 +1,23 @@
 open Waterlang_lex
 
-type t =
+type t = {
+  perr_loc: Loc.t;
+  perr_spec: spec;
+}
+
+and spec =
   | LexError of Waterlang_lex.Lex_error.t
   | MalformedUnicode
 
-exception Error of (Loc.t * t) list
+exception Error of t list
 
-let error loc e = raise (Error [(loc, e)])
+let error t = raise (Error [t])
 
 module PP = struct
 
-  let error = function
+  let error err =
+    let { perr_spec; _ } = err in
+    match perr_spec with
     | LexError lex_err -> Lex_error.PP.error lex_err
     | MalformedUnicode -> "Malformed unicode"
 

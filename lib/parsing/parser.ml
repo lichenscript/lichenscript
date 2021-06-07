@@ -14,7 +14,7 @@ let rec parse_string source content =
   let program = parse_program env in
   let errs = errors env in
   if List.length errs > 0 then
-    Result.Error (List.map (fun (_, err) -> err) errs)
+    Result.Error errs
   else 
     Result.Ok program
 
