@@ -13,6 +13,8 @@ val error : env -> Parse_error.t -> unit
 
 val error_unexpected : ?expected:string -> env -> unit
 
+val last_loc : env -> Waterlang_lex.Loc.t option
+
 module Peek : sig
 
   val token : env -> Waterlang_lex.Token.t

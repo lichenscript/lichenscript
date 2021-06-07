@@ -3,20 +3,20 @@ open Ast
 open Parser_env
 open Waterlang_lex
 
+let with_start_loc env start_loc =
+  let loc = last_loc env in
+  match loc with
+  | Some loc -> Loc.btwn start_loc loc
+  | None -> start_loc
+
 let rec parse_string source content = 
   let env = Parser_env.init_env source content in
   let program = parse_program env in
   let errs = errors env in
   if List.length errs > 0 then
-    List.iter
-      (fun (_, err) ->
-        let msg = Parse_error.PP.error err in
-        print_endline msg)
-      errs
+    Result.Error (List.map (fun (_, err) -> err) errs)
   else 
-    print_endline "no errors"
-  ;
-  program
+    Result.Ok program
 
 and parse_program env : program =
   let stmt = parse_statement env in
@@ -28,7 +28,7 @@ and parse_program env : program =
   }
 
 and parse_statement env : statement =
-  let pstmt_loc = Peek.loc env in
+  let start_loc = Peek.loc env in
   let next = Peek.token env in
 
   let pstmt_desc: statement_desc =
@@ -50,7 +50,7 @@ and parse_statement env : statement =
 
   {
     pstmt_desc;
-    pstmt_loc;
+    pstmt_loc = with_start_loc env start_loc;
     pstmt_loc_stack = [];
     pstmt_attributes = [];
   }
@@ -76,17 +76,67 @@ and parse_identifier env : Identifier.t =
     }
 
 and parse_class env : _class =
+  let start_loc = Peek.loc env in
+  Eat.token env;
   let id = parse_identifier env in
-  let pcls_loc = Peek.loc env in
+  let body = parse_class_body env in
   {
     pcls_id = Some id;
-    pcls_loc;
-    pcls_body = Pcls_method;
+    pcls_loc = with_start_loc env start_loc;
+    pcls_body = body;
     pcls_comments = [];
   }
 
+and parse_visibility env =
+  let next = Peek.token env in
+  match next with
+  | Token.T_PUBLIC ->
+    Eat.token env;
+    Some Pvisibility_public
+
+  | Token.T_PROTECTED ->
+    Eat.token env;
+    Some Pvisibility_protected
+
+  | Token.T_PRIVATE ->
+    Eat.token env;
+    Some Pvisibility_private
+
+  | _ -> None
+
+and parse_class_body env =
+  let parse_element env =
+    let start_pos = Peek.loc env in
+    let v = parse_visibility env in
+    let id = parse_identifier env in
+    Expect.token env Token.T_COLON;
+    let ty = parse_type env in
+    Expect.token env Token.T_SEMICOLON;
+    Pcls_property {
+      pcls_property_visiblity = v;
+      pcls_property_loc = with_start_loc env start_pos;
+      pcls_property_name = id;
+      pcls_property_type = ty;
+    }
+  in
+
+  let start_loc = Peek.loc env in
+  Expect.token env Token.T_LCURLY;  (* { *)
+
+  let tmp_body: class_body_element list ref = ref [] in
+
+  while Peek.token env <> Token.T_RCURLY && Peek.token env <> Token.T_EOF do
+    tmp_body := (parse_element env)::!tmp_body;
+  done;
+
+  Expect.token env Token.T_RCURLY;  (* } *)
+  {
+    pcls_body_elements = List.rev !tmp_body;
+    pcls_body_loc = with_start_loc env start_loc;
+  }
+
 and parse_expression env : expression =
-  let loc = Peek.loc env in
+  let start_loc = Peek.loc env in
   let next = Peek.token env in
 
   let pexp_desc : expression_desc =
@@ -102,13 +152,13 @@ and parse_expression env : expression =
 
   {
     pexp_desc;
-    pexp_loc = loc;
+    pexp_loc = with_start_loc env start_loc;
     pexp_loc_stack = [];
     pexp_attributes = [];
   }
 
 and _parse_pattern env : pattern =
-  let ppat_loc = Peek.loc env in
+  let start_loc = Peek.loc env in
   let next = Peek.token env in
   let ppat_desc =
     match next with
@@ -119,4 +169,15 @@ and _parse_pattern env : pattern =
     | _ -> failwith "not implemented"
   in
 
-  { ppat_loc; ppat_desc; }
+  {
+    ppat_loc = with_start_loc env start_loc;
+    ppat_desc;
+  }
+
+and parse_type env : _type =
+  let start_loc = Peek.loc env in
+  let id = parse_identifier env in
+  {
+    pty_desc = Pty_ctor (id, []);
+    pty_loc = with_start_loc env start_loc;
+  }

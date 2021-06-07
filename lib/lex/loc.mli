@@ -12,6 +12,8 @@ type t = {
 
 val none : t
 
+val btwn : t -> t -> t
+
 val mk_pos: int -> int -> position
 
 val source : t -> File_key.t option

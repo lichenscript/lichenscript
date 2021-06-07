@@ -25,6 +25,11 @@ type constant =
 
 type location_stack = Loc.t list
 
+type visibility =
+  | Pvisibility_public
+  | Pvisibility_protected
+  | Pvisibility_private
+
 (** {1 Extension points} *)
 
 type attribute = {
@@ -36,10 +41,10 @@ type attribute = {
 and attributes = attribute list
 
 and expression = {
-   pexp_desc: expression_desc;
-   pexp_loc: Loc.t;
-   pexp_loc_stack: location_stack;
-   pexp_attributes: attributes;
+  pexp_desc: expression_desc;
+  pexp_loc: Loc.t;
+  pexp_loc_stack: location_stack;
+  pexp_attributes: attributes;
 }
 
 and expression_desc =
@@ -48,10 +53,10 @@ and expression_desc =
   | Pexp_lambda of _function
 
 and statement = {
-   pstmt_desc: statement_desc;
-   pstmt_loc: Loc.t;
-   pstmt_loc_stack: location_stack;
-   pstmt_attributes: attributes;
+  pstmt_desc: statement_desc;
+  pstmt_loc: Loc.t;
+  pstmt_loc_stack: location_stack;
+  pstmt_attributes: attributes;
 }
 
 and statement_desc =
@@ -72,22 +77,22 @@ and statement_desc =
   | Pstmt_throw of expression
 
 and block = {
-   body: statement list;
-   comments: Loc.t Waterlang_lex.Comment.t list;
+  body: statement list;
+  comments: Loc.t Waterlang_lex.Comment.t list;
 }
 
 and pattern = {
-   ppat_desc: pattern_desc;
-   ppat_loc: Loc.t;
+  ppat_desc: pattern_desc;
+  ppat_loc: Loc.t;
 }
 
 and pattern_desc =
   | Ppat_identifier of Identifier.t
 
 and _function = {
-   pfun_id: Identifier.t option;
-   pfun_body: function_body;
-   pfun_comments: Loc.t Waterlang_lex.Comment.t list;
+  pfun_id: Identifier.t option;
+  pfun_body: function_body;
+  pfun_comments: Loc.t Waterlang_lex.Comment.t list;
 }
 
 and function_body =
@@ -95,19 +100,36 @@ and function_body =
   | Pfun_expression_body of expression
 
 and _class = {
-   pcls_id:       Identifier.t option;
-   pcls_loc:      Loc.t;
-   pcls_body:     class_body;
-   pcls_comments: Loc.t Waterlang_lex.Comment.t list;
+  pcls_id:       Identifier.t option;
+  pcls_loc:      Loc.t;
+  pcls_body:     class_body;
+  pcls_comments: Loc.t Waterlang_lex.Comment.t list;
 }
 
-and class_body =
-  | Pcls_method
-  | Pcls_property
+and class_body = {
+  pcls_body_elements: class_body_element list;
+  pcls_body_loc: Loc.t;
+}
+
+and class_property = {
+  pcls_property_visiblity: visibility option;
+  pcls_property_loc: Loc.t;
+  pcls_property_name: Identifier.t;
+  pcls_property_type: _type;
+}
+
+and class_method = {
+  pcls_method_visiblity: visibility option;
+  pcls_method_loc: Loc.t;
+}
+
+and class_body_element =
+  | Pcls_method of class_method
+  | Pcls_property of class_property
 
 and _type = {
-   pty_desc: type_desc;
-   pty_loc: Loc.t;
+  pty_desc: type_desc;
+  pty_loc: Loc.t;
 }
 
 and type_desc =
@@ -121,6 +143,6 @@ and type_desc =
     _type         (* result *)
 
 and program = {
-   pprogram_statements: statement list;
-   pprogram_comments: Loc.t Waterlang_lex.Comment.t list;
+  pprogram_statements: statement list;
+  pprogram_comments: Loc.t Waterlang_lex.Comment.t list;
 }

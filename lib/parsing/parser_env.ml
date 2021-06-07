@@ -228,6 +228,10 @@ let error_unexpected ?expected env =
   error_list env (Peek.errors env);
   error env (get_unexpected_error ?expected (Peek.token env))
 
+let last_loc env =
+  match !(env.last_lex_result) with
+  | Some lex_result -> Some (Lex_result.loc lex_result)
+  | None -> None
 
 module Expect = struct
 
