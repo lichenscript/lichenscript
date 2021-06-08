@@ -11,13 +11,14 @@ let test_parser _ =
     assert true
 
   | Result.Error errs ->
-    List.iter
-      (fun error ->
-        let str = Parse_error.PP.error error in
-        let { Loc. line; column; } = error.perr_loc.start in
-        Format.printf "%d:%d %s\n" line column str;
-      )
-      errs;
+    errs
+    |> List.rev
+    |> List.iter
+       (fun error ->
+         let str = Parse_error.PP.error error in
+         let { Loc. line; column; } = error.perr_loc.start in
+         Format.printf "%d:%d %s\n" line column str;
+        );
     assert false
 
 let suite =

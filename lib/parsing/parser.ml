@@ -60,6 +60,7 @@ and parse_identifier env : Identifier.t =
   let pident_loc = Peek.loc env in
   match next with
   | Token.T_IDENTIFIER ident ->
+    Eat.token env;
     {
       Identifier.
       pident_name = ident.value;
@@ -77,7 +78,7 @@ and parse_identifier env : Identifier.t =
 
 and parse_class env : _class =
   let start_loc = Peek.loc env in
-  Eat.token env;
+  Eat.token env;  (* class *)
   let id = parse_identifier env in
   let body = parse_class_body env in
   {
