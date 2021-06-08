@@ -110,15 +110,48 @@ and parse_class_body env =
     let start_pos = Peek.loc env in
     let v = parse_visibility env in
     let id = parse_identifier env in
-    Expect.token env Token.T_COLON;
-    let ty = parse_type env in
-    Expect.token env Token.T_SEMICOLON;
-    Pcls_property {
-      pcls_property_visiblity = v;
-      pcls_property_loc = with_start_loc env start_pos;
-      pcls_property_name = id;
-      pcls_property_type = ty;
-    }
+
+    if Peek.token env == Token.T_LPAREN then
+      begin
+        Eat.token env;
+        Expect.token env Token.T_RPAREN;
+        Pcls_method {
+          pcls_method_visiblity = v;
+          pcls_method_name = id;
+          pcls_method_loc = with_start_loc env start_pos;
+        }
+      end
+    else
+      begin
+        let pcls_property_type = 
+          if Peek.token env == Token.T_COLON then
+            begin
+              Eat.token env;
+              Some (parse_type env)
+            end
+          else
+            None
+        in
+
+        let pcls_property_init =
+          if Peek.token env == Token.T_ASSIGN then
+            begin
+              Eat.token env;
+              Some (parse_expression env)
+            end
+          else
+            None
+        in
+
+        Expect.token env Token.T_SEMICOLON;
+        Pcls_property {
+          pcls_property_visiblity = v;
+          pcls_property_loc = with_start_loc env start_pos;
+          pcls_property_name = id;
+          pcls_property_type;
+          pcls_property_init;
+        }
+    end
   in
 
   let start_loc = Peek.loc env in

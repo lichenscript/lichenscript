@@ -118,11 +118,13 @@ and class_property = {
   pcls_property_visiblity: visibility option;
   pcls_property_loc: Loc.t;
   pcls_property_name: Identifier.t;
-  pcls_property_type: _type;
+  pcls_property_type: _type option;
+  pcls_property_init: expression option;
 }
 
 and class_method = {
   pcls_method_visiblity: visibility option;
+  pcls_method_name: Identifier.t;
   pcls_method_loc: Loc.t;
 }
 
