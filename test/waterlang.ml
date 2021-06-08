@@ -10,7 +10,7 @@ let test_parser _ =
   }
 
   function main(args, args2: string, ...rest) {
-
+    let name = 3;
   }
   " in
   match result with

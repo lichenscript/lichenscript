@@ -1,26 +1,12 @@
 module Loc = Waterlang_lex.Loc
 
 type constant =
-    Pconst_integer of string * char option
-  (* 3 3l 3L 3n
-
-     Suffixes [g-z][G-Z] are accepted by the parser.
-     Suffixes except 'l', 'L' and 'n' are rejected by the typechecker
-  *)
+  |  Pconst_integer of string * char option
   | Pconst_char of char
   (* 'c' *)
   | Pconst_string of string * Loc.t * string option
-  (* "constant"
-     {delim|other constant|delim}
-
-     The location span the content of the string, without the delimiters.
-  *)
   | Pconst_float of string * char option
-  (* 3.4 2e5 1.4e-4
-
-     Suffixes [g-z][G-Z] are accepted by the parser.
-     Suffixes are rejected by the typechecker.
-  *)
+  | Pconst_boolean of bool
   [@@deriving show]
 
 type location_stack = Loc.t list
@@ -71,6 +57,7 @@ and statement_desc =
     statement * (* consequent *)
     statement option *  (* alternatives *)
     Loc.t Waterlang_lex.Comment.t list (* comments *)
+  | Pstmt_let of let_binding
   | Pstmt_block of block
   | Pstmt_break of Identifier.t option
   | Pstmt_contintue of Identifier.t option
@@ -78,6 +65,13 @@ and statement_desc =
   | Pstmt_return of
     expression option
   | Pstmt_throw of expression
+
+and let_binding = {
+  plet_loc: Loc.t;
+  plet_ty: _type option;
+  plet_pat: pattern;
+  plet_init: expression;
+}
 
 and block = {
   pblk_body: statement list;
@@ -106,7 +100,7 @@ and params = {
 }
 
 and param =  {
-  pparam_id: Identifier.t;
+  pparam_pat: pattern;
   pparam_ty: _type option;
   pparam_init: expression option;
   pparam_loc: Loc.t;

@@ -50,6 +50,9 @@ and parse_statement env : statement =
       let has_else = Eat.maybe env Token.T_ELSE in
       let alternative = if has_else then Some (parse_statement env) else None in
       Pstmt_if (test, consequent, alternative, [])
+
+    | Token.T_LET ->
+      Pstmt_let (parse_let_binding env)
       
     | _ ->
       error_unexpected env;
@@ -64,6 +67,30 @@ and parse_statement env : statement =
     pstmt_loc = with_start_loc env start_loc;
     pstmt_loc_stack = [];
     pstmt_attributes = [];
+  }
+
+and parse_let_binding env =
+  let start_loc = Peek.loc env in
+  Expect.token env Token.T_LET;
+  let plet_pat = parse_pattern env in
+
+  let plet_ty =
+    if Peek.token env == Token.T_COLON then
+      begin
+        Eat.token env;
+        Some (parse_type env)
+      end
+    else None
+  in
+
+  Expect.token env Token.T_ASSIGN;
+  let plet_init = parse_expression env in
+  Expect.token env Token.T_SEMICOLON;
+  {
+    plet_loc = with_start_loc env start_loc;
+    plet_ty;
+    plet_pat;
+    plet_init;
   }
 
 and parse_function env: _function =
@@ -84,7 +111,7 @@ and parse_params env =
   let parse_param env =
     let start_loc = Peek.loc env in
     let pparam_rest = Eat.maybe env Token.T_ELLIPSIS in
-    let pparam_id = parse_identifier env in
+    let pparam_pat = parse_pattern env in
     let pparam_ty =
       if Peek.token env == Token.T_COLON then
         begin
@@ -95,7 +122,7 @@ and parse_params env =
         None
     in
     {
-      pparam_id;
+      pparam_pat;
       pparam_ty;
       pparam_init = None;
       pparam_loc = with_start_loc env start_loc;
@@ -123,10 +150,17 @@ and parse_params env =
 
 and parse_block env =
   let start_pos = Peek.loc env in
+  let content = ref [] in
+
   Expect.token env Token.T_LCURLY;
+
+  while Peek.token env <> Token.T_RCURLY do
+    content := (parse_statement env)::(!content);
+  done;
+
   Expect.token env Token.T_RCURLY;
   {
-    pblk_body = [];
+    pblk_body = List.rev (!content);
     pblk_loc = with_start_loc env start_pos;
   }
 
@@ -253,6 +287,22 @@ and parse_expression env : expression =
     | Token.T_IDENTIFIER _ ->
       let ident = parse_identifier env in
       Pexp_identifier ident
+
+    | Token.T_NUMBER { raw; _ } ->
+      Eat.token env;
+      Pexp_constant (Pconst_integer (raw, None))
+
+    | Token.T_STRING (loc, value, _, _) ->
+      Eat.token env;
+      Pexp_constant (Pconst_string (value, loc, None))
+
+    | Token.T_TRUE ->
+      Eat.token env;
+      Pexp_constant (Pconst_boolean true)
+
+    | Token.T_FALSE ->
+      Eat.token env;
+      Pexp_constant (Pconst_boolean false)
     
     | _ ->
       failwith "not implemented"
@@ -266,7 +316,7 @@ and parse_expression env : expression =
     pexp_attributes = [];
   }
 
-and _parse_pattern env : pattern =
+and parse_pattern env : pattern =
   let start_loc = Peek.loc env in
   let next = Peek.token env in
   let ppat_desc =
