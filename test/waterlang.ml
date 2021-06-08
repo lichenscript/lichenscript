@@ -4,7 +4,9 @@ open Waterlang_lex
 open Waterlang_parsing
 
 let test_parser _ =
-  let result =  Parser.parse_string None "class Array { }" in
+  let result =  Parser.parse_string None "class Array {
+    private __name: sring;
+  }" in
   match result with
   | Result.Ok program ->
     Ast.pp_program Format.std_formatter program;
