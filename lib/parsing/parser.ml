@@ -53,6 +53,11 @@ and parse_statement env : statement =
 
     | Token.T_LET ->
       Pstmt_let (parse_let_binding env)
+
+    | Token.T_SEMICOLON ->
+      Eat.token env;
+      Pstmt_empty
+
       
     | _ ->
       error_unexpected env;

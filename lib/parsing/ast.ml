@@ -65,6 +65,7 @@ and statement_desc =
   | Pstmt_return of
     expression option
   | Pstmt_throw of expression
+  | Pstmt_empty
 
 and let_binding = {
   plet_loc: Loc.t;
