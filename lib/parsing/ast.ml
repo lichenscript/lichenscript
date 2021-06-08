@@ -80,8 +80,8 @@ and statement_desc =
   | Pstmt_throw of expression
 
 and block = {
-  body: statement list;
-  comments: Loc.t Waterlang_lex.Comment.t list;
+  pblk_body: statement list;
+  pblk_loc: Loc.t;
 }
 
 and pattern = {
@@ -94,8 +94,23 @@ and pattern_desc =
 
 and _function = {
   pfun_id: Identifier.t option;
+  pfun_params: params;
   pfun_body: function_body;
+  pfun_loc: Loc.t;
   pfun_comments: Loc.t Waterlang_lex.Comment.t list;
+}
+
+and params = {
+  pparams_content: param list;
+  pparams_loc: Loc.t
+}
+
+and param =  {
+  pparam_id: Identifier.t;
+  pparam_ty: _type option;
+  pparam_init: expression option;
+  pparam_loc: Loc.t;
+  pparam_rest: bool;
 }
 
 and function_body =

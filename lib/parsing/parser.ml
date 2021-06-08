@@ -19,11 +19,15 @@ let rec parse_string source content =
     Result.Ok program
 
 and parse_program env : program =
-  let stmt = parse_statement env in
+  let stmts = ref [] in
+
+  while Peek.token env <> Token.T_EOF do
+    let stmt = parse_statement env in
+    stmts := stmt::(!stmts)
+  done;
+
   {
-    pprogram_statements = [
-      stmt;
-    ];
+    pprogram_statements = List.rev !stmts;
     pprogram_comments = [];
   }
 
@@ -36,6 +40,9 @@ and parse_statement env : statement =
     | Token.T_CLASS ->
       Pstmt_class (parse_class env)
 
+    | Token.T_FUNCTION ->
+      Pstmt_function (parse_function env)
+
     | Token.T_IF ->
       Eat.token env;
       let test = parse_expression env in
@@ -44,7 +51,11 @@ and parse_statement env : statement =
       let alternative = if has_else then Some (parse_statement env) else None in
       Pstmt_if (test, consequent, alternative, [])
       
-    | _ -> failwith "not implementd"
+    | _ ->
+      error_unexpected env;
+      let errors = errors env in
+      let err = List.hd errors in
+      Parse_error.error err
 
   in
 
@@ -53,6 +64,70 @@ and parse_statement env : statement =
     pstmt_loc = with_start_loc env start_loc;
     pstmt_loc_stack = [];
     pstmt_attributes = [];
+  }
+
+and parse_function env: _function =
+  let start_loc = Peek.loc env in
+  Expect.token env Token.T_FUNCTION;
+  let id = parse_identifier env in
+  let pfun_params = parse_params env in
+  let block = parse_block env in
+  {
+    pfun_id = Some id;
+    pfun_params;
+    pfun_body = Pfun_block_body block;
+    pfun_loc = with_start_loc env start_loc;
+    pfun_comments = [];
+  }
+
+and parse_params env =
+  let parse_param env =
+    let start_loc = Peek.loc env in
+    let pparam_rest = Eat.maybe env Token.T_ELLIPSIS in
+    let pparam_id = parse_identifier env in
+    let pparam_ty =
+      if Peek.token env == Token.T_COLON then
+        begin
+          Eat.token env;
+          Some (parse_type env)
+        end
+      else
+        None
+    in
+    {
+      pparam_id;
+      pparam_ty;
+      pparam_init = None;
+      pparam_loc = with_start_loc env start_loc;
+      pparam_rest;
+    }
+  in
+
+  let start_loc = Peek.loc env in
+  Expect.token env Token.T_LPAREN;
+
+  let content = ref [] in
+
+  while Peek.token env <> Token.T_RPAREN do
+    content := (parse_param env)::(!content);
+    if Peek.token env <> Token.T_RPAREN then (
+      Expect.token env Token.T_COMMA;
+    )
+  done;
+
+  Expect.token env Token.T_RPAREN;
+  {
+    pparams_content = List.rev (!content);
+    pparams_loc = with_start_loc env start_loc;
+  }
+
+and parse_block env =
+  let start_pos = Peek.loc env in
+  Expect.token env Token.T_LCURLY;
+  Expect.token env Token.T_RCURLY;
+  {
+    pblk_body = [];
+    pblk_loc = with_start_loc env start_pos;
   }
 
 and parse_identifier env : Identifier.t =
@@ -113,8 +188,8 @@ and parse_class_body env =
 
     if Peek.token env == Token.T_LPAREN then
       begin
-        Eat.token env;
-        Expect.token env Token.T_RPAREN;
+        Eat.token env; (* ( *)
+        Expect.token env Token.T_RPAREN; (* ) *)
         Pcls_method {
           pcls_method_visiblity = v;
           pcls_method_name = id;
