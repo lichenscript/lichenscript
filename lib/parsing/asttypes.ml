@@ -9,8 +9,10 @@ type constant =
 | Const_int32 of int32
 | Const_int64 of int64
 | Const_nativeint of nativeint
+[@@deriving show]
 
 type 'a loc = {
   txt : 'a;
   loc : Loc.t;
 }
+[@@deriving show]

@@ -1,5 +1,4 @@
-
-open Asttypes
+module Loc = Waterlang_lex.Loc
 
 type constant =
     Pconst_integer of string * char option
@@ -22,21 +21,25 @@ type constant =
      Suffixes [g-z][G-Z] are accepted by the parser.
      Suffixes are rejected by the typechecker.
   *)
+  [@@deriving show]
 
 type location_stack = Loc.t list
+[@@deriving show]
 
 type visibility =
   | Pvisibility_public
   | Pvisibility_protected
   | Pvisibility_private
+  [@@deriving show]
 
 (** {1 Extension points} *)
 
 type attribute = {
-    attr_name : string loc;
-    attr_payload : string; (* modified *)
-    attr_loc : Loc.t;
-  }
+  attr_name : string Asttypes.loc;
+  attr_payload : string; (* modified *)
+  attr_loc : Loc.t;
+}
+[@@deriving show]
 
 and attributes = attribute list
 
@@ -146,3 +149,4 @@ and program = {
   pprogram_statements: statement list;
   pprogram_comments: Loc.t Waterlang_lex.Comment.t list;
 }
+[@@deriving show]
