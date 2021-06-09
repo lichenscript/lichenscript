@@ -1,0 +1,4 @@
+
+type t = {
+  name: string;
+}
