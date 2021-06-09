@@ -1,12 +1,12 @@
 open Waterlang_lex
 
 type expression = {
-  tecp_desc: expression_desc;
+  texp_desc: expression_desc;
   texp_loc: Loc.t;
 }
 
 and expression_desc =
-  | Texp_constant
+  | Texp_constant of Waterlang_parsing.Ast.constant
   | Texp_identifier of Symbol.t
   | Texp_lambda
   | Texp_throw

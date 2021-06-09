@@ -10,3 +10,6 @@ let create () =
     root_scope;
     scope_counter = 1;
   }
+
+let find_or_create_symbol env name =
+  Scope.find_or_create_symbol env.root_scope name

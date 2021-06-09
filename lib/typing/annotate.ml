@@ -33,10 +33,19 @@ let rec annotate_statement (env: Env.t) stmt =
     tstmt_loc = pstmt_loc;
   }
 
-and anotate_expression (_env: Env.t) expr =
-  let { Ast. pexp_loc; _; } = expr in
+and anotate_expression (env: Env.t) expr =
+  let { Ast. pexp_desc; pexp_loc; _; } = expr in
+  let texp_desc =
+    match pexp_desc with
+    | Pexp_constant cnst -> Texp_constant cnst
+    | Pexp_identifier id ->
+      let sym = Env.find_or_create_symbol env id.pident_name in
+      Texp_identifier sym
+
+    | _ -> Texp_lambda
+  in
   {
-    tecp_desc = Texp_constant;
+    texp_desc;
     texp_loc = pexp_loc;
   }
 

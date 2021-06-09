@@ -1,7 +1,7 @@
 module Loc = Waterlang_lex.Loc
 
 type constant =
-  |  Pconst_integer of string * char option
+  | Pconst_integer of string * char option
   | Pconst_char of char
   (* 'c' *)
   | Pconst_string of string * Loc.t * string option
