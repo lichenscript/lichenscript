@@ -34,7 +34,7 @@ type attribute = {
 
 and attributes = attribute list
 
-and expression = {
+type expression = {
   pexp_desc: expression_desc;
   pexp_loc: Loc.t;
   pexp_loc_stack: location_stack;

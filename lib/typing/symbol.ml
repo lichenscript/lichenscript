@@ -1,4 +1,10 @@
 
+type kind =
+  | Local
+  | Global
+
 type t = {
-  name: string;
+  name:     string;
+  kind:     kind;
+  scope_id: int;
 }
