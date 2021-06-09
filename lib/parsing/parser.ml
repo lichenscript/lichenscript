@@ -43,14 +43,6 @@ and parse_statement env : statement =
     | Token.T_FUNCTION ->
       Pstmt_function (parse_function env)
 
-    | Token.T_IF ->
-      Eat.token env;
-      let test = parse_expression env in
-      let consequent = parse_statement env in
-      let has_else = Eat.maybe env Token.T_ELSE in
-      let alternative = if has_else then Some (parse_statement env) else None in
-      Pstmt_if (test, consequent, alternative, [])
-
     | Token.T_LET ->
       Pstmt_let (parse_let_binding env)
 
@@ -58,12 +50,56 @@ and parse_statement env : statement =
       Eat.token env;
       Pstmt_empty
 
-      
+    | Token.T_WHILE ->
+      begin
+        let start_loc = Peek.loc env in
+        Eat.token env;
+        Expect.token env Token.T_LPAREN;
+        let pwhile_test = parse_expression(env) in
+        Expect.token env Token.T_RPAREN;
+        let pwhile_block = parse_block env in
+        let pwhile_loc = with_start_loc env start_loc in
+        Pstmt_while {
+          pwhile_test;
+          pwhile_block;
+          pwhile_loc;
+        }
+      end
+
+    | Token.T_BREAK ->
+      Eat.token env;
+      let next = Peek.token env in
+      let id =
+        match next with
+        | Token.T_IDENTIFIER _ ->
+          Some (parse_identifier env)
+        | _ -> None
+      in
+      Expect.token env Token.T_SEMICOLON;
+      Pstmt_break id
+
+    | Token.T_CONTINUE ->
+      Eat.token env;
+      let next = Peek.token env in
+      let id =
+        match next with
+        | Token.T_IDENTIFIER _ ->
+          Some (parse_identifier env)
+        | _ -> None
+      in
+      Expect.token env Token.T_SEMICOLON;
+      Pstmt_contintue id
+
+    | Token.T_DEBUGGER ->
+      Eat.token env;
+      Pstmt_debugger
+
     | _ ->
-      error_unexpected env;
-      let errors = errors env in
-      let err = List.hd errors in
-      Parse_error.error err
+      let expr = parse_expression env in
+      if Peek.token env == Token.T_SEMICOLON then
+        Pstmt_semi expr
+      else
+        Pstmt_expr expr
 
   in
 
@@ -308,7 +344,27 @@ and parse_expression env : expression =
     | Token.T_FALSE ->
       Eat.token env;
       Pexp_constant (Pconst_boolean false)
-    
+
+    | Token.T_THROW ->
+      Eat.token env;
+      Pexp_throw (parse_expression env)
+
+    | Token.T_IF ->
+      begin
+        let start_loc = Peek.loc env in
+        Eat.token env;
+        let pif_test = parse_expression env in
+        let pif_consequent = parse_statement env in
+        let has_else = Eat.maybe env Token.T_ELSE in
+        let pif_alternative = if has_else then Some (parse_statement env) else None in
+        Pexp_if {
+          pif_test;
+          pif_consequent;
+          pif_alternative;
+          pif_loc = with_start_loc env start_loc;
+        }
+      end
+
     | _ ->
       failwith "not implemented"
 

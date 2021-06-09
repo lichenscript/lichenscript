@@ -40,6 +40,15 @@ and expression_desc =
   | Pexp_constant of constant
   | Pexp_identifier of Identifier.t
   | Pexp_lambda of _function
+  | Pexp_throw of expression
+  | Pexp_if of if_desc
+
+and if_desc = {
+  pif_test: expression;
+  pif_consequent: statement;
+  pif_alternative: statement option;
+  pif_loc: Loc.t;
+}
 
 and statement = {
   pstmt_desc: statement_desc;
@@ -50,13 +59,10 @@ and statement = {
 
 and statement_desc =
   | Pstmt_class of _class
-  | Pstmt_expression of expression
+  | Pstmt_expr of expression (* Expr without trailing semi-colon. *)
+  | Pstmt_semi of expression (* Expr with a trailing semi-colon. *)
   | Pstmt_function of _function
-  | Pstmt_if of
-    expression *  (* test *)
-    statement * (* consequent *)
-    statement option *  (* alternatives *)
-    Loc.t Waterlang_lex.Comment.t list (* comments *)
+  | Pstmt_while of while_desc
   | Pstmt_let of let_binding
   | Pstmt_block of block
   | Pstmt_break of Identifier.t option
@@ -64,8 +70,13 @@ and statement_desc =
   | Pstmt_debugger
   | Pstmt_return of
     expression option
-  | Pstmt_throw of expression
   | Pstmt_empty
+
+and while_desc = {
+  pwhile_test: expression;
+  pwhile_block: block;
+  pwhile_loc: Loc.t;
+}
 
 and let_binding = {
   plet_loc: Loc.t;
