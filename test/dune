@@ -3,4 +3,5 @@
  (libraries
   waterlang_lex
   waterlang_parsing
+  waterlang_typing
   ounit2))

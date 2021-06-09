@@ -1,0 +1,2 @@
+
+type program = int

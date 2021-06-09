@@ -1,0 +1,3 @@
+(library
+ (name waterlang_typing)
+ (libraries waterlang_lex waterlang_parsing))
