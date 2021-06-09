@@ -18,6 +18,11 @@ type visibility =
   | Pvisibility_private
   [@@deriving show]
 
+type var_kind =
+  | Pvar_let
+  | Pvar_const
+[@@deriving show]
+
 (** {1 Extension points} *)
 
 type attribute = {
@@ -63,7 +68,7 @@ and statement_desc =
   | Pstmt_semi of expression (* Expr with a trailing semi-colon. *)
   | Pstmt_function of _function
   | Pstmt_while of while_desc
-  | Pstmt_let of let_binding
+  | Pstmt_binding of var_binding
   | Pstmt_block of block
   | Pstmt_break of Identifier.t option
   | Pstmt_contintue of Identifier.t option
@@ -78,11 +83,12 @@ and while_desc = {
   pwhile_loc: Loc.t;
 }
 
-and let_binding = {
-  plet_loc: Loc.t;
-  plet_ty: _type option;
-  plet_pat: pattern;
-  plet_init: expression;
+and var_binding = {
+  pbinding_kind: var_kind;
+  pbinding_loc: Loc.t;
+  pbinding_ty: _type option;
+  pbinding_pat: pattern;
+  pbinding_init: expression;
 }
 
 and block = {

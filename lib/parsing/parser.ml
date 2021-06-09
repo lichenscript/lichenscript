@@ -43,8 +43,11 @@ and parse_statement env : statement =
     | Token.T_FUNCTION ->
       Pstmt_function (parse_function env)
 
+    | Token.T_CONST ->
+      Pstmt_binding (parse_var_binding env Pvar_const)
+
     | Token.T_LET ->
-      Pstmt_let (parse_let_binding env)
+      Pstmt_binding (parse_var_binding env Pvar_let)
 
     | Token.T_SEMICOLON ->
       Eat.token env;
@@ -110,12 +113,12 @@ and parse_statement env : statement =
     pstmt_attributes = [];
   }
 
-and parse_let_binding env =
+and parse_var_binding env kind =
   let start_loc = Peek.loc env in
   Expect.token env Token.T_LET;
-  let plet_pat = parse_pattern env in
+  let pbinding_pat = parse_pattern env in
 
-  let plet_ty =
+  let pbinding_ty =
     if Peek.token env == Token.T_COLON then
       begin
         Eat.token env;
@@ -125,13 +128,14 @@ and parse_let_binding env =
   in
 
   Expect.token env Token.T_ASSIGN;
-  let plet_init = parse_expression env in
+  let pbinding_init = parse_expression env in
   Expect.token env Token.T_SEMICOLON;
   {
-    plet_loc = with_start_loc env start_loc;
-    plet_ty;
-    plet_pat;
-    plet_init;
+    pbinding_kind = kind;
+    pbinding_loc = with_start_loc env start_loc;
+    pbinding_ty;
+    pbinding_pat;
+    pbinding_init;
   }
 
 and parse_function env: _function =
