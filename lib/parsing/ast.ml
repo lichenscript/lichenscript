@@ -47,6 +47,7 @@ and expression_desc =
   | Pexp_lambda of _function
   | Pexp_throw of expression
   | Pexp_if of if_desc
+  | Pexp_array of expression list
 
 and if_desc = {
   pif_test: expression;
@@ -167,7 +168,7 @@ and _type = {
 and type_desc =
   | Pty_any
   | Pty_var of string
-  | Pty_ctor of Identifier.t * type_desc list
+  | Pty_ctor of Identifier.t * _type list
     (* List<int> *)
 
   | Pty_arrow of

@@ -58,7 +58,7 @@ and parse_statement env : statement =
         let start_loc = Peek.loc env in
         Eat.token env;
         Expect.token env Token.T_LPAREN;
-        let pwhile_test = parse_expression(env) in
+        let pwhile_test = parse_expression env in
         Expect.token env Token.T_RPAREN;
         let pwhile_block = parse_block env in
         let pwhile_loc = with_start_loc env start_loc in
@@ -367,6 +367,25 @@ and parse_expression env : expression =
           pif_alternative;
           pif_loc = with_start_loc env start_loc;
         }
+      end
+
+    | Token.T_LBRACKET ->
+      begin
+        let result = ref [] in
+        Eat.token env;
+
+        while Peek.token env <> Token.T_RBRACKET do
+          let expr = parse_expression env in
+
+          if Peek.token env <> Token.T_RBRACKET then (
+            Expect.token env Token.T_COMMA;
+          );
+
+          result := expr::(!result);
+        done;
+
+        Expect.token env Token.T_RBRACKET;
+        Pexp_array (List.rev !result)
       end
 
     | _ ->
