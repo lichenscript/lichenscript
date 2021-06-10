@@ -1,17 +1,17 @@
 open Core_kernel
 open Core_type
 
-module TypeMap = Map.Make(Int)
+module TypeBindingMap = Map.Make(Int)
 
 type t = {
   root_scope: Scope.t;
   scope_stack: Scope.t Stack.t;
   mutable scope_counter: int;
-  mutable type_map: Core_type.core_type TypeMap.t;
+  mutable type_map: Core_type.core_type TypeBindingMap.t;
 }
 
-let set_symbol_type env sym_id ty =
-  env.type_map <- TypeMap.set env.type_map ~key:sym_id ~data:ty;;
+let bind_type env ~sym_id ty =
+  env.type_map <- TypeBindingMap.set env.type_map ~key:sym_id ~data:ty;;
 
 let default_symbols = [|
   ("u32", Numeric Num_u32);
@@ -27,7 +27,7 @@ let add_default_symbols env (scope: Scope.t) =
   Array.iter
     ~f:(fun (name, ty) ->
       let sym = Symbol.mk_builtin_global ~scope_id:(Scope.id scope) name in
-      set_symbol_type env sym.id ty;
+      bind_type env ~sym_id:sym.id ty;
       Scope.set_type_symbol scope name sym;
     )
     default_symbols
@@ -39,7 +39,7 @@ let create () =
       root_scope;
       scope_stack = Stack.create ();
       scope_counter = 1;
-      type_map = TypeMap.empty;
+      type_map = TypeBindingMap.empty;
     }
   in
   add_default_symbols env root_scope;
