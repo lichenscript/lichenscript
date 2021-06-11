@@ -26,8 +26,8 @@ let default_symbols = [|
 let add_default_symbols env (scope: Scope.t) =
   Array.iter
     ~f:(fun (name, ty) ->
-      let sym = Symbol.mk_builtin_global ~scope_id:(Scope.id scope) name in
-      bind_type env ~sym_id:sym.id ty;
+      let sym = Symbol.mk_builtin_global_tsym ~scope_id:(Scope.id scope) name in
+      bind_type env ~sym_id:sym.tsym_id ty;
       Scope.set_type_symbol scope name sym;
     )
     default_symbols
@@ -56,3 +56,6 @@ let pop_scope env =
 
 let find_or_create_var_symbol env name =
   Scope.find_or_create_var_symbol env.root_scope name
+
+let find_or_create_type_symbol env name =
+  Scope.find_or_create_type_symbol env.root_scope name

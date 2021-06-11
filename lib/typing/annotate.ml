@@ -85,7 +85,7 @@ and annotate_type env ty =
     | Ast.Pty_any -> Tty_any
     | Ast.Pty_var str -> Tty_var str
     | Ast.Pty_ctor (id, types) ->
-      let sym = Env.find_or_create_var_symbol env id.pident_name in
+      let sym = Env.find_or_create_type_symbol env id.pident_name in
       let types = List.map ~f:(annotate_type env) types in
       Tty_ctor (sym, types)
     | Ast.Pty_arrow (params, ret) ->

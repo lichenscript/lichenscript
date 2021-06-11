@@ -7,7 +7,7 @@ type expression = {
 
 and expression_desc =
   | Texp_constant of Waterlang_parsing.Ast.constant
-  | Texp_identifier of Symbol.t
+  | Texp_identifier of Symbol.var_sym
   | Texp_lambda
   | Texp_throw of expression
   | Texp_if of if_desc
@@ -64,7 +64,7 @@ and pattern = {
 }
 
 and pattern_desc =
- | Tpat_symbol of Symbol.t
+ | Tpat_symbol of Symbol.var_sym
 
 and program = {
   tprogram_statements: statement list;
@@ -78,7 +78,7 @@ and _type = {
 and type_desc =
   | Tty_any
   | Tty_var of string
-  | Tty_ctor of Symbol.t * _type list
+  | Tty_ctor of Symbol.type_sym * _type list
   | Tty_arrow of
     _type list *
     _type
