@@ -4,8 +4,6 @@ type kind =
   | Local
   | Global
 
-let counter = ref 0
-
 module rec TypeValue : sig
   type numeric_type =
     | Num_u32
@@ -67,8 +65,6 @@ end = struct
   }
 
   let mk_builtin_global ~scope_id name =
-    let tsym_id = !counter in
-    counter := tsym_id + 1;
     {
       name = name;
       kind = Global;
@@ -78,8 +74,6 @@ end = struct
     }
   
   let mk_local ~scope_id name =
-    let vsym_id = !counter in
-    counter := vsym_id + 1;
     {
       name = name;
       kind = Local;
@@ -116,8 +110,6 @@ end = struct
   }
 
   let mk_local ~scope_id name =
-    let vsym_id = !counter in
-    counter := vsym_id + 1;
     {
       name = name;
       def_type = None;
