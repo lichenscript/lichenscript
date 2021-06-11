@@ -1,11 +1,12 @@
 open Core_kernel
+open Core_type
 
 module SymbolTable = Hashtbl.Make_binable(String)
 
 type t = {
   id: int;
-  var_symbols: Symbol.var_sym SymbolTable.t;
-  type_symbols: Symbol.type_sym SymbolTable.t;
+  var_symbols: VarSym.t SymbolTable.t;
+  type_symbols: TypeSym.t SymbolTable.t;
 }
 
 let id scope = scope.id
@@ -22,7 +23,7 @@ let find_or_create_var_symbol scope name =
   match opt with
   | Some sym -> sym
   | None ->
-    let sym = Symbol.mk_local_vsym ~scope_id:scope.id name in
+    let sym = VarSym.mk_local ~scope_id:scope.id name in
     let _ =  SymbolTable.add scope.var_symbols ~key:name ~data:sym in
     sym
 
@@ -31,7 +32,7 @@ let find_or_create_type_symbol scope name =
   match opt with
   | Some sym -> sym
   | None ->
-    let sym = Symbol.mk_local_tsym ~scope_id:scope.id name in
+    let sym = TypeSym.mk_local ~scope_id:scope.id name in
     let _ =  SymbolTable.add scope.type_symbols ~key:name ~data:sym in
     sym
 
