@@ -24,18 +24,18 @@ module rec TypeValue : sig
   and class_type = {
     tcls_name:       TypeSym.t;
     tcls_extends:    TypeSym.t option;
-    tcls_methods:    class_method_type list;
     tcls_properties: class_property_type list;
-  }
-
-  and class_method_type = {
-    tcls_method_name: TypeSym.t;
-    tcls_method_params: t list;
+    tcls_methods:    function_type list;
   }
 
   and class_property_type = {
     tcls_property_name: TypeSym.t;
     tcls_property_type: t;
+  }
+
+  and function_type = {
+    tfun_params: t list;
+    tfun_ret: t;
   }
 
 end =

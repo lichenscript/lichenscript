@@ -39,6 +39,33 @@ and statement_desc =
   | Tstmt_return of expression option
   | Tstmt_empty
 
+and _class = {
+  tcls_id: Core_type.TypeSym.t;
+  tcls_loc: Loc.t;
+  tcls_body: class_body;
+}
+
+and class_body = {
+  tcls_body_elements: class_body_element list;
+  tcls_body_loc: Loc.t;
+}
+
+and class_property = {
+  tcls_property_visibility: Waterlang_parsing.Ast.visibility;
+  tcls_property_loc: Loc.t;
+  tcls_property_name: Waterlang_parsing.Identifier.t;
+  tcls_property_init: expression option;
+}
+
+and class_method = {
+  tcls_method_visibility: Waterlang_parsing.Ast.visibility;
+  tcls_method_loc: Loc.t;
+}
+
+and class_body_element =
+  | Tcls_method of class_method
+  | Tcls_property of class_property
+
 and var_binding = {
   tbinding_kind: Waterlang_parsing.Ast.var_kind;
   tbinding_loc: Loc.t;
