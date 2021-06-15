@@ -8,7 +8,10 @@ let rec annotate_statement (env: Env.t) stmt =
   let tstmt_desc =
     match pstmt_desc with
     | Pstmt_class cls ->
-      Tstmt_class (annotate_class env cls)
+      let cls = annotate_class env cls in
+      let ty_val = Infer.infer_class cls in
+      cls.tcls_id.value <- ty_val;
+      Tstmt_class cls
 
     | Pstmt_expr expr ->
       Tstmt_expr (annotate_expression env expr)

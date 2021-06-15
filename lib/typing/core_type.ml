@@ -25,17 +25,15 @@ module rec TypeValue : sig
     | Class of class_type
     | Function of function_type
     | Array of t
-  [@@deriving show]
 
   and class_type = {
-    tcls_name:       TypeSym.t;
-    tcls_extends:    TypeSym.t option;
+    tcls_extends:    t option;
     tcls_properties: class_property_type list;
     tcls_methods:    function_type list;
   }
 
   and class_property_type = {
-    tcls_property_name: TypeSym.t;
+    tcls_property_name: Waterlang_parsing.Identifier.t;
     tcls_property_type: t;
   }
 
@@ -50,7 +48,7 @@ and TypeSym: sig
   type t = {
     name:     string;
     kind:     kind;
-    mutable value:       TypeValue.t;
+    mutable value: TypeValue.t;
     scope_id: int;
     builtin:  bool;
   }
