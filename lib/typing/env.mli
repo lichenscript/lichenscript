@@ -13,4 +13,6 @@ val find_or_create_var_symbol: t -> string -> Core_type.VarSym.t
 
 val find_or_create_type_symbol: t -> string -> Core_type.TypeSym.t
 
+val find_type_symbol: t -> string -> Core_type.TypeSym.t option
+
 val add_error: t -> Type_error.t -> unit

@@ -36,5 +36,8 @@ let find_or_create_type_symbol scope name =
     let _ =  SymbolTable.add scope.type_symbols ~key:name ~data:sym in
     sym
 
+let find_type_symbol scope name =
+  SymbolTable.find scope.type_symbols name
+
 let set_type_symbol scope name sym =
   SymbolTable.set scope.type_symbols ~key:name ~data:sym;

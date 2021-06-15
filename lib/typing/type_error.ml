@@ -8,6 +8,7 @@ type t = {
 
 and spec =
   | NotAssignable of TypeValue.t * TypeValue.t
+  | CannotFindName of string
 
 module PP = struct
 
@@ -20,5 +21,8 @@ module PP = struct
       TypeValue.pp Format.str_formatter assign;
       let str2 = Format.flush_str_formatter() in
       Format.sprintf "Type '%s' is not assignable to type '%s'" str1 str2
+
+    | CannotFindName name ->
+      Format.sprintf "Can not find name '%s'" name
   
 end

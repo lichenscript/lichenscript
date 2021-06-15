@@ -55,5 +55,8 @@ let find_or_create_var_symbol env name =
 let find_or_create_type_symbol env name =
   Scope.find_or_create_type_symbol env.root_scope name
 
+let find_type_symbol env name =
+  Scope.find_type_symbol env.root_scope name
+
 let add_error env err =
   env.errors <- err::env.errors

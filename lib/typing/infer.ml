@@ -1,6 +1,7 @@
 
 open Core_kernel
 open Core_type
+open Waterlang_parsing
 open Typedtree
 
 let infer_class cls =
@@ -40,3 +41,30 @@ let infer_class cls =
     tcls_properties;
     tcls_methods;
   })
+
+let rec infer env (ty: Ast._type) =
+  let open Ast in
+  let { pty_desc; pty_loc } = ty in
+  match pty_desc with
+  | Pty_any -> TypeValue.Any
+  | Pty_var _ -> failwith "unreachable"
+  | Pty_ctor(id, _) ->
+    begin
+      let sym = Env.find_type_symbol env id.pident_name in
+      match sym with
+      | Some sym -> sym.value
+      | None ->
+        Env.add_error env { Type_error.
+          spec = CannotFindName id.pident_name;
+          loc = pty_loc;
+        };
+        TypeValue.Unknown
+    end
+
+  | Pty_arrow(params, ret) ->
+    let params_types = List.map ~f:(infer env) params in
+    let params_ret = infer env ret in
+    TypeValue.(Function {
+      tfun_params = params_types;
+      tfun_ret = params_ret;
+    })
