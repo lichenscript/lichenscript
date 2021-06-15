@@ -1,8 +1,10 @@
 open Waterlang_lex
+open Core_type
 
 type expression = {
   texp_desc: expression_desc;
   texp_loc: Loc.t;
+  mutable texp_val: TypeValue.t;
 }
 
 and expression_desc =
@@ -12,6 +14,14 @@ and expression_desc =
   | Texp_throw of expression
   | Texp_if of if_desc
   | Texp_array of expression list
+  | Texp_call of call
+  | Texp_member of expression * Waterlang_parsing.Identifier.t
+
+and call = {
+  tcallee: expression;
+  tcall_params: expression list;
+  tcall_loc: Loc.t;
+}
 
 and if_desc = {
   tif_test: expression;
@@ -26,10 +36,10 @@ and statement = {
 }
 
 and statement_desc =
-  | Tstmt_class
+  | Tstmt_class of _class
   | Tstmt_expr of expression
   | Tstmt_semi of expression
-  | Tstmt_function
+  | Tstmt_function of _function
   | Tstmt_while of while_desc
   | Tstmt_binding of var_binding
   | Tstmt_block of block
@@ -72,6 +82,29 @@ and var_binding = {
   tbinding_ty: _type option;
   tbinding_pat: pattern;
   tbinding_init: expression;
+}
+
+and _function = {
+  tfun_id: Core_type.VarSym.t;
+  tfun_params: params;
+  tfun_body: function_body;
+  tfun_loc: Loc.t;
+}
+
+and function_body =
+  | Tfun_block_body of block
+  | Tfun_expression_body of expression
+
+and params = {
+  tparams_content: param list;
+  tparams_loc: Loc.t;
+}
+
+and param = {
+  tparam_pat: pattern;
+  tparam_init: expression option;
+  tparam_loc: Loc.t;
+  tparam_rest: bool;
 }
 
 and while_desc = {

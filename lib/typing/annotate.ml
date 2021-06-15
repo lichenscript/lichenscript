@@ -1,4 +1,5 @@
 open Core_kernel
+open Core_type
 open Typedtree
 open Waterlang_parsing
 
@@ -6,7 +7,8 @@ let rec annotate_statement (env: Env.t) stmt =
   let { Ast. pstmt_loc; pstmt_desc; _; } = stmt in
   let tstmt_desc =
     match pstmt_desc with
-    | Pstmt_class _ -> Tstmt_class
+    | Pstmt_class cls ->
+      Tstmt_class (annotate_class env cls)
 
     | Pstmt_expr expr ->
       Tstmt_expr (annotate_expression env expr)
@@ -14,7 +16,9 @@ let rec annotate_statement (env: Env.t) stmt =
     | Pstmt_semi expr ->
       Tstmt_semi (annotate_expression env expr)
 
-    | Pstmt_function _ -> Tstmt_function
+    | Pstmt_function _fun ->
+      Tstmt_function (annotate_function env _fun)
+
     | Pstmt_while {Ast. pwhile_test; pwhile_block; pwhile_loc; } ->
       let twhile_test = annotate_expression env pwhile_test in
       let twhile_block = annotate_block env pwhile_block in
@@ -43,6 +47,100 @@ let rec annotate_statement (env: Env.t) stmt =
   {
     tstmt_desc;
     tstmt_loc = pstmt_loc;
+  }
+
+and annotate_function env _function =
+  let annotate_param env param =
+    let {Ast. pparam_pat; pparam_init; pparam_loc; pparam_rest; _ } = param in
+    let tparam_pat = annotate_pattern env pparam_pat in
+    {
+      tparam_pat;
+      tparam_init = Option.map ~f:(annotate_expression env) pparam_init;
+      tparam_loc = pparam_loc;
+      tparam_rest = pparam_rest;
+    }
+  in
+  let { Ast. pfun_id; pfun_params; pfun_body; pfun_loc; _; } = _function in
+  let tfun_id = Env.find_or_create_var_symbol env (Option.value_exn pfun_id).pident_name in
+  let tfun_params =
+    {
+      tparams_content = List.map ~f:(annotate_param env) pfun_params.pparams_content;
+      tparams_loc = pfun_params.pparams_loc;
+    }
+  in
+  let tfun_body = match pfun_body with
+    | Ast.Pfun_block_body block ->
+      Tfun_block_body (annotate_block env block)
+
+    | Ast.Pfun_expression_body expr ->
+      Tfun_expression_body (annotate_expression env expr)
+
+  in
+  {
+    tfun_id;
+    tfun_params;
+    tfun_body;
+    tfun_loc = pfun_loc;
+  }
+
+and annotate_class env _class =
+  let annotate_body env cls_body =
+    let { Ast. pcls_body_elements; pcls_body_loc } = cls_body in
+    let tcls_body_elements =
+      List.map
+        ~f:(function
+        | Pcls_method _method ->
+          begin
+            let { Ast. pcls_method_visiblity; pcls_method_loc; _ } = _method in
+            let tcls_method_visibility =
+              Option.value ~default:Ast.Pvisibility_private pcls_method_visiblity
+            in
+            Tcls_method {
+              tcls_method_visibility;
+              tcls_method_loc = pcls_method_loc;
+            }
+          end
+
+        | Pcls_property prop ->
+          begin
+            let { Ast.
+              pcls_property_visiblity;
+              pcls_property_loc;
+              pcls_property_name;
+              (* pcls_property_type; *)
+              pcls_property_init;
+              _;
+            } = prop
+            in
+            let tcls_property_visibility =
+              Option.value ~default:Ast.Pvisibility_private pcls_property_visiblity
+            in
+            let tcls_property_init = Option.map ~f:(annotate_expression env) pcls_property_init in
+            Tcls_property {
+              tcls_property_visibility;
+              tcls_property_loc = pcls_property_loc;
+              tcls_property_name = pcls_property_name;
+              tcls_property_init;
+            }
+          end
+
+        )
+        pcls_body_elements
+    in
+    {
+      tcls_body_elements;
+      tcls_body_loc = pcls_body_loc;
+    }
+  in
+
+  let { Ast. pcls_id; pcls_loc; pcls_body; _; } = _class in
+  let id = Option.value_exn pcls_id in
+  let tcls_id =  Env.find_or_create_type_symbol env id.pident_name in
+  let tcls_body = annotate_body env pcls_body in
+  {
+    tcls_id;
+    tcls_loc = pcls_loc;
+    tcls_body;
   }
 
 and annotate_block env block =
@@ -126,15 +224,28 @@ and annotate_expression (env: Env.t) expr =
 
     | Pexp_array arr ->
       Texp_array (List.map ~f:(annotate_expression env) arr)
+    
+    | Pexp_call call ->
+      let {Ast. pcallee; pcall_params; pcall_loc } = call in
+      let tcallee = annotate_expression env pcallee in
+      let tcall_params = List.map ~f:(annotate_expression env) pcall_params in
+      Texp_call {
+        tcallee;
+        tcall_params;
+        tcall_loc = pcall_loc;
+      }
+
+    | Pexp_member (expr, field) ->
+      Texp_member (annotate_expression env expr, field)
 
   in
   {
     texp_desc;
     texp_loc = pexp_loc;
+    texp_val = TypeValue.Unknown;
   }
 
-let annotate (program: Ast.program) =
-  let env = Env.create () in
+let annotate env (program: Ast.program) =
   let { Ast. pprogram_statements; _; } = program in
   let tprogram_statements =
     List.map ~f:(annotate_statement env) pprogram_statements

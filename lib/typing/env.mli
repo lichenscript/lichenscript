@@ -12,3 +12,5 @@ val pop_scope: t -> Scope.t option
 val find_or_create_var_symbol: t -> string -> Core_type.VarSym.t
 
 val find_or_create_type_symbol: t -> string -> Core_type.TypeSym.t
+
+val add_error: t -> Type_error.t -> unit

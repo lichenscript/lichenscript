@@ -1,2 +1,2 @@
 
-val annotate: Waterlang_parsing.Ast.program -> Typedtree.program
+val annotate: Env.t -> Waterlang_parsing.Ast.program -> Typedtree.program

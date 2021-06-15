@@ -48,6 +48,14 @@ and expression_desc =
   | Pexp_throw of expression
   | Pexp_if of if_desc
   | Pexp_array of expression list
+  | Pexp_call of call
+  | Pexp_member of expression * Identifier.t
+
+and call = {
+  pcallee: expression;
+  pcall_params: expression list;
+  pcall_loc: Loc.t;
+}
 
 and if_desc = {
   pif_test: expression;

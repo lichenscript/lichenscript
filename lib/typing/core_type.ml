@@ -12,14 +12,20 @@ module rec TypeValue : sig
     | Num_i64
     | Num_f32
     | Num_f64
+  [@@deriving show]
 
   type t =
     | Unknown
     | Any
     | Numeric of numeric_type
+    | Char
     | String
+    | Boolean
     | Ctor of TypeSym.t
     | Class of class_type
+    | Function of function_type
+    | Array of t
+  [@@deriving show]
 
   and class_type = {
     tcls_name:       TypeSym.t;
@@ -37,9 +43,9 @@ module rec TypeValue : sig
     tfun_params: t list;
     tfun_ret: t;
   }
+  [@@deriving show]
 
-end =
-  TypeValue
+end = TypeValue
 and TypeSym: sig
   type t = {
     name:     string;

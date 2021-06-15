@@ -4,6 +4,7 @@ open Core_type
 type t = {
   root_scope: Scope.t;
   scope_stack: Scope.t Stack.t;
+  mutable errors: Type_error.t list;
   mutable scope_counter: int;
 }
 
@@ -32,6 +33,7 @@ let create () =
     {
       root_scope;
       scope_stack = Stack.create ();
+      errors = [];
       scope_counter = 1;
     }
   in
@@ -52,3 +54,6 @@ let find_or_create_var_symbol env name =
 
 let find_or_create_type_symbol env name =
   Scope.find_or_create_type_symbol env.root_scope name
+
+let add_error env err =
+  env.errors <- err::env.errors
