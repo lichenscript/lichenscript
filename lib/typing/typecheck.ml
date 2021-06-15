@@ -139,6 +139,15 @@ and check_expression env expr =
       check_expression env expr;
       TypeValue.Any
 
+    | Texp_unary (_, expr) ->
+      check_expression env expr;
+      TypeValue.Any
+
+    | Texp_binary (_, left, right) ->
+      check_expression env left;
+      check_expression env right;
+      TypeValue.Any
+
   in
   expr.texp_val <- type_value
 

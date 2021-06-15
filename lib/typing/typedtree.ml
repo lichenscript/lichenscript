@@ -16,6 +16,14 @@ and expression_desc =
   | Texp_array of expression list
   | Texp_call of call
   | Texp_member of expression * Waterlang_parsing.Identifier.t
+  | Texp_unary of
+    Waterlang_parsing.Asttypes.unary_op *
+    expression
+
+  | Texp_binary of
+    Waterlang_parsing.Asttypes.binary_op *
+    expression *
+    expression
 
 and call = {
   tcallee: expression;

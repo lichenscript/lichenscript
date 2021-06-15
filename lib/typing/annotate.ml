@@ -238,6 +238,15 @@ and annotate_expression (env: Env.t) expr =
     | Pexp_member (expr, field) ->
       Texp_member (annotate_expression env expr, field)
 
+    | Pexp_unary (op, expr) ->
+      let expr = annotate_expression env expr in
+      Texp_unary(op, expr)
+
+    | Pexp_binary (op, left, right) ->
+      let left = annotate_expression env left in
+      let right = annotate_expression env right in
+      Texp_binary(op, left, right)
+
   in
   {
     texp_desc;

@@ -50,6 +50,8 @@ and expression_desc =
   | Pexp_array of expression list
   | Pexp_call of call
   | Pexp_member of expression * Identifier.t
+  | Pexp_unary of Asttypes.unary_op * expression
+  | Pexp_binary of Asttypes.binary_op * expression * expression
 
 and call = {
   pcallee: expression;

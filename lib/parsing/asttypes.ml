@@ -16,3 +16,33 @@ type 'a loc = {
   loc : Loc.t;
 }
 [@@deriving show]
+
+type unary_op =
+  | Minus
+  | Plus
+  | Not
+  | BitNot
+  [@@deriving show]
+
+type binary_op =
+  | Equal
+  | NotEqual
+  | StrictEqual
+  | StrictNotEqual
+  | LessThan
+  | LessThanEqual
+  | GreaterThan
+  | GreaterThanEqual
+  | LShift
+  | RShift
+  | RShift3
+  | Plus
+  | Minus
+  | Mult
+  | Exp
+  | Div
+  | Mod
+  | BitOr
+  | Xor
+  | BitAnd
+  [@@deriving show]
