@@ -9,10 +9,10 @@ let infer_class cls =
     List.partition_map
       ~f:(function
       | Tcls_method _method ->
-        `Fst _method
+        First _method
 
       | Tcls_property prop ->
-        `Snd prop
+        Second prop
 
       )
     cls.tcls_body.tcls_body_elements
