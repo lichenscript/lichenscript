@@ -4,6 +4,7 @@ open Core_type
 module SymbolTable = Hashtbl.Make_binable(String)
 
 type t = {
+  prev: t option;
   id: int;
   var_symbols: VarSym.t SymbolTable.t;
   type_symbols: TypeSym.t SymbolTable.t;
@@ -11,8 +12,9 @@ type t = {
 
 let id scope = scope.id
 
-let create id =
+let create ?prev id =
   {
+    prev;
     id;
     var_symbols = SymbolTable.create ();
     type_symbols = SymbolTable.create ();

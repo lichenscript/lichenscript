@@ -64,7 +64,10 @@ and annotate_function env _function =
     }
   in
   let { Ast. pfun_id; pfun_params; pfun_body; pfun_loc; _; } = _function in
-  let tfun_id = Env.find_or_create_var_symbol env (Option.value_exn pfun_id).pident_name in
+  let tfun_id = env
+    |> Env.peek_scope
+    |> fun env -> Scope.find_or_create_var_symbol env (Option.value_exn pfun_id).pident_name
+  in
   let tfun_params =
     {
       tparams_content = List.map ~f:(annotate_param env) pfun_params.pparams_content;
@@ -138,7 +141,10 @@ and annotate_class env _class =
 
   let { Ast. pcls_id; pcls_loc; pcls_body; _; } = _class in
   let id = Option.value_exn pcls_id in
-  let tcls_id =  Env.find_or_create_type_symbol env id.pident_name in
+  let tcls_id = env
+    |> Env.peek_scope
+    |> fun env -> Scope.find_or_create_type_symbol env id.pident_name
+  in
   let tcls_body = annotate_body env pcls_body in
   {
     tcls_id;
@@ -172,7 +178,10 @@ and annotate_pattern env pat =
   let tpat_desc =
     match ppat_desc with
     | Ast.Ppat_identifier id ->
-      Tpat_symbol (Env.find_or_create_var_symbol env id.pident_name)
+      begin
+        let current_scope = Env.peek_scope env in
+        Tpat_symbol (Scope.find_or_create_var_symbol current_scope id.pident_name)
+      end
   in
   {
     tpat_desc;
@@ -186,9 +195,15 @@ and annotate_type env ty =
     | Ast.Pty_any -> Tty_any
     | Ast.Pty_var str -> Tty_var str
     | Ast.Pty_ctor (id, types) ->
-      let sym = Env.find_or_create_type_symbol env id.pident_name in
-      let types = List.map ~f:(annotate_type env) types in
-      Tty_ctor (sym, types)
+      begin
+        let sym = env
+          |> Env.peek_scope
+          |> fun env -> Scope.find_or_create_type_symbol env id.pident_name
+        in
+        let types = List.map ~f:(annotate_type env) types in
+        Tty_ctor (sym, types)
+      end
+
     | Ast.Pty_arrow (params, ret) ->
       let t_params = List.map ~f:(annotate_type env) params in
       let t_ret = annotate_type env ret in
@@ -206,8 +221,13 @@ and annotate_expression (env: Env.t) expr =
     match pexp_desc with
     | Pexp_constant cnst -> Texp_constant cnst
     | Pexp_identifier id ->
-      let sym = Env.find_or_create_var_symbol env id.pident_name in
-      Texp_identifier sym
+      begin
+        let sym = env
+          |> Env.peek_scope
+          |> fun env -> Scope.find_or_create_var_symbol env id.pident_name
+        in
+        Texp_identifier sym
+      end
 
     | Pexp_throw expr ->
       Texp_throw (annotate_expression env expr)

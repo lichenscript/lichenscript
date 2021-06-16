@@ -3,7 +3,7 @@ open Core_type
 
 type t = {
   root_scope: Scope.t;
-  scope_stack: Scope.t Stack.t;
+  mutable current_scope: Scope.t;
   mutable errors: Type_error.t list;
   mutable scope_counter: int;
 }
@@ -32,7 +32,7 @@ let create () =
   let env =
     {
       root_scope;
-      scope_stack = Stack.create ();
+      current_scope = root_scope;
       errors = [];
       scope_counter = 1;
     }
@@ -40,23 +40,10 @@ let create () =
   add_default_symbols root_scope;
   env
 
-let peek_scope env =
-  Stack.top_exn env.scope_stack
+let set_current_scope env scope =
+  env.current_scope <- scope
 
-let push_scope env scope =
-  Stack.push env.scope_stack scope
-
-let pop_scope env =
-  Stack.pop env.scope_stack
-
-let find_or_create_var_symbol env name =
-  Scope.find_or_create_var_symbol env.root_scope name
-
-let find_or_create_type_symbol env name =
-  Scope.find_or_create_type_symbol env.root_scope name
-
-let find_type_symbol env name =
-  Scope.find_type_symbol env.root_scope name
+let peek_scope env = env.current_scope
 
 let add_error env err =
   env.errors <- err::env.errors

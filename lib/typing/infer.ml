@@ -50,7 +50,10 @@ let rec infer env (ty: Ast._type) =
   | Pty_var _ -> failwith "unreachable"
   | Pty_ctor(id, _) ->
     begin
-      let sym = Env.find_type_symbol env id.pident_name in
+      let sym = env
+        |> Env.peek_scope
+        |> (fun scope -> Scope.find_type_symbol scope id.pident_name)
+      in
       match sym with
       | Some sym -> sym.value
       | None ->
