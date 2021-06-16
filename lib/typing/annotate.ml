@@ -277,7 +277,54 @@ and annotate_expression (env: Env.t) expr =
     texp_val = TypeValue.Unknown;
   }
 
+(**
+ * pre-scan symbol of root-level definitions of
+ * class/function/struct/enum
+ *)
+let pre_scan_definitions env program =
+  let { Ast. pprogram_statements; _; } = program in
+
+  let find_or_add_type_sym name loc =
+    let scope = Env.peek_scope env in
+    let type_sym = Scope.find_type_symbol scope name in
+    match type_sym with
+    | Some _ ->
+      begin
+        let err = Type_error.make_error loc (Type_error.Redefinition name) in
+        Env.add_error env err
+      end
+
+    | None ->
+      begin
+        let type_sym = Core_type.TypeSym.mk_local ~scope_id:scope.id name in
+        Scope.set_type_symbol scope name type_sym
+      end
+  in
+
+  List.iter
+    ~f:(fun stmt ->
+      let { Ast. pstmt_desc; _; } = stmt in
+      match pstmt_desc with
+      | Pstmt_class cls ->
+        begin
+          let { Ast. pcls_id; pcls_loc; _; } = cls in
+          let id = Option.value_exn pcls_id in
+          find_or_add_type_sym id.pident_name pcls_loc;
+        end
+
+      | Pstmt_function _fun ->
+        begin
+          let { Ast. pfun_id; pfun_loc; _; } = _fun in
+          let id = Option.value_exn pfun_id in
+          find_or_add_type_sym id.pident_name pfun_loc
+        end
+
+      | _ -> ()
+    )
+    pprogram_statements
+
 let annotate env (program: Ast.program) =
+  pre_scan_definitions env program;
   let { Ast. pprogram_statements; _; } = program in
   let tprogram_statements =
     List.map ~f:(annotate_statement env) pprogram_statements

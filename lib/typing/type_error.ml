@@ -9,6 +9,10 @@ type t = {
 and spec =
   | NotAssignable of TypeValue.t * TypeValue.t
   | CannotFindName of string
+  | Redefinition of string
+
+let make_error loc spec =
+  { loc; spec }
 
 module PP = struct
 
@@ -24,5 +28,8 @@ module PP = struct
 
     | CannotFindName name ->
       Format.sprintf "Can not find name '%s'" name
+
+    | Redefinition name ->
+      Format.sprintf "Redefinition of '%s'" name
   
 end
