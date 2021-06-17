@@ -64,30 +64,41 @@ and annotate_function env _function =
     }
   in
   let { Ast. pfun_id; pfun_params; pfun_body; pfun_loc; _; } = _function in
-  let tfun_id = env
-    |> Env.peek_scope
-    |> fun env -> Scope.find_or_create_var_symbol env (Option.value_exn pfun_id).pident_name
-  in
-  let tfun_params =
-    {
-      tparams_content = List.map ~f:(annotate_param env) pfun_params.pparams_content;
-      tparams_loc = pfun_params.pparams_loc;
-    }
-  in
-  let tfun_body = match pfun_body with
-    | Ast.Pfun_block_body block ->
-      Tfun_block_body (annotate_block env block)
+  let name = (Option.value_exn pfun_id).pident_name in
+  let scope = Env.peek_scope env in
+  let var_sym = Scope.find_var_symbol scope name in
 
-    | Ast.Pfun_expression_body expr ->
-      Tfun_expression_body (annotate_expression env expr)
+  match var_sym with
+  | Some tfun_id ->
+    begin
+      let tfun_params =
+        {
+          tparams_content = List.map ~f:(annotate_param env) pfun_params.pparams_content;
+          tparams_loc = pfun_params.pparams_loc;
+        }
+      in
+      let tfun_body = match pfun_body with
+        | Ast.Pfun_block_body block ->
+          Tfun_block_body (annotate_block env block)
 
-  in
-  {
-    tfun_id;
-    tfun_params;
-    tfun_body;
-    tfun_loc = pfun_loc;
-  }
+        | Ast.Pfun_expression_body expr ->
+          Tfun_expression_body (annotate_expression env expr)
+
+      in
+      {
+        tfun_id;
+        tfun_params;
+        tfun_body;
+        tfun_loc = pfun_loc;
+      }
+    end
+
+  | None ->
+    begin
+      let err = Type_error.make_error pfun_loc (Type_error.CannotFindName name) in
+      Env.add_error env err;
+      raise (Type_error.Error err)
+    end
 
 and annotate_class env _class =
   let annotate_body env cls_body =
@@ -141,16 +152,25 @@ and annotate_class env _class =
 
   let { Ast. pcls_id; pcls_loc; pcls_body; _; } = _class in
   let id = Option.value_exn pcls_id in
-  let tcls_id = env
-    |> Env.peek_scope
-    |> fun env -> Scope.find_or_create_type_symbol env id.pident_name
-  in
-  let tcls_body = annotate_body env pcls_body in
-  {
-    tcls_id;
-    tcls_loc = pcls_loc;
-    tcls_body;
-  }
+  let scope = Env.peek_scope env in
+  let type_sym_opt = Scope.find_type_symbol scope id.pident_name in
+  match type_sym_opt with
+  | Some tcls_id ->
+    begin
+      let tcls_body = annotate_body env pcls_body in
+      {
+        tcls_id;
+        tcls_loc = pcls_loc;
+        tcls_body;
+      }
+    end
+
+  | None ->
+    begin
+      let err = Type_error.make_error pcls_loc (Type_error.CannotFindName id.pident_name) in
+      Env.add_error env err;
+      raise (Type_error.Error err)
+    end
 
 and annotate_block env block =
   let { Ast. pblk_body; pblk_loc } = block in
@@ -180,7 +200,9 @@ and annotate_pattern env pat =
     | Ast.Ppat_identifier id ->
       begin
         let current_scope = Env.peek_scope env in
-        Tpat_symbol (Scope.find_or_create_var_symbol current_scope id.pident_name)
+        let var_sym = VarSym.mk_local ~scope_id:current_scope.id id.pident_name in
+        Scope.set_var_symbol current_scope id.pident_name var_sym;
+        Tpat_symbol var_sym
       end
   in
   {
@@ -196,12 +218,21 @@ and annotate_type env ty =
     | Ast.Pty_var str -> Tty_var str
     | Ast.Pty_ctor (id, types) ->
       begin
-        let sym = env
-          |> Env.peek_scope
-          |> fun env -> Scope.find_or_create_type_symbol env id.pident_name
-        in
-        let types = List.map ~f:(annotate_type env) types in
-        Tty_ctor (sym, types)
+        let current_scope = Env.peek_scope env in
+        let type_sym_opt = Scope.find_type_symbol current_scope id.pident_name in
+        match type_sym_opt with
+        | Some sym ->
+          begin
+            let types = List.map ~f:(annotate_type env) types in
+            Tty_ctor (sym, types)
+          end
+        | None ->
+          begin
+            let err = Type_error.make_error pty_loc (Type_error.CannotFindName id.pident_name) in
+            Env.add_error env err;
+            raise (Type_error.Error err)
+          end
+
       end
 
     | Ast.Pty_arrow (params, ret) ->
@@ -222,11 +253,18 @@ and annotate_expression (env: Env.t) expr =
     | Pexp_constant cnst -> Texp_constant cnst
     | Pexp_identifier id ->
       begin
-        let sym = env
-          |> Env.peek_scope
-          |> fun env -> Scope.find_or_create_var_symbol env id.pident_name
-        in
-        Texp_identifier sym
+        let current_scope = Env.peek_scope env in
+        let var_sym_opt = Scope.find_var_symbol current_scope id.pident_name in
+        match var_sym_opt with
+        | Some sym ->
+          Texp_identifier sym
+
+        | None ->
+          begin
+            let err = Type_error.make_error pexp_loc (Type_error.CannotFindName id.pident_name) in
+            Env.add_error env err;
+            raise (Type_error.Error err)
+          end
       end
 
     | Pexp_throw expr ->

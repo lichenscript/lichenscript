@@ -20,26 +20,14 @@ let create ?prev id =
     type_symbols = SymbolTable.create ();
   }
 
-let find_or_create_var_symbol scope name =
-  let opt = SymbolTable.find scope.var_symbols name in
-  match opt with
-  | Some sym -> sym
-  | None ->
-    let sym = VarSym.mk_local ~scope_id:scope.id name in
-    let _ =  SymbolTable.add scope.var_symbols ~key:name ~data:sym in
-    sym
-
-let find_or_create_type_symbol scope name =
-  let opt = SymbolTable.find scope.type_symbols name in
-  match opt with
-  | Some sym -> sym
-  | None ->
-    let sym = TypeSym.mk_local ~scope_id:scope.id name in
-    let _ =  SymbolTable.add scope.type_symbols ~key:name ~data:sym in
-    sym
+let find_var_symbol scope name =
+  SymbolTable.find scope.var_symbols name
 
 let find_type_symbol scope name =
   SymbolTable.find scope.type_symbols name
+
+let set_var_symbol scope name sym =
+  SymbolTable.set scope.var_symbols ~key:name ~data:sym
 
 let set_type_symbol scope name sym =
   SymbolTable.set scope.type_symbols ~key:name ~data:sym;

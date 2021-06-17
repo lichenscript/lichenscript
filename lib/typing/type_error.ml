@@ -14,6 +14,8 @@ and spec =
 let make_error loc spec =
   { loc; spec }
 
+exception Error of t
+
 module PP = struct
 
   let error err =
