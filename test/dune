@@ -4,4 +4,5 @@
   waterlang_lex
   waterlang_parsing
   waterlang_typing
+  waterlang_wasm
   ounit2))

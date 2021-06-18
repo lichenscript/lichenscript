@@ -2,6 +2,7 @@
 open OUnit2
 open Waterlang_lex
 open Waterlang_parsing
+open Waterlang_wasm
 
 let test_parser _ =
   let result =  Parser.parse_string None "
@@ -16,9 +17,9 @@ let test_parser _ =
   match result with
   | Result.Ok program ->
     Ast.pp_program Format.std_formatter program;
-    let env = Waterlang_typing.Env.create () in
-    let program = Waterlang_typing.Annotate.annotate env program in
-    Waterlang_typing.Typecheck.type_check env program;
+    let _env = Waterlang_typing.Env.create () in
+    (* let program = Waterlang_typing.Annotate.annotate env program in
+    Waterlang_typing.Typecheck.type_check env program; *)
     assert true
 
   | Result.Error errs ->
@@ -32,9 +33,14 @@ let test_parser _ =
         );
     assert false
 
+let test_codegen _ =
+  Codegen.codegen ();
+  assert true
+
 let suite =
   "TestParser" >::: [
     "test_parser" >:: test_parser;
+    "test_codegen" >:: test_codegen;
   ]
 
 let () =

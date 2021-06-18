@@ -1,0 +1,12 @@
+(library
+ (name waterlang_wasm)
+ (libraries
+  waterlang_typing
+  waterlang_lex
+  waterlang_parsing
+  core_kernel
+  ctypes
+  ctypes.foreign
+ )
+ (flags :standard -cclib -lbinaryen)
+ (preprocess (pps ppx_deriving.show)))
