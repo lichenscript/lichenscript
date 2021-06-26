@@ -67,14 +67,20 @@ CAMLprim value make_module() {
 
 CAMLprim value module_emit_text(value v) {
   BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(v);
-  static char buffer[4096];
-  memset(buffer, 0, 4096);
-  size_t size = BinaryenModuleWriteText(*ref, buffer, 4096);
-  return caml_copy_string(buffer);
+  char* result_str = BinaryenModuleAllocateAndWriteText(*ref);
+  value result = caml_copy_string(result_str);
+  free(result_str);
+  return result;
 }
 
-// 4k
-#define FILE_BUFFER (4096 * 4)
+static void clean_binary_result(BinaryenModuleAllocateAndWriteResult result) {
+  if (result.binary) {
+    free(result.binary);
+  }
+  if (result.sourceMap) {
+    free(result.sourceMap);
+  }
+}
 
 CAMLprim value module_emit_binary(value module, value path) {
   BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
@@ -87,23 +93,26 @@ CAMLprim value module_emit_binary(value module, value path) {
     return Val_unit;
   }
 
-  ftruncate(fd, FILE_BUFFER);
+  BinaryenModuleAllocateAndWriteResult binary_result = BinaryenModuleAllocateAndWrite(*ref, "");
 
-  char* src = (char*)mmap(NULL, FILE_BUFFER, PROT_READ | PROT_WRITE,
+  ftruncate(fd, binary_result.binaryBytes);
+
+  char* src = (char*)mmap(NULL, binary_result.binaryBytes, PROT_READ | PROT_WRITE,
     MAP_SHARED, fd, 0);
   if (src < 0 || src == 0) {
+    clean_binary_result(binary_result);
     close(fd);
     caml_failwith("map to file failed");
     return Val_unit;
   }
 
-  size_t s = BinaryenModuleWrite(*ref, src, FILE_BUFFER);
+  memcpy(src, binary_result.binary, binary_result.binaryBytes);
 
-  munmap(src, FILE_BUFFER);
-
-  ftruncate(fd, s);
+  munmap(src, binary_result.binaryBytes);
 
   close(fd);
+
+  clean_binary_result(binary_result);
 
   return Val_unit;
 }
