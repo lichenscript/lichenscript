@@ -50,8 +50,9 @@ and expression_desc =
   | Pexp_array of expression list
   | Pexp_call of call
   | Pexp_member of expression * Identifier.t
-  | Pexp_unary of Asttypes.unary_op * expression
-  | Pexp_binary of Asttypes.binary_op * expression * expression
+  | Pexp_unary of Asttypes.UnaryOp.t * expression
+  | Pexp_binary of Asttypes.BinaryOp.t * expression * expression
+  | Pexp_update of Asttypes.UpdateOp.t * expression * bool (* prefix *)
 
 and call = {
   pcallee: expression;

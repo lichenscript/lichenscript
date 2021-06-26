@@ -148,6 +148,10 @@ and check_expression env expr =
       check_expression env right;
       TypeValue.Any
 
+    | Texp_update (_, exp, _) ->
+      check_expression env exp;
+      TypeValue.Any
+
   in
   expr.texp_val <- type_value
 

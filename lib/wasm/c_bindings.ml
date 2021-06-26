@@ -11,6 +11,8 @@ type exp
 
 type function_
 
+type export
+
 external make_module: unit -> m = "make_module"
 
 external module_emit: m -> string = "module_emit"
@@ -29,6 +31,8 @@ external make_ty_any_ref: unit -> ty = "make_ty_any_ref"
 
 external make_ty_unreachable: unit -> ty = "make_ty_unreachable"
 
+external make_ty_multiples: ty array -> ty = "make_ty_multiples"
+
 external make_op_add_i32: unit -> op = "make_op_add_i32"
 
 external make_op_sub_i32: unit -> op = "make_op_sub_i32"
@@ -45,7 +49,13 @@ external make_literal_f64: Float.t -> literal = "make_literal_f64"
 
 external make_exp_const: m -> literal -> exp = "make_exp_const"
 
-external make_exp_binary: m -> op -> exp -> exp = "make_exp_binary"
+external make_exp_binary: m -> op -> exp -> exp -> exp = "make_exp_binary"
+
+external make_exp_unrechable: m -> exp = "make_exp_unreachable"
+
+external make_exp_return: m -> exp option -> exp = "make_exp_return"
 
 external add_function: m -> string -> ty -> ty -> ty array -> exp -> function_ =
   "add_function_bytecode" "add_function_native"
+
+external add_function_export: m -> string -> string -> export = "add_function_export"

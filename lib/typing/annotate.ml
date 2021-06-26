@@ -308,6 +308,10 @@ and annotate_expression (env: Env.t) expr =
       let right = annotate_expression env right in
       Texp_binary(op, left, right)
 
+    | Pexp_update (op, expr, prefix) ->
+      let expr = annotate_expression env expr in
+      Texp_update(op, expr, prefix)
+
   in
   {
     texp_desc;
@@ -339,6 +343,23 @@ let pre_scan_definitions env program =
       end
   in
 
+  let find_or_add_var_sym name loc =
+    let scope = Env.peek_scope env in
+    let var_sym = Scope.find_var_symbol scope name in
+    match var_sym with
+    | Some _ ->
+      begin
+        let err = Type_error.make_error loc (Type_error.Redefinition name) in
+        Env.add_error env err
+      end
+
+    | None ->
+      begin
+        let var_sym = Core_type.VarSym.mk_local ~scope_id:scope.id name in
+        Scope.set_var_symbol scope name var_sym
+      end
+  in
+
   List.iter
     ~f:(fun stmt ->
       let { Ast. pstmt_desc; _; } = stmt in
@@ -348,13 +369,15 @@ let pre_scan_definitions env program =
           let { Ast. pcls_id; pcls_loc; _; } = cls in
           let id = Option.value_exn pcls_id in
           find_or_add_type_sym id.pident_name pcls_loc;
+          find_or_add_var_sym id.pident_name pcls_loc
         end
 
       | Pstmt_function _fun ->
         begin
           let { Ast. pfun_id; pfun_loc; _; } = _fun in
           let id = Option.value_exn pfun_id in
-          find_or_add_type_sym id.pident_name pfun_loc
+          find_or_add_type_sym id.pident_name pfun_loc;
+          find_or_add_var_sym id.pident_name pfun_loc
         end
 
       | _ -> ()

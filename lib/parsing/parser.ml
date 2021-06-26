@@ -97,6 +97,20 @@ and parse_statement env : statement =
       Eat.token env;
       Pstmt_debugger
 
+    | Token.T_RETURN ->
+      Eat.token env;
+      let next = Peek.token env in
+      if next == Token.T_SEMICOLON then
+        begin
+          Eat.token env;
+          Pstmt_return None
+        end
+      else
+        begin
+          let expr = parse_expression env in
+          Pstmt_return(Some expr)
+        end
+
     | _ ->
       let expr = parse_expression env in
       if Peek.token env == Token.T_SEMICOLON then
@@ -324,6 +338,152 @@ and parse_class_body env =
   }
 
 and parse_expression env : expression =
+  parse_binary_expression env
+
+and parse_binary_expression env =
+  let rec parse_binary_enhance env left_expr left_token =
+    let start_loc = Peek.loc env in
+    let expr = parse_exponentialtion_expression env in
+    let left_prec = Precedence.binary_precedence left_token in
+    let right_token = Peek.token env in
+    let right_prec = Precedence.binary_precedence right_token in
+
+    if left_prec < right_prec then (
+      Eat.token env;
+      let right = parse_binary_enhance env expr right_token in
+      let op = Asttypes.BinaryOp.from_token left_token in
+      let desc = Pexp_binary(op, left_expr, right) in
+      {
+        pexp_desc = desc;
+        pexp_loc = with_start_loc env start_loc;
+        pexp_loc_stack = [];
+        pexp_attributes = [];
+      }
+    ) else if left_prec == right_prec then (
+      if left_prec <= 0 then
+        expr
+      else (
+        let op = Asttypes.BinaryOp.from_token left_token in
+        let desc = Pexp_binary(op, left_expr, expr) in
+        let binary =
+          {
+            pexp_desc = desc;
+            pexp_loc = with_start_loc env start_loc;
+            pexp_loc_stack = [];
+            pexp_attributes = [];
+          }
+        in
+        parse_binary_enhance env binary right_token
+      )
+    ) else (
+      let op = Asttypes.BinaryOp.from_token left_token in
+      let desc = Pexp_binary(op, left_expr, expr) in
+      let binary =
+        {
+          pexp_desc = desc;
+          pexp_loc = with_start_loc env start_loc;
+          pexp_loc_stack = [];
+          pexp_attributes = [];
+        }
+      in
+      if right_prec <= 0 then
+        binary
+      else (
+        Eat.token env;
+        parse_binary_enhance env binary right_token
+      )
+    )
+  in
+
+  let expr = parse_exponentialtion_expression env in
+  let next = Peek.token env in
+  let prec = Precedence.binary_precedence next in
+  if prec > 0 then
+    begin
+      Eat.token env;
+      parse_binary_enhance env expr next
+    end
+  else
+    expr
+
+and parse_exponentialtion_expression env =
+  parse_unary_expression env
+
+and parse_unary_expression env =
+  let start_loc = Peek.loc env in
+  let next = Peek.token env in
+  match next with
+  | Token.T_PLUS
+  | Token.T_MINUS
+  | Token.T_BIT_NOT
+  | Token.T_NOT ->
+    begin
+      let op = Asttypes.UnaryOp.from_token next in
+      Eat.token env;
+      let expr = parse_unary_expression env in
+      let pexp_desc = Pexp_unary(op, expr) in
+      {
+        pexp_desc;
+        pexp_loc = with_start_loc env start_loc;
+        pexp_loc_stack = [];
+        pexp_attributes = [];
+      }
+    end
+
+  | _ ->
+    parse_update_expression env
+
+and parse_update_expression env =
+  let token_to_op =
+    let open Asttypes.UpdateOp in
+    function
+      | Token.T_INCR -> Increase
+      | Token.T_DECR -> Decrease
+      | _ -> failwith "unreachable"
+  in
+  let next = Peek.token env in
+  match next with
+  | Token.T_INCR
+  | Token.T_DECR ->
+    begin
+      let start_loc = Peek.loc env in
+      Eat.token env;
+      let expr = parse_unary_expression env in
+      let op = token_to_op next in
+      let pexp_desc = Pexp_update(op, expr, true) in
+      {
+        pexp_desc;
+        pexp_loc = with_start_loc env start_loc;
+        pexp_loc_stack = [];
+        pexp_attributes = [];
+      }
+    end
+  | _ ->
+    let start_loc = Peek.loc env in
+    let expr = parse_left_handside_expression_allow_call env in
+    let next = Peek.token env in
+    match next with
+    | Token.T_INCR
+    | Token.T_DECR ->
+      begin
+        Eat.token env;
+        let op = token_to_op next in
+        let pexp_desc = Pexp_update(op, expr, false) in
+        {
+          pexp_desc;
+          pexp_loc = with_start_loc env start_loc;
+          pexp_loc_stack = [];
+          pexp_attributes = [];
+        }
+      end
+
+    | _ ->
+      expr
+
+and parse_left_handside_expression_allow_call env =
+  parse_primary_expression env
+
+and parse_primary_expression env =
   let start_loc = Peek.loc env in
   let next = Peek.token env in
 
@@ -389,7 +549,9 @@ and parse_expression env : expression =
       end
 
     | _ ->
-      failwith "not implemented"
+      let tok = Token.token_to_string next in
+      let str = Format.sprintf "not implemented %s" tok in
+      failwith str
 
   in
 

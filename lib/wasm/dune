@@ -5,8 +5,6 @@
   waterlang_lex
   waterlang_parsing
   core_kernel
-  ctypes
-  ctypes.foreign
  )
  (foreign_stubs
   (language c)

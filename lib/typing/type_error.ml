@@ -18,8 +18,7 @@ exception Error of t
 
 module PP = struct
 
-  let error err =
-    let { spec; _ } = err in
+  let error_spec spec =
     match spec with
     | NotAssignable (be_assigned, assign) ->
       TypeValue.pp Format.str_formatter be_assigned;
@@ -33,5 +32,11 @@ module PP = struct
 
     | Redefinition name ->
       Format.sprintf "Redefinition of '%s'" name
+
+  let error err =
+    let { spec; loc } = err in
+    let open Loc in
+    let spec_err = error_spec spec in
+    Format.sprintf "Error: %d:%d %s" loc.start.line loc.start.column spec_err
   
 end

@@ -25,6 +25,7 @@
 
 TY_HANDLER(BinaryenExpressionRef)
 TY_HANDLER(BinaryenFunctionRef)
+TY_HANDLER(BinaryenExportRef)
 
 static struct custom_operations literal_ops = {
   "binaryen.literal",
@@ -103,6 +104,19 @@ CAMLprim value make_ty_unreachable() {
   return caml_copy_int64(t);
 }
 
+CAMLprim value make_ty_multiples(value arr) {
+  mlsize_t size = caml_array_length(arr);
+  BinaryenType* types = alloca(sizeof(BinaryenType) * size);
+
+  for (mlsize_t i = 0; i < size; i++) {
+    BinaryenType t = Int64_val(Field(arr, i));
+    types[i] = t;
+  }
+
+  BinaryenType result = BinaryenTypeCreate(types, size);
+  return caml_copy_int64(result);
+}
+
 CAMLprim value make_op_add_i32() {
   BinaryenOp op = BinaryenAddInt32();
   return caml_copy_int32(op);
@@ -166,6 +180,22 @@ CAMLprim value make_exp_binary(value module, value op, value left, value right) 
   return val_of_BinaryenExpressionRef(bin);
 }
 
+CAMLprim value make_exp_unreachable(value module) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  BinaryenExpressionRef u = BinaryenUnreachable(*ref);
+  return val_of_BinaryenExpressionRef(u);
+}
+
+CAMLprim value make_exp_return(value module, value exp) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  BinaryenExpressionRef exp_ref = NULL;
+  if (Is_some(exp)) {
+    exp_ref = BinaryenExpressionRef_of_val(Some_val(exp));
+  }
+  BinaryenExpressionRef result = BinaryenReturn(*ref, exp_ref);
+  return val_of_BinaryenExpressionRef(result);
+}
+
 CAMLprim value add_function_native(value module, value name, value params_type, value result_ty, value var_types, value body) {
   BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
   const char* fun_name = String_val(name);
@@ -192,4 +222,12 @@ CAMLprim value add_function_native(value module, value name, value params_type, 
 
 CAMLprim value add_function_bytecode(value * argv, int argn) {
   return add_function_native(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
+}
+
+CAMLprim value add_function_export(value module, value intern_name, value extern_name) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  const char* intern_name_c = String_val(intern_name);
+  const char* extern_name_c = String_val(extern_name);
+  BinaryenExportRef export = BinaryenAddFunctionExport(*ref, intern_name_c, extern_name_c);
+  return val_of_BinaryenExportRef(export);
 }
