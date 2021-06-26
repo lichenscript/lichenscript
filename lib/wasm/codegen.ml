@@ -38,8 +38,8 @@ and codegen_expressions env expr: C_bindings.exp =
     end
 
   | Texp_identifier var_sym ->
-    let i32_ty = C_bindings.make_ty_int32 () in
-    C_bindings.make_exp_local_get env.module_ var_sym.id_in_scope i32_ty
+    C_bindings.make_exp_local_get
+      env.module_ var_sym.id_in_scope Binaryen_types.i32
 
   | Texp_constant _ ->
     let lit = C_bindings.make_literal_i32 (Int32.of_int_exn 100) in
@@ -49,12 +49,11 @@ and codegen_expressions env expr: C_bindings.exp =
     C_bindings.make_exp_unrechable env.module_
 
 and codegen_function env function_ =
-  let i32_ty = C_bindings.make_ty_int32 () in
   let parms_type params =
     let open Typedtree in
     let { tparams_content; _; } = params in
     let params_arr = List.to_array tparams_content in
-    let types_arr = Array.map ~f:(fun _ -> i32_ty) params_arr in
+    let types_arr = Array.map ~f:(fun _ -> Binaryen_types.i32) params_arr in
     C_bindings.make_ty_multiples types_arr
   in
 
@@ -79,7 +78,7 @@ and codegen_function env function_ =
 
   let id = function_.tfun_id in
   let id_name = id.name in
-  let _fun = C_bindings.add_function env.module_ id_name params_ty i32_ty [| |] exp in
+  let _fun = C_bindings.add_function env.module_ id_name params_ty Binaryen_types.i32 [| |] exp in
   let _ = C_bindings.add_function_export env.module_ id_name id_name in
   ()
 

@@ -3,6 +3,7 @@ open Codegen_env
 
 let generate_glue filename = "
   const fs = require('fs');
+  const path = require('path');
 
   var importObject = {
     imports: {
@@ -15,8 +16,11 @@ let generate_glue filename = "
     },
   };
 
-  const bytes = fs.readFileSync('" ^ filename ^ ".wasm');
-  WebAssembly.instantiate(bytes, importObject)
+  const bytes = fs.readFileSync(path.join(__dirname, '" ^ filename ^ ".wasm'));
+  WebAssembly.instantiate(bytes, importObject).then(function (result) {
+    let tmp = result.instance.exports.main(1, 2);
+    console.log(tmp);
+  })
   "
 
 
