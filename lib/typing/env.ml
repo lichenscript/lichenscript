@@ -47,3 +47,10 @@ let peek_scope env = env.current_scope
 
 let add_error env err =
   env.errors <- err::env.errors
+
+let with_new_scope env scope callback =
+  let prev_scope = env.current_scope in
+  env.current_scope <- scope;
+  let result = callback env in
+  env.current_scope <- prev_scope;
+  result

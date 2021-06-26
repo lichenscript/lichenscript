@@ -37,7 +37,10 @@ and codegen_expressions env expr: C_bindings.exp =
       C_bindings.make_exp_binary env.module_ op left right
     end
 
-  | Texp_identifier _
+  | Texp_identifier var_sym ->
+    let i32_ty = C_bindings.make_ty_int32 () in
+    C_bindings.make_exp_local_get env.module_ var_sym.id_in_scope i32_ty
+
   | Texp_constant _ ->
     let lit = C_bindings.make_literal_i32 (Int32.of_int_exn 100) in
     C_bindings.make_exp_const env.module_ lit

@@ -196,6 +196,14 @@ CAMLprim value make_exp_return(value module, value exp) {
   return val_of_BinaryenExpressionRef(result);
 }
 
+CAMLprim value make_exp_local_get(value module, value index, value ty) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  int index_i = Int_val(index);
+  BinaryenType ty_v = Int64_val(ty);
+  BinaryenExpressionRef result = BinaryenLocalGet(*ref, index_i, ty_v);
+  return val_of_BinaryenExpressionRef(result);
+}
+
 CAMLprim value add_function_native(value module, value name, value params_type, value result_ty, value var_types, value body) {
   BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
   const char* fun_name = String_val(name);

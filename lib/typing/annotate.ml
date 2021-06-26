@@ -65,40 +65,42 @@ and annotate_function env _function =
   in
   let { Ast. pfun_id; pfun_params; pfun_body; pfun_loc; _; } = _function in
   let name = (Option.value_exn pfun_id).pident_name in
-  let scope = Env.peek_scope env in
-  let var_sym = Scope.find_var_symbol scope name in
+  let prev_scope = Env.peek_scope env in
+  let var_sym = Scope.find_var_symbol prev_scope name in
+  let scope = Scope.create ~prev:prev_scope prev_scope.id in
+  Env.with_new_scope env scope (fun env ->
+    match var_sym with
+    | Some tfun_id ->
+      begin
+        let tfun_params =
+          {
+            tparams_content = List.map ~f:(annotate_param env) pfun_params.pparams_content;
+            tparams_loc = pfun_params.pparams_loc;
+          }
+        in
+        let tfun_body = match pfun_body with
+          | Ast.Pfun_block_body block ->
+            Tfun_block_body (annotate_block env block)
 
-  match var_sym with
-  | Some tfun_id ->
-    begin
-      let tfun_params =
+          | Ast.Pfun_expression_body expr ->
+            Tfun_expression_body (annotate_expression env expr)
+
+        in
         {
-          tparams_content = List.map ~f:(annotate_param env) pfun_params.pparams_content;
-          tparams_loc = pfun_params.pparams_loc;
+          tfun_id;
+          tfun_params;
+          tfun_body;
+          tfun_loc = pfun_loc;
         }
-      in
-      let tfun_body = match pfun_body with
-        | Ast.Pfun_block_body block ->
-          Tfun_block_body (annotate_block env block)
+      end
 
-        | Ast.Pfun_expression_body expr ->
-          Tfun_expression_body (annotate_expression env expr)
-
-      in
-      {
-        tfun_id;
-        tfun_params;
-        tfun_body;
-        tfun_loc = pfun_loc;
-      }
-    end
-
-  | None ->
-    begin
-      let err = Type_error.make_error pfun_loc (Type_error.CannotFindName name) in
-      Env.add_error env err;
-      raise (Type_error.Error err)
-    end
+    | None ->
+      begin
+        let err = Type_error.make_error pfun_loc (Type_error.CannotFindName name) in
+        Env.add_error env err;
+        raise (Type_error.Error err)
+      end
+  )
 
 and annotate_class env _class =
   let annotate_body env cls_body =
@@ -200,9 +202,8 @@ and annotate_pattern env pat =
     | Ast.Ppat_identifier id ->
       begin
         let current_scope = Env.peek_scope env in
-        let var_sym = VarSym.mk_local ~scope_id:current_scope.id id.pident_name in
-        Scope.set_var_symbol current_scope id.pident_name var_sym;
-        Tpat_symbol var_sym
+        let sym = Scope.create_var_symbol current_scope id.pident_name in
+        Tpat_symbol sym
       end
   in
   {
@@ -354,10 +355,9 @@ let pre_scan_definitions env program =
       end
 
     | None ->
-      begin
-        let var_sym = Core_type.VarSym.mk_local ~scope_id:scope.id name in
-        Scope.set_var_symbol scope name var_sym
-      end
+      let _ = Scope.create_var_symbol scope name in
+      ()
+
   in
 
   List.iter

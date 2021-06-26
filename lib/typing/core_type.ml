@@ -93,28 +93,31 @@ end
 
 and VarSym : sig
   type t = {
-    name:     string;
-    def_type: TypeSym.t option;
-    def_loc:  Loc.t option;
-    kind:     kind;
-    scope_id: int;
-    builtin:  bool
+    id_in_scope: int;
+    name:        string;
+    def_type:    TypeSym.t option;
+    def_loc:     Loc.t option;
+    kind:        kind;
+    scope_id:    int;
+    builtin:     bool;
   }
 
-  val mk_local: scope_id:int -> string -> t
+  val mk_local: id_in_scope:int -> scope_id:int -> string -> t
 
 end = struct
   type t = {
-    name:     string;
-    def_type: TypeSym.t option;
-    def_loc:  Loc.t option;
-    kind:     kind;
-    scope_id: int;
-    builtin:  bool
+    id_in_scope: int;
+    name:        string;
+    def_type:    TypeSym.t option;
+    def_loc:     Loc.t option;
+    kind:        kind;
+    scope_id:    int;
+    builtin:     bool;
   }
 
-  let mk_local ~scope_id name =
+  let mk_local ~id_in_scope ~scope_id name =
     {
+      id_in_scope;
       name = name;
       def_type = None;
       def_loc = None;

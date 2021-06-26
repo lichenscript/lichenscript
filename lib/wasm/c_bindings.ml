@@ -55,6 +55,8 @@ external make_exp_unrechable: m -> exp = "make_exp_unreachable"
 
 external make_exp_return: m -> exp option -> exp = "make_exp_return"
 
+external make_exp_local_get: m -> int -> ty -> exp = "make_exp_local_get"
+
 external add_function: m -> string -> ty -> ty -> ty array -> exp -> function_ =
   "add_function_bytecode" "add_function_native"
 
