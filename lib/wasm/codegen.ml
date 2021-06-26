@@ -94,7 +94,8 @@ let codegen program config : string =
   let str = C_bindings.module_emit_text env.module_ in
   str
 
-let codegen_binary program config path : unit =
-  let env = Codegen_env.create config in
+let codegen_binary program env path : unit =
   codegen_program env program;
-  C_bindings.module_emit_binary_to_file env.module_ path
+  C_bindings.module_emit_binary_to_file env.module_ path;
+  let js_glue_content = Js_glue.dump_js_glue env in
+  Out_channel.write_all (env.output_filename ^ ".js") ~data:js_glue_content

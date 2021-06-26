@@ -42,4 +42,5 @@ let parse_string_and_codegen content =
 let parse_string_and_codegen_to_path content path =
   let p = parse_string_to_program content in
   let config = Config.debug_default () in
-  Codegen.codegen_binary p config path
+  let env = Codegen_env.create config in
+  Codegen.codegen_binary p env path
