@@ -86,11 +86,13 @@ and annotate_function env _function =
             Tfun_expression_body (annotate_expression env expr)
 
         in
+        let tfun_return_ty = Core_type.TypeValue.Unknown in
         {
           tfun_id;
           tfun_params;
           tfun_body;
           tfun_loc = pfun_loc;
+          tfun_return_ty;
         }
       end
 

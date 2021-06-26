@@ -102,6 +102,7 @@ and _function = {
   tfun_params: params;
   tfun_body: function_body;
   tfun_loc: Loc.t;
+  tfun_return_ty: Core_type.TypeValue.t;
 }
 
 and function_body =
