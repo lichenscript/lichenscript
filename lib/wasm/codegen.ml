@@ -91,5 +91,10 @@ and codegen_program env (program: Program.t) =
 let codegen program config : string =
   let env = Codegen_env.create config in
   codegen_program env program;
-  let str = C_bindings.module_emit env.module_ in
+  let str = C_bindings.module_emit_text env.module_ in
   str
+
+let codegen_binary program config path : unit =
+  let env = Codegen_env.create config in
+  codegen_program env program;
+  C_bindings.module_emit_binary_to_file env.module_ path

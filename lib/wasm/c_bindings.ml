@@ -15,7 +15,9 @@ type export
 
 external make_module: unit -> m = "make_module"
 
-external module_emit: m -> string = "module_emit"
+external module_emit_text: m -> string = "module_emit_text"
+
+external module_emit_binary_to_file: m -> string -> unit = "module_emit_binary"
 
 external make_ty_none: unit -> ty = "make_ty_none"
 

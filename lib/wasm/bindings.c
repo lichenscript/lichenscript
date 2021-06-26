@@ -2,12 +2,16 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/mman.h>
 #include <binaryen-c.h>
 #define CAML_NAME_SPACE
 #include <caml/mlvalues.h>
 #include <caml/memory.h>
 #include <caml/alloc.h>
 #include <caml/custom.h>
+#include <caml/fail.h>
 
 #define TY_HANDLER(NAME) \
   /* Create an OCaml value encapsulating the pointer p */ \
@@ -61,12 +65,47 @@ CAMLprim value make_module() {
   return v;
 }
 
-CAMLprim value module_emit(value v) {
+CAMLprim value module_emit_text(value v) {
   BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(v);
   static char buffer[4096];
   memset(buffer, 0, 4096);
   size_t size = BinaryenModuleWriteText(*ref, buffer, 4096);
   return caml_copy_string(buffer);
+}
+
+// 4k
+#define FILE_BUFFER (4096 * 4)
+
+CAMLprim value module_emit_binary(value module, value path) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  const char* path_str = String_val(path);
+  int fd;
+
+  fd = open(path_str, O_RDWR | O_CREAT | O_TRUNC, 0666);
+  if (fd < 0) {
+    caml_invalid_argument("can not open file");
+    return Val_unit;
+  }
+
+  ftruncate(fd, FILE_BUFFER);
+
+  char* src = (char*)mmap(NULL, FILE_BUFFER, PROT_READ | PROT_WRITE,
+    MAP_SHARED, fd, 0);
+  if (src < 0 || src == 0) {
+    close(fd);
+    caml_failwith("map to file failed");
+    return Val_unit;
+  }
+
+  size_t s = BinaryenModuleWrite(*ref, src, FILE_BUFFER);
+
+  munmap(src, FILE_BUFFER);
+
+  ftruncate(fd, s);
+
+  close(fd);
+
+  return Val_unit;
 }
 
 CAMLprim value make_ty_none() {
