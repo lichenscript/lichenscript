@@ -34,7 +34,7 @@ let test_parser _ =
 
 let test_codegen _ =
   let source = "
-    function main(a: i32, b: i32) {
+    function main(a: i32, b: i32): i32 {
       return a + b;
     }
     "
@@ -44,7 +44,7 @@ let test_codegen _ =
 
 let test_codegen_binary _ =
   let source = "
-    function main(a: i32, b: i32) {
+    function main(a: i32, b: i32): i32 {
       return a + b;
     }
     "

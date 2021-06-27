@@ -22,11 +22,19 @@ let create ?prev id =
     var_counter = 0;
   }
 
-let find_var_symbol scope name =
-  SymbolTable.find scope.var_symbols name
+let rec find_var_symbol scope name =
+  let tmp = SymbolTable.find scope.var_symbols name in
+  match tmp with
+  | Some _ -> tmp
+  | None ->
+    Option.(scope.prev >>= (fun parent -> find_var_symbol parent name))
 
-let find_type_symbol scope name =
-  SymbolTable.find scope.type_symbols name
+let rec find_type_symbol scope name =
+  let tmp = SymbolTable.find scope.type_symbols name in
+  match tmp with
+  | Some _ -> tmp
+  | None ->
+    Option.(scope.prev >>= (fun parent -> find_type_symbol parent name))
 
 let set_var_symbol scope name sym =
   SymbolTable.set scope.var_symbols ~key:name ~data:sym

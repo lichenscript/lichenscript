@@ -157,10 +157,23 @@ and parse_function env: _function =
   Expect.token env Token.T_FUNCTION;
   let id = parse_identifier env in
   let pfun_params = parse_params env in
+  let next = Peek.token env in
+  let pfun_return_ty =
+    match next with
+    | Token.T_COLON ->
+      begin
+        Eat.token env;
+        let ty = parse_type env in
+        Some ty
+      end
+
+    | _ -> None
+  in
   let block = parse_block env in
   {
     pfun_id = Some id;
     pfun_params;
+    pfun_return_ty;
     pfun_body = Pfun_block_body block;
     pfun_loc = with_start_loc env start_loc;
     pfun_comments = [];

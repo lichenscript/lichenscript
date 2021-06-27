@@ -86,13 +86,13 @@ and annotate_function env _function =
             Tfun_expression_body (annotate_expression env expr)
 
         in
-        let tfun_return_ty = Core_type.TypeValue.Unknown in
+        let ty_sym = Scope.find_type_symbol scope "i32" in
         {
           tfun_id;
           tfun_params;
+          tfun_return_ty = Option.value_exn ty_sym;
           tfun_body;
           tfun_loc = pfun_loc;
-          tfun_return_ty;
         }
       end
 

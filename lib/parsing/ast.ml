@@ -119,6 +119,7 @@ and pattern_desc =
 and _function = {
   pfun_id: Identifier.t option;
   pfun_params: params;
+  pfun_return_ty: _type option;
   pfun_body: function_body;
   pfun_loc: Loc.t;
   pfun_comments: Loc.t Waterlang_lex.Comment.t list;

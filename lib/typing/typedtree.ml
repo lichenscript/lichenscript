@@ -100,9 +100,9 @@ and var_binding = {
 and _function = {
   tfun_id: Core_type.VarSym.t;
   tfun_params: params;
+  tfun_return_ty: Core_type.TypeSym.t;
   tfun_body: function_body;
   tfun_loc: Loc.t;
-  tfun_return_ty: Core_type.TypeValue.t;
 }
 
 and function_body =
