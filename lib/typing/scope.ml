@@ -7,7 +7,7 @@ type t = {
   prev: t option;
   id: int;
   var_symbols: VarSym.t SymbolTable.t;
-  type_symbols: TypeSym.t SymbolTable.t;
+  type_symbols: type_sym SymbolTable.t;
   mutable var_counter: int;
 }
 

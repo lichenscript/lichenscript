@@ -493,8 +493,71 @@ and parse_update_expression env =
     | _ ->
       expr
 
+and parse_arguments env =
+  let result = ref [] in
+
+  Expect.token env Token.T_LPAREN;
+
+  while (Peek.token env) <> Token.T_RPAREN do
+    let expr = parse_expression env in
+    result := expr::!result;
+    
+    if (Peek.token env) <> Token.T_RPAREN then (
+      Expect.token env Token.T_COMMA;
+    );
+  done;
+
+  Expect.token env Token.T_RPAREN;
+
+  List.rev !result
+
 and parse_left_handside_expression_allow_call env =
-  parse_primary_expression env
+  let rec loop env expr =
+    let start_pos = Peek.loc env in
+    let next = Peek.token env in
+    match next with
+    | Token.T_PERIOD ->  (* . *)
+      Eat.token env;
+      let id = parse_identifier env in
+      let spec = Pexp_member(expr, id) in
+      let expr =
+        {
+          pexp_desc = spec;
+          pexp_loc = with_start_loc env start_pos;
+          pexp_loc_stack = [];
+          pexp_attributes = [];
+        }
+      in
+      loop env expr
+
+    | Token.T_LPAREN ->  (* ( )*)
+      let pcall_params = parse_arguments env in
+      let call =
+        {
+          pcallee = expr;
+          pcall_params;
+          pcall_loc = with_start_loc env start_pos;
+        }
+      in
+      let desc = Pexp_call call in
+      let expr =
+        {
+          pexp_desc = desc;
+          pexp_loc = with_start_loc env start_pos;
+          pexp_loc_stack = [];
+          pexp_attributes = [];
+        }
+      in
+      loop env expr
+
+    (* | Token.T_LCURLYBAR *)
+
+    | _ -> expr
+
+  in
+
+  let expr = parse_primary_expression env in
+  loop env expr
 
 and parse_primary_expression env =
   let start_loc = Peek.loc env in

@@ -10,6 +10,7 @@ and spec =
   | NotAssignable of TypeValue.t * TypeValue.t
   | CannotFindName of string
   | Redefinition of string
+  | NotCallable of TypeValue.t
 
 let make_error loc spec =
   { loc; spec }
@@ -32,6 +33,11 @@ module PP = struct
 
     | Redefinition name ->
       Format.sprintf "Redefinition of '%s'" name
+
+    | NotCallable ty ->
+      TypeValue.pp Format.str_formatter ty;
+      let str = Format.flush_str_formatter() in
+      Format.sprintf "Type '%s' is not callable" str
 
   let error err =
     let { spec; loc } = err in

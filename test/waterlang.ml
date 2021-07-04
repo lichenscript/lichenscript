@@ -51,11 +51,39 @@ let test_codegen_binary _ =
   in
   Utils.parse_string_and_codegen_to_path source "test.wasm"
 
+let test_type_checking _ =
+  let source = "
+    function main(a: i32, b: i32): f32 {
+      return a + b;
+    }
+    "
+  in
+  assert_raises
+    (Utils.ExpectedError "Error: 2:4 Type 'f32' is not assignable to type 'i32'\n")
+    (fun _ ->
+      Utils.parse_string_and_codegen_to_path source "type_check.wasm"
+    )
+
+let test_function_call _ =
+  let source = "
+    function add(a: i32, b: i32): i32 {
+      return a + b;
+    }
+
+    function main(a: i32, b: i32): i32 {
+      return add(a, b);
+    }
+    "
+  in
+  Utils.parse_string_and_codegen_to_path source "test_function_call.wasm"
+
 let suite =
   "TestParser" >::: [
     "test_parser" >:: test_parser;
     "test_codegen" >:: test_codegen;
     "test_codegen_binary" >:: test_codegen_binary;
+    "test_type_checking" >:: test_type_checking;
+    "test_function_call" >:: test_function_call;
   ]
 
 let () =

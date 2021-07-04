@@ -63,7 +63,7 @@ and statement_desc =
   | Tstmt_empty
 
 and _class = {
-  tcls_id: Core_type.TypeSym.t;
+  tcls_id: Core_type.type_sym;
   tcls_loc: Loc.t;
   tcls_body: class_body;
 }
@@ -100,7 +100,7 @@ and var_binding = {
 and _function = {
   tfun_id: Core_type.VarSym.t;
   tfun_params: params;
-  tfun_return_ty: Core_type.TypeSym.t;
+  tfun_return_ty: Core_type.TypeValue.t;
   tfun_body: function_body;
   tfun_loc: Loc.t;
 }
@@ -152,7 +152,7 @@ and _type = {
 and type_desc =
   | Tty_any
   | Tty_var of string
-  | Tty_ctor of Core_type.TypeSym.t * _type list
+  | Tty_ctor of Core_type.type_sym * _type list
   | Tty_arrow of
     _type list *
     _type

@@ -9,8 +9,8 @@ let rec annotate_statement (env: Env.t) stmt =
     match pstmt_desc with
     | Pstmt_class cls ->
       let cls = annotate_class env cls in
-      let ty_val = Infer.infer_class cls in
-      cls.tcls_id.value <- ty_val;
+      (* let ty_val = Infer.infer_class cls in
+      cls.tcls_id.value <- ty_val; *)
       Tstmt_class cls
 
     | Pstmt_expr expr ->
@@ -41,7 +41,13 @@ let rec annotate_statement (env: Env.t) stmt =
     | Pstmt_contintue id -> Tstmt_continue id
     | Pstmt_debugger -> Tstmt_debugger
     | Pstmt_return expr_opt ->
-      Tstmt_return (Option.map ~f:(annotate_expression env) expr_opt)
+      Tstmt_return (Option.map
+        ~f:(function expr ->
+          let annotated_expr = annotate_expression env expr in
+          Env.set_return_type env (Some annotated_expr.texp_val);
+          annotated_expr
+        )
+        expr_opt)
 
     | Pstmt_empty -> Tstmt_empty
 
@@ -63,11 +69,12 @@ and annotate_function env _function =
       tparam_rest = pparam_rest;
     }
   in
-  let { Ast. pfun_id; pfun_params; pfun_body; pfun_loc; _; } = _function in
+  let { Ast. pfun_id; pfun_params; pfun_body; pfun_loc; pfun_return_ty; _; } = _function in
   let name = (Option.value_exn pfun_id).pident_name in
   let prev_scope = Env.peek_scope env in
   let var_sym = Scope.find_var_symbol prev_scope name in
   let scope = Scope.create ~prev:prev_scope prev_scope.id in
+  Env.set_return_type env None;
   Env.with_new_scope env scope (fun env ->
     match var_sym with
     | Some tfun_id ->
@@ -86,11 +93,18 @@ and annotate_function env _function =
             Tfun_expression_body (annotate_expression env expr)
 
         in
-        let ty_sym = Scope.find_type_symbol scope "i32" in
+        let tfun_return_ty =
+          pfun_return_ty
+          |> Option.map ~f:(Infer.infer env)
+          |> Option.value ~default:TypeValue.Unit
+        in
+        TypeValue.pp Format.str_formatter tfun_return_ty;
+        let str = Format.flush_str_formatter() in
+        Format.printf "return ty: %s" str;
         {
           tfun_id;
           tfun_params;
-          tfun_return_ty = Option.value_exn ty_sym;
+          tfun_return_ty;
           tfun_body;
           tfun_loc = pfun_loc;
         }
@@ -249,18 +263,39 @@ and annotate_type env ty =
     tty_loc = pty_loc;
   }
 
+and annotate_constant (env: Env.t) (cnst: Waterlang_parsing.Ast.constant) =
+  let open Waterlang_parsing.Ast in
+  match cnst with
+  | Pconst_integer _ ->
+    (cnst, Env.ty_i32 env)
+
+  | Pconst_char _ ->
+    (cnst, Env.ty_char env)
+
+  | Pconst_float _ ->
+    (cnst, Env.ty_f32 env)
+
+  | Pconst_string _ ->
+    (cnst, Env.ty_string env)
+
+  | Pconst_boolean _ ->
+    (cnst, Env.ty_boolean env)
+
 and annotate_expression (env: Env.t) expr =
   let { Ast. pexp_desc; pexp_loc; _; } = expr in
-  let texp_desc =
+  let (texp_desc, ty_val) =
     match pexp_desc with
-    | Pexp_constant cnst -> Texp_constant cnst
+    | Pexp_constant cnst ->
+      let (cnst, ty_val) = annotate_constant env cnst in
+      (Texp_constant cnst, TypeValue.Ctor ty_val)
+
     | Pexp_identifier id ->
       begin
         let current_scope = Env.peek_scope env in
         let var_sym_opt = Scope.find_var_symbol current_scope id.pident_name in
         match var_sym_opt with
         | Some sym ->
-          Texp_identifier sym
+          (Texp_identifier sym, TypeValue.Unknown)
 
         | None ->
           begin
@@ -271,55 +306,58 @@ and annotate_expression (env: Env.t) expr =
       end
 
     | Pexp_throw expr ->
-      Texp_throw (annotate_expression env expr)
+      let t = annotate_expression env expr in
+      (Texp_throw t, TypeValue.Unknown) 
 
-    | Pexp_lambda _ -> Texp_lambda
+    | Pexp_lambda _ -> (Texp_lambda, TypeValue.Unknown)
 
     | Pexp_if { Ast. pif_test; pif_consequent; pif_alternative; pif_loc; } ->
       let tif_test = annotate_expression env pif_test in
       let tif_consequent = annotate_statement env pif_consequent in
       let tif_alternative = Option.map ~f:(annotate_statement env) pif_alternative in
-      Texp_if {
+      (Texp_if {
         tif_test;
         tif_consequent;
         tif_alternative;
         tif_loc = pif_loc;
-      }
+      }, TypeValue.Unknown)
 
     | Pexp_array arr ->
-      Texp_array (List.map ~f:(annotate_expression env) arr)
+      (Texp_array (List.map ~f:(annotate_expression env) arr), TypeValue.Unknown)
     
     | Pexp_call call ->
       let {Ast. pcallee; pcall_params; pcall_loc } = call in
       let tcallee = annotate_expression env pcallee in
       let tcall_params = List.map ~f:(annotate_expression env) pcall_params in
-      Texp_call {
+      (Texp_call {
         tcallee;
         tcall_params;
         tcall_loc = pcall_loc;
-      }
+      }, TypeValue.Unknown)
 
     | Pexp_member (expr, field) ->
-      Texp_member (annotate_expression env expr, field)
+      let expr = annotate_expression env expr in
+      (Texp_member(expr, field), TypeValue.Unknown)
 
     | Pexp_unary (op, expr) ->
       let expr = annotate_expression env expr in
-      Texp_unary(op, expr)
+      (Texp_unary(op, expr), TypeValue.Unknown)
 
     | Pexp_binary (op, left, right) ->
       let left = annotate_expression env left in
       let right = annotate_expression env right in
-      Texp_binary(op, left, right)
+      let ty_val = TypeValue.Ctor (Env.ty_i32 env) in
+      (Texp_binary(op, left, right), ty_val)
 
     | Pexp_update (op, expr, prefix) ->
       let expr = annotate_expression env expr in
-      Texp_update(op, expr, prefix)
+      (Texp_update(op, expr, prefix), TypeValue.Unknown)
 
   in
   {
     texp_desc;
     texp_loc = pexp_loc;
-    texp_val = TypeValue.Unknown;
+    texp_val = ty_val;
   }
 
 (**
@@ -341,8 +379,9 @@ let pre_scan_definitions env program =
 
     | None ->
       begin
-        let type_sym = Core_type.TypeSym.mk_local ~scope_id:scope.id name in
-        Scope.set_type_symbol scope name type_sym
+        let open Core_type in
+        let sym = new type_sym scope.id name Local in
+        Scope.set_type_symbol scope name sym
       end
   in
 

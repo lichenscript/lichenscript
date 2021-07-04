@@ -55,7 +55,7 @@ let rec infer env (ty: Ast._type) =
         |> (fun scope -> Scope.find_type_symbol scope id.pident_name)
       in
       match sym with
-      | Some sym -> sym.value
+      | Some sym -> TypeValue.Ctor sym
       | None ->
         Env.add_error env { Type_error.
           spec = CannotFindName id.pident_name;

@@ -56,14 +56,27 @@ and check_class env cls =
     )
     tcls_body_elements
 
-and check_function env _fun =
-  let { tfun_body; _ } = _fun in
-  match tfun_body with
-  | Tfun_block_body blk -> 
-    check_block env blk
+and check_function (env: Env.t) _fun =
+  let { tfun_body; tfun_return_ty; tfun_loc; _; } = _fun in
+  let actual_return_ty =
+    match tfun_body with
+    | Tfun_block_body blk -> 
+      begin
+        check_block env blk;
+        if List.is_empty blk.tblk_body then
+          TypeValue.Unit
+        else
+          Option.value (Env.return_type env) ~default:(Core_type.TypeValue.Unit)
+      end
 
-  | Tfun_expression_body expr ->
-    check_expression env expr
+    | Tfun_expression_body expr ->
+      begin
+        check_expression env expr;
+        expr.texp_val
+      end
+
+  in
+  check_assignable env tfun_loc tfun_return_ty actual_return_ty
 
 and check_block env blk =
   let { tblk_body; _ } = blk in
@@ -80,7 +93,7 @@ and check_binding env binding =
   check_expression env tbinding_init;
   check_assignable env tbinding_loc left_val tbinding_init.texp_val
 
-and check_expression env expr =
+and check_expression (env: Env.t) expr =
   let { texp_desc; _; } = expr in
   let type_value =
     match texp_desc with
@@ -88,19 +101,19 @@ and check_expression env expr =
       TypeValue.(
         match cnst with
         | Ast.Pconst_integer _ ->
-          Numeric Num_i32
+          Ctor (Env.ty_i32 env)
 
         | Ast.Pconst_char _ ->
-          Char
+          Ctor (Env.ty_char env)
 
         | Ast.Pconst_string _ ->
-          String
+          Ctor (Env.ty_string env)
 
         | Ast.Pconst_float _ ->
-          Numeric Num_f32
+          Ctor (Env.ty_f32 env)
 
         | Ast.Pconst_boolean _ ->
-          Boolean
+          Ctor (Env.ty_boolean env)
 
       )
 
@@ -130,10 +143,27 @@ and check_expression env expr =
       TypeValue.Array TypeValue.Any
 
     | Texp_call call ->
-      let { tcallee; tcall_params; _; } = call in
+      let { tcallee; tcall_params; tcall_loc; _; } = call in
       check_expression env tcallee;
-      List.iter ~f:(check_expression env) tcall_params;
-      TypeValue.Any
+      let callee_type = tcallee.texp_val in
+      let _param_types =
+        List.map
+          ~f:(fun param ->
+            check_expression env param;
+            param.texp_val
+          )
+          tcall_params
+      in
+      TypeValue.(
+      match callee_type with
+      | Function fun_ty ->
+        fun_ty.tfun_ret
+
+      | _ ->
+        let err = Type_error.make_error tcall_loc (Type_error.NotCallable callee_type) in
+        Env.add_error env err;
+        TypeValue.Any
+      )
 
     | Texp_member (expr, _field) ->
       check_expression env expr;
@@ -156,22 +186,29 @@ and check_expression env expr =
   expr.texp_val <- type_value
 
 and check_assignable env loc left right =
-  let result = 
-    TypeValue.(
-      match (left, right) with
-      | (Any, _)
-      | (_, Any)
-        -> true
+  let spec = match (left, right) with
+  | (Any, _)
+  | (_, Any)
+  | (Unknown, Unknown) -> None
+  | (Ctor left_sym, Ctor right_sym) ->
+    if phys_equal left_sym right_sym then
+      None
+    else
+      begin
+        let spec = Type_error.NotAssignable(left, right) in
+        Some spec
+      end
 
-      | _ -> false
-
-    )
+  | _ ->
+    let spec = Type_error.NotAssignable(left, right) in
+    Some spec
   in
-  if (not result) then (
-    let spec = Type_error.NotAssignable (left, right) in
+  match spec with
+  | Some spec ->
     let err = {Type_error. loc; spec } in
     Env.add_error env err
-  )
+
+  | None -> ()
 
 let type_check env program =
   let { tprogram_statements; _; } = program in
