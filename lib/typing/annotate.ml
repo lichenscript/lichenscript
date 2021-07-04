@@ -44,7 +44,9 @@ let rec annotate_statement (env: Env.t) stmt =
       Tstmt_return (Option.map
         ~f:(function expr ->
           let annotated_expr = annotate_expression env expr in
-          Env.set_return_type env (Some annotated_expr.texp_val);
+          if Option.is_none (Env.return_type env) then (
+            Env.set_return_type env (Some annotated_expr.texp_val);
+          );
           annotated_expr
         )
         expr_opt)
@@ -74,7 +76,7 @@ and annotate_function env _function =
   let prev_scope = Env.peek_scope env in
   let var_sym = Scope.find_var_symbol prev_scope name in
   let scope = Scope.create ~prev:prev_scope prev_scope.id in
-  Env.set_return_type env None;
+  Env.set_return_type env (Option.map ~f:(Infer.infer env) pfun_return_ty);
   Env.with_new_scope env scope (fun env ->
     match var_sym with
     | Some tfun_id ->
@@ -93,18 +95,21 @@ and annotate_function env _function =
             Tfun_expression_body (annotate_expression env expr)
 
         in
-        let tfun_return_ty =
+        let return_ty =
           pfun_return_ty
           |> Option.map ~f:(Infer.infer env)
           |> Option.value ~default:TypeValue.Unit
         in
-        TypeValue.pp Format.str_formatter tfun_return_ty;
-        let str = Format.flush_str_formatter() in
-        Format.printf "return ty: %s" str;
+        let fun_ty =
+          { TypeValue.
+            tfun_params = [];
+            tfun_ret = return_ty;
+          }
+        in
+        VarSym.set_def_type tfun_id (TypeValue.Function fun_ty);
         {
           tfun_id;
           tfun_params;
-          tfun_return_ty;
           tfun_body;
           tfun_loc = pfun_loc;
         }
@@ -295,7 +300,7 @@ and annotate_expression (env: Env.t) expr =
         let var_sym_opt = Scope.find_var_symbol current_scope id.pident_name in
         match var_sym_opt with
         | Some sym ->
-          (Texp_identifier sym, TypeValue.Unknown)
+          (Texp_identifier sym, sym.def_type)
 
         | None ->
           begin
@@ -328,12 +333,17 @@ and annotate_expression (env: Env.t) expr =
     | Pexp_call call ->
       let {Ast. pcallee; pcall_params; pcall_loc } = call in
       let tcallee = annotate_expression env pcallee in
+      let return_ty =
+        match tcallee.texp_val with
+        | TypeValue.Function fun_ -> fun_.tfun_ret
+        | _ -> TypeValue.Unknown
+      in
       let tcall_params = List.map ~f:(annotate_expression env) pcall_params in
       (Texp_call {
         tcallee;
         tcall_params;
         tcall_loc = pcall_loc;
-      }, TypeValue.Unknown)
+      }, return_ty)
 
     | Pexp_member (expr, field) ->
       let expr = annotate_expression env expr in

@@ -8,6 +8,7 @@ type t = {
 
 and spec =
   | NotAssignable of TypeValue.t * TypeValue.t
+  | CannotReturn of TypeValue.t * TypeValue.t
   | CannotFindName of string
   | Redefinition of string
   | NotCallable of TypeValue.t
@@ -23,6 +24,9 @@ module PP = struct
     match spec with
     | NotAssignable (be_assigned, assign) ->
       Format.fprintf formatter "Type '%a' is not assignable to type '%a'" TypeValue.pp be_assigned TypeValue.pp assign
+
+    | CannotReturn (expected, actual) ->
+      Format.fprintf formatter "Type '%a' can not be returned because '%a' is expected" TypeValue.pp actual TypeValue.pp expected
 
     | CannotFindName name ->
       Format.fprintf formatter "Can not find name '%s'" name

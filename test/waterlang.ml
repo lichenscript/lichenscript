@@ -59,7 +59,7 @@ let test_type_checking _ =
     "
   in
   assert_raises
-    (Utils.ExpectedError "Error: 2:4 Type 'f32' is not assignable to type 'i32'\n")
+    (Utils.ExpectedError "Error: 3:6 Type 'i32' can not be returned because 'f32' is expected\n")
     (fun _ ->
       Utils.parse_string_and_codegen_to_path source "type_check.wasm"
     )

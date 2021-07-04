@@ -86,7 +86,7 @@ and VarSym : sig
   type t = {
     id_in_scope: int;
     name:        string;
-    def_type:    TypeValue.t;
+    mutable def_type:    TypeValue.t;
     def_loc:     Loc.t option;
     kind:        kind;
     scope_id:    int;
@@ -95,11 +95,13 @@ and VarSym : sig
 
   val mk_local: id_in_scope:int -> scope_id:int -> string -> t
 
+  val set_def_type: t -> TypeValue.t -> unit
+
 end = struct
   type t = {
     id_in_scope: int;
     name:        string;
-    def_type:    TypeValue.t;
+    mutable def_type:    TypeValue.t;
     def_loc:     Loc.t option;
     kind:        kind;
     scope_id:    int;
@@ -116,6 +118,9 @@ end = struct
       scope_id = scope_id;
       builtin = false;
     }
+
+  let set_def_type t ty =
+    t.def_type <- ty
   
 end
 

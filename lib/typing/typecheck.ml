@@ -1,10 +1,24 @@
 open Core_kernel
 open Core_type
 open Typedtree
-open Waterlang_parsing
+
+let type_assinable left right =
+  let open TypeValue in
+  match (left, right) with
+  | (Any, _)
+  | (_, Any)
+  | (Unknown, Unknown) -> true
+  | (Ctor left_sym, Ctor right_sym) ->
+    if phys_equal left_sym right_sym then
+      true
+    else
+      false
+
+  | _ ->
+    false
 
 let rec check_statement env statement =
-  let { tstmt_desc; _; } = statement in
+  let { tstmt_desc; tstmt_loc; _; } = statement in
   match tstmt_desc with
   | Tstmt_class cls ->
     check_class env cls
@@ -33,7 +47,16 @@ let rec check_statement env statement =
   | Tstmt_continue _
   | Tstmt_debugger -> ()
   | Tstmt_return expr_opt -> 
-    Option.iter ~f:(check_expression env) expr_opt
+    let expected = Option.value ~default:TypeValue.Unit (Env.return_type env) in
+    (match expr_opt with
+    | Some expr ->
+      check_expression env expr;
+      check_returnable env tstmt_loc expected expr.texp_val
+
+    | None -> 
+      check_returnable env tstmt_loc expected TypeValue.Unit
+
+    )
 
   | Tstmt_empty -> ()
 
@@ -57,26 +80,13 @@ and check_class env cls =
     tcls_body_elements
 
 and check_function (env: Env.t) _fun =
-  let { tfun_body; tfun_return_ty; tfun_loc; _; } = _fun in
-  let actual_return_ty =
-    match tfun_body with
-    | Tfun_block_body blk -> 
-      begin
-        check_block env blk;
-        if List.is_empty blk.tblk_body then
-          TypeValue.Unit
-        else
-          Option.value (Env.return_type env) ~default:(Core_type.TypeValue.Unit)
-      end
+  let { tfun_body;  _; } = _fun in
+  match tfun_body with
+  | Tfun_block_body blk -> 
+    check_block env blk;
 
-    | Tfun_expression_body expr ->
-      begin
-        check_expression env expr;
-        expr.texp_val
-      end
-
-  in
-  check_assignable env tfun_loc tfun_return_ty actual_return_ty
+  | Tfun_expression_body expr ->
+    check_expression env expr
 
 and check_block env blk =
   let { tblk_body; _ } = blk in
@@ -95,120 +105,81 @@ and check_binding env binding =
 
 and check_expression (env: Env.t) expr =
   let { texp_desc; _; } = expr in
-  let type_value =
-    match texp_desc with
-    | Texp_constant cnst ->
-      TypeValue.(
-        match cnst with
-        | Ast.Pconst_integer _ ->
-          Ctor (Env.ty_i32 env)
+  match texp_desc with
+  | Texp_constant _
+  | Texp_identifier _
+  | Texp_lambda
+    -> ()
 
-        | Ast.Pconst_char _ ->
-          Ctor (Env.ty_char env)
+  | Texp_throw expr ->
+    check_expression env expr
 
-        | Ast.Pconst_string _ ->
-          Ctor (Env.ty_string env)
+  | Texp_if _if ->
+    begin
+      let { tif_test; tif_consequent; tif_alternative; _; } = _if in
+      check_expression env tif_test;
+      check_statement env tif_consequent;
+      Option.iter ~f:(check_statement env) tif_alternative
+    end
 
-        | Ast.Pconst_float _ ->
-          Ctor (Env.ty_f32 env)
-
-        | Ast.Pconst_boolean _ ->
-          Ctor (Env.ty_boolean env)
-
+  | Texp_array arr ->
+    List.iter
+      ~f:(fun expr ->
+        check_expression env expr;
       )
+      arr
+    ;
 
-    | Texp_identifier _
-    | Texp_lambda -> TypeValue.Any
-    | Texp_throw expr ->
-      check_expression env expr;
-      TypeValue.Any
-
-    | Texp_if _if ->
-      begin
-        let { tif_test; tif_consequent; tif_alternative; _; } = _if in
-        check_expression env tif_test;
-        check_statement env tif_consequent;
-        Option.iter ~f:(check_statement env) tif_alternative;
-        TypeValue.Any
-      end
-
-    | Texp_array arr ->
-      List.iter
-        ~f:(fun expr ->
-          check_expression env expr;
+  | Texp_call call ->
+    let { tcallee; tcall_params; tcall_loc; _; } = call in
+    check_expression env tcallee;
+    let callee_type = tcallee.texp_val in
+    let _param_types =
+      List.map
+        ~f:(fun param ->
+          check_expression env param;
+          param.texp_val
         )
-        arr
-      ;
+        tcall_params
+    in
+    TypeValue.(
+    match callee_type with
+    | Function _ ->
+      ()
 
-      TypeValue.Array TypeValue.Any
+    | _ ->
+      let err = Type_error.make_error tcall_loc (Type_error.NotCallable callee_type) in
+      Env.add_error env err
+    )
 
-    | Texp_call call ->
-      let { tcallee; tcall_params; tcall_loc; _; } = call in
-      check_expression env tcallee;
-      let callee_type = tcallee.texp_val in
-      let _param_types =
-        List.map
-          ~f:(fun param ->
-            check_expression env param;
-            param.texp_val
-          )
-          tcall_params
-      in
-      TypeValue.(
-      match callee_type with
-      | Function fun_ty ->
-        fun_ty.tfun_ret
+  | Texp_member (expr, _field) ->
+    check_expression env expr
 
-      | _ ->
-        let err = Type_error.make_error tcall_loc (Type_error.NotCallable callee_type) in
-        Env.add_error env err;
-        TypeValue.Any
-      )
+  | Texp_unary (_, expr) ->
+    check_expression env expr
 
-    | Texp_member (expr, _field) ->
-      check_expression env expr;
-      TypeValue.Any
+  | Texp_binary (_, left, right) ->
+    check_expression env left;
+    check_expression env right
 
-    | Texp_unary (_, expr) ->
-      check_expression env expr;
-      TypeValue.Any
-
-    | Texp_binary (_, left, right) ->
-      check_expression env left;
-      check_expression env right;
-      TypeValue.Any
-
-    | Texp_update (_, exp, _) ->
-      check_expression env exp;
-      TypeValue.Any
-
-  in
-  expr.texp_val <- type_value
+  | Texp_update (_, exp, _) ->
+    check_expression env exp
 
 and check_assignable env loc left right =
-  let spec = match (left, right) with
-  | (Any, _)
-  | (_, Any)
-  | (Unknown, Unknown) -> None
-  | (Ctor left_sym, Ctor right_sym) ->
-    if phys_equal left_sym right_sym then
-      None
-    else
-      begin
-        let spec = Type_error.NotAssignable(left, right) in
-        Some spec
-      end
-
-  | _ ->
+  if type_assinable left right then
+    ()
+  else
     let spec = Type_error.NotAssignable(left, right) in
-    Some spec
-  in
-  match spec with
-  | Some spec ->
     let err = {Type_error. loc; spec } in
     Env.add_error env err
 
-  | None -> ()
+and check_returnable env loc expected actual =
+  if type_assinable expected actual then
+    ()
+  else
+    let spec = Type_error.CannotReturn(expected, actual) in
+    let err = {Type_error. loc; spec } in
+    Env.add_error env err
 
 let type_check env program =
   let { tprogram_statements; _; } = program in
