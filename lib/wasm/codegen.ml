@@ -45,6 +45,17 @@ and codegen_expressions env expr: C_bindings.exp =
     let lit = C_bindings.make_literal_i32 (Int32.of_int_exn 100) in
     C_bindings.make_exp_const env.module_ lit
 
+  | Texp_call call ->
+    let open Waterlang_typing.Typedtree in
+    let callee_name = match call.tcallee.texp_desc with
+      | Texp_identifier sym ->
+        sym.name
+
+      | _ -> failwith "unreachable"
+    in
+    let ty = C_bindings.make_ty_int32 () in
+    C_bindings.make_exp_call env.module_ callee_name [| |] ty
+
   | _ ->
     C_bindings.make_exp_unrechable env.module_
 
