@@ -134,18 +134,22 @@ and check_expression (env: Env.t) expr =
     let { tcallee; tcall_params; tcall_loc; _; } = call in
     check_expression env tcallee;
     let callee_type = tcallee.texp_val in
-    let _param_types =
-      List.map
-        ~f:(fun param ->
-          check_expression env param;
-          param.texp_val
-        )
-        tcall_params
-    in
     TypeValue.(
     match callee_type with
-    | Function _ ->
-      ()
+    | Function fun_ ->
+      begin
+        let result = List.iter2 tcall_params fun_.tfun_params
+          ~f:(fun actual_param (name, def_param) ->
+            check_passable env tcall_loc ~name ~def:def_param ~actual:actual_param.texp_val
+          )
+        in
+        match result with
+        | Unequal_lengths ->
+          let err = Type_error.make_error tcall_loc (Type_error.ParamsMismatch callee_type) in
+          Env.add_error env err
+
+        | _ -> ()
+      end
 
     | _ ->
       let err = Type_error.make_error tcall_loc (Type_error.NotCallable callee_type) in
@@ -178,6 +182,14 @@ and check_returnable env loc expected actual =
     ()
   else
     let spec = Type_error.CannotReturn(expected, actual) in
+    let err = {Type_error. loc; spec } in
+    Env.add_error env err
+
+and check_passable env loc ~name ~(def: TypeValue.t) ~(actual: TypeValue.t) =
+  if type_assinable def actual then
+    ()
+  else
+    let spec = Type_error.CannotPassParam(name, def, actual) in
     let err = {Type_error. loc; spec } in
     Env.add_error env err
 

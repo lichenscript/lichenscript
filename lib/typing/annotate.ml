@@ -62,10 +62,18 @@ let rec annotate_statement (env: Env.t) stmt =
 
 and annotate_function env _function =
   let annotate_param env param =
-    let {Ast. pparam_pat; pparam_init; pparam_loc; pparam_rest; _ } = param in
-    let tparam_pat = annotate_pattern env pparam_pat in
+    let {Ast. pparam_pat; pparam_init; pparam_loc; pparam_ty; pparam_rest; _ } = param in
+    let tparam_pat: pattern = annotate_pattern env pparam_pat in
+    let tparam_ty = pparam_ty
+      |> Option.map ~f:(Infer.infer env)
+      |> Option.value ~default:Core_type.TypeValue.Unknown
+    in
+    match tparam_pat.tpat_desc with
+      | Tpat_symbol sym ->
+        Core_type.VarSym.set_def_type sym tparam_ty;
     {
       tparam_pat;
+      tparam_ty;
       tparam_init = Option.map ~f:(annotate_expression env) pparam_init;
       tparam_loc = pparam_loc;
       tparam_rest = pparam_rest;
@@ -102,7 +110,13 @@ and annotate_function env _function =
         in
         let fun_ty =
           { TypeValue.
-            tfun_params = [];
+            tfun_params = List.map
+              ~f:(fun param ->
+                Typedtree.pp_pattern Format.str_formatter param.tparam_pat;
+                let param_name = Format.flush_str_formatter () in
+                (param_name, param.tparam_ty)
+              )
+              tfun_params.tparams_content;
             tfun_ret = return_ty;
           }
         in

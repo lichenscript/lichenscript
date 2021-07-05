@@ -65,7 +65,7 @@ let rec infer env (ty: Ast._type) =
     end
 
   | Pty_arrow(params, ret) ->
-    let params_types = List.map ~f:(infer env) params in
+    let params_types = List.map ~f:(fun ty -> ("<unknown>", infer env ty)) params in
     let params_ret = infer env ret in
     TypeValue.(Function {
       tfun_params = params_types;

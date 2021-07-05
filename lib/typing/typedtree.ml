@@ -115,6 +115,7 @@ and params = {
 
 and param = {
   tparam_pat: pattern;
+  tparam_ty: Core_type.TypeValue.t;
   tparam_init: expression option;
   tparam_loc: Loc.t;
   tparam_rest: bool;
@@ -155,3 +156,8 @@ and type_desc =
   | Tty_arrow of
     _type list *
     _type
+
+let pp_pattern formatter pat =
+  match pat.tpat_desc with
+  | Tpat_symbol sym ->
+    Format.pp_print_string formatter sym.name

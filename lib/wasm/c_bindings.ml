@@ -3,6 +3,8 @@ type m
 
 type ty
 
+type global
+
 type literal
 
 type op = Int32.t
@@ -65,3 +67,13 @@ external add_function: m -> string -> ty -> ty -> ty array -> exp -> function_ =
   "add_function_bytecode" "add_function_native"
 
 external add_function_export: m -> string -> string -> export = "add_function_export"
+
+external add_global: m -> string -> ty -> bool -> exp -> global = "add_global"
+
+external make_exp_global_get: m -> string -> ty -> exp = "make_exp_global_get"
+
+external make_exp_global_set: m -> string -> exp -> exp = "make_exp_global_set"
+
+external set_memory:
+  m -> int -> int -> string -> string array -> bool array -> exp array -> int array -> bool -> unit =
+  "set_memory_bytecode" "set_memory"

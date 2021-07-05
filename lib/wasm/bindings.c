@@ -30,6 +30,7 @@
 TY_HANDLER(BinaryenExpressionRef)
 TY_HANDLER(BinaryenFunctionRef)
 TY_HANDLER(BinaryenExportRef)
+TY_HANDLER(BinaryenGlobalRef)
 
 static struct custom_operations literal_ops = {
   "binaryen.literal",
@@ -308,4 +309,46 @@ CAMLprim value add_function_export(value module, value intern_name, value extern
   const char* extern_name_c = String_val(extern_name);
   BinaryenExportRef export = BinaryenAddFunctionExport(*ref, intern_name_c, extern_name_c);
   return val_of_BinaryenExportRef(export);
+}
+
+CAMLprim value add_global(value module, value name, value type, value mut, value init_expr) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  const char* global_name = String_val(name);
+  BinaryenType ty = Int64_val(type);
+  bool is_mutable = Bool_val(mut);
+  BinaryenExpressionRef exp = BinaryenExpressionRef_of_val(init_expr);
+  BinaryenGlobalRef global = BinaryenAddGlobal(*ref, global_name, ty, is_mutable, exp);
+  return val_of_BinaryenGlobalRef(global);
+}
+
+CAMLprim value make_exp_global_get(value module, value name, value type) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  const char* global_name = String_val(name);
+  BinaryenType ty = Int64_val(type);
+  BinaryenExpressionRef exp = BinaryenGlobalGet(*ref, global_name, ty);
+  return val_of_BinaryenExpressionRef(exp);
+}
+
+CAMLprim value make_exp_global_set(value module, value name, value v) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  const char* global_name = String_val(name);
+  BinaryenExpressionRef set_value = BinaryenExpressionRef_of_val(v);
+  BinaryenExpressionRef exp = BinaryenGlobalSet(*ref, global_name, set_value);
+  return val_of_BinaryenExpressionRef(exp);
+}
+
+CAMLprim value set_memory(value module, value initial_int, value max_int, value export_name_str, value segments, value segmentPassive, value segmentOffsets, value segmentSizes, value shared_bl) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  int initial = Int_val(initial_int);
+  int maximum = Int_val(max_int);
+  const char* export_name = String_val(export_name_str);
+  mlsize_t types_len = caml_array_length(segments);
+  bool shared = Bool_val(shared_bl);
+  BinaryenSetMemory(*ref, initial, maximum, export_name, NULL, NULL, NULL, NULL, types_len, shared);
+  return Val_unit;
+}
+
+CAMLprim value set_memory_bytecode(value * argv, int argn) {
+  return set_memory(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5],
+    argv[6], argv[7], argv[8]);
 }

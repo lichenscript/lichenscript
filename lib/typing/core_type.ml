@@ -39,11 +39,12 @@ module rec TypeValue : sig
   }
 
   and function_type = {
-    tfun_params: t list;
+    tfun_params: (string * t) list;
     tfun_ret: t;
   }
 
   val pp: Format.formatter -> t -> unit
+  val pp_function_type: Format.formatter -> function_type -> unit
 
 end = struct
   type t =
@@ -67,18 +68,38 @@ end = struct
   }
 
   and function_type = {
-    tfun_params: t list;
+    tfun_params: (string * t) list;
     tfun_ret: t;
   }
 
-  let pp formatter = function
+  let rec pp formatter = function
   | Unknown -> Format.pp_print_string formatter "unknown"
   | Any -> Format.pp_print_string formatter "any"
   | Unit -> Format.pp_print_string formatter "unit"
   | Ctor sym -> Format.pp_print_string formatter sym#get_name
   | Class _ -> Format.pp_print_string formatter "Class"
-  | Function _ -> Format.pp_print_string formatter "Function"
+  | Function fun_ ->
+    pp_function_type formatter fun_
+
   | Array _ -> Format.pp_print_string formatter "Array"
+
+  and pp_function_type formatter fun_ =
+    Format.pp_print_string formatter "(";
+
+    List.iteri
+      (fun index param ->
+        let (name, ty) = param in
+        Format.pp_print_string formatter name;
+        Format.pp_print_string formatter ": ";
+        pp formatter ty;
+        if index <> (List.length fun_.tfun_params) - 1 then (
+          Format.pp_print_string formatter ", "
+        )
+      )
+      fun_.tfun_params;
+
+    Format.pp_print_string formatter ") => ";
+    pp formatter fun_.tfun_ret
   
 end
 
