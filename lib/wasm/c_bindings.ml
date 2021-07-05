@@ -69,6 +69,8 @@ external make_exp_store: m -> int -> int -> int -> exp -> exp -> ty -> exp =
 
 external make_exp_call: m -> string -> exp array -> ty -> exp = "make_exp_call"
 
+external make_exp_memory_fill: m -> exp -> exp -> exp -> exp = "make_exp_memory_fill"
+
 (* name -> params ty -> return ty -> var_types -> exp *)
 external add_function: m -> string -> ty -> ty -> ty array -> exp -> function_ =
   "add_function_bytecode" "add_function_native"

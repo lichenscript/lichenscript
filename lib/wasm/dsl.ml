@@ -59,6 +59,9 @@ module Binaryen (M: BinaryenModule) = struct
   let call_ name params ty =
     C_bindings.make_exp_call M.m name params ty
 
+  let memory_fill ~dest ~value ~size =
+    C_bindings.make_exp_memory_fill M.m dest value size
+
   let function_ ~name ~params_ty ~ret_ty ~vars_ty ~content =
     C_bindings.add_function M.m name params_ty ret_ty vars_ty content
 

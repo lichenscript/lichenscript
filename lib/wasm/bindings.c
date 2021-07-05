@@ -300,6 +300,17 @@ CAMLprim value make_exp_call(value module, value name, value params, value retur
   return val_of_BinaryenExpressionRef(result);
 }
 
+CAMLprim value make_exp_memory_fill(value module, value dest_exp, value value_exp, value size_exp) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+
+  BinaryenExpressionRef dest = BinaryenExpressionRef_of_val(dest_exp);
+  BinaryenExpressionRef value = BinaryenExpressionRef_of_val(value_exp);
+  BinaryenExpressionRef size = BinaryenExpressionRef_of_val(size_exp);
+
+  BinaryenExpressionRef result = BinaryenMemoryFill(*ref, dest, value, size);
+  return val_of_BinaryenExpressionRef(result);
+}
+
 CAMLprim value add_function_native(value module, value name, value params_type, value result_ty, value var_types, value body) {
   BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
   const char* fun_name = String_val(name);
