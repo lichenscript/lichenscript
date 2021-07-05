@@ -78,6 +78,15 @@ let test_function_call _ =
   let result = Utils.parse_string_and_codegen source in
   Format.printf "%s" result
 
+let test_string _ =
+  let source = "
+    function main() {
+      let a: string = \"Hello World!\";
+    }
+  "
+  in
+  Utils.parse_string_and_codegen_to_path source "test_string.wasm"
+
 let suite =
   "TestParser" >::: [
     "test_parser" >:: test_parser;
@@ -85,6 +94,7 @@ let suite =
     "test_codegen_binary" >:: test_codegen_binary;
     "test_type_checking" >:: test_type_checking;
     "test_function_call" >:: test_function_call;
+    "test_string" >:: test_string;
   ]
 
 let () =

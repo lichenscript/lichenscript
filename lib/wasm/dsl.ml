@@ -26,9 +26,14 @@ module Binaryen (M: BinaryenModule) = struct
 
   let unreachable = C_bindings.make_ty_unreachable ()
 
+  let auto = C_bindings.make_ty_auto ()
+
   let const_wrap maker value =
     let lit = maker value in
     C_bindings.make_exp_const M.m lit
+
+  let block ~name children ty =
+    C_bindings.make_exp_block M.m name children ty
 
   let const_i32 = const_wrap C_bindings.make_literal_i32
 

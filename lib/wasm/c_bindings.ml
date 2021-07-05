@@ -35,6 +35,8 @@ external make_ty_any_ref: unit -> ty = "make_ty_any_ref"
 
 external make_ty_unreachable: unit -> ty = "make_ty_unreachable"
 
+external make_ty_auto: unit -> ty = "make_ty_auto"
+
 external make_ty_multiples: ty array -> ty = "make_ty_multiples"
 
 external make_op_add_i32: unit -> op = "make_op_add_i32"
@@ -50,6 +52,8 @@ external make_literal_i64: Int64.t -> literal = "make_literal_i64"
 external make_literal_f32: Float.t -> literal = "make_literal_f32"
 
 external make_literal_f64: Float.t -> literal = "make_literal_f64"
+
+external make_exp_block: m -> string option -> exp array -> ty -> exp = "make_exp_block"
 
 external make_exp_const: m -> literal -> exp = "make_exp_const"
 

@@ -11,7 +11,6 @@ type t = {
   config: Config.t;
   mutable facilities_flags: int;
   mutable static_string_pool: int StaticStringPool.t;
-  mutable last_expr: C_bindings.exp option;
 }
 
 let create ?output_filename config =
@@ -21,7 +20,6 @@ let create ?output_filename config =
     config;
     facilities_flags = 0;
     static_string_pool = StaticStringPool.empty;
-    last_expr = None;
   }
 
 let add_static_string env str =

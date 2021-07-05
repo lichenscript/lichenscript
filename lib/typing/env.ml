@@ -23,7 +23,7 @@ let make_default_type_sym scope =
   |] in
   Array.iter
     ~f:(fun name ->
-      let sym = new type_sym (Scope.id scope) name Global in
+      let sym = new builtin_sym (Scope.id scope) name Global in
       Scope.set_type_symbol scope name sym;
     )
     names

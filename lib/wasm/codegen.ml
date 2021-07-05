@@ -6,17 +6,36 @@ module M (S: Dsl.BinaryenModule) = struct
   module Dsl = Dsl.Binaryen(S)
   open Dsl
 
-  let rec codegen_statements env stat =
+  let get_binaryen_ty_by_core_ty (ty: Core_type.TypeValue.t): C_bindings.ty =
+    let open Core_type.TypeValue in
+    match ty with
+    | Ctor sym ->
+      if sym#builtin then (
+        match sym#get_name with
+        | "i32" -> i32
+        | "i64" -> i64
+        | "f32" -> f32
+        | "f64" -> f64
+        | "char" -> i32
+        | "boolean" -> i32
+        | _ -> unreachable
+      ) else
+        failwith "not implemented"
+
+    | Unit -> none
+    | _ -> unreachable
+
+  let rec codegen_statements env stat: C_bindings.exp option =
     let open Typedtree in
     let { tstmt_desc; _; } = stat in
     match tstmt_desc with
     | Tstmt_function fun_ ->
-      env.last_expr <- None;
-      codegen_function env fun_
+      codegen_function env fun_;
+      None
     
     | Tstmt_expr expr ->
       let expr_result = codegen_expression env expr in
-      env.last_expr <- (Some expr_result)
+      Some expr_result
 
     | Tstmt_return expr_opt ->
       let expr = Option.map
@@ -24,10 +43,9 @@ module M (S: Dsl.BinaryenModule) = struct
         expr_opt
       in
       let return_expr = return_ expr in
-      env.last_expr <- (Some return_expr)
+      Some return_expr
 
-    | _ ->
-      ()
+    | _ -> None
 
   and codegen_constant env cnst =
     let open Waterlang_parsing.Ast in
@@ -74,7 +92,8 @@ module M (S: Dsl.BinaryenModule) = struct
         (codegen_expression env right)
 
     | Texp_identifier var_sym ->
-      local_get var_sym.id_in_scope i32
+      let ty = get_binaryen_ty_by_core_ty var_sym.def_type in
+      local_get var_sym.id_in_scope ty
 
     | Texp_constant cnst ->
       codegen_constant env cnst
@@ -114,11 +133,11 @@ module M (S: Dsl.BinaryenModule) = struct
       | Typedtree.Tfun_block_body block ->
         begin
           let { Typedtree. tblk_body; _; } = block in
-          List.iter
-            ~f:(codegen_statements env)
+          let expressions = 
             tblk_body
-          ;
-          Option.value_exn env.last_expr
+            |> List.filter_map ~f:(codegen_statements env)
+          in
+          Dsl.block ~name:None (List.to_array expressions) auto
         end
 
       | Typedtree.Tfun_expression_body expr ->
@@ -141,7 +160,7 @@ module M (S: Dsl.BinaryenModule) = struct
   and codegen_program env (program: Program.t) =
     let { Program. tree } = program in
     let { Typedtree. tprogram_statements } = tree in
-    List.iter ~f:(codegen_statements env) tprogram_statements;
+    let _ = List.map ~f:(codegen_statements env) tprogram_statements in
 
     if Codegen_env.needs_allocator env then (
       Allocator_facility.codegen_allocator_facility (module S);

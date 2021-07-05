@@ -153,6 +153,11 @@ CAMLprim value make_ty_unreachable() {
   return caml_copy_int64(t);
 }
 
+CAMLprim value make_ty_auto() {
+  BinaryenType t = BinaryenTypeAuto();
+  return caml_copy_int64(t);
+}
+
 CAMLprim value make_ty_multiples(value arr) {
   mlsize_t size = caml_array_length(arr);
   BinaryenType* types = alloca(sizeof(BinaryenType) * size);
@@ -211,6 +216,29 @@ CAMLprim value make_literal_f64(value i) {
   struct BinaryenLiteral* alloc_v = (struct BinaryenLiteral*)Data_custom_val(v);
   *alloc_v = BinaryenLiteralFloat64(double_val);
   return v;
+}
+
+CAMLprim value make_exp_block(value module, value name, value children, value ty) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  const char* name_str = NULL;
+
+  if (Is_some(name)) {
+    name_str = String_val(Some_val(name));
+  }
+  
+  mlsize_t children_size = caml_array_length(children);
+
+  BinaryenExpressionRef* children_exprs = NULL;
+  children_exprs = (BinaryenExpressionRef*)alloca(sizeof(BinaryenExpressionRef) * children_size);
+
+  for (mlsize_t i = 0; i < children_size; i++) {
+    children_exprs[i] = BinaryenExpressionRef_of_val(Field(children, i));
+  }
+
+  BinaryenType t = Int64_val(ty);
+
+  BinaryenExpressionRef result = BinaryenBlock(*ref, name_str, children_exprs, children_size, t);
+  return val_of_BinaryenExpressionRef(result);
 }
 
 CAMLprim value make_exp_const(value module, value literal) {

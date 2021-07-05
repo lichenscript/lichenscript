@@ -12,6 +12,15 @@ class type_sym (scope_id: int) (name: string) (kind: kind) =
 
     method get_scope_id = scope_id
 
+    method builtin = false
+
+  end
+
+class builtin_sym (scope_id: int) (name: string) (kind: kind) =
+  object inherit type_sym scope_id name kind
+
+    method! builtin = true
+
   end
 
 let pp_type_sym formatter (sym: type_sym) =
