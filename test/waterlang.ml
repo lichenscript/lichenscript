@@ -75,7 +75,8 @@ let test_function_call _ =
     }
     "
   in
-  Utils.parse_string_and_codegen_to_path source "test_function_call.wasm"
+  let result = Utils.parse_string_and_codegen source in
+  Format.printf "%s" result
 
 let suite =
   "TestParser" >::: [
