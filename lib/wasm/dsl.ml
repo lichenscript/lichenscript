@@ -6,6 +6,8 @@ module type BinaryenModule = sig
 end
 
 module Binaryen (M: BinaryenModule) = struct
+  let none = C_bindings.make_ty_none()
+
   let i32 = C_bindings.make_ty_int32()
 
   let i64 = C_bindings.make_ty_int64 ()
@@ -39,6 +41,12 @@ module Binaryen (M: BinaryenModule) = struct
   let local_get index ty =
     C_bindings.make_exp_local_get M.m index ty
 
+  let local_set index exp =
+    C_bindings.make_exp_local_set M.m index exp
+
+  let store ~bytes ~offset ~align ~ptr ~value ~ty =
+    C_bindings.make_exp_store M.m bytes offset align ptr value ty
+
   let unreachable_exp () =
     C_bindings.make_exp_unrechable M.m
 
@@ -50,5 +58,11 @@ module Binaryen (M: BinaryenModule) = struct
 
   let call_ name params ty =
     C_bindings.make_exp_call M.m name params ty
+
+  let function_ ~name ~params_ty ~ret_ty ~vars_ty ~content =
+    C_bindings.add_function M.m name params_ty ret_ty vars_ty content
+
+  let export_function intern_name export_name =
+    C_bindings.add_function_export M.m intern_name export_name
   
 end

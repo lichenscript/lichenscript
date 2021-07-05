@@ -127,14 +127,26 @@ module M (S: Dsl.BinaryenModule) = struct
 
     let id = function_.tfun_id in
     let id_name = id.name in
-    let _fun = C_bindings.add_function env.module_ id_name params_ty i32 [| |] exp in
-    let _ = C_bindings.add_function_export env.module_ id_name id_name in
+    (* let sym = function_.tfun_id in
+    let ret_ty =
+      match sym.def_type with
+      | Core_type.TypeValue.Function fun_ty ->
+        fun_ty.tfun_ret
+      | _ -> failwith "not a function"
+    in *)
+    let _fun = Dsl.function_ ~name:id_name ~params_ty ~ret_ty:i32 ~vars_ty:[| |] ~content:exp in
+    let _ = export_function id_name id_name in
     ()
 
   and codegen_program env (program: Program.t) =
     let { Program. tree } = program in
     let { Typedtree. tprogram_statements } = tree in
     List.iter ~f:(codegen_statements env) tprogram_statements;
+
+    if Codegen_env.needs_allocator env then (
+      Allocator_facility.codegen_allocator_facility (module S);
+    );
+
     C_bindings.set_memory env.module_ 1024 1024 "memory" [||] [||] [||] [||] false;
   
 end

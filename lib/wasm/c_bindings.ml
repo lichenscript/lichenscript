@@ -61,8 +61,15 @@ external make_exp_return: m -> exp option -> exp = "make_exp_return"
 
 external make_exp_local_get: m -> int -> ty -> exp = "make_exp_local_get"
 
+external make_exp_local_set: m -> int -> exp -> exp = "make_exp_local_set"
+
+(* bytes -> offset -> align -> ptr -> value -> type *)
+external make_exp_store: m -> int -> int -> int -> exp -> exp -> ty -> exp =
+  "make_exp_store_bytecode" "make_exp_store"
+
 external make_exp_call: m -> string -> exp array -> ty -> exp = "make_exp_call"
 
+(* name -> params ty -> return ty -> var_types -> exp *)
 external add_function: m -> string -> ty -> ty -> ty array -> exp -> function_ =
   "add_function_bytecode" "add_function_native"
 

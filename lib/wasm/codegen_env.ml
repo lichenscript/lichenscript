@@ -40,3 +40,9 @@ let turn_on_allocator env =
 let turn_on_string env =
   turn_on_allocator env;
   env.facilities_flags <- env.facilities_flags lor string_facility_flag
+
+let needs_allocator env =
+  not (Int.equal (env.facilities_flags land allocator_facility_flag) 0)
+
+let needs_string env =
+  not (Int.equal (env.facilities_flags land string_facility_flag) 0)

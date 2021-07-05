@@ -253,6 +253,31 @@ CAMLprim value make_exp_local_get(value module, value index, value ty) {
   return val_of_BinaryenExpressionRef(result);
 }
 
+CAMLprim value make_exp_local_set(value module, value index, value exp) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  int index_i = Int_val(index);
+  BinaryenExpressionRef expr = BinaryenExpressionRef_of_val(exp);
+  BinaryenExpressionRef result = BinaryenLocalSet(*ref, index_i, expr);
+  return val_of_BinaryenExpressionRef(result);
+}
+
+CAMLprim value make_exp_store(value module, value bytes_i, value offset_i, value align_i, value ptr, value content, value ty) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  int bytes = Int_val(bytes_i);
+  int offset = Int_val(offset_i);
+  int align = Int_val(align_i);
+  BinaryenExpressionRef ptr_ref = BinaryenExpressionRef_of_val(ptr);
+  BinaryenExpressionRef content_ref = BinaryenExpressionRef_of_val(content);
+  BinaryenType v_ty = Int64_val(ty);
+
+  BinaryenExpressionRef result = BinaryenStore(*ref, bytes, offset, align, ptr_ref, content_ref, v_ty);
+  return val_of_BinaryenExpressionRef(result);
+}
+
+CAMLprim value make_exp_store_bytecode(value * argv, int argn) {
+  return make_exp_store(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5], argv[6]);
+}
+
 CAMLprim value make_exp_call(value module, value name, value params, value return_type) {
   BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
   const char* name_str = String_val(name);
