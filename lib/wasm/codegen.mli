@@ -24,6 +24,12 @@ open Waterlang_typing
   * | length         | i32      |
   * | bytes          | ptr[]    |
   * |----------------|----------|
+  * 
+  * user defined object
+  * |----------------|----------|
+  * | object layout  | 16 bytes |
+  * | properties     |          |
+  * | methods        |          |
   *
   *)
 val codegen: Program.t -> Config.t -> string
