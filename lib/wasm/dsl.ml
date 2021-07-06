@@ -32,10 +32,13 @@ module Binaryen (M: BinaryenModule) = struct
     let lit = maker value in
     C_bindings.make_exp_const M.m lit
 
-  let block ~name children ty =
+  let block ?name children ty =
     C_bindings.make_exp_block M.m name children ty
 
   let const_i32 = const_wrap C_bindings.make_literal_i32
+
+  let const_i32_of_int value =
+    const_i32 (Int32.of_int value)
 
   let const_i64 = const_wrap C_bindings.make_literal_i64
 
@@ -67,10 +70,16 @@ module Binaryen (M: BinaryenModule) = struct
   let memory_fill ~dest ~value ~size =
     C_bindings.make_exp_memory_fill M.m dest value size
 
+  let memory_copy ~dest ~src ~size =
+    C_bindings.make_exp_memory_copy M.m dest src size
+
   let function_ ~name ~params_ty ~ret_ty ~vars_ty ~content =
     C_bindings.add_function M.m name params_ty ret_ty vars_ty content
 
   let export_function intern_name export_name =
     C_bindings.add_function_export M.m intern_name export_name
+
+  let import_function ~intern_name ~extern_name ~extern_base_name ~params_ty ~ret_ty =
+    C_bindings.add_function_import M.m intern_name extern_name extern_base_name params_ty ret_ty
   
 end

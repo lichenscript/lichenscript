@@ -12,9 +12,11 @@ open Waterlang_typing
   * |----------------|-----|
   *
   * string layout
+  * (star represents "reserve")
   * |----------------|----------|
   * | object layout  | 16 bytes |
   * | length         | i32      |
+  * | string flag*   | i32      |
   * | bytes          | u16[]    |
   * |----------------|----------|
   *

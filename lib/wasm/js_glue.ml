@@ -5,22 +5,82 @@ let generate_glue filename = "
   const fs = require('fs');
   const path = require('path');
 
-  var importObject = {
-    imports: {
-      imported_func: function(arg) {
-        console.log(arg);
-      }
-    },
-    env: {
-      abort: () => {},
-    },
-  };
+  var Module = typeof Module !== 'undefined' ? Module : {};
+  var wasmMemory;
 
-  const bytes = fs.readFileSync(path.join(__dirname, '" ^ filename ^ ".wasm'));
-  WebAssembly.instantiate(bytes, importObject).then(function (result) {
-    let tmp = result.instance.exports.main(1, 2);
-    console.log(tmp);
-  })
+  var HEAP,
+  /** @type {ArrayBuffer} */
+  buffer,
+  /** @type {Int8Array} */
+  HEAP8,
+  /** @type {Uint8Array} */
+  HEAPU8,
+  /** @type {Int16Array} */
+  HEAP16,
+  /** @type {Uint16Array} */
+  HEAPU16,
+  /** @type {Int32Array} */
+  HEAP32,
+  /** @type {Uint32Array} */
+  HEAPU32,
+  /** @type {Float32Array} */
+  HEAPF32,
+  /** @type {Float64Array} */
+  HEAPF64;
+
+  function updateGlobalBufferAndViews(buf) {
+    buffer = buf;
+    Module['HEAP8'] = HEAP8 = new Int8Array(buf);
+    Module['HEAP16'] = HEAP16 = new Int16Array(buf);
+    Module['HEAP32'] = HEAP32 = new Int32Array(buf);
+    Module['HEAPU8'] = HEAPU8 = new Uint8Array(buf);
+    Module['HEAPU16'] = HEAPU16 = new Uint16Array(buf);
+    Module['HEAPU32'] = HEAPU32 = new Uint32Array(buf);
+    Module['HEAPF32'] = HEAPF32 = new Float32Array(buf);
+    Module['HEAPF64'] = HEAPF64 = new Float64Array(buf);
+  }
+
+  function wtfStringToJsString(ptr) {
+    var length = HEAP32[(ptr + 16) >> 2];
+
+    var str = '';
+
+    for (var i = 0; i < length; i++) {
+      str += String.fromCharCode(HEAP16[((ptr + 24) >> 1) + i]);
+    }
+
+    return str;
+  }
+
+  function main() {
+
+    function receiveInstance(instance, module) {
+      var exports = instance.exports;
+
+      Module['asm'] = exports;
+
+      wasmMemory = Module['asm']['memory'];
+      updateGlobalBufferAndViews(wasmMemory.buffer);
+    }
+
+    var env = {
+      console_log: function (ptr) {
+        var str = wtfStringToJsString(ptr);
+        console.log(str);
+      }
+    }
+
+    var info = {
+      env,
+    };
+
+    const bytes = fs.readFileSync(path.join(__dirname, '" ^ filename ^ ".wasm'));
+    WebAssembly.instantiate(bytes, info).then(function (result) {
+      receiveInstance(result.instance);
+    })
+  }
+
+  main();
   "
 
 

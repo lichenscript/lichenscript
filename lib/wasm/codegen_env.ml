@@ -44,3 +44,16 @@ let needs_allocator env =
 
 let needs_string env =
   not (Int.equal (env.facilities_flags land string_facility_flag) 0)
+
+let ptr_ty env =
+  match env.config.arch with
+  | Config.ARCH_WASM32 ->
+    C_bindings.make_ty_int32 ()
+
+  | Config.ARCH_WASM64 ->
+    C_bindings.make_ty_int64 ()
+
+let ptr_size env =
+  match env.config.arch with
+  | Config.ARCH_WASM32 -> 4
+  | Config.ARCH_WASM64 -> 8

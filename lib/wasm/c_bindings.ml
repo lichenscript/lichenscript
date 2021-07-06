@@ -75,9 +75,14 @@ external make_exp_call: m -> string -> exp array -> ty -> exp = "make_exp_call"
 
 external make_exp_memory_fill: m -> exp -> exp -> exp -> exp = "make_exp_memory_fill"
 
+external make_exp_memory_copy: m -> exp -> exp -> exp -> exp = "make_exp_memory_copy"
+
 (* name -> params ty -> return ty -> var_types -> exp *)
 external add_function: m -> string -> ty -> ty -> ty array -> exp -> function_ =
   "add_function_bytecode" "add_function_native"
+
+external add_function_import: m -> string -> string -> string -> ty -> ty -> unit =
+  "add_function_import_bytecode" "add_function_import"
 
 external add_function_export: m -> string -> string -> export = "add_function_export"
 
@@ -88,5 +93,5 @@ external make_exp_global_get: m -> string -> ty -> exp = "make_exp_global_get"
 external make_exp_global_set: m -> string -> exp -> exp = "make_exp_global_set"
 
 external set_memory:
-  m -> int -> int -> string -> string array -> bool array -> exp array -> int array -> bool -> unit =
+  m -> int -> int -> string -> string array -> bool array -> exp array -> bool -> unit =
   "set_memory_bytecode" "set_memory"

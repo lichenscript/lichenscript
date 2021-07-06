@@ -339,6 +339,17 @@ CAMLprim value make_exp_memory_fill(value module, value dest_exp, value value_ex
   return val_of_BinaryenExpressionRef(result);
 }
 
+CAMLprim value make_exp_memory_copy(value module, value dest_exp, value value_exp, value size_exp) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+
+  BinaryenExpressionRef dest = BinaryenExpressionRef_of_val(dest_exp);
+  BinaryenExpressionRef src = BinaryenExpressionRef_of_val(value_exp);
+  BinaryenExpressionRef size = BinaryenExpressionRef_of_val(size_exp);
+
+  BinaryenExpressionRef result = BinaryenMemoryCopy(*ref, dest, src, size);
+  return val_of_BinaryenExpressionRef(result);
+}
+
 CAMLprim value add_function_native(value module, value name, value params_type, value result_ty, value var_types, value body) {
   BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
   const char* fun_name = String_val(name);
@@ -365,6 +376,21 @@ CAMLprim value add_function_native(value module, value name, value params_type, 
 
 CAMLprim value add_function_bytecode(value * argv, int argn) {
   return add_function_native(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
+}
+
+CAMLprim value add_function_import(value module, value intern_name_str, value extern_name_str, value extern_name_base_str, value params_ty_i, value ret_ty_i) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  const char* intern_name = String_val(intern_name_str);
+  const char* extern_name = String_val(extern_name_str);
+  const char* extern_name_base = String_val(extern_name_base_str);
+  BinaryenType params_ty = Int64_val(params_ty_i);
+  BinaryenType ret_ty = Int64_val(ret_ty_i);
+  BinaryenAddFunctionImport(*ref, intern_name, extern_name, extern_name_base, params_ty, ret_ty);
+  return Val_none;
+}
+
+CAMLprim value add_function_import_bytecode(value * argv, int argn) {
+  return add_function_import(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5]);
 }
 
 CAMLprim value add_function_export(value module, value intern_name, value extern_name) {
@@ -401,18 +427,58 @@ CAMLprim value make_exp_global_set(value module, value name, value v) {
   return val_of_BinaryenExpressionRef(exp);
 }
 
-CAMLprim value set_memory(value module, value initial_int, value max_int, value export_name_str, value segments, value segmentPassive, value segmentOffsets, value segmentSizes, value shared_bl) {
+CAMLprim value set_memory(value module, value initial_int, value max_int, value export_name_str, value segments, value segmentPassive, value segmentOffsets, value shared_bl) {
   BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
   int initial = Int_val(initial_int);
   int maximum = Int_val(max_int);
   const char* export_name = String_val(export_name_str);
+
   mlsize_t types_len = caml_array_length(segments);
+  mlsize_t segments_len = types_len;
+
+  const char** segments_c = NULL;
+  BinaryenIndex* segments_size = NULL;
+
+  if (types_len != 0) {
+    segments_c = (const char**)alloca(sizeof(const char*) * types_len);
+    segments_size = (BinaryenIndex*)alloca(sizeof(BinaryenIndex) * types_len);
+  }
+
+  for (mlsize_t i = 0; i < types_len; i++) {
+    value tmp = Field(segments, i);
+    segments_c[i] = String_val(tmp);
+    segments_size[i] = strlen(segments_c[i]);
+  }
+
+  types_len = caml_array_length(segmentPassive);
+
+  bool* segment_passive_arr = NULL;
+  if (types_len != 0) {
+    segment_passive_arr = (bool*)alloca(sizeof(bool) * types_len);
+  }
+
+  for (mlsize_t i = 0; i < types_len; i++) {
+    segment_passive_arr[i] = Bool_val(Field(segmentPassive, i));
+  }
+
+  BinaryenExpressionRef* offsets = NULL;
+
+  types_len = caml_array_length(segmentOffsets);
+
+  if (types_len != 0) {
+    offsets = (BinaryenExpressionRef*)alloca(sizeof(BinaryenExpressionRef) * types_len);
+  }
+
+  for (mlsize_t i = 0; i < types_len; i++) {
+    offsets[i] = BinaryenExpressionRef_of_val(Field(segmentOffsets, i));
+  }
+
   bool shared = Bool_val(shared_bl);
-  BinaryenSetMemory(*ref, initial, maximum, export_name, NULL, NULL, NULL, NULL, types_len, shared);
+  BinaryenSetMemory(*ref, initial, maximum, export_name, segments_c, segment_passive_arr, offsets, segments_size, segments_len, shared);
   return Val_unit;
 }
 
 CAMLprim value set_memory_bytecode(value * argv, int argn) {
   return set_memory(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5],
-    argv[6], argv[7], argv[8]);
+    argv[6], argv[7]);
 }

@@ -85,7 +85,8 @@ let test_string _ =
     }
   "
   in
-  Utils.parse_string_and_codegen_to_path source "test_string.wasm"
+  let result = Utils.parse_string_and_codegen source in
+  Format.printf "%s" result
 
 let suite =
   "TestParser" >::: [
