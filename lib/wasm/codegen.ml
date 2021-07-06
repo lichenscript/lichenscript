@@ -25,6 +25,14 @@ module M (S: Dsl.BinaryenModule) = struct
     | Unit -> none
     | _ -> unreachable
 
+  let unwrap_function_return_type (ty: Core_type.TypeValue.t) =
+    let open Core_type in
+    match ty with
+    | TypeValue.Function f ->
+      f.tfun_ret
+
+    | _ -> TypeValue.Unknown
+
   let rec codegen_statements env stat: C_bindings.exp option =
     let open Typedtree in
     let { tstmt_desc; _; } = stat in
@@ -106,12 +114,18 @@ module M (S: Dsl.BinaryenModule) = struct
 
         | _ -> failwith "unreachable"
       in
+      let callee_ty = call.tcallee.texp_val in
+      let return_ty =
+        callee_ty
+        |> unwrap_function_return_type
+        |> get_binaryen_ty_by_core_ty
+      in
       let params =
         call.tcall_params
         |> List.map ~f:(codegen_expression env)
         |> List.to_array
       in
-      call_ callee_name params i32
+      call_ callee_name params return_ty
 
     | _ ->
       unreachable_exp()
@@ -121,7 +135,10 @@ module M (S: Dsl.BinaryenModule) = struct
       let open Typedtree in
       let { tparams_content; _; } = params in
       let params_arr = List.to_array tparams_content in
-      let types_arr = Array.map ~f:(fun _ -> i32) params_arr in
+      let types_arr = Array.map
+        ~f:(fun param -> param.tparam_ty |> get_binaryen_ty_by_core_ty)
+        params_arr
+      in
       C_bindings.make_ty_multiples types_arr
     in
 
@@ -146,14 +163,12 @@ module M (S: Dsl.BinaryenModule) = struct
 
     let id = function_.tfun_id in
     let id_name = id.name in
-    (* let sym = function_.tfun_id in
     let ret_ty =
-      match sym.def_type with
-      | Core_type.TypeValue.Function fun_ty ->
-        fun_ty.tfun_ret
-      | _ -> failwith "not a function"
-    in *)
-    let _fun = Dsl.function_ ~name:id_name ~params_ty ~ret_ty:i32 ~vars_ty:[| |] ~content:exp in
+      function_.tfun_id.def_type
+      |> unwrap_function_return_type
+      |> get_binaryen_ty_by_core_ty
+    in
+    let _fun = Dsl.function_ ~name:id_name ~params_ty ~ret_ty ~vars_ty:[| |] ~content:exp in
     let _ = export_function id_name id_name in
     ()
 
