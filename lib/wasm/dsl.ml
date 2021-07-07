@@ -52,6 +52,12 @@ module Binaryen (M: BinaryenModule) = struct
   let local_set index exp =
     C_bindings.make_exp_local_set M.m index exp
 
+  let global_set name exp =
+    C_bindings.make_exp_global_set M.m name exp
+
+  let global_get name ty =
+    C_bindings.make_exp_global_get M.m name ty
+
   let store ~bytes ~offset ~align ~ptr ~value ~ty =
     C_bindings.make_exp_store M.m bytes offset align ptr value ty
 
@@ -81,5 +87,8 @@ module Binaryen (M: BinaryenModule) = struct
 
   let import_function ~intern_name ~extern_name ~extern_base_name ~params_ty ~ret_ty =
     C_bindings.add_function_import M.m intern_name extern_name extern_base_name params_ty ret_ty
+
+  let add_global_var ~name ty ~mut ~init =
+    C_bindings.add_global M.m name ty mut init
   
 end

@@ -3,12 +3,20 @@ open Waterlang_typing
 (**
   * Object in waterlang are refcounting
   *
-  * object layout: 16 bytes
+  * object(active) layout: 16 bytes
   * |----------------|-----|
   * | total bytes    | i32 |
   * | flag           | i32 |
   * | strong counter | i32 |
   * | weak counter   | i32 |
+  * |----------------|-----|
+
+  * object(freed) layout: 16 bytes
+  * |----------------|-----|
+  * | total bytes    | i32 |
+  * | magic number   | i32 |
+  * | next_free_obj  | i32 |
+  * | (reserved)     | i32 |
   * |----------------|-----|
   *
   * string layout
