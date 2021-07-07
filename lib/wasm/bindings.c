@@ -273,6 +273,17 @@ CAMLprim value make_exp_return(value module, value exp) {
   return val_of_BinaryenExpressionRef(result);
 }
 
+CAMLprim value make_exp_if(value module, value cond, value ifTrue, value ifFalse) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+
+  BinaryenExpressionRef cond_exp = BinaryenExpressionRef_of_val(cond);
+  BinaryenExpressionRef true_exp = BinaryenExpressionRef_of_val(ifTrue);
+  BinaryenExpressionRef false_exp = BinaryenExpressionRef_of_val(ifFalse);
+
+  BinaryenExpressionRef result = BinaryenIf(*ref, cond_exp, true_exp, false_exp);
+  return val_of_BinaryenExpressionRef(result);
+}
+
 CAMLprim value make_exp_local_get(value module, value index, value ty) {
   BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
   int index_i = Int_val(index);

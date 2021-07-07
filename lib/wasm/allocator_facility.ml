@@ -20,8 +20,23 @@ let codegen_allocator_facility (env: Codegen_env.t) =
 
   let wtf_alloc_fun_name = "__wtf_alloc_fun" in
 
+  (* function __wtf_alloc_fun(size: i32) -> ptr *)
+  (* local 1: tmp result *)
   let codegen_wtl_alloc () =
-    let content = unreachable_exp() in
+    let content =
+      if_ (global_get free_object_var_name ptr_ty)  (* check free objects *)
+        (block [|
+          local_set 1 (global_get free_object_var_name ptr_ty);
+          local_get 1 ptr_ty;
+        |] ptr_ty)
+        (block [|
+          local_set 1 (global_get free_space_var_name ptr_ty);
+
+          global_set free_space_var_name (binary add_i32 (local_get 1 ptr_ty) (local_get 0 i32));
+
+          local_get 1 ptr_ty
+        |] ptr_ty)
+    in
     let params_ty = C_bindings.make_ty_multiples [| Codegen_env.ptr_ty env |] in
     let _ = function_ ~name:wtf_alloc_fun_name ~params_ty ~ret_ty:none ~vars_ty:[||] ~content in
     ()

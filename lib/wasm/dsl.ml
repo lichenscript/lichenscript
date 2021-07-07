@@ -46,17 +46,13 @@ module Binaryen (M: BinaryenModule) = struct
 
   let const_f64 = const_wrap C_bindings.make_literal_f64
 
-  let local_get index ty =
-    C_bindings.make_exp_local_get M.m index ty
+  let local_get = C_bindings.make_exp_local_get M.m
 
-  let local_set index exp =
-    C_bindings.make_exp_local_set M.m index exp
+  let local_set = C_bindings.make_exp_local_set M.m
 
-  let global_set name exp =
-    C_bindings.make_exp_global_set M.m name exp
+  let global_set = C_bindings.make_exp_global_set M.m
 
-  let global_get name ty =
-    C_bindings.make_exp_global_get M.m name ty
+  let global_get = C_bindings.make_exp_global_get M.m
 
   let store ~bytes ~offset ~align ~ptr ~value ~ty =
     C_bindings.make_exp_store M.m bytes offset align ptr value ty
@@ -64,14 +60,13 @@ module Binaryen (M: BinaryenModule) = struct
   let unreachable_exp () =
     C_bindings.make_exp_unrechable M.m
 
-  let return_ exp =
-    C_bindings.make_exp_return M.m exp
+  let return_ = C_bindings.make_exp_return M.m
 
-  let binary op left right =
-    C_bindings.make_exp_binary M.m op left right
+  let if_ = C_bindings.make_exp_if M.m
 
-  let call_ name params ty =
-    C_bindings.make_exp_call M.m name params ty
+  let binary = C_bindings.make_exp_binary M.m
+
+  let call_ = C_bindings.make_exp_call M.m
 
   let memory_fill ~dest ~value ~size =
     C_bindings.make_exp_memory_fill M.m dest value size
