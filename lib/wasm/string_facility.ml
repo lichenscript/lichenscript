@@ -5,24 +5,22 @@ let init_string_fun_name_static = "__init_wtl_string_static"
 let codegen_string_facility (env: Codegen_env.t) =
   let module Dsl =
     Dsl.Binaryen(struct
+      let ptr_ty = Codegen_env.ptr_ty env
       let m = env.module_
     end)
   in
   let open Dsl in
-  let ptr_ty = Codegen_env.ptr_ty env in
 
   (* function __init_string_fun_name(obj: ptr) *)
   let codegen_init_string () =
-    let content =
-      call_
-        Allocator_facility.init_object_fun_name
-        [| local_get 0 (Codegen_env.ptr_ty env) |]
-        none
+    let _ = def_function init_string_fun_name ~params:[| ptr_ty |] ~ret_ty:none (fun _ ->
+        call_
+          Allocator_facility.init_object_fun_name
+          [| Ptr.local_get 0 |]
+          none
+      )
     in
-    let params_ty = C_bindings.make_ty_multiples [| Codegen_env.ptr_ty env |] in
-    let _ = function_ ~name:init_string_fun_name ~params_ty ~ret_ty:none ~vars_ty:[||] ~content in
-    let _ = export_function init_string_fun_name init_string_fun_name in
-    ()
+    let _ = export_function init_string_fun_name init_string_fun_name in ()
   in
 
   (* function __init_string_fun_name(obj: ptr, static_str: ptr, size: i32) *)
@@ -30,27 +28,27 @@ let codegen_string_facility (env: Codegen_env.t) =
   let codegen_init_string_static () =
     let length_offset = 16 in
     let bytes_offset = 24 in
-    let content =
-      block [|
-        call_
-          Allocator_facility.init_object_fun_name
-          [| local_get 0 (Codegen_env.ptr_ty env) |]
-          none
-        ;
+    let _ = def_function init_string_fun_name_static ~params:[| ptr_ty; ptr_ty; i32 |] ~ret_ty:none (fun ctx ->
+        let offset = def_local ctx ptr_ty in
+        block [|
+          call_
+            Allocator_facility.init_object_fun_name
+            [| Ptr.local_get 0 |]
+            none
+          ;
 
-        store ~bytes:4 ~offset:length_offset ~align:0
-          ~ptr:(local_get 0 ptr_ty) ~value:(local_get 2 i32) ~ty:i32
-        ;
+          store ~bytes:4 ~offset:length_offset ~align:0
+            ~ptr:(Ptr.local_get 0) ~value:(I32.local_get 2) ~ty:i32
+          ;
 
-        local_set 3 (binary add_i32 (local_get 0 ptr_ty) (const_i32_of_int bytes_offset));
+          local_set offset (binary add_i32 (Ptr.local_get 0) (const_i32_of_int bytes_offset));
 
-        memory_copy ~dest:(local_get 3 ptr_ty) ~src:(local_get 1 ptr_ty) ~size:(local_get 2 i32);
+          memory_copy ~dest:(Ptr.local_get offset) ~src:(Ptr.local_get 1) ~size:(I32.local_get 2);
 
-      |]
-      auto
+        |]
+        auto
+      )
     in
-    let params_ty = C_bindings.make_ty_multiples [| Codegen_env.ptr_ty env |] in
-    let _ = function_ ~name:init_string_fun_name_static ~params_ty ~ret_ty:none ~vars_ty:[| ptr_ty |] ~content in
     let _ = export_function init_string_fun_name_static init_string_fun_name_static in
     ()
   in

@@ -45,6 +45,10 @@ external make_op_sub_i32: unit -> op = "make_op_sub_i32"
 
 external make_op_mul_i32: unit -> op = "make_op_mul_i32"
 
+external make_op_lt_i32: unit -> op = "make_op_lt_i32"
+
+external make_op_gt_i32: unit -> op = "make_op_gt_i32"
+
 external make_literal_i32: Int32.t -> literal = "make_literal_i32"
 
 external make_literal_i64: Int64.t -> literal = "make_literal_i64"
@@ -65,9 +69,18 @@ external make_exp_return: m -> exp option -> exp = "make_exp_return"
 
 external make_exp_if: m -> exp -> exp -> exp -> exp = "make_exp_if"
 
+external make_exp_loop: m -> string -> exp -> exp = "make_exp_loop"
+
+(* name -> condition -> value *)
+external make_exp_break: m -> string -> exp option -> exp option -> exp = "make_exp_break"
+
 external make_exp_local_get: m -> int -> ty -> exp = "make_exp_local_get"
 
 external make_exp_local_set: m -> int -> exp -> exp = "make_exp_local_set"
+
+(* bytes -> signed -> offset -> align -> type -> ptr *)
+external make_exp_load: m -> int -> bool -> int -> int -> ty -> exp -> exp =
+  "make_exp_load_bytecode" "make_exp_load"
 
 (* bytes -> offset -> align -> ptr -> value -> type *)
 external make_exp_store: m -> int -> int -> int -> exp -> exp -> ty -> exp =

@@ -215,6 +215,7 @@ let codegen program config : string =
   let env = Codegen_env.create config in
   let module Cg = M(struct
       let m = env.module_
+      let ptr_ty = Codegen_env.ptr_ty env
     end)
   in
   Cg.codegen_program env program;
@@ -224,6 +225,7 @@ let codegen program config : string =
 let codegen_binary program env path : unit =
   let module Cg = M(struct
       let m = env.module_
+      let ptr_ty = Codegen_env.ptr_ty env
     end)
   in
   Cg.codegen_program env program;

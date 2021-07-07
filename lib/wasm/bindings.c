@@ -186,6 +186,16 @@ CAMLprim value make_op_mul_i32() {
   return caml_copy_int32(op);
 }
 
+CAMLprim value make_op_lt_i32 () {
+  BinaryenOp op = BinaryenLtSInt32();
+  return caml_copy_int32(op);
+}
+
+CAMLprim value make_op_gt_i32 () {
+  BinaryenOp op = BinaryenGtSInt32();
+  return caml_copy_int32(op);
+}
+
 CAMLprim value make_literal_i32(value i) {
   value v = caml_alloc_custom(&literal_ops, sizeof(struct BinaryenLiteral), 0, 1);
   int32_t int_val = Int32_val(i);
@@ -284,6 +294,35 @@ CAMLprim value make_exp_if(value module, value cond, value ifTrue, value ifFalse
   return val_of_BinaryenExpressionRef(result);
 }
 
+CAMLprim value make_exp_loop(value module, value name_s, value exp_ref) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+
+  const char* name = String_val(name_s);
+  BinaryenExpressionRef exp = BinaryenExpressionRef_of_val(exp_ref);
+
+  BinaryenExpressionRef result = BinaryenLoop(*ref, name, exp);
+  return val_of_BinaryenExpressionRef(result);
+}
+
+CAMLprim value make_exp_break(value module, value name_s, value cond_opt, value value_opt) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+  const char* name = String_val(name_s);
+
+  BinaryenExpressionRef cond = NULL;
+  BinaryenExpressionRef value_expr = NULL;
+
+  if (Is_some(cond_opt)) {
+    cond = BinaryenExpressionRef_of_val(Some_val(cond_opt));
+  }
+
+  if (Is_some(value_opt)) {
+    value_expr = BinaryenExpressionRef_of_val(Some_val(value_opt));
+  }
+
+  BinaryenExpressionRef result = BinaryenBreak(*ref, name, cond, value_expr);
+  return val_of_BinaryenExpressionRef(result);
+}
+
 CAMLprim value make_exp_local_get(value module, value index, value ty) {
   BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
   int index_i = Int_val(index);
@@ -298,6 +337,24 @@ CAMLprim value make_exp_local_set(value module, value index, value exp) {
   BinaryenExpressionRef expr = BinaryenExpressionRef_of_val(exp);
   BinaryenExpressionRef result = BinaryenLocalSet(*ref, index_i, expr);
   return val_of_BinaryenExpressionRef(result);
+}
+
+CAMLprim value make_exp_load(value module, value bytes_i, value signed_b, value offset_i, value align_i, value ty, value ptr) {
+  BinaryenModuleRef* ref = (BinaryenModuleRef*)Data_custom_val(module);
+
+  int bytes = Int_val(bytes_i);
+  bool s = Bool_val(signed_b);
+  int offset = Int_val(offset_i);
+  int align = Int_val(align_i);
+  BinaryenType t = Int64_val(ty);
+  BinaryenExpressionRef ptr_expr = BinaryenExpressionRef_of_val(ptr);
+
+  BinaryenExpressionRef result = BinaryenLoad(*ref, bytes, s, offset, align, t, ptr_expr);
+  return val_of_BinaryenExpressionRef(result);
+}
+
+CAMLprim value make_exp_load_bytecode(value * argv, int argn) {
+  return make_exp_load(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5], argv[6]);
 }
 
 CAMLprim value make_exp_store(value module, value bytes_i, value offset_i, value align_i, value ptr, value content, value ty) {
