@@ -19,14 +19,14 @@ val set_return_type: t -> Core_type.TypeValue.t option -> unit
 
 val return_type: t -> Core_type.TypeValue.t option
 
-val ty_u32: t -> Core_type.type_sym
+val ty_u32: t -> Core_type.TypeSym.t
 
-val ty_i32: t -> Core_type.type_sym
+val ty_i32: t -> Core_type.TypeSym.t
 
-val ty_f32: t -> Core_type.type_sym
+val ty_f32: t -> Core_type.TypeSym.t
 
-val ty_char: t -> Core_type.type_sym
+val ty_char: t -> Core_type.TypeSym.t
 
-val ty_string: t -> Core_type.type_sym
+val ty_string: t -> Core_type.TypeSym.t
 
-val ty_boolean: t -> Core_type.type_sym
+val ty_boolean: t -> Core_type.TypeSym.t

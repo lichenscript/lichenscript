@@ -22,6 +22,14 @@ module VarOperator (M: BinaryenModule) (T: BinaryenTypeContainer) = struct
 
   let global_get name =
     C_bindings.make_exp_global_get M.m name T.ty
+
+  let store ~offset ?(align = 0) ~ptr content =
+    C_bindings.make_exp_store
+      M.m T.size offset align ptr content T.ty
+
+  let load ?(signed = true) ~offset ?(align = 0) ptr =
+    C_bindings.make_exp_load
+      M.m T.size signed offset align T.ty ptr
   
 end
 
@@ -45,6 +53,8 @@ module Binaryen (M: BinaryenModule) = struct
 
   let mul_i32 = C_bindings.make_op_sub_i32 ()
 
+  let div_i32 = C_bindings.make_op_div_i32 ()
+
   let lt_i32 = C_bindings.make_op_lt_i32 ()
 
   let gt_i32 = C_bindings.make_op_gt_i32 ()
@@ -59,7 +69,7 @@ module Binaryen (M: BinaryenModule) = struct
     let lit = maker value in
     C_bindings.make_exp_const M.m lit
 
-  let block ?name children ty =
+  let block ?name ?(ty = none) children  =
     C_bindings.make_exp_block M.m name children ty
 
   let const_i32 = const_wrap C_bindings.make_literal_i32

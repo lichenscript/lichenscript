@@ -1,4 +1,5 @@
 open Core_kernel
+open Binaryen
 open Codegen_env
 open Waterlang_typing
 
@@ -7,11 +8,11 @@ module M (S: Dsl.BinaryenModule) = struct
   open Dsl
 
   let get_binaryen_ty_by_core_ty env (ty: Core_type.TypeValue.t): C_bindings.ty =
-    let open Core_type.TypeValue in
+    let open Core_type in
     match ty with
     | Ctor sym ->
-      if sym#builtin then (
-        match sym#get_name with
+      if (TypeSym.builtin sym) then (
+        match (TypeSym.name sym) with
         | "i32" -> i32
         | "i64" -> i64
         | "f32" -> f32
@@ -35,9 +36,9 @@ module M (S: Dsl.BinaryenModule) = struct
     | _ -> TypeValue.Unknown
 
   let set_memory env =
-    let strings = env.static_string_pool
-      |> Codegen_env.StaticStringPool.to_alist ~key_order:`Increasing
-      |> List.map ~f:(fun (key, _) -> String_utils.u8string_to_u16string key)
+    let strings = env.data_segment.allocated_str
+      |> Data_segment_allocator.StaticStringPool.to_alist
+      |> List.map ~f:(fun (_, value) -> Data_segment_allocator.(value.data))
       |> List.to_array
     in
     let passitive = Array.init ~f:(fun _ -> false) (Array.length strings) in
@@ -87,14 +88,14 @@ module M (S: Dsl.BinaryenModule) = struct
       const_f64 value
 
     | Pconst_string (content, _, _) ->
-      print_endline "turn on string";
       Codegen_env.turn_on_string env;
-      let _ = Codegen_env.add_static_string env content in
-      const_i32_of_int 0
+      let value = Data_segment_allocator.add_static_string env.data_segment content in
+      call_ String_facility.init_string_fun_name_static
+        [| Data_segment_allocator.(const_i32_of_int value.offset) |] i32
 
     | Pconst_char ch ->
       let str = Char.to_string ch in
-      let _ = Codegen_env.add_static_string env str in
+      let _ = Data_segment_allocator.add_static_string env.data_segment str in
       failwith "not implemented"
 
     | Pconst_boolean true ->
@@ -176,7 +177,7 @@ module M (S: Dsl.BinaryenModule) = struct
             tblk_body
             |> List.filter_map ~f:(codegen_statements env)
           in
-          Dsl.block (List.to_array expressions) auto
+          Dsl.block (List.to_array expressions)
         end
 
       | Typedtree.Tfun_expression_body expr ->

@@ -186,6 +186,11 @@ CAMLprim value make_op_mul_i32() {
   return caml_copy_int32(op);
 }
 
+CAMLprim value make_op_div_i32() {
+  BinaryenOp op = BinaryenDivSInt32();
+  return caml_copy_int32(op);
+}
+
 CAMLprim value make_op_lt_i32 () {
   BinaryenOp op = BinaryenLtSInt32();
   return caml_copy_int32(op);

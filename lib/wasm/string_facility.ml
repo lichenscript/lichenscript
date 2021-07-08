@@ -1,3 +1,4 @@
+open Binaryen
 
 let init_string_fun_name = "__init_wtl_string"
 let init_string_fun_name_static = "__init_wtl_string_static"
@@ -37,16 +38,13 @@ let codegen_string_facility (env: Codegen_env.t) =
             none
           ;
 
-          store ~bytes:4 ~offset:length_offset ~align:0
-            ~ptr:(Ptr.local_get 0) ~value:(I32.local_get 2) ~ty:i32
-          ;
+          I32.store ~offset:length_offset ~ptr:(Ptr.local_get 0) (I32.local_get 2);
 
           local_set offset (binary add_i32 (Ptr.local_get 0) (const_i32_of_int bytes_offset));
 
           memory_copy ~dest:(Ptr.local_get offset) ~src:(Ptr.local_get 1) ~size:(I32.local_get 2);
 
         |]
-        auto
       )
     in
     let _ = export_function init_string_fun_name_static init_string_fun_name_static in

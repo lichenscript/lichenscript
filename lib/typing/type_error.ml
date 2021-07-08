@@ -14,6 +14,7 @@ and spec =
   | NotCallable of TypeValue.t
   | ParamsMismatch of TypeValue.t
   | CannotPassParam of string * TypeValue.t * TypeValue.t
+  | CannotReadMember of string * TypeValue.t
 
 let make_error loc spec =
   { loc; spec }
@@ -45,6 +46,10 @@ module PP = struct
     | CannotPassParam(name, def_param, actual_param) ->
       Format.fprintf formatter "Can not pass '%a' as param '%s', because '%a' is expected"
         TypeValue.pp actual_param name TypeValue.pp def_param
+
+    | CannotReadMember(name, ty) ->
+      Format.fprintf formatter "Can not read member '%s' of type '%a'"
+        name TypeValue.pp ty
 
   let error formatter err =
     let { spec; loc } = err in

@@ -5,10 +5,6 @@
   waterlang_lex
   waterlang_parsing
   core_kernel
+  binaryen
  )
- (foreign_stubs
-  (language c)
-  (names bindings))
- (c_library_flags (-lbinaryen))
- (flags :standard -cclib -lbinaryen)
  (preprocess (pps ppx_deriving.show)))

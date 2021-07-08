@@ -1,37 +1,19 @@
 open Waterlang_lex
+open Core_kernel
 
 type kind =
   | Local
   | Global
 
-class type_sym (scope_id: int) (name: string) (kind: kind) =
-  object
-    method get_name = name
 
-    method get_kind = kind
-
-    method get_scope_id = scope_id
-
-    method builtin = false
-
-  end
-
-class builtin_sym (scope_id: int) (name: string) (kind: kind) =
-  object inherit type_sym scope_id name kind
-
-    method! builtin = true
-
-  end
-
-let pp_type_sym formatter (sym: type_sym) =
-  Format.pp_print_string formatter sym#get_name
+module PropsMap = Hashtbl.Make(String)
 
 module rec TypeValue : sig
   type t =
     | Unknown
     | Any
     | Unit
-    | Ctor of type_sym
+    | Ctor of TypeSym.t
     | Class of class_type
     | Function of function_type
     | Array of t
@@ -60,7 +42,7 @@ end = struct
     | Unknown
     | Any
     | Unit
-    | Ctor of type_sym
+    | Ctor of TypeSym.t
     | Class of class_type
     | Function of function_type
     | Array of t
@@ -85,7 +67,7 @@ end = struct
   | Unknown -> Format.pp_print_string formatter "unknown"
   | Any -> Format.pp_print_string formatter "any"
   | Unit -> Format.pp_print_string formatter "unit"
-  | Ctor sym -> Format.pp_print_string formatter sym#get_name
+  | Ctor sym -> Format.pp_print_string formatter (TypeSym.name sym)
   | Class _ -> Format.pp_print_string formatter "Class"
   | Function fun_ ->
     pp_function_type formatter fun_
@@ -96,7 +78,7 @@ end = struct
     Format.pp_print_string formatter "(";
 
     List.iteri
-      (fun index param ->
+      ~f:(fun index param ->
         let (name, ty) = param in
         Format.pp_print_string formatter name;
         Format.pp_print_string formatter ": ";
@@ -109,6 +91,77 @@ end = struct
 
     Format.pp_print_string formatter ") => ";
     pp formatter fun_.tfun_ret
+  
+end
+
+and TypeSym : sig
+  type module_type = {
+    props: TypeValue.t PropsMap.t;
+  }
+
+  type spec =
+    | Primitive
+    | Class
+    | Alias of TypeValue.t
+    | Module_ of module_type
+
+  type t = {
+    builtin: bool;
+    scope_id: int;
+    name: string;
+    kind: kind;
+    spec: spec;
+  }
+
+  val name: t -> string
+
+  val builtin: t -> bool
+
+  val create: ?builtin:bool -> ?kind:kind -> scope_id:int -> string -> spec -> t
+
+  val create_module: unit -> module_type
+
+  val pp: Format.formatter -> t -> unit
+
+end = struct
+  type module_type = {
+    props: TypeValue.t PropsMap.t;
+  }
+
+  type spec =
+    | Primitive
+    | Class
+    | Alias of TypeValue.t
+    | Module_ of module_type
+
+  type t = {
+    builtin: bool;
+    scope_id: int;
+    name: string;
+    kind: kind;
+    spec: spec;
+  }
+
+  let name sym = sym.name
+
+  let builtin sym = sym.builtin
+
+  let create ?(builtin=false) ?(kind=Local)  ~scope_id name spec =
+    {
+      builtin;
+      scope_id;
+      name;
+      kind;
+      spec;
+    }
+
+  let create_module () =
+    {
+      props = PropsMap.create ();
+    }
+
+  let pp formatter (sym: t) =
+    Format.pp_print_string formatter sym.name
   
 end
 
@@ -153,13 +206,3 @@ end = struct
     t.def_type <- ty
   
 end
-
-class cls_type_sym (scope_id: int) (name: string) (kind: kind) (c: TypeValue.t) =
-  object inherit type_sym scope_id name kind
-    val cls: TypeValue.t = c
-  end
-
-class alias_type_sym (scope_id: int) (name: string) (kind: kind) (alias: TypeValue.t) =
-  object inherit type_sym scope_id name kind
-    method get_alias = alias
-  end

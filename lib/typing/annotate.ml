@@ -360,8 +360,28 @@ and annotate_expression (env: Env.t) expr =
       }, return_ty)
 
     | Pexp_member (expr, field) ->
+
       let expr = annotate_expression env expr in
-      (Texp_member(expr, field), TypeValue.Unknown)
+
+      let add_cannot_read_name_error name =
+          let spec = Type_error.CannotReadMember(name, expr.texp_val) in
+          let err = { Type_error. spec; loc = pexp_loc } in
+          Env.add_error env err;
+          raise (Type_error.Error err)
+      in
+
+      let open TypeValue in
+      (match expr.texp_val with
+      | Ctor { TypeSym. spec = Module_ mod_; _; } ->
+        let name = field.pident_name in
+        let field_type_opt = PropsMap.find mod_.props name in
+        (match field_type_opt with
+        | Some field_type ->
+          (Texp_member(expr, field), field_type)
+        | None -> add_cannot_read_name_error field.pident_name)
+
+      | _ -> 
+        add_cannot_read_name_error field.pident_name)
 
     | Pexp_unary (op, expr) ->
       let expr = annotate_expression env expr in
@@ -404,8 +424,8 @@ let pre_scan_definitions env program =
     | None ->
       begin
         let open Core_type in
-        let sym = new type_sym scope.id name Local in
-        Scope.set_type_symbol scope name sym
+        let sym = TypeSym.create ~scope_id:scope.id name TypeSym.Primitive in
+        Scope.insert_type_symbol scope sym
       end
   in
 

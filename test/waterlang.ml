@@ -82,6 +82,7 @@ let test_string _ =
   let source = "
     function main() {
       let a: string = \"Hello World!\";
+      console.log(a);
     }
   "
   in

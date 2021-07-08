@@ -9,6 +9,28 @@ type t = {
   mutable return_type: TypeValue.t option;
 }
 
+let make_default_module_sym scope =
+  let module_t = TypeSym.create_module() in
+  let str_ty = Option.value_exn (Scope.find_type_symbol scope "string")in
+  PropsMap.set module_t.props ~key:"log" ~data:(Core_type.TypeValue.(Function {
+    tfun_params = [("content", Ctor str_ty)];
+    tfun_ret = Unit;
+  }));
+  let console = TypeSym.create ~builtin:true ~kind:Global ~scope_id:(Scope.id scope) "console" (TypeSym.Module_ module_t) in
+  Scope.insert_type_symbol scope console;
+  let var_sym =
+    { VarSym.
+      id_in_scope = Scope.next_var_id scope;
+      name = "console";
+      def_type = Ctor console;
+      def_loc = None;
+      kind = Global;
+      scope_id = Scope.id scope;
+      builtin = true;
+    }
+  in
+  Scope.insert_var_symbol scope var_sym
+
 let make_default_type_sym scope =
   let names = [|
     "u32";
@@ -23,10 +45,12 @@ let make_default_type_sym scope =
   |] in
   Array.iter
     ~f:(fun name ->
-      let sym = new builtin_sym (Scope.id scope) name Global in
-      Scope.set_type_symbol scope name sym;
+      let sym = TypeSym.create ~builtin:true ~kind:Global ~scope_id:(Scope.id scope) name TypeSym.Primitive in
+      Scope.insert_type_symbol scope sym;
     )
     names
+  ;
+  make_default_module_sym scope
 
 let create () =
   let root_scope = Scope.create 0 in
