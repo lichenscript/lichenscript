@@ -49,7 +49,12 @@ module M (S: Dsl.BinaryenModule) = struct
       )
       (Array.length strings)
     in
-    C_bindings.set_memory env.module_ 1024 1024 "memory" strings passitive offsets false
+    let mem_size = env.config.init_mem_size / (64 * 1024) in
+    C_bindings.set_memory
+      env.module_
+      mem_size
+      mem_size
+      "memory" strings passitive offsets false
 
   let rec codegen_statements env stat: C_bindings.exp option =
     let open Typedtree in
@@ -73,6 +78,9 @@ module M (S: Dsl.BinaryenModule) = struct
 
     | Tstmt_binding binding ->
       codegen_binding env binding
+
+    | Tstmt_semi expr ->
+      Some(codegen_expression env expr)
 
     | _ -> None
 
@@ -100,8 +108,13 @@ module M (S: Dsl.BinaryenModule) = struct
     | Pconst_string (content, _, _) ->
       Codegen_env.turn_on_string env;
       let value = Data_segment_allocator.add_static_string env.data_segment content in
+      let open Data_segment_allocator in
+      let str_len = String.length content in
       call_ String_facility.init_string_fun_name_static
-        [| Data_segment_allocator.(const_i32_of_int value.offset) |] i32
+        [|
+          const_i32_of_int value.offset;
+          (const_i32_of_int str_len);
+        |] i32
 
     | Pconst_char ch ->
       let str = Char.to_string ch in
@@ -140,28 +153,69 @@ module M (S: Dsl.BinaryenModule) = struct
       codegen_constant env cnst
 
     | Texp_call call ->
-      let open Waterlang_typing.Typedtree in
-      let callee_name = match call.tcallee.texp_desc with
-        | Texp_identifier sym ->
-          sym.name
+      codegen_call env call
 
-        | _ -> failwith "unreachable"
+    | _ ->
+      unreachable_exp()
+
+  and codegen_call env call =
+    let open Typedtree in
+    let open Core_type.VarSym in
+    let (callee_sym, prop_names) = call.tcallee.tcallee_spec in
+    let params =
+      call.tcall_params
+      |> List.map ~f:(codegen_expression env)
+      |> List.to_array
+    in
+    match callee_sym.spec with
+    | Internal ->
+      let get_function_name_by_callee callee =
+        match callee.tcallee_spec with
+        | (callee_sym, []) -> callee_sym.name
+        | (callee_sym, _arr) ->
+          callee_sym.name
       in
-      let callee_ty = call.tcallee.texp_val in
+      let callee_name: string = get_function_name_by_callee call.tcallee in
+      let callee_ty = call.tcallee.tcallee_ty in
       let return_ty =
         callee_ty
         |> unwrap_function_return_type
         |> (get_binaryen_ty_by_core_ty env)
       in
-      let params =
-        call.tcall_params
-        |> List.map ~f:(codegen_expression env)
-        |> List.to_array
-      in
       call_ callee_name params return_ty
 
-    | _ ->
-      unreachable_exp()
+    | ExternalModule _mod ->
+      let call_var_sym: Core_type.VarSym.t =
+        List.fold
+        ~init:callee_sym
+        ~f:(fun sym name_spec ->
+          match sym.spec with
+          | Internal -> failwith "unreachable"
+          | ExternalModule mod_ ->
+            let child_name = match name_spec with
+              | `Property name -> name
+              | _ -> failwith "not implemented"
+            in
+            let next_sym = Core_type.PropsMap.find_exn mod_ child_name in
+            next_sym
+
+          | ExternalMethod _ -> failwith "not implemented")
+        prop_names
+      in
+      let return_ty =
+        call_var_sym.def_type
+        |> unwrap_function_return_type
+        |> (get_binaryen_ty_by_core_ty env)
+      in
+      let name =
+        match call_var_sym.spec with
+        | ExternalMethod m -> m
+        | _ -> failwith "unreachable"
+      in
+      call_ name params return_ty
+
+    | ExternalMethod _ ->
+      failwith "not implemented"
 
   and codegen_function env function_ =
     let parms_type params =
@@ -249,4 +303,4 @@ let codegen_binary program env path : unit =
   Cg.codegen_program env program;
   C_bindings.module_emit_binary_to_file env.module_ path;
   let js_glue_content = Js_glue.dump_js_glue env in
-  Out_channel.write_all (env.output_filename ^ ".js") ~data:js_glue_content
+  Out_channel.write_all (path ^ ".js") ~data:js_glue_content

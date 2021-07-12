@@ -61,23 +61,33 @@ let generate_glue filename = "
 
       wasmMemory = Module['asm']['memory'];
       updateGlobalBufferAndViews(wasmMemory.buffer);
+
+      exports['main']();
     }
 
     var env = {
       console_log: function (ptr) {
         var str = wtfStringToJsString(ptr);
         console.log(str);
-      }
+      },
+      memory_fill: function (dest, value, size) {
+        for (var i = 0; i < size; i++) {
+          HEAPU8[dest + i] = value;
+        }
+      },
+      memory_copy: function (dest, src, num) {
+        HEAPU8.copyWithin(dest, src, src + num);
+      },
     }
 
     var info = {
       env,
     };
 
-    const bytes = fs.readFileSync(path.join(__dirname, '" ^ filename ^ ".wasm'));
+    const bytes = fs.readFileSync('" ^ filename ^ "');
     WebAssembly.instantiate(bytes, info).then(function (result) {
       receiveInstance(result.instance);
-    })
+    }).catch(err => console.error(err));
   }
 
   main();

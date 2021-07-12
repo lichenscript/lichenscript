@@ -5,6 +5,9 @@ let init_object_fun_name = "__wtl_init_object"
 let free_object_fun_name = "__wtl_free_object"
 let free_object_var_name = "__wtl_free_obj"
 let free_space_var_name = "__wtf_free_space"
+let memory_copy_fun_name = "__wtl_memory_copy"
+let memory_fill_fun_name = "__wtl_memory_fill"
+let wtf_alloc_fun_name = "__wtf_alloc_fun"
 
 (**
   * global info
@@ -20,7 +23,6 @@ let codegen_allocator_facility (env: Codegen_env.t) =
   in
   let open Dsl in
 
-  let wtf_alloc_fun_name = "__wtf_alloc_fun" in
   let wtf_alloc_from_free_space_fun_name = "__wtf_alloc_from_free_space" in
 
   let codegen_wtf_next_align_size () =
@@ -69,13 +71,13 @@ let codegen_allocator_facility (env: Codegen_env.t) =
   (* local 2: obj total size *)
   (* local 3: current free_object *)
   let codegen_wtl_alloc () =
-    let _ = def_function wtf_alloc_fun_name ~params:[| ptr_ty |] ~ret_ty:none (fun ctx ->
+    let _ = def_function wtf_alloc_fun_name ~params:[| ptr_ty |] ~ret_ty:ptr_ty (fun ctx ->
         let tmp_result = def_local ctx ptr_ty in
         let remain_size = def_local ctx i32 in
         let prev_free_obj = def_local ctx ptr_ty in
         let current_free_obj = def_local ctx ptr_ty in
 
-        block [|
+        block ~ty:ptr_ty ~name:"fun_blk" [|
           (* Question: Is this neccessary? *)
           local_set prev_free_obj (const_i32_of_int 0);
 
@@ -84,7 +86,7 @@ let codegen_allocator_facility (env: Codegen_env.t) =
 
           loop "find_free_obj" (
             if_ (Ptr.local_get current_free_obj)  (* check free objects *)
-              (block ~ty:ptr_ty [|
+              (block ~ty:none [|
                 (* total_size <- (current_free_obj->total_bytes) *)
                 local_set
                   remain_size
@@ -94,7 +96,7 @@ let codegen_allocator_facility (env: Codegen_env.t) =
                 (* if (remain_size > required_size) *)
                 (if_ (binary gt_i32 (I32.local_get remain_size) (I32.local_get 0))
                   (* return current free_object *)
-                  (block ~ty:ptr_ty [|
+                  (block ~ty:none [|
                     (* tmp_result <- $__wtl_free_obj *)
                     local_set tmp_result (Ptr.global_get free_object_var_name);
 
@@ -112,12 +114,12 @@ let codegen_allocator_facility (env: Codegen_env.t) =
                         (Ptr.load ~offset:8 (Ptr.local_get 0))));
 
                     (* return tmp result *)
-                    Ptr.local_get tmp_result;
+                    break_ "fun_blk" ~value:(Ptr.local_get tmp_result);
 
                   |])
                   (* else *)
                   (* check next node on linked-list *)
-                  (block [|
+                  (block ~ty:none [|
 
                     (* prev_free_obj <- curent_free_obj *)
                     local_set prev_free_obj (Ptr.local_get current_free_obj);
@@ -130,10 +132,13 @@ let codegen_allocator_facility (env: Codegen_env.t) =
               |])
 
               (* no suitable free obj found, alloca from free space *)
-              (break_
-                ?value:(Some(call_ wtf_alloc_from_free_space_fun_name [| Ptr.local_get 0 |] ptr_ty))
-                "find_free_obj")
+              (block [|
+                local_set tmp_result (call_ wtf_alloc_from_free_space_fun_name [| Ptr.local_get 0 |] ptr_ty);
+                break_ "fun_blk" ~value:(Ptr.local_get tmp_result);
+              |])
           );
+
+          Ptr.local_get tmp_result;
         |]
       )
     in
@@ -143,7 +148,8 @@ let codegen_allocator_facility (env: Codegen_env.t) =
   (* function __wtl_init_object(obj: ptr) *)
   let codegen_wtl_init_object () =
     let _ = def_function init_object_fun_name ~params:[| ptr_ty |] ~ret_ty:none (fun _ ->
-        memory_fill ~dest:(Ptr.local_get 0) ~value:(const_i32_of_int 0) ~size:(const_i32_of_int 16)
+        (* memory_fill ~dest:(Ptr.local_get 0) ~value:(const_i32_of_int 0) ~size:(const_i32_of_int 16) *)
+        call_ memory_fill_fun_name [| Ptr.local_get 0; const_i32_of_int 0; const_i32_of_int 16 |] none
       )
     in
     let _ = export_function init_object_fun_name init_object_fun_name in
@@ -171,6 +177,26 @@ let codegen_allocator_facility (env: Codegen_env.t) =
     ~init:(const_i32_of_int env.config.stack_size)
   in
 
+  let codegen_memory_copy () =
+    import_function
+      ~intern_name:memory_copy_fun_name
+      ~extern_name:"env"
+      ~extern_base_name:"memory_copy"
+      ~params_ty:(C_bindings.make_ty_multiples [| ptr_ty; ptr_ty; i32 |])
+      ~ret_ty:none
+  in
+
+  let codegen_memory_fill () =
+    import_function
+      ~intern_name:memory_fill_fun_name
+      ~extern_name:"env"
+      ~extern_base_name:"memory_fill"
+      ~params_ty:(C_bindings.make_ty_multiples [| ptr_ty; i32; i32 |])
+      ~ret_ty:none
+  in
+
+  codegen_memory_copy();
+  codegen_memory_fill();
   codegen_wtf_next_align_size();
   codegen_wtl_alloc_from_free_space();
   codegen_wtl_alloc();

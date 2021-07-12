@@ -259,8 +259,8 @@ and annotate_pattern env pat =
     tpat_loc = ppat_loc;
   }
 
-and annotate_constant (env: Env.t) (cnst: Waterlang_parsing.Ast.constant) =
-  let open Waterlang_parsing.Ast in
+and annotate_constant (env: Env.t) (cnst: Ast.constant) =
+  let open Ast in
   match cnst with
   | Pconst_integer _ ->
     (cnst, Env.ty_i32 env)
@@ -321,20 +321,7 @@ and annotate_expression (env: Env.t) expr =
     | Pexp_array arr ->
       (Texp_array (List.map ~f:(annotate_expression env) arr), TypeValue.Unknown)
     
-    | Pexp_call call ->
-      let {Ast. pcallee; pcall_params; pcall_loc } = call in
-      let tcallee = annotate_expression env pcallee in
-      let return_ty =
-        match tcallee.texp_val with
-        | TypeValue.Function fun_ -> fun_.tfun_ret
-        | _ -> TypeValue.Unknown
-      in
-      let tcall_params = List.map ~f:(annotate_expression env) pcall_params in
-      (Texp_call {
-        tcallee;
-        tcall_params;
-        tcall_loc = pcall_loc;
-      }, return_ty)
+    | Pexp_call call -> annotate_call env call
 
     | Pexp_member (expr, field) ->
 
@@ -380,6 +367,65 @@ and annotate_expression (env: Env.t) expr =
     texp_loc = pexp_loc;
     texp_val = ty_val;
   }
+
+and annotate_call env call =
+  let rec cast_member_to_callee (expr: Typedtree.expression) props =
+    match expr.texp_desc with
+    | Texp_identifier id ->
+      let (ty, props) = props
+        |> List.rev
+        |> List.fold_map
+          ~init:id.def_type
+          ~f:(fun acc id ->
+            let open Core_type.TypeValue in
+            let open Core_type.TypeSym in
+            let open Identifier in
+            let ty = match acc with
+              | Ctor { spec = Module_ mod_; _; } ->
+                let name = id.pident_name in
+                let prop_opt = Core_type.PropsMap.find mod_.props name in
+                Option.value_exn prop_opt
+
+              | _ -> Unknown
+            in
+            let prop = `Property id.pident_name  in
+            ty, prop
+          )
+      in
+      let callee_item = (id, props) in
+      (callee_item, ty)
+
+    | Texp_member(new_expr, id) ->
+      cast_member_to_callee new_expr (id::props)
+
+    | _ ->
+      let spec = Type_error.NotCallable expr.texp_val in
+      let err = Type_error.make_error expr.texp_loc spec in
+      Env.add_error env err;
+      raise (Type_error.Error err)
+
+  and cast_expr_to_callee (expr: Typedtree.expression): callee =
+    let (spec, tcallee_ty) = cast_member_to_callee expr [] in
+    { Typedtree.
+      tcallee_spec = spec;
+      tcallee_loc = expr.texp_loc;
+      tcallee_ty;
+    }
+
+  in
+  let {Ast. pcallee; pcall_params; pcall_loc } = call in
+  let tcallee = annotate_expression env pcallee in
+  let return_ty =
+    match tcallee.texp_val with
+    | TypeValue.Function fun_ -> fun_.tfun_ret
+    | _ -> TypeValue.Unknown
+  in
+  let tcall_params = List.map ~f:(annotate_expression env) pcall_params in
+  (Texp_call {
+    tcallee = cast_expr_to_callee tcallee;
+    tcall_params;
+    tcall_loc = pcall_loc;
+  }, return_ty)
 
 (**
  * pre-scan symbol of root-level definitions of

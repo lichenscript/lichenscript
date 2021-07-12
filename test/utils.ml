@@ -58,5 +58,7 @@ let parse_string_and_codegen content =
 let parse_string_and_codegen_to_path content path =
   let p = parse_string_to_program content in
   let config = Config.debug_default () in
-  let env = Codegen_env.create config in
+  let slices = String.split path ~on:'/' in
+  let output_filename = List.last_exn slices in
+  let env = Codegen_env.create ~output_filename config in
   Codegen.codegen_binary p env path

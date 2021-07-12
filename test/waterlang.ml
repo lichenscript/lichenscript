@@ -75,8 +75,9 @@ let test_function_call _ =
     }
     "
   in
-  let result = Utils.parse_string_and_codegen source in
-  Format.printf "%s" result
+  let _result = Utils.parse_string_and_codegen source in
+  ()
+  (* Format.printf "%s" result *)
 
 let test_string _ =
   let source = "
@@ -87,7 +88,8 @@ let test_string _ =
   "
   in
   let result = Utils.parse_string_and_codegen source in
-  Format.printf "%s" result
+  Format.printf "%s" result;
+  Utils.parse_string_and_codegen_to_path source "/tmp/test_wtl"
 
 let suite =
   "TestParser" >::: [

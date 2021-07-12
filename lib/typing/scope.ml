@@ -55,3 +55,6 @@ let create_var_symbol scope name =
   let sym = VarSym.mk_local ~id_in_scope:id ~scope_id name in
   insert_var_symbol scope sym;
   sym
+
+let pp formatter scope =
+  Format.fprintf formatter "Scope(%d)" scope.id

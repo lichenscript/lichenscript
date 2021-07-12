@@ -30,8 +30,14 @@ and expression_desc =
     expression *
     bool
 
+and callee = {
+  tcallee_spec: Core_type.VarSym.t * ([ `Property of string | `Expr of expression ] list);
+  tcallee_loc: Loc.t;
+  tcallee_ty: Core_type.TypeValue.t
+}
+
 and call = {
-  tcallee: expression;
+  tcallee: callee;
   tcall_params: expression list;
   tcall_loc: Loc.t;
 }
@@ -144,8 +150,9 @@ and pattern_desc =
 and program = {
   tprogram_statements: statement list;
 }
+[@@deriving show]
 
-let pp_pattern formatter pat =
+(* let pp_pattern formatter pat =
   match pat.tpat_desc with
   | Tpat_symbol sym ->
-    Format.pp_print_string formatter sym.name
+    Format.pp_print_string formatter sym.name *)

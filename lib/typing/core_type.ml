@@ -166,13 +166,13 @@ end = struct
 end
 
 and VarSym : sig
-  type external_method = (string * string)
 
   type spec =
   | Internal
-  | External of external_method
+  | ExternalModule of t PropsMap.t
+  | ExternalMethod of string
 
-  type t = {
+  and t = {
     id_in_scope: int;
     name:        string;
     mutable def_type:    TypeValue.t;
@@ -187,14 +187,16 @@ and VarSym : sig
 
   val set_def_type: t -> TypeValue.t -> unit
 
+  val pp: Format.formatter -> t -> unit
+
 end = struct
-  type external_method = (string * string)
 
   type spec =
   | Internal
-  | External of external_method
+  | ExternalModule of t PropsMap.t
+  | ExternalMethod of string
 
-  type t = {
+  and t = {
     id_in_scope: int;
     name:        string;
     mutable def_type:    TypeValue.t;
@@ -219,5 +221,8 @@ end = struct
 
   let set_def_type t ty =
     t.def_type <- ty
+
+  let pp formatter sym =
+    Format.fprintf formatter "VarSym('%s')" sym.name
   
 end

@@ -132,8 +132,8 @@ and check_expression (env: Env.t) expr =
 
   | Texp_call call ->
     let { tcallee; tcall_params; tcall_loc; _; } = call in
-    check_expression env tcallee;
-    let callee_type = tcallee.texp_val in
+    check_callee env tcallee;
+    let callee_type = tcallee.tcallee_ty in
     TypeValue.(
     match callee_type with
     | Function fun_ ->
@@ -169,29 +169,48 @@ and check_expression (env: Env.t) expr =
   | Texp_update (_, exp, _) ->
     check_expression env exp
 
+and check_callee _env (callee: Typedtree.callee) =
+  match callee.tcallee_spec with
+  | (_, []) -> ()
+
+  | (sym, arr) ->
+    let _ = List.fold
+      ~init:sym.def_type
+      ~f:(fun acc prop -> (match prop with
+      | `Property prop_name -> (
+        let open Core_type.TypeValue in
+        let open Core_type.TypeSym in
+        match acc with
+        | Ctor { spec = Module_ mod_; _; } ->
+          let prop_opt = Core_type.PropsMap.find mod_.props prop_name in
+          Option.value_exn prop_opt
+
+        | _ -> Unknown
+      )
+      | `Expr _expr -> failwith "not implement"))
+      arr
+    in ()
+
 and check_assignable env loc left right =
-  if type_assinable left right then
-    ()
-  else
+  if not (type_assinable left right) then (
     let spec = Type_error.NotAssignable(left, right) in
     let err = {Type_error. loc; spec } in
     Env.add_error env err
+  )
 
 and check_returnable env loc expected actual =
-  if type_assinable expected actual then
-    ()
-  else
+  if not (type_assinable expected actual) then (
     let spec = Type_error.CannotReturn(expected, actual) in
     let err = {Type_error. loc; spec } in
     Env.add_error env err
+  )
 
 and check_passable env loc ~name ~(def: TypeValue.t) ~(actual: TypeValue.t) =
-  if type_assinable def actual then
-    ()
-  else
+  if not (type_assinable def actual) then (
     let spec = Type_error.CannotPassParam(name, def, actual) in
     let err = {Type_error. loc; spec } in
     Env.add_error env err
+  )
 
 let type_check env program =
   let { tprogram_statements; _; } = program in

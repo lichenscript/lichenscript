@@ -51,7 +51,7 @@ module Binaryen (M: BinaryenModule) = struct
 
   let sub_i32 = C_bindings.make_op_sub_i32 ()
 
-  let mul_i32 = C_bindings.make_op_sub_i32 ()
+  let mul_i32 = C_bindings.make_op_mul_i32 ()
 
   let div_i32 = C_bindings.make_op_div_i32 ()
 

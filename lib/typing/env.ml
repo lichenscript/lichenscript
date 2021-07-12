@@ -18,6 +18,20 @@ let make_default_module_sym scope =
   }));
   let console = TypeSym.create ~builtin:true ~kind:Global ~scope_id:(Scope.id scope) "console" (TypeSym.Module_ module_t) in
   Scope.insert_type_symbol scope console;
+  let extern_module = PropsMap.create() in
+  let log_method =
+    { VarSym.
+      id_in_scope = Scope.next_var_id scope;
+      name = "log";
+      def_type = TypeValue.Unknown;
+      def_loc = None;
+      kind = Local;
+      scope_id = Scope.id scope;
+      builtin = true;
+      spec = Core_type.VarSym.ExternalMethod "__wtl_console_log"
+    }
+  in
+  PropsMap.set extern_module ~key:"log" ~data:log_method;
   let var_sym =
     { VarSym.
       id_in_scope = Scope.next_var_id scope;
@@ -27,7 +41,7 @@ let make_default_module_sym scope =
       kind = Global;
       scope_id = Scope.id scope;
       builtin = true;
-      spec = Core_type.VarSym.External("console", "log");
+      spec = Core_type.VarSym.ExternalModule(extern_module);
     }
   in
   Scope.insert_var_symbol scope var_sym
