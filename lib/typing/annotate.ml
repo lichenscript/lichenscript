@@ -125,6 +125,7 @@ and annotate_function env _function =
           tfun_id;
           tfun_params;
           tfun_body;
+          tfun_assoc_scope = scope;
           tfun_loc = pfun_loc;
         }
       end
@@ -220,8 +221,20 @@ and annotate_block env block =
 and annotate_binding env binding =
   let { Ast. pbinding_kind; pbinding_loc; pbinding_ty; pbinding_pat; pbinding_init } = binding in
   let tbinding_init = annotate_expression env pbinding_init in
-  let tbinding_ty = Option.map ~f:(annotate_type env) pbinding_ty in
+  let tbinding_ty: TypeValue.t option = Option.map ~f:(Infer.infer env) pbinding_ty in
   let tbinding_pat = annotate_pattern env pbinding_pat in
+
+  Typedtree.(match tbinding_pat.tpat_desc with
+  | Tpat_symbol sym ->
+    match tbinding_ty with
+    | Some t ->
+      sym.def_type <- t
+
+    | None ->
+      sym.def_type <- tbinding_init.texp_val
+
+  );
+
   {
     tbinding_kind = pbinding_kind;
     tbinding_loc = pbinding_loc;
@@ -244,42 +257,6 @@ and annotate_pattern env pat =
   {
     tpat_desc;
     tpat_loc = ppat_loc;
-  }
-
-and annotate_type env ty =
-  let {Ast. pty_desc; pty_loc } = ty in
-  let tty_desc =
-    match pty_desc with
-    | Ast.Pty_any -> Tty_any
-    | Ast.Pty_var str -> Tty_var str
-    | Ast.Pty_ctor (id, types) ->
-      begin
-        let current_scope = Env.peek_scope env in
-        let type_sym_opt = Scope.find_type_symbol current_scope id.pident_name in
-        match type_sym_opt with
-        | Some sym ->
-          begin
-            let types = List.map ~f:(annotate_type env) types in
-            Tty_ctor (sym, types)
-          end
-        | None ->
-          begin
-            let err = Type_error.make_error pty_loc (Type_error.CannotFindName id.pident_name) in
-            Env.add_error env err;
-            raise (Type_error.Error err)
-          end
-
-      end
-
-    | Ast.Pty_arrow (params, ret) ->
-      let t_params = List.map ~f:(annotate_type env) params in
-      let t_ret = annotate_type env ret in
-      Tty_arrow (t_params, t_ret)
-
-  in
-  {
-    tty_desc;
-    tty_loc = pty_loc;
   }
 
 and annotate_constant (env: Env.t) (cnst: Waterlang_parsing.Ast.constant) =

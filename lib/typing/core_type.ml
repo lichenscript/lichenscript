@@ -166,6 +166,12 @@ end = struct
 end
 
 and VarSym : sig
+  type external_method = (string * string)
+
+  type spec =
+  | Internal
+  | External of external_method
+
   type t = {
     id_in_scope: int;
     name:        string;
@@ -174,6 +180,7 @@ and VarSym : sig
     kind:        kind;
     scope_id:    int;
     builtin:     bool;
+    spec:        spec;
   }
 
   val mk_local: id_in_scope:int -> scope_id:int -> string -> t
@@ -181,6 +188,12 @@ and VarSym : sig
   val set_def_type: t -> TypeValue.t -> unit
 
 end = struct
+  type external_method = (string * string)
+
+  type spec =
+  | Internal
+  | External of external_method
+
   type t = {
     id_in_scope: int;
     name:        string;
@@ -189,6 +202,7 @@ end = struct
     kind:        kind;
     scope_id:    int;
     builtin:     bool;
+    spec:        spec;
   }
 
   let mk_local ~id_in_scope ~scope_id name =
@@ -200,6 +214,7 @@ end = struct
       kind = Local;
       scope_id = scope_id;
       builtin = false;
+      spec = Internal;
     }
 
   let set_def_type t ty =

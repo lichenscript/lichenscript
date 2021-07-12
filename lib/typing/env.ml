@@ -27,6 +27,7 @@ let make_default_module_sym scope =
       kind = Global;
       scope_id = Scope.id scope;
       builtin = true;
+      spec = Core_type.VarSym.External("console", "log");
     }
   in
   Scope.insert_var_symbol scope var_sym

@@ -92,7 +92,7 @@ and class_body_element =
 and var_binding = {
   tbinding_kind: Waterlang_parsing.Ast.var_kind;
   tbinding_loc: Loc.t;
-  tbinding_ty: _type option;
+  tbinding_ty: TypeValue.t option;
   tbinding_pat: pattern;
   tbinding_init: expression;
 }
@@ -101,6 +101,7 @@ and _function = {
   tfun_id: Core_type.VarSym.t;
   tfun_params: params;
   tfun_body: function_body;
+  tfun_assoc_scope: Scope.t;
   tfun_loc: Loc.t;
 }
 
@@ -143,19 +144,6 @@ and pattern_desc =
 and program = {
   tprogram_statements: statement list;
 }
-
-and _type = {
-  tty_desc: type_desc;
-  tty_loc: Loc.t;
-}
-
-and type_desc =
-  | Tty_any
-  | Tty_var of string
-  | Tty_ctor of Core_type.TypeSym.t * _type list
-  | Tty_arrow of
-    _type list *
-    _type
 
 let pp_pattern formatter pat =
   match pat.tpat_desc with

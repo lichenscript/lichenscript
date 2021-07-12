@@ -72,9 +72,19 @@ module M (S: Dsl.BinaryenModule) = struct
       Some return_expr
 
     | Tstmt_binding binding ->
-      Some (codegen_expression env binding.tbinding_init)
+      codegen_binding env binding
 
     | _ -> None
+
+  and codegen_binding env binding: C_bindings.exp option =
+    let init_exp = codegen_expression env binding.tbinding_init in
+    let open Typedtree in
+    let open Core_type.VarSym in
+    let local_id =
+      match binding.tbinding_pat.tpat_desc with
+      | Tpat_symbol sym -> sym.id_in_scope
+    in
+    Some(local_set local_id init_exp)
 
   and codegen_constant env cnst =
     let open Waterlang_parsing.Ast in
@@ -166,7 +176,14 @@ module M (S: Dsl.BinaryenModule) = struct
     in
 
     let params_ty = parms_type function_.tfun_params in
+    let vars_ty =
+      function_.tfun_assoc_scope.var_symbols
+      |> Scope.SymbolTable.to_alist
+      |> List.map
+          ~f:(fun (_, var_sym) -> Core_type.VarSym.(get_binaryen_ty_by_core_ty env var_sym.def_type))
+      |> List.to_array
 
+    in
     let { Typedtree. tfun_body; _; } = function_ in
     let exp =
       match tfun_body with
@@ -191,7 +208,7 @@ module M (S: Dsl.BinaryenModule) = struct
       |> unwrap_function_return_type
       |> get_binaryen_ty_by_core_ty env
     in
-    let _fun = Dsl.function_ ~name:id_name ~params_ty ~ret_ty ~vars_ty:[| |] ~content:exp in
+    let _fun = Dsl.function_ ~name:id_name ~params_ty ~ret_ty ~vars_ty ~content:exp in
     let _ = export_function id_name id_name in
     ()
 
