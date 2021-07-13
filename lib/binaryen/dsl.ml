@@ -14,6 +14,14 @@ module type BinaryenTypeContainer = sig
 
   val ty: C_bindings.ty
 
+  val add_op: C_bindings.op
+
+  val sub_op: C_bindings.op
+
+  val mul_op: C_bindings.op
+
+  val div_op: C_bindings.op
+
 end
 
 module VarOperator (M: BinaryenModule) (T: BinaryenTypeContainer) = struct
@@ -30,6 +38,30 @@ module VarOperator (M: BinaryenModule) (T: BinaryenTypeContainer) = struct
   let load ?(signed = true) ~offset ?(align = 0) ptr =
     C_bindings.make_exp_load
       M.m T.size signed offset align T.ty ptr
+
+  let add left right =
+    C_bindings.make_exp_binary
+      M.m T.add_op left right
+
+  let (+) = add
+
+  let sub left right =
+    C_bindings.make_exp_binary
+      M.m T.sub_op left right
+
+  let (-) = sub
+
+  let mul left right =
+    C_bindings.make_exp_binary
+      M.m T.mul_op left right
+
+  let ( * ) = mul
+
+  let div left right =
+    C_bindings.make_exp_binary
+      M.m T.div_op left right
+
+  let (/) = div
   
 end
 
@@ -155,11 +187,27 @@ module Binaryen (M: BinaryenModule) = struct
     let size = 4
     let ty = i32
 
+    let add_op = C_bindings.make_op_add_i32()
+
+    let sub_op = C_bindings.make_op_sub_i32()
+
+    let mul_op = C_bindings.make_op_mul_i32()
+
+    let div_op = C_bindings.make_op_div_i32()
+
   end)
 
   module Ptr = VarOperator(M)(struct
     let size = 4
     let ty = ptr_ty
+
+    let add_op = C_bindings.make_op_add_i32()
+
+    let sub_op = C_bindings.make_op_sub_i32()
+
+    let mul_op = C_bindings.make_op_mul_i32()
+
+    let div_op = C_bindings.make_op_div_i32()
 
   end)
   

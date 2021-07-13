@@ -1,7 +1,7 @@
 open Binaryen
 
-let init_string_fun_name = "__init_wtl_string"
-let init_string_fun_name_static = "__init_wtl_string_static"
+let init_string_fun_name = "__wtl_init_string"
+let init_string_fun_name_static = "__wtl_init_string_static"
 
 let codegen_string_facility (env: Codegen_env.t) =
   let module Dsl =

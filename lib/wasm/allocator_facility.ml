@@ -7,7 +7,7 @@ let free_object_var_name = "__wtl_free_obj"
 let free_space_var_name = "__wtf_free_space"
 let memory_copy_fun_name = "__wtl_memory_copy"
 let memory_fill_fun_name = "__wtl_memory_fill"
-let wtf_alloc_fun_name = "__wtf_alloc_fun"
+let wtf_alloc_fun_name = "__wtf_alloc"
 
 (**
   * global info
@@ -29,15 +29,9 @@ let codegen_allocator_facility (env: Codegen_env.t) =
     (* function next_align_size(size: i32, align: i32): i32 *)
     (* (n + k - 1) / k * k *)
     let _ = def_function next_align_size_fun_name ~params:[| i32; i32 |] ~ret_ty:i32 (fun _ ->
-      (binary mul_i32
-        (binary div_i32
-          (binary sub_i32
-            (binary add_i32 (I32.local_get 0) (I32.local_get 1))
-            (const_i32_of_int 1))
-          (I32.local_get 1))
-          (I32.local_get 1))
-    ) in
-    ()
+      I32.(
+        ((I32.local_get 0) + (I32.local_get 1) - (const_i32_of_int 1)) / (I32.local_get 1) * (I32.local_get 1)
+    )) in ()
   in
 
   let codegen_wtl_alloc_from_free_space () =
