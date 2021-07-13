@@ -4,7 +4,7 @@ module StaticStringPool = Hashtbl.Make(String)
 
 type data = {
   offset: int;
-  data: string;
+  data: Buffer.t;
 }
 
 type t = {
@@ -25,14 +25,14 @@ let add_static_string allocator str =
   match opt with
   | Some result -> result
   | None ->
-    let encoded_str = (String_utils.u8string_to_u16string str) ^ "\\00" in
+    let encoded_buffer = String_utils.u8string_to_buffer str in
     let data =
       {
-        data = encoded_str;
+        data = encoded_buffer;
         offset = allocator.allocated_offset;
       }
     in
-    let new_offset = allocator.allocated_offset + (String.length encoded_str) in
+    let new_offset = allocator.allocated_offset + (Buffer.length encoded_buffer) in
     allocator.allocated_offset <- new_offset;
     StaticStringPool.set allocator.allocated_str ~key:str ~data;
     data

@@ -2,9 +2,6 @@ open Core_kernel
 open Codegen_env
 
 let generate_glue filename = "
-  const fs = require('fs');
-  const path = require('path');
-
   var Module = typeof Module !== 'undefined' ? Module : {};
   var wasmMemory;
 
@@ -65,29 +62,38 @@ let generate_glue filename = "
       exports['main']();
     }
 
-    var env = {
-      console_log: function (ptr) {
-        var str = wtfStringToJsString(ptr);
-        console.log(str);
-      },
-      memory_fill: function (dest, value, size) {
-        for (var i = 0; i < size; i++) {
-          HEAPU8[dest + i] = value;
-        }
-      },
-      memory_copy: function (dest, src, num) {
-        HEAPU8.copyWithin(dest, src, src + num);
-      },
+    function console_log(ptr) {
+      var str = wtfStringToJsString(ptr);
+      console.log(str);
     }
+
+    function memory_fill(dest, value, size) {
+      for (var i = 0; i < size; i++) {
+        HEAPU8[dest + i] = value;
+      }
+    }
+
+    function memory_copy(dest, src, num) {
+      HEAPU8.copyWithin(dest, src, src + num);
+    }
+
+    var env = {};
+    env['console_log'] = console_log;
+    env['memory_fill'] = memory_fill;
+    env['memory_copy'] = memory_copy;
 
     var info = {
       env,
     };
 
-    const bytes = fs.readFileSync('" ^ filename ^ "');
-    WebAssembly.instantiate(bytes, info).then(function (result) {
-      receiveInstance(result.instance);
-    }).catch(err => console.error(err));
+    const name = '" ^ filename ^ "';
+    fetch(name).then(function (response) {
+      response.arrayBuffer().then(function(bytes) {
+        WebAssembly.instantiate(bytes, info).then(function (result) {
+          receiveInstance(result.instance);
+        }).catch(err => console.error(err));
+      });
+    });
   }
 
   main();

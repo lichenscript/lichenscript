@@ -36,9 +36,12 @@ module M (S: Dsl.BinaryenModule) = struct
     | _ -> TypeValue.Unknown
 
   let set_memory env =
-    let strings = env.data_segment.allocated_str
+    let strings: bytes array = env.data_segment.allocated_str
       |> Data_segment_allocator.StaticStringPool.to_alist
-      |> List.map ~f:(fun (_, value) -> Data_segment_allocator.(value.data))
+      |> List.map ~f:(fun (_, value) ->
+        let open Data_segment_allocator in
+        Buffer.contents_bytes value.data
+        )
       |> List.to_array
     in
     let passitive = Array.init ~f:(fun _ -> false) (Array.length strings) in

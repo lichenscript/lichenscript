@@ -509,18 +509,18 @@ CAMLprim value set_memory(value module, value initial_int, value max_int, value 
   mlsize_t types_len = caml_array_length(segments);
   mlsize_t segments_len = types_len;
 
-  const char** segments_c = NULL;
+  unsigned char** segments_c = NULL;
   BinaryenIndex* segments_size = NULL;
 
   if (types_len != 0) {
-    segments_c = (const char**)alloca(sizeof(const char*) * types_len);
+    segments_c = (unsigned char**)alloca(sizeof(const char*) * types_len);
     segments_size = (BinaryenIndex*)alloca(sizeof(BinaryenIndex) * types_len);
   }
 
   for (mlsize_t i = 0; i < types_len; i++) {
     value tmp = Field(segments, i);
-    segments_c[i] = String_val(tmp);
-    segments_size[i] = strlen(segments_c[i]);
+    segments_c[i] = Bytes_val(tmp);
+    segments_size[i] = caml_string_length(segments_c[i]);
   }
 
   types_len = caml_array_length(segmentPassive);

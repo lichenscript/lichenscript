@@ -110,5 +110,5 @@ external make_exp_global_get: m -> string -> ty -> exp = "make_exp_global_get"
 external make_exp_global_set: m -> string -> exp -> exp = "make_exp_global_set"
 
 external set_memory:
-  m -> int -> int -> string -> string array -> bool array -> exp array -> bool -> unit =
+  m -> int -> int -> string -> bytes array -> bool array -> exp array -> bool -> unit =
   "set_memory_bytecode" "set_memory"

@@ -24,7 +24,7 @@ let codegen_string_facility (env: Codegen_env.t) =
     let _ = export_function init_string_fun_name init_string_fun_name in ()
   in
 
-  (* function __init_string_fun_name(obj: ptr, static_str: ptr, str_size: i32) *)
+  (* function __init_string_fun_name(static_str: ptr, str_size: i32) *)
   (* local 3: ptr_ty bytes offset *)
   let codegen_init_string_static () =
     let length_offset = 16 in
@@ -35,7 +35,7 @@ let codegen_string_facility (env: Codegen_env.t) =
         let need_size = def_local ctx i32 in
         let offset = def_local ctx ptr_ty in
         block ~ty:ptr_ty [|
-          local_set str_bytes_size (binary add_i32 (binary add_i32 (I32.local_get 1) (I32.local_get 1)) (const_i32_of_int 2));
+          local_set str_bytes_size (binary mul_i32 (binary add_i32 (I32.local_get 1) (const_i32_of_int 1)) (const_i32_of_int 2));
 
           local_set need_size (binary add_i32 (I32.local_get str_bytes_size) (const_i32_of_int bytes_offset));
 
@@ -52,7 +52,7 @@ let codegen_string_facility (env: Codegen_env.t) =
 
           local_set offset (binary add_i32 (Ptr.local_get new_ptr) (const_i32_of_int bytes_offset));
 
-          call_ Allocator_facility.memory_copy_fun_name [| Ptr.local_get offset; Ptr.local_get 0; I32.local_get 1 |] none;
+          call_ Allocator_facility.memory_copy_fun_name [| Ptr.local_get offset; Ptr.local_get 0; I32.local_get str_bytes_size |] none;
           (* memory_copy ~dest:(Ptr.local_get offset) ~src:(Ptr.local_get 1) ~size:(I32.local_get 2); *)
 
           Ptr.local_get new_ptr
