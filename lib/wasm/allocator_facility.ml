@@ -109,9 +109,9 @@ let codegen_allocator_facility (env: Codegen_env.t) =
                       (* else *)
                       (* no prev object *)
                       (* $__wtl_free_obj <- (ptr->next_free_obj) *)
-                      (global_set
+                      (Some (global_set
                         free_object_var_name
-                        (Ptr.load ~offset:8 (Ptr.local_get 0))));
+                        (Ptr.load ~offset:8 (Ptr.local_get 0)))));
 
                     (* return tmp result *)
                     break_ "fun_blk" ~value:(Ptr.local_get tmp_result);
@@ -119,7 +119,7 @@ let codegen_allocator_facility (env: Codegen_env.t) =
                   |])
                   (* else *)
                   (* check next node on linked-list *)
-                  (block ~ty:none [|
+                  (Some (block ~ty:none [|
 
                     (* prev_free_obj <- curent_free_obj *)
                     local_set prev_free_obj (Ptr.local_get current_free_obj);
@@ -127,15 +127,15 @@ let codegen_allocator_facility (env: Codegen_env.t) =
                     (* current_free_obj <- current_free_obj->next *)
                     local_set current_free_obj (Ptr.load ~offset:8 (Ptr.local_get current_free_obj));
 
-                  |]));
+                  |])));
 
               |])
 
               (* no suitable free obj found, alloca from free space *)
-              (block [|
+              (Some (block [|
                 local_set tmp_result (call_ wtf_alloc_from_free_space_fun_name [| Ptr.local_get 0 |] ptr_ty);
                 break_ "fun_blk" ~value:(Ptr.local_get tmp_result);
-              |])
+              |]))
           );
 
           Ptr.local_get tmp_result;

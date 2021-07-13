@@ -293,7 +293,10 @@ CAMLprim value make_exp_if(value module, value cond, value ifTrue, value ifFalse
 
   BinaryenExpressionRef cond_exp = BinaryenExpressionRef_of_val(cond);
   BinaryenExpressionRef true_exp = BinaryenExpressionRef_of_val(ifTrue);
-  BinaryenExpressionRef false_exp = BinaryenExpressionRef_of_val(ifFalse);
+  BinaryenExpressionRef false_exp = NULL;
+  if (Is_some(ifFalse)) {
+    false_exp = BinaryenExpressionRef_of_val(Some_val(ifFalse));
+  }
 
   BinaryenExpressionRef result = BinaryenIf(*ref, cond_exp, true_exp, false_exp);
   return val_of_BinaryenExpressionRef(result);

@@ -69,7 +69,7 @@ external make_exp_unrechable: m -> exp = "make_exp_unreachable"
 
 external make_exp_return: m -> exp option -> exp = "make_exp_return"
 
-external make_exp_if: m -> exp -> exp -> exp -> exp = "make_exp_if"
+external make_exp_if: m -> exp -> exp -> exp option -> exp = "make_exp_if"
 
 external make_exp_loop: m -> string -> exp -> exp = "make_exp_loop"
 
