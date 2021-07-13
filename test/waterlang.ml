@@ -3,7 +3,7 @@ open OUnit2
 open Waterlang_lex
 open Waterlang_parsing
 
-let temp_dir_name = Filename.get_temp_dir_name()
+let temp_dir_name = "/tmp/test_waterlang/"
 
 let test_parser _ =
   let result =  Parser.parse_string None "
@@ -89,9 +89,14 @@ let test_string _ =
     }
   "
   in
-  let _result = Utils.parse_string_and_codegen source in
-  Format.printf "%s" temp_dir_name;
-  Utils.parse_string_and_codegen_to_path source "/tmp/test_wtl"
+  Core.Unix.mkdir_p temp_dir_name;
+  let test_output_name = temp_dir_name ^ "test_wtl" in
+  Format.printf "output name: %s" test_output_name;
+  Utils.parse_string_and_codegen_to_path source test_output_name;
+  let in_chan = Core.Unix.open_process_in ("node " ^ test_output_name ^ ".js" ) in
+  let r = Core.In_channel.input_all in_chan in
+  Core.In_channel.close in_chan;
+  assert_equal r "Hello World!\n"
 
 let suite =
   "TestParser" >::: [
