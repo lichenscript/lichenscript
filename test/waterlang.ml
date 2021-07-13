@@ -3,6 +3,8 @@ open OUnit2
 open Waterlang_lex
 open Waterlang_parsing
 
+let temp_dir_name = Filename.get_temp_dir_name()
+
 let test_parser _ =
   let result =  Parser.parse_string None "
   class Array {
@@ -87,8 +89,8 @@ let test_string _ =
     }
   "
   in
-  let result = Utils.parse_string_and_codegen source in
-  Format.printf "%s" result;
+  let _result = Utils.parse_string_and_codegen source in
+  Format.printf "%s" temp_dir_name;
   Utils.parse_string_and_codegen_to_path source "/tmp/test_wtl"
 
 let suite =
