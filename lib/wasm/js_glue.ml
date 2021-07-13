@@ -82,18 +82,26 @@ let generate_glue filename = "
     env['memory_fill'] = memory_fill;
     env['memory_copy'] = memory_copy;
 
-    var info = {
-      env,
-    };
+    var info = { env: env };
 
     const name = '" ^ filename ^ "';
-    fetch(name).then(function (response) {
-      response.arrayBuffer().then(function(bytes) {
-        WebAssembly.instantiate(bytes, info).then(function (result) {
-          receiveInstance(result.instance);
-        }).catch(err => console.error(err));
+    if (typeof require === 'undefined') {
+      fetch(name).then(function (response) {
+        response.arrayBuffer().then(function(bytes) {
+          WebAssembly.instantiate(bytes, info).then(function (result) {
+            receiveInstance(result.instance);
+          }).catch(err => console.error(err));
+        });
       });
-    });
+    } else {
+      const fs = require('fs');
+      const path = require('path');
+      const fullPath = path.resolve(__dirname, '" ^ filename ^ "');
+      const bytes = fs.readFileSync(fullPath);
+      WebAssembly.instantiate(bytes, info).then(function (result) {
+        receiveInstance(result.instance);
+      }).catch(err => console.error(err));
+    }
   }
 
   main();
