@@ -195,6 +195,26 @@ let codegen_allocator_facility (env: Codegen_env.t) =
       ~ret_ty:none
   in
 
+  Codegen_env.add_js_snippet env {
+    js_fun_def = "
+    function memory_fill(dest, value, size) {
+      for (var i = 0; i < size; i++) {
+        HEAPU8[dest + i] = value;
+      }
+    }";
+    js_add_env_def =
+      Some "env['memory_fill'] = memory_fill;";
+  };
+
+  Codegen_env.add_js_snippet env {
+    js_fun_def = "
+    function memory_copy(dest, src, num) {
+      HEAPU8.copyWithin(dest, src, src + num);
+    }";
+    js_add_env_def =
+      Some "env['memory_copy'] = memory_copy;";
+  };
+
   codegen_memory_copy();
   codegen_memory_fill();
   codegen_wtf_next_align_size();

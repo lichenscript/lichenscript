@@ -1,7 +1,7 @@
 open Core_kernel
 open Codegen_env
 
-let generate_glue filename = "
+let generate_glue js_glues env_glues filename = "
   var Module = typeof Module !== 'undefined' ? Module : {};
   var wasmMemory;
 
@@ -62,25 +62,17 @@ let generate_glue filename = "
       exports['main']();
     }
 
+    " ^ js_glues ^ "
+
     function console_log(ptr) {
       var str = wtfStringToJsString(ptr);
       console.log(str);
     }
 
-    function memory_fill(dest, value, size) {
-      for (var i = 0; i < size; i++) {
-        HEAPU8[dest + i] = value;
-      }
-    }
-
-    function memory_copy(dest, src, num) {
-      HEAPU8.copyWithin(dest, src, src + num);
-    }
-
     var env = {};
     env['console_log'] = console_log;
-    env['memory_fill'] = memory_fill;
-    env['memory_copy'] = memory_copy;
+
+    " ^ env_glues ^ "
 
     var info = { env: env };
 
@@ -109,4 +101,25 @@ let generate_glue filename = "
 
 
 let dump_js_glue env =
-  generate_glue env.output_filename
+  let js_glues =
+    env.js_snippets
+    |> List.rev
+    |> List.fold ~init:""
+      ~f:(fun acc item ->
+        let open Codegen_env in
+        acc ^ item.js_fun_def ^ "\n"
+      )
+  in
+  let env_glues =
+    env.js_snippets
+    |> List.rev
+    |> List.fold ~init:""
+      ~f:(fun acc item ->
+        let open Codegen_env in
+        match item.js_add_env_def with
+        | None -> acc
+        | Some content ->
+          acc ^ content ^ "\n"
+        )
+  in
+  generate_glue js_glues env_glues env.output_filename

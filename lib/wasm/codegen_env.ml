@@ -4,12 +4,18 @@ open Binaryen
 let allocator_facility_flag = 0b00000001
 let string_facility_flag    = 0b00000010
 
+type js_snippet = {
+  js_fun_def: string;
+  js_add_env_def: string option;
+}
+
 type t = {
   module_: C_bindings.m;
   output_filename: string;
   config: Config.t;
   mutable facilities_flags: int;
   data_segment: Data_segment_allocator.t;
+  mutable js_snippets: js_snippet list;
 }
 
 let create ?output_filename config =
@@ -19,6 +25,7 @@ let create ?output_filename config =
     config;
     facilities_flags = 0;
     data_segment = Data_segment_allocator.init_with_begin_offset config.data_segment_offset;
+    js_snippets = [];
   }
 
 let turn_on_allocator env =
@@ -46,3 +53,6 @@ let ptr_size env =
   match env.config.arch with
   | Config.ARCH_WASM32 -> 4
   | Config.ARCH_WASM64 -> 8
+
+let add_js_snippet env snippet =
+  env.js_snippets <- snippet::env.js_snippets
