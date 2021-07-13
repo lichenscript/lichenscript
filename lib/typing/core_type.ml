@@ -101,7 +101,7 @@ and TypeSym : sig
 
   type spec =
     | Primitive
-    | Class
+    | Object 
     | Alias of TypeValue.t
     | Module_ of module_type
 
@@ -130,7 +130,7 @@ end = struct
 
   type spec =
     | Primitive
-    | Class
+    | Object
     | Alias of TypeValue.t
     | Module_ of module_type
 

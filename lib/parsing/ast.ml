@@ -34,161 +34,195 @@ type attribute = {
 
 and attributes = attribute list
 
-type expression = {
-  pexp_desc: expression_desc;
-  pexp_loc: Loc.t;
-  pexp_loc_stack: location_stack;
-  pexp_attributes: attributes;
-}
+module rec Expression : sig
 
-and expression_desc =
-  | Pexp_constant of constant
-  | Pexp_identifier of Identifier.t
-  | Pexp_lambda of _function
-  | Pexp_throw of expression
-  | Pexp_if of if_desc
-  | Pexp_array of expression list
-  | Pexp_call of call
-  | Pexp_member of expression * Identifier.t
-  | Pexp_unary of Asttypes.UnaryOp.t * expression
-  | Pexp_binary of Asttypes.BinaryOp.t * expression * expression
-  | Pexp_update of Asttypes.UpdateOp.t * expression * bool (* prefix *)
+  type if_desc = {
+    if_test: t;
+    if_consequent: Statement.t;
+    if_alternative: Statement.t option;
+    if_loc: Loc.t;
+  }
 
-and call = {
-  pcallee: expression;
-  pcall_params: expression list;
-  pcall_loc: Loc.t;
-}
+  and call = {
+    callee: t;
+    call_params: t list;
+    call_loc: Loc.t;
+  }
 
-and if_desc = {
-  pif_test: expression;
-  pif_consequent: statement;
-  pif_alternative: statement option;
-  pif_loc: Loc.t;
-}
+  and spec =
+    | Constant of constant
+    | Identifier of Identifier.t
+    | Lambda of Function.t
+    | Throw of t
+    | If of if_desc
+    | Array of t list
+    | Call of call
+    | Member of t * Identifier.t
+    | Unary of Asttypes.UnaryOp.t * t
+    | Binary of Asttypes.BinaryOp.t * t * t
+    | Update of Asttypes.UpdateOp.t * t * bool (* prefix *)
 
-and statement = {
-  pstmt_desc: statement_desc;
-  pstmt_loc: Loc.t;
-  pstmt_loc_stack: location_stack;
-  pstmt_attributes: attributes;
-}
+  and t = {
+    spec: spec;
+    loc: Loc.t;
+    loc_stack: location_stack;
+    attributes: attributes;
+  }
+  [@@deriving show]
+  
+end
+  = Expression
+and Statement : sig
 
-and statement_desc =
-  | Pstmt_class of _class
-  | Pstmt_expr of expression (* Expr without trailing semi-colon. *)
-  | Pstmt_semi of expression (* Expr with a trailing semi-colon. *)
-  | Pstmt_function of _function
-  | Pstmt_while of while_desc
-  | Pstmt_binding of var_binding
-  | Pstmt_block of block
-  | Pstmt_break of Identifier.t option
-  | Pstmt_contintue of Identifier.t option
-  | Pstmt_debugger
-  | Pstmt_return of
-    expression option
-  | Pstmt_empty
+  type _class = {
+    cls_id:       Identifier.t option;
+    cls_loc:      Loc.t;
+    cls_body:     class_body;
+    cls_comments: Loc.t Waterlang_lex.Comment.t list;
+  }
 
-and while_desc = {
-  pwhile_test: expression;
-  pwhile_block: block;
-  pwhile_loc: Loc.t;
-}
+  and class_body = {
+    cls_body_elements: class_body_element list;
+    cls_body_loc: Loc.t;
+  }
 
-and var_binding = {
-  pbinding_kind: var_kind;
-  pbinding_loc: Loc.t;
-  pbinding_ty: _type option;
-  pbinding_pat: pattern;
-  pbinding_init: expression;
-}
+  and class_property = {
+    cls_property_visiblity: visibility option;
+    cls_property_loc: Loc.t;
+    cls_property_name: Identifier.t;
+    cls_property_type: Type.t option;
+    cls_property_init: Expression.t option;
+  }
 
-and block = {
-  pblk_body: statement list;
-  pblk_loc: Loc.t;
-}
+  and class_method = {
+    cls_method_visiblity: visibility option;
+    cls_method_name: Identifier.t;
+    cls_method_loc: Loc.t;
+  }
 
-and pattern = {
-  ppat_desc: pattern_desc;
-  ppat_loc: Loc.t;
-}
+  and class_body_element =
+    | Cls_method of class_method
+    | Cls_property of class_property
 
-and pattern_desc =
-  | Ppat_identifier of Identifier.t
 
-and _function = {
-  pfun_id: Identifier.t option;
-  pfun_params: params;
-  pfun_return_ty: _type option;
-  pfun_body: function_body;
-  pfun_loc: Loc.t;
-  pfun_comments: Loc.t Waterlang_lex.Comment.t list;
-}
+  and while_desc = {
+    while_test: Expression.t;
+    while_block: Block.t;
+    while_loc: Loc.t;
+  }
 
-and params = {
-  pparams_content: param list;
-  pparams_loc: Loc.t
-}
+  and var_binding = {
+    binding_kind: var_kind;
+    binding_loc: Loc.t;
+    binding_ty: Type.t option;
+    binding_pat: Pattern.t;
+    binding_init: Expression.t;
+  }
 
-and param =  {
-  pparam_pat: pattern;
-  pparam_ty: _type option;
-  pparam_init: expression option;
-  pparam_loc: Loc.t;
-  pparam_rest: bool;
-}
+  and spec =
+    | Class of _class
+    | Expr of Expression.t (* Expr without trailing semi-colon. *)
+    | Semi of Expression.t (* Expr with a trailing semi-colon. *)
+    | Function_ of Function.t
+    | While of while_desc
+    | Binding of var_binding
+    | Block of Block.t
+    | Break of Identifier.t option
+    | Contintue of Identifier.t option
+    | Debugger
+    | Return of Expression.t option
+    | Empty
 
-and function_body =
-  | Pfun_block_body of block
-  | Pfun_expression_body of expression
+  and t = {
+    spec: spec;
+    loc: Loc.t;
+    loc_stack: location_stack;
+    attributes: attributes;
+  }
+  [@@deriving show]
 
-and _class = {
-  pcls_id:       Identifier.t option;
-  pcls_loc:      Loc.t;
-  pcls_body:     class_body;
-  pcls_comments: Loc.t Waterlang_lex.Comment.t list;
-}
+end
+  = Statement
 
-and class_body = {
-  pcls_body_elements: class_body_element list;
-  pcls_body_loc: Loc.t;
-}
+and Block : sig
 
-and class_property = {
-  pcls_property_visiblity: visibility option;
-  pcls_property_loc: Loc.t;
-  pcls_property_name: Identifier.t;
-  pcls_property_type: _type option;
-  pcls_property_init: expression option;
-}
+  type t = {
+    body: Statement.t list;
+    loc: Loc.t;
+  }
+  [@@deriving show]
 
-and class_method = {
-  pcls_method_visiblity: visibility option;
-  pcls_method_name: Identifier.t;
-  pcls_method_loc: Loc.t;
-}
+end
+  = Block
 
-and class_body_element =
-  | Pcls_method of class_method
-  | Pcls_property of class_property
+and Pattern : sig
 
-and _type = {
-  pty_desc: type_desc;
-  pty_loc: Loc.t;
-}
+  type spec =
+    | Identifier of Identifier.t
 
-and type_desc =
-  | Pty_any
-  | Pty_var of string
-  | Pty_ctor of Identifier.t * _type list
-    (* List<int> *)
+  and t = {
+    spec: spec;
+    loc: Loc.t;
+  }
+  [@@deriving show]
 
-  | Pty_arrow of
-    _type list *  (* params*)
-    _type         (* result *)
+end
+  = Pattern
 
-and program = {
-  pprogram_statements: statement list;
+and Function : sig
+
+  type t = {
+    id: Identifier.t option;
+    params: params;
+    return_ty: Type.t option;
+    body: function_body;
+    loc: Loc.t;
+    comments: Loc.t Waterlang_lex.Comment.t list;
+  }
+
+  and params = {
+    params_content: param list;
+    params_loc: Loc.t
+  }
+
+  and param =  {
+    param_pat: Pattern.t;
+    param_ty: Type.t option;
+    param_init: Expression.t option;
+    param_loc: Loc.t;
+    param_rest: bool;
+  }
+
+  and function_body =
+    | Fun_block_body of Block.t
+    | Fun_expression_body of Expression.t
+  [@@deriving show]
+
+end
+  = Function
+
+and Type : sig
+  type t = {
+    spec: spec;
+    loc: Loc.t;
+  }
+
+  and spec =
+    | Ty_any
+    | Ty_var of string
+    | Ty_ctor of Identifier.t * t list
+      (* List<int> *)
+
+    | Ty_arrow of
+      t list *  (* params*)
+      t         (* result *)
+
+end
+  = Type
+
+
+type program = {
+  pprogram_statements: Statement.t list;
   pprogram_comments: Loc.t Waterlang_lex.Comment.t list;
 }
 [@@deriving show]

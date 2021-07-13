@@ -1,110 +1,113 @@
 open Core_kernel
 open Core_type
-open Typedtree
 open Waterlang_parsing
 
-let rec annotate_statement (env: Env.t) stmt =
-  let { Ast. pstmt_loc; pstmt_desc; _; } = stmt in
-  let tstmt_desc =
-    match pstmt_desc with
-    | Pstmt_class cls ->
+module T = Typedtree
+
+let rec annotate_statement env (stmt: Ast.Statement.t) =
+  let open Ast.Statement in
+  let { loc; spec = parser_spec; _; } = stmt in
+  let spec =
+    match parser_spec with
+    | Class cls ->
       let cls = annotate_class env cls in
       (* let ty_val = Infer.infer_class cls in
       cls.tcls_id.value <- ty_val; *)
-      Tstmt_class cls
+      T.Statement.Class cls
 
-    | Pstmt_expr expr ->
-      Tstmt_expr (annotate_expression env expr)
+    | Expr expr ->
+      T.Statement.Expr (annotate_expression env expr)
 
-    | Pstmt_semi expr ->
-      Tstmt_semi (annotate_expression env expr)
+    | Semi expr ->
+      T.Statement.Semi (annotate_expression env expr)
 
-    | Pstmt_function _fun ->
-      Tstmt_function (annotate_function env _fun)
+    | Function_ _fun ->
+      T.Statement.Function_ (annotate_function env _fun)
 
-    | Pstmt_while {Ast. pwhile_test; pwhile_block; pwhile_loc; } ->
-      let twhile_test = annotate_expression env pwhile_test in
-      let twhile_block = annotate_block env pwhile_block in
-      Tstmt_while {
-        twhile_test;
-        twhile_block;
-        twhile_loc = pwhile_loc;
+    | While { while_test; while_block; while_loc; } ->
+      let while_test = annotate_expression env while_test in
+      let while_block = annotate_block env while_block in
+      T.Statement.While {
+        while_test;
+        while_block;
+        while_loc = while_loc;
       }
 
-    | Pstmt_binding binding ->
-      Tstmt_binding (annotate_binding env binding)
+    | Binding binding ->
+      T.Statement.Binding (annotate_binding env binding)
 
-    | Pstmt_block block ->
-      Tstmt_block (annotate_block env block)
+    | Block block ->
+      T.Statement.Block (annotate_block env block)
 
-    | Pstmt_break id -> Tstmt_break id
-    | Pstmt_contintue id -> Tstmt_continue id
-    | Pstmt_debugger -> Tstmt_debugger
-    | Pstmt_return expr_opt ->
-      Tstmt_return (Option.map
+    | Break id -> T.Statement.Break id
+    | Contintue id -> T.Statement.Continue id
+    | Debugger -> T.Statement.Debugger
+    | Return expr_opt ->
+      T.Statement.Return (Option.map
         ~f:(function expr ->
           let annotated_expr = annotate_expression env expr in
           if Option.is_none (Env.return_type env) then (
-            Env.set_return_type env (Some annotated_expr.texp_val);
+            Env.set_return_type env (Some annotated_expr.val_);
           );
           annotated_expr
         )
         expr_opt)
 
-    | Pstmt_empty -> Tstmt_empty
+    | Empty -> T.Statement.Empty
 
   in
 
-  {
-    tstmt_desc;
-    tstmt_loc = pstmt_loc;
+  { T.Statement.
+    spec;
+    loc;
   }
 
-and annotate_function env _function =
+and annotate_function env (_function: Ast.Function.t) =
+  let open Ast.Function in
   let annotate_param env param =
-    let {Ast. pparam_pat; pparam_init; pparam_loc; pparam_ty; pparam_rest; _ } = param in
-    let tparam_pat: pattern = annotate_pattern env pparam_pat in
-    let tparam_ty = pparam_ty
+    let { param_pat; param_init; param_loc; param_ty; param_rest; _ } = param in
+    let param_pat: T.Pattern.t = annotate_pattern env param_pat in
+    let param_ty = param_ty
       |> Option.map ~f:(Infer.infer env)
       |> Option.value ~default:Core_type.TypeValue.Unknown
     in
-    match tparam_pat.tpat_desc with
-      | Tpat_symbol sym ->
-        Core_type.VarSym.set_def_type sym tparam_ty;
-    {
-      tparam_pat;
-      tparam_ty;
-      tparam_init = Option.map ~f:(annotate_expression env) pparam_init;
-      tparam_loc = pparam_loc;
-      tparam_rest = pparam_rest;
+    match param_pat.spec with
+      | T.Pattern.Symbol sym ->
+        Core_type.VarSym.set_def_type sym param_ty;
+    { T.Function.
+      param_pat;
+      param_ty;
+      param_init = Option.map ~f:(annotate_expression env) param_init;
+      param_loc = param_loc;
+      param_rest = param_rest;
     }
   in
-  let { Ast. pfun_id; pfun_params; pfun_body; pfun_loc; pfun_return_ty; _; } = _function in
-  let name = (Option.value_exn pfun_id).pident_name in
+  let { id; params; body; loc; return_ty; _; } = _function in
+  let name = (Option.value_exn id).pident_name in
   let prev_scope = Env.peek_scope env in
   let var_sym = Scope.find_var_symbol prev_scope name in
   let scope = Scope.create ~prev:prev_scope prev_scope.id in
-  Env.set_return_type env (Option.map ~f:(Infer.infer env) pfun_return_ty);
+  Env.set_return_type env (Option.map ~f:(Infer.infer env) return_ty);
   Env.with_new_scope env scope (fun env ->
     match var_sym with
     | Some tfun_id ->
       begin
-        let tfun_params =
-          {
-            tparams_content = List.map ~f:(annotate_param env) pfun_params.pparams_content;
-            tparams_loc = pfun_params.pparams_loc;
+        let params =
+          { T.Function.
+            params_content = List.map ~f:(annotate_param env) params.params_content;
+            params_loc = params.params_loc;
           }
         in
-        let tfun_body = match pfun_body with
-          | Ast.Pfun_block_body block ->
-            Tfun_block_body (annotate_block env block)
+        let body = match body with
+          | Fun_block_body block ->
+            T.Function.Fun_block_body (annotate_block env block)
 
-          | Ast.Pfun_expression_body expr ->
-            Tfun_expression_body (annotate_expression env expr)
+          | Fun_expression_body expr ->
+            T.Function.Fun_expression_body (annotate_expression env expr)
 
         in
         let return_ty =
-          pfun_return_ty
+          return_ty
           |> Option.map ~f:(Infer.infer env)
           |> Option.value ~default:TypeValue.Unit
         in
@@ -112,151 +115,156 @@ and annotate_function env _function =
           { TypeValue.
             tfun_params = List.map
               ~f:(fun param ->
-                Typedtree.pp_pattern Format.str_formatter param.tparam_pat;
+                T.Pattern.pp Format.str_formatter param.param_pat;
                 let param_name = Format.flush_str_formatter () in
-                (param_name, param.tparam_ty)
+                (param_name, param.param_ty)
               )
-              tfun_params.tparams_content;
+              params.params_content;
             tfun_ret = return_ty;
           }
         in
         VarSym.set_def_type tfun_id (TypeValue.Function fun_ty);
-        {
-          tfun_id;
-          tfun_params;
-          tfun_body;
-          tfun_assoc_scope = scope;
-          tfun_loc = pfun_loc;
+        { T.Function.
+          id = tfun_id;
+          params;
+          body;
+          assoc_scope = scope;
+          loc;
         }
       end
 
     | None ->
       begin
-        let err = Type_error.make_error pfun_loc (Type_error.CannotFindName name) in
+        let err = Type_error.make_error loc (Type_error.CannotFindName name) in
         Env.add_error env err;
         raise (Type_error.Error err)
       end
   )
 
 and annotate_class env _class =
+  let open Ast.Statement in
   let annotate_body env cls_body =
-    let { Ast. pcls_body_elements; pcls_body_loc } = cls_body in
-    let tcls_body_elements =
+    let { cls_body_elements; cls_body_loc } = cls_body in
+    let cls_body_elements =
       List.map
         ~f:(function
-        | Pcls_method _method ->
+        | Cls_method _method ->
           begin
-            let { Ast. pcls_method_visiblity; pcls_method_loc; _ } = _method in
-            let tcls_method_visibility =
-              Option.value ~default:Ast.Pvisibility_private pcls_method_visiblity
+            let { cls_method_visiblity; cls_method_loc; _ } = _method in
+            let cls_method_visibility =
+              Option.value ~default:Ast.Pvisibility_private cls_method_visiblity
             in
-            Tcls_method {
-              tcls_method_visibility;
-              tcls_method_loc = pcls_method_loc;
+            T.Statement.Cls_method {
+              cls_method_visibility;
+              cls_method_loc;
             }
           end
 
-        | Pcls_property prop ->
+        | Cls_property prop ->
           begin
-            let { Ast.
-              pcls_property_visiblity;
-              pcls_property_loc;
-              pcls_property_name;
+            let {
+              cls_property_visiblity;
+              cls_property_loc;
+              cls_property_name;
               (* pcls_property_type; *)
-              pcls_property_init;
+              cls_property_init;
               _;
             } = prop
             in
-            let tcls_property_visibility =
-              Option.value ~default:Ast.Pvisibility_private pcls_property_visiblity
+            let cls_property_visibility =
+              Option.value ~default:Ast.Pvisibility_private cls_property_visiblity
             in
-            let tcls_property_init = Option.map ~f:(annotate_expression env) pcls_property_init in
-            Tcls_property {
-              tcls_property_visibility;
-              tcls_property_loc = pcls_property_loc;
-              tcls_property_name = pcls_property_name;
-              tcls_property_init;
+            let cls_property_init = Option.map ~f:(annotate_expression env) cls_property_init in
+            T.Statement.Cls_property {
+              cls_property_visibility;
+              cls_property_loc = cls_property_loc;
+              cls_property_name = cls_property_name;
+              cls_property_init;
             }
           end
 
         )
-        pcls_body_elements
+        cls_body_elements
     in
-    {
-      tcls_body_elements;
-      tcls_body_loc = pcls_body_loc;
+    { T.Statement.
+      cls_body_elements;
+      cls_body_loc = cls_body_loc;
     }
   in
 
-  let { Ast. pcls_id; pcls_loc; pcls_body; _; } = _class in
-  let id = Option.value_exn pcls_id in
+  let { cls_id; cls_loc; cls_body; _; } = _class in
+  let id = Option.value_exn cls_id in
   let scope = Env.peek_scope env in
   let type_sym_opt = Scope.find_type_symbol scope id.pident_name in
   match type_sym_opt with
-  | Some tcls_id ->
+  | Some cls_id ->
     begin
-      let tcls_body = annotate_body env pcls_body in
-      {
-        tcls_id;
-        tcls_loc = pcls_loc;
-        tcls_body;
+      let cls_body: T.Statement.class_body = annotate_body env cls_body in
+      { T.Statement.
+        cls_id;
+        cls_loc;
+        cls_body;
       }
     end
 
   | None ->
     begin
-      let err = Type_error.make_error pcls_loc (Type_error.CannotFindName id.pident_name) in
+      let err = Type_error.make_error cls_loc (Type_error.CannotFindName id.pident_name) in
       Env.add_error env err;
       raise (Type_error.Error err)
     end
 
 and annotate_block env block =
-  let { Ast. pblk_body; pblk_loc } = block in
-  let tblk_body = List.map ~f:(annotate_statement env) pblk_body in
-  {
-    tblk_body;
-    tblk_loc = pblk_loc;
+  let open Ast.Block in
+  let { body; loc } = block in
+  let body = List.map ~f:(annotate_statement env) body in
+  { T.Block.
+    body;
+    loc;
   }
 
-and annotate_binding env binding =
-  let { Ast. pbinding_kind; pbinding_loc; pbinding_ty; pbinding_pat; pbinding_init } = binding in
-  let tbinding_init = annotate_expression env pbinding_init in
-  let tbinding_ty: TypeValue.t option = Option.map ~f:(Infer.infer env) pbinding_ty in
-  let tbinding_pat = annotate_pattern env pbinding_pat in
+and annotate_binding env (binding: Ast.Statement.var_binding) =
+  let open Ast.Statement in
+  let { binding_kind; binding_loc; binding_ty; binding_pat; binding_init } = binding in
+  let binding_init = annotate_expression env binding_init in
+  let binding_ty: TypeValue.t option = Option.map ~f:(Infer.infer env) binding_ty in
+  let binding_pat = annotate_pattern env binding_pat in
 
-  Typedtree.(match tbinding_pat.tpat_desc with
-  | Tpat_symbol sym ->
-    match tbinding_ty with
-    | Some t ->
-      sym.def_type <- t
+  T.Pattern.(
+    match binding_pat.spec with
+    | Symbol sym ->
+      (match binding_ty with
+      | Some t ->
+        sym.def_type <- t
 
-    | None ->
-      sym.def_type <- tbinding_init.texp_val
+      | None ->
+        sym.def_type <- binding_init.val_)
 
   );
 
-  {
-    tbinding_kind = pbinding_kind;
-    tbinding_loc = pbinding_loc;
-    tbinding_ty;
-    tbinding_pat;
-    tbinding_init;
+  { T.Statement.
+    binding_kind;
+    binding_loc;
+    binding_ty;
+    binding_pat;
+    binding_init;
   }
 
-and annotate_pattern env pat =
-  let {Ast. ppat_desc; ppat_loc } = pat in
-  let tpat_desc =
-    match ppat_desc with
-    | Ast.Ppat_identifier id ->
+and annotate_pattern env (pat: Ast.Pattern.t) =
+  let open Ast.Pattern in
+  let { spec; loc } = pat in
+  let spec =
+    match spec with
+    | Identifier id ->
       begin
         let current_scope = Env.peek_scope env in
         let sym = Scope.create_var_symbol current_scope id.pident_name in
-        Tpat_symbol sym
+        T.Pattern.Symbol sym
       end
   in
-  {
-    tpat_desc;
-    tpat_loc = ppat_loc;
+  { T.Pattern.
+    spec;
+    loc;
   }
 
 and annotate_constant (env: Env.t) (cnst: Ast.constant) =
@@ -278,100 +286,104 @@ and annotate_constant (env: Env.t) (cnst: Ast.constant) =
     (cnst, Env.ty_boolean env)
 
 and annotate_expression (env: Env.t) expr =
-  let { Ast. pexp_desc; pexp_loc; _; } = expr in
-  let (texp_desc, ty_val) =
-    match pexp_desc with
-    | Pexp_constant cnst ->
+  let open Ast.Expression in
+  let { spec; loc; _; } = expr in
+  let (spec, ty_val) =
+    match spec with
+    | Constant cnst ->
       let (cnst, ty_val) = annotate_constant env cnst in
-      (Texp_constant cnst, TypeValue.Ctor ty_val)
+      (T.Expression.Constant cnst, TypeValue.Ctor ty_val)
 
-    | Pexp_identifier id ->
+    | Identifier id ->
       begin
         let current_scope = Env.peek_scope env in
         let var_sym_opt = Scope.find_var_symbol current_scope id.pident_name in
         match var_sym_opt with
         | Some sym ->
-          (Texp_identifier sym, sym.def_type)
+          (T.Expression.Identifier sym, sym.def_type)
 
         | None ->
           begin
-            let err = Type_error.make_error pexp_loc (Type_error.CannotFindName id.pident_name) in
+            let err = Type_error.make_error loc (Type_error.CannotFindName id.pident_name) in
             Env.add_error env err;
             raise (Type_error.Error err)
           end
       end
 
-    | Pexp_throw expr ->
+    | Throw expr ->
       let t = annotate_expression env expr in
-      (Texp_throw t, TypeValue.Unknown) 
+      (T.Expression.Throw t, TypeValue.Unknown) 
 
-    | Pexp_lambda _ -> (Texp_lambda, TypeValue.Unknown)
+    | Lambda _ -> (T.Expression.Lambda, TypeValue.Unknown)
 
-    | Pexp_if { Ast. pif_test; pif_consequent; pif_alternative; pif_loc; } ->
-      let tif_test = annotate_expression env pif_test in
-      let tif_consequent = annotate_statement env pif_consequent in
-      let tif_alternative = Option.map ~f:(annotate_statement env) pif_alternative in
-      (Texp_if {
-        tif_test;
-        tif_consequent;
-        tif_alternative;
-        tif_loc = pif_loc;
+    | If { if_test; if_consequent; if_alternative; if_loc; } ->
+      let if_test = annotate_expression env if_test in
+      let if_consequent = annotate_statement env if_consequent in
+      let if_alternative = Option.map ~f:(annotate_statement env) if_alternative in
+      (T.Expression.If {
+        if_test;
+        if_consequent;
+        if_alternative;
+        if_loc;
       }, TypeValue.Unknown)
 
-    | Pexp_array arr ->
-      (Texp_array (List.map ~f:(annotate_expression env) arr), TypeValue.Unknown)
+    | Array arr ->
+      (T.Expression.Array
+        (List.map ~f:(annotate_expression env) arr),
+        TypeValue.Unknown)
     
-    | Pexp_call call -> annotate_call env call
+    | Call call -> annotate_call env call
 
-    | Pexp_member (expr, field) ->
+    | Member (expr, field) ->
 
       let expr = annotate_expression env expr in
 
       let add_cannot_read_name_error name =
-          let spec = Type_error.CannotReadMember(name, expr.texp_val) in
-          let err = { Type_error. spec; loc = pexp_loc } in
+          let spec = Type_error.CannotReadMember(name, expr.val_) in
+          let err = { Type_error. spec; loc; } in
           Env.add_error env err;
           raise (Type_error.Error err)
       in
 
       let open TypeValue in
-      (match expr.texp_val with
+      (match expr.val_ with
       | Ctor { TypeSym. spec = Module_ mod_; _; } ->
         let name = field.pident_name in
         let field_type_opt = PropsMap.find mod_.props name in
         (match field_type_opt with
         | Some field_type ->
-          (Texp_member(expr, field), field_type)
+          (T.Expression.Member(expr, field), field_type)
         | None -> add_cannot_read_name_error field.pident_name)
 
       | _ -> 
         add_cannot_read_name_error field.pident_name)
 
-    | Pexp_unary (op, expr) ->
+    | Unary (op, expr) ->
       let expr = annotate_expression env expr in
-      (Texp_unary(op, expr), TypeValue.Unknown)
+      (T.Expression.Unary(op, expr), TypeValue.Unknown)
 
-    | Pexp_binary (op, left, right) ->
+    | Binary (op, left, right) ->
       let left = annotate_expression env left in
       let right = annotate_expression env right in
       let ty_val = TypeValue.Ctor (Env.ty_i32 env) in
-      (Texp_binary(op, left, right), ty_val)
+      (T.Expression.Binary(op, left, right), ty_val)
 
-    | Pexp_update (op, expr, prefix) ->
+    | Update (op, expr, prefix) ->
       let expr = annotate_expression env expr in
-      (Texp_update(op, expr, prefix), TypeValue.Unknown)
+      (T.Expression.Update(op, expr, prefix), TypeValue.Unknown)
 
   in
-  {
-    texp_desc;
-    texp_loc = pexp_loc;
-    texp_val = ty_val;
+  { T.Expression.
+    spec;
+    loc;
+    val_ = ty_val;
   }
 
-and annotate_call env call =
-  let rec cast_member_to_callee (expr: Typedtree.expression) props =
-    match expr.texp_desc with
-    | Texp_identifier id ->
+and annotate_call env (call: Ast.Expression.call) =
+  let open Ast.Expression in
+  let rec cast_member_to_callee (expr: T.Expression.t) props =
+    match expr.spec with
+    | T.Expression.Identifier id ->
       let (ty, props) = props
         |> List.rev
         |> List.fold_map
@@ -395,36 +407,36 @@ and annotate_call env call =
       let callee_item = (id, props) in
       (callee_item, ty)
 
-    | Texp_member(new_expr, id) ->
+    | T.Expression.Member(new_expr, id) ->
       cast_member_to_callee new_expr (id::props)
 
     | _ ->
-      let spec = Type_error.NotCallable expr.texp_val in
-      let err = Type_error.make_error expr.texp_loc spec in
+      let spec = Type_error.NotCallable expr.val_ in
+      let err = Type_error.make_error expr.loc spec in
       Env.add_error env err;
       raise (Type_error.Error err)
 
-  and cast_expr_to_callee (expr: Typedtree.expression): callee =
-    let (spec, tcallee_ty) = cast_member_to_callee expr [] in
-    { Typedtree.
-      tcallee_spec = spec;
-      tcallee_loc = expr.texp_loc;
-      tcallee_ty;
+  and cast_expr_to_callee (expr: T.Expression.t): T.Expression.callee =
+    let (spec, callee_ty) = cast_member_to_callee expr [] in
+    { T.Expression.
+      callee_spec = spec;
+      callee_loc = expr.loc;
+      callee_ty;
     }
 
   in
-  let {Ast. pcallee; pcall_params; pcall_loc } = call in
-  let tcallee = annotate_expression env pcallee in
+  let { callee; call_params; call_loc } = call in
+  let tcallee = annotate_expression env callee in
   let return_ty =
-    match tcallee.texp_val with
+    match tcallee.val_ with
     | TypeValue.Function fun_ -> fun_.tfun_ret
     | _ -> TypeValue.Unknown
   in
-  let tcall_params = List.map ~f:(annotate_expression env) pcall_params in
-  (Texp_call {
-    tcallee = cast_expr_to_callee tcallee;
-    tcall_params;
-    tcall_loc = pcall_loc;
+  let call_params = List.map ~f:(annotate_expression env) call_params in
+  (T.Expression.Call {
+    callee = cast_expr_to_callee tcallee;
+    call_params;
+    call_loc = call_loc;
   }, return_ty)
 
 (**
@@ -470,22 +482,24 @@ let pre_scan_definitions env program =
 
   List.iter
     ~f:(fun stmt ->
-      let { Ast. pstmt_desc; _; } = stmt in
-      match pstmt_desc with
-      | Pstmt_class cls ->
+      let open Ast.Statement in
+      let { spec; _; } = stmt in
+      match spec with
+      | Class cls ->
         begin
-          let { Ast. pcls_id; pcls_loc; _; } = cls in
-          let id = Option.value_exn pcls_id in
-          find_or_add_type_sym id.pident_name pcls_loc;
-          find_or_add_var_sym id.pident_name pcls_loc
+          let { cls_id; cls_loc; _; } = cls in
+          let id = Option.value_exn cls_id in
+          find_or_add_type_sym id.pident_name cls_loc;
+          find_or_add_var_sym id.pident_name cls_loc
         end
 
-      | Pstmt_function _fun ->
+      | Function_ _fun ->
         begin
-          let { Ast. pfun_id; pfun_loc; _; } = _fun in
-          let id = Option.value_exn pfun_id in
-          find_or_add_type_sym id.pident_name pfun_loc;
-          find_or_add_var_sym id.pident_name pfun_loc
+          let open Ast.Function in
+          let { id; loc; _; } = _fun in
+          let id = Option.value_exn id in
+          find_or_add_type_sym id.pident_name loc;
+          find_or_add_var_sym id.pident_name loc
         end
 
       | _ -> ()
@@ -498,6 +512,6 @@ let annotate env (program: Ast.program) =
   let tprogram_statements =
     List.map ~f:(annotate_statement env) pprogram_statements
   in
-  {
+  { T.
     tprogram_statements;
   }

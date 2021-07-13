@@ -60,18 +60,18 @@ module M (S: Dsl.BinaryenModule) = struct
       "memory" strings passitive offsets false
 
   let rec codegen_statements env stat: C_bindings.exp option =
-    let open Typedtree in
-    let { tstmt_desc; _; } = stat in
-    match tstmt_desc with
-    | Tstmt_function fun_ ->
+    let open Typedtree.Statement in
+    let { spec; _; } = stat in
+    match spec with
+    | Function_ fun_ ->
       codegen_function env fun_;
       None
     
-    | Tstmt_expr expr ->
+    | Expr expr ->
       let expr_result = codegen_expression env expr in
       Some expr_result
 
-    | Tstmt_return expr_opt ->
+    | Return expr_opt ->
       let expr = Option.map
         ~f:(codegen_expression env)
         expr_opt
@@ -79,21 +79,20 @@ module M (S: Dsl.BinaryenModule) = struct
       let return_expr = return_ expr in
       Some return_expr
 
-    | Tstmt_binding binding ->
+    | Binding binding ->
       codegen_binding env binding
 
-    | Tstmt_semi expr ->
+    | Semi expr ->
       Some(codegen_expression env expr)
 
     | _ -> None
 
   and codegen_binding env binding: C_bindings.exp option =
-    let init_exp = codegen_expression env binding.tbinding_init in
-    let open Typedtree in
+    let init_exp = codegen_expression env binding.binding_init in
     let open Core_type.VarSym in
     let local_id =
-      match binding.tbinding_pat.tpat_desc with
-      | Tpat_symbol sym -> sym.id_in_scope
+      match binding.binding_pat.spec with
+      | Typedtree.Pattern.Symbol sym -> sym.id_in_scope
     in
     Some(local_set local_id init_exp)
 
@@ -131,8 +130,8 @@ module M (S: Dsl.BinaryenModule) = struct
       const_i32_of_int 0
 
   and codegen_expression env expr: C_bindings.exp =
-    let open Typedtree in
-    let { texp_desc; _; } = expr in
+    let open Typedtree.Expression in
+    let { spec; _; } = expr in
     let convert_op raw =
       let open Waterlang_parsing.Asttypes.BinaryOp in
       match raw with
@@ -141,45 +140,45 @@ module M (S: Dsl.BinaryenModule) = struct
       | Mult -> mul_i32
       | _ -> failwith "not implemented"
     in
-    match texp_desc with
-    | Texp_binary(op, left, right) ->
+    match spec with
+    | Binary(op, left, right) ->
       binary
         (convert_op op)
         (codegen_expression env left)
         (codegen_expression env right)
 
-    | Texp_identifier var_sym ->
+    | Identifier var_sym ->
       let ty = get_binaryen_ty_by_core_ty env var_sym.def_type in
       local_get var_sym.id_in_scope ty
 
-    | Texp_constant cnst ->
+    | Constant cnst ->
       codegen_constant env cnst
 
-    | Texp_call call ->
+    | Call call ->
       codegen_call env call
 
     | _ ->
       unreachable_exp()
 
   and codegen_call env call =
-    let open Typedtree in
+    let open Typedtree.Expression in
     let open Core_type.VarSym in
-    let (callee_sym, prop_names) = call.tcallee.tcallee_spec in
+    let (callee_sym, prop_names) = call.callee.callee_spec in
     let params =
-      call.tcall_params
+      call.call_params
       |> List.map ~f:(codegen_expression env)
       |> List.to_array
     in
     match callee_sym.spec with
     | Internal ->
       let get_function_name_by_callee callee =
-        match callee.tcallee_spec with
+        match callee.callee_spec with
         | (callee_sym, []) -> callee_sym.name
         | (callee_sym, _arr) ->
           callee_sym.name
       in
-      let callee_name: string = get_function_name_by_callee call.tcallee in
-      let callee_ty = call.tcallee.tcallee_ty in
+      let callee_name: string = get_function_name_by_callee call.callee in
+      let callee_ty = call.callee.callee_ty in
       let return_ty =
         callee_ty
         |> unwrap_function_return_type
@@ -221,47 +220,74 @@ module M (S: Dsl.BinaryenModule) = struct
       failwith "not implemented"
 
   and codegen_function env function_ =
+    let open Typedtree.Function in
     let parms_type params =
-      let open Typedtree in
-      let { tparams_content; _; } = params in
-      let params_arr = List.to_array tparams_content in
+      let { params_content; _; } = params in
+      let params_arr = List.to_array params_content in
       let types_arr = Array.map
-        ~f:(fun param -> param.tparam_ty |> (get_binaryen_ty_by_core_ty env))
+        ~f:(fun param -> param.param_ty |> (get_binaryen_ty_by_core_ty env))
         params_arr
       in
       C_bindings.make_ty_multiples types_arr
     in
 
-    let params_ty = parms_type function_.tfun_params in
+    let params_ty = parms_type function_.params in
     let vars_ty =
-      function_.tfun_assoc_scope.var_symbols
+      function_.assoc_scope.var_symbols
       |> Scope.SymbolTable.to_alist
       |> List.map
           ~f:(fun (_, var_sym) -> Core_type.VarSym.(get_binaryen_ty_by_core_ty env var_sym.def_type))
       |> List.to_array
 
     in
-    let { Typedtree. tfun_body; _; } = function_ in
-    let exp =
-      match tfun_body with
-      | Typedtree.Tfun_block_body block ->
+    let { body; _; } = function_ in
+    let block_contents =
+      match body with
+      | Fun_block_body block ->
         begin
-          let { Typedtree. tblk_body; _; } = block in
+          let open Typedtree.Block in
+          let { body; _; } = block in
           let expressions = 
-            tblk_body
+            body
             |> List.filter_map ~f:(codegen_statements env)
           in
-          Dsl.block (List.to_array expressions)
+          List.to_array expressions
         end
 
-      | Typedtree.Tfun_expression_body expr ->
-        codegen_expression env expr
+      | Fun_expression_body expr ->
+        [| codegen_expression env expr |]
+
     in
 
-    let id = function_.tfun_id in
+    let finalizers: C_bindings.exp array =
+      function_.assoc_scope.var_symbols
+      |> Scope.SymbolTable.to_alist
+      |> List.filter_map
+        ~f:(fun (_, (sym: Core_type.VarSym.t)) ->
+          let open Core_type in
+          let open VarSym in
+          let open TypeValue in
+          match sym.def_type with
+          | Ctor type_sym ->
+            (match type_sym.spec with
+            | TypeSym.Primitive -> None
+            | TypeSym.Object ->
+              let exp =
+                call_ Allocator_facility.release_object_fun_name [| Ptr.local_get sym.id_in_scope |] none
+              in
+              Some exp
+
+            | _ -> failwith "not implemented")
+          | _ -> failwith "not implemented"
+        )
+      |> List.to_array
+    in
+    let exp = block (Array.concat [block_contents; finalizers]) in
+
+    let id = function_.id in
     let id_name = id.name in
     let ret_ty =
-      function_.tfun_id.def_type
+      function_.id.def_type
       |> unwrap_function_return_type
       |> get_binaryen_ty_by_core_ty env
     in
@@ -270,6 +296,7 @@ module M (S: Dsl.BinaryenModule) = struct
     ()
 
   and codegen_program env (program: Program.t) =
+    C_bindings.set_debug_info (not env.config.release);
     let { Program. tree } = program in
     let { Typedtree. tprogram_statements } = tree in
     let _ = List.map ~f:(codegen_statements env) tprogram_statements in

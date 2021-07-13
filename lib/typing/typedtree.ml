@@ -1,154 +1,178 @@
 open Waterlang_lex
+open Waterlang_parsing
 open Core_type
 
-type expression = {
-  texp_desc: expression_desc;
-  texp_loc: Loc.t;
-  mutable texp_val: TypeValue.t;
-}
+module Pattern = struct
 
-and expression_desc =
-  | Texp_constant of Waterlang_parsing.Ast.constant
-  | Texp_identifier of Core_type.VarSym.t
-  | Texp_lambda
-  | Texp_throw of expression
-  | Texp_if of if_desc
-  | Texp_array of expression list
-  | Texp_call of call
-  | Texp_member of expression * Waterlang_parsing.Identifier.t
-  | Texp_unary of
-    Waterlang_parsing.Asttypes.UnaryOp.t *
-    expression
+  type t = {
+    spec: spec;
+    loc: Loc.t
+  }
 
-  | Texp_binary of
-    Waterlang_parsing.Asttypes.BinaryOp.t *
-    expression *
-    expression
+  and spec =
+  | Symbol of Core_type.VarSym.t
+  [@@deriving show]
 
-  | Texp_update of
-    Waterlang_parsing.Asttypes.UpdateOp.t *
-    expression *
-    bool
+end
 
-and callee = {
-  tcallee_spec: Core_type.VarSym.t * ([ `Property of string | `Expr of expression ] list);
-  tcallee_loc: Loc.t;
-  tcallee_ty: Core_type.TypeValue.t
-}
+module rec Expression : sig
+  type t = {
+    spec: spec;
+    loc: Loc.t;
+    mutable val_: TypeValue.t;
+  }
 
-and call = {
-  tcallee: callee;
-  tcall_params: expression list;
-  tcall_loc: Loc.t;
-}
+  and spec =
+    | Constant of Ast.constant
+    | Identifier of Core_type.VarSym.t
+    | Lambda
+    | Throw of t
+    | If of if_desc
+    | Array of t list
+    | Call of call
+    | Member of t * Identifier.t
+    | Unary of
+      Asttypes.UnaryOp.t *
+      t
 
-and if_desc = {
-  tif_test: expression;
-  tif_consequent: statement;
-  tif_alternative: statement option;
-  tif_loc: Loc.t;
-}
+    | Binary of
+      Asttypes.BinaryOp.t * t * t
 
-and statement = {
-  tstmt_desc: statement_desc;
-  tstmt_loc: Loc.t;
-}
+    | Update of
+      Asttypes.UpdateOp.t * t * bool
 
-and statement_desc =
-  | Tstmt_class of _class
-  | Tstmt_expr of expression
-  | Tstmt_semi of expression
-  | Tstmt_function of _function
-  | Tstmt_while of while_desc
-  | Tstmt_binding of var_binding
-  | Tstmt_block of block
-  | Tstmt_break of Waterlang_parsing.Identifier.t option
-  | Tstmt_continue of Waterlang_parsing.Identifier.t option
-  | Tstmt_debugger
-  | Tstmt_return of expression option
-  | Tstmt_empty
+  and callee = {
+    callee_spec: Core_type.VarSym.t * ([ `Property of string | `Expr of t ] list);
+    callee_loc: Loc.t;
+    callee_ty: Core_type.TypeValue.t
+  }
 
-and _class = {
-  tcls_id: Core_type.TypeSym.t;
-  tcls_loc: Loc.t;
-  tcls_body: class_body;
-}
+  and call = {
+    callee: callee;
+    call_params: t list;
+    call_loc: Loc.t;
+  }
 
-and class_body = {
-  tcls_body_elements: class_body_element list;
-  tcls_body_loc: Loc.t;
-}
+  and if_desc = {
+    if_test: t;
+    if_consequent: Statement.t;
+    if_alternative: Statement.t option;
+    if_loc: Loc.t;
+  }
+  
+end
+  = Expression
 
-and class_property = {
-  tcls_property_visibility: Waterlang_parsing.Ast.visibility;
-  tcls_property_loc: Loc.t;
-  tcls_property_name: Waterlang_parsing.Identifier.t;
-  tcls_property_init: expression option;
-}
+and Statement : sig
 
-and class_method = {
-  tcls_method_visibility: Waterlang_parsing.Ast.visibility;
-  tcls_method_loc: Loc.t;
-}
+  type t = {
+    spec: spec;
+    loc: Loc.t;
+  }
 
-and class_body_element =
-  | Tcls_method of class_method
-  | Tcls_property of class_property
+  and spec =
+    | Class of _class
+    | Expr of Expression.t
+    | Semi of Expression.t
+    | Function_ of Function.t
+    | While of while_desc
+    | Binding of var_binding
+    | Block of Block.t
+    | Break of Identifier.t option
+    | Continue of Identifier.t option
+    | Debugger
+    | Return of Expression.t option
+    | Empty
 
-and var_binding = {
-  tbinding_kind: Waterlang_parsing.Ast.var_kind;
-  tbinding_loc: Loc.t;
-  tbinding_ty: TypeValue.t option;
-  tbinding_pat: pattern;
-  tbinding_init: expression;
-}
+  and _class = {
+    cls_id: Core_type.TypeSym.t;
+    cls_loc: Loc.t;
+    cls_body: class_body;
+  }
 
-and _function = {
-  tfun_id: Core_type.VarSym.t;
-  tfun_params: params;
-  tfun_body: function_body;
-  tfun_assoc_scope: Scope.t;
-  tfun_loc: Loc.t;
-}
+  and class_body = {
+    cls_body_elements: class_body_element list;
+    cls_body_loc: Loc.t;
+  }
 
-and function_body =
-  | Tfun_block_body of block
-  | Tfun_expression_body of expression
+  and class_property = {
+    cls_property_visibility: Ast.visibility;
+    cls_property_loc: Loc.t;
+    cls_property_name: Identifier.t;
+    cls_property_init: Expression.t option;
+  }
 
-and params = {
-  tparams_content: param list;
-  tparams_loc: Loc.t;
-}
+  and class_method = {
+    cls_method_visibility: Ast.visibility;
+    cls_method_loc: Loc.t;
+  }
 
-and param = {
-  tparam_pat: pattern;
-  tparam_ty: Core_type.TypeValue.t;
-  tparam_init: expression option;
-  tparam_loc: Loc.t;
-  tparam_rest: bool;
-}
+  and class_body_element =
+    | Cls_method of class_method
+    | Cls_property of class_property
 
-and while_desc = {
-  twhile_test: expression;
-  twhile_block: block;
-  twhile_loc: Loc.t;
-}
+  and var_binding = {
+    binding_kind: Ast.var_kind;
+    binding_loc: Loc.t;
+    binding_ty: TypeValue.t option;
+    binding_pat: Pattern.t;
+    binding_init: Expression.t;
+  }
 
-and block = {
-  tblk_body: statement list;
-  tblk_loc: Loc.t;
-}
+  and while_desc = {
+    while_test: Expression.t;
+    while_block: Block.t;
+    while_loc: Loc.t;
+  }
+  [@@deriving show]
 
-and pattern = {
-  tpat_desc: pattern_desc;
-  tpat_loc: Loc.t
-}
+end
+  = Statement
 
-and pattern_desc =
- | Tpat_symbol of Core_type.VarSym.t
+and Function : sig
+  type t = {
+    id: Core_type.VarSym.t;
+    params: params;
+    body: function_body;
+    assoc_scope: Scope.t;
+    loc: Loc.t;
+  }
 
-and program = {
-  tprogram_statements: statement list;
+  and function_body =
+    | Fun_block_body of Block.t
+    | Fun_expression_body of Expression.t
+
+  and params = {
+    params_content: param list;
+    params_loc: Loc.t;
+  }
+
+  and param = {
+    param_pat: Pattern.t;
+    param_ty: Core_type.TypeValue.t;
+    param_init: Expression.t option;
+    param_loc: Loc.t;
+    param_rest: bool;
+  }
+  [@@deriving show]
+
+end
+  = Function
+
+and Block : sig
+
+  type t = {
+    body: Statement.t list;
+    loc: Loc.t;
+  }
+  [@@deriving show]
+
+end
+  = Block
+
+
+type program = {
+  tprogram_statements: Statement.t list;
 }
 [@@deriving show]
 

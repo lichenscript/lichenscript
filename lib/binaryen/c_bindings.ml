@@ -112,3 +112,5 @@ external make_exp_global_set: m -> string -> exp -> exp = "make_exp_global_set"
 external set_memory:
   m -> int -> int -> string -> bytes array -> bool array -> exp array -> bool -> unit =
   "set_memory_bytecode" "set_memory"
+
+external set_debug_info: bool -> unit = "set_debug_info"

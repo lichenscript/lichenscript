@@ -18,111 +18,116 @@ let type_assinable left right =
     false
 
 let rec check_statement env statement =
-  let { tstmt_desc; tstmt_loc; _; } = statement in
-  match tstmt_desc with
-  | Tstmt_class cls ->
+  let open Typedtree.Statement in
+  let { spec; loc; _; } = statement in
+  match spec with
+  | Class cls ->
     check_class env cls
 
-  | Tstmt_expr expr
-  | Tstmt_semi expr ->
+  | Expr expr
+  | Semi expr ->
     check_expression env expr
 
-  | Tstmt_function _fun ->
+  | Function_ _fun ->
     check_function env _fun
 
-  | Tstmt_while _while ->
+  | While _while ->
     begin
-      let { twhile_test; twhile_block; _; } = _while in
-      check_expression env twhile_test;
-      check_block env twhile_block
+      let { while_test; while_block; _; } = _while in
+      check_expression env while_test;
+      check_block env while_block
     end
 
-  | Tstmt_binding binding -> 
+  | Binding binding -> 
     check_binding env binding
 
-  | Tstmt_block blk ->
+  | Block blk ->
     check_block env blk
 
-  | Tstmt_break _
-  | Tstmt_continue _
-  | Tstmt_debugger -> ()
-  | Tstmt_return expr_opt -> 
+  | Break _
+  | Continue _
+  | Debugger -> ()
+  | Return expr_opt -> 
     let expected = Option.value ~default:TypeValue.Unit (Env.return_type env) in
     (match expr_opt with
     | Some expr ->
       check_expression env expr;
-      check_returnable env tstmt_loc expected expr.texp_val
+      check_returnable env loc expected expr.val_
 
     | None -> 
-      check_returnable env tstmt_loc expected TypeValue.Unit
+      check_returnable env loc expected TypeValue.Unit
 
     )
 
-  | Tstmt_empty -> ()
+  | Empty -> ()
 
 and check_class env cls =
-  let { tcls_body; _; } = cls in
-  let { tcls_body_elements; _; } = tcls_body in
+  let open Typedtree.Statement in
+  let { cls_body; _; } = cls in
+  let { cls_body_elements; _; } = cls_body in
   List.iter
     ~f:(function
-    | Tcls_method _ ->
+    | Cls_method _ ->
       ()
 
-    | Tcls_property prop ->
-      let { tcls_property_init; _; } = prop in
+    | Cls_property prop ->
+      let { cls_property_init; _; } = prop in
       Option.iter
         ~f:(fun expr ->
           check_expression env expr;
         )
-        tcls_property_init
+        cls_property_init
 
     )
-    tcls_body_elements
+    cls_body_elements
 
 and check_function (env: Env.t) _fun =
-  let { tfun_body;  _; } = _fun in
-  match tfun_body with
-  | Tfun_block_body blk -> 
+  let open Typedtree.Function in
+  let { body;  _; } = _fun in
+  match body with
+  | Fun_block_body blk -> 
     check_block env blk;
 
-  | Tfun_expression_body expr ->
+  | Fun_expression_body expr ->
     check_expression env expr
 
 and check_block env blk =
-  let { tblk_body; _ } = blk in
-  List.iter ~f:(check_statement env) tblk_body
+  let open Typedtree.Block in
+  let { body; _ } = blk in
+  List.iter ~f:(check_statement env) body
 
 and check_binding env binding =
-  let { tbinding_pat; tbinding_init; tbinding_loc; _ } = binding in
-  let { tpat_desc; _; } = tbinding_pat in
+  let open Typedtree.Statement in
+  let { binding_pat; binding_init; binding_loc; _ } = binding in
   let left_val =
-    match tpat_desc with
-    | Tpat_symbol _var_sym ->
+    match binding_pat.spec with
+    | Typedtree.Pattern.Symbol _var_sym ->
       TypeValue.Any
   in
-  check_expression env tbinding_init;
-  check_assignable env tbinding_loc left_val tbinding_init.texp_val
+  check_expression env binding_init;
+  check_assignable env binding_loc left_val binding_init.val_
 
-and check_expression (env: Env.t) expr =
-  let { texp_desc; _; } = expr in
-  match texp_desc with
-  | Texp_constant _
-  | Texp_identifier _
-  | Texp_lambda
+and check_expression env (expr: Typedtree.Expression.t) =
+  let open Typedtree.Expression in
+  let { spec; _; } = expr in
+  match spec with
+  | Constant _
+  | Identifier _
+  | Lambda
     -> ()
 
-  | Texp_throw expr ->
+  | Throw expr ->
     check_expression env expr
 
-  | Texp_if _if ->
+  | If _if ->
     begin
-      let { tif_test; tif_consequent; tif_alternative; _; } = _if in
-      check_expression env tif_test;
-      check_statement env tif_consequent;
-      Option.iter ~f:(check_statement env) tif_alternative
+      let { if_test; if_consequent; if_alternative; _; } = _if in
+      check_expression env if_test;
+      check_statement env if_consequent;
+      Option.iter ~f:(check_statement env) if_alternative
     end
 
-  | Texp_array arr ->
+  | Array arr ->
     List.iter
       ~f:(fun expr ->
         check_expression env expr;
@@ -130,47 +135,47 @@ and check_expression (env: Env.t) expr =
       arr
     ;
 
-  | Texp_call call ->
-    let { tcallee; tcall_params; tcall_loc; _; } = call in
-    check_callee env tcallee;
-    let callee_type = tcallee.tcallee_ty in
+  | Call call ->
+    let { callee; call_params; call_loc; _; } = call in
+    check_callee env callee;
+    let callee_type = callee.callee_ty in
     TypeValue.(
     match callee_type with
     | Function fun_ ->
       begin
-        let result = List.iter2 tcall_params fun_.tfun_params
+        let result = List.iter2 call_params fun_.tfun_params
           ~f:(fun actual_param (name, def_param) ->
-            check_passable env tcall_loc ~name ~def:def_param ~actual:actual_param.texp_val
+            check_passable env call_loc ~name ~def:def_param ~actual:actual_param.val_
           )
         in
         match result with
         | Unequal_lengths ->
-          let err = Type_error.make_error tcall_loc (Type_error.ParamsMismatch callee_type) in
+          let err = Type_error.make_error call_loc (Type_error.ParamsMismatch callee_type) in
           Env.add_error env err
 
         | _ -> ()
       end
 
     | _ ->
-      let err = Type_error.make_error tcall_loc (Type_error.NotCallable callee_type) in
+      let err = Type_error.make_error call_loc (Type_error.NotCallable callee_type) in
       Env.add_error env err
     )
 
-  | Texp_member (expr, _field) ->
+  | Member (expr, _field) ->
     check_expression env expr
 
-  | Texp_unary (_, expr) ->
+  | Unary (_, expr) ->
     check_expression env expr
 
-  | Texp_binary (_, left, right) ->
+  | Binary (_, left, right) ->
     check_expression env left;
     check_expression env right
 
-  | Texp_update (_, exp, _) ->
+  | Update (_, exp, _) ->
     check_expression env exp
 
-and check_callee _env (callee: Typedtree.callee) =
-  match callee.tcallee_spec with
+and check_callee _env (callee: Typedtree.Expression.callee) =
+  match callee.callee_spec with
   | (_, []) -> ()
 
   | (sym, arr) ->

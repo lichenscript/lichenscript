@@ -47,20 +47,22 @@ let make_default_module_sym scope =
   Scope.insert_var_symbol scope var_sym
 
 let make_default_type_sym scope =
+  let open TypeSym in
   let names = [|
-    "u32";
-    "i32";
-    "u64";
-    "i64";
-    "f32";
-    "f64";
-    "char";
-    "string";
-    "boolean";
+    ("u32", Primitive);
+    ("i32", Primitive);
+    ("u64", Primitive);
+    ("i64", Primitive);
+    ("f32", Primitive);
+    ("f64", Primitive);
+    ("char", Primitive);
+    ("string", Object);
+    ("boolean", Primitive);
   |] in
   Array.iter
-    ~f:(fun name ->
-      let sym = TypeSym.create ~builtin:true ~kind:Global ~scope_id:(Scope.id scope) name TypeSym.Primitive in
+    ~f:(fun (name, spec) ->
+      let scope_id = Scope.id scope in
+      let sym = TypeSym.create ~builtin:true ~kind:Global ~scope_id name spec in
       Scope.insert_type_symbol scope sym;
     )
     names

@@ -8,6 +8,8 @@ let free_space_var_name = "__wtf_free_space"
 let memory_copy_fun_name = "__wtl_memory_copy"
 let memory_fill_fun_name = "__wtl_memory_fill"
 let wtf_alloc_fun_name = "__wtf_alloc"
+let retain_object_fun_name = "__wtf_retain_object"
+let release_object_fun_name = "__wtf_release_object"
 
 (**
   * global info
@@ -166,6 +168,53 @@ let codegen_allocator_facility (env: Codegen_env.t) =
     let _ = export_function free_object_fun_name free_object_fun_name in ()
   in
 
+  (* function __wtf_retain_object(obj: ptr) *)
+  (* strong counter += 1*)
+  let codegen_wtf_retain_object () =
+    let _ = def_function retain_object_fun_name ~params:[| ptr_ty |] ~ret_ty:none (fun ctx ->
+        let next_count = def_local ctx i32 in
+        block [|
+          (* next_count <- obj->strong_counter *)
+          local_set next_count (I32.load ~offset:8 (Ptr.local_get 0));
+
+          (* next_count <- next_count + 1 *)
+          local_set next_count I32.((local_get next_count) + (const_i32_of_int 1));
+
+          (* obj->strong_counter <- next_count *)
+          I32.store ~offset:8 ~ptr:(Ptr.local_get 0) (I32.local_get next_count);
+
+        |]
+      )
+    in
+    let _ = export_function retain_object_fun_name retain_object_fun_name in ()
+  in
+
+  (* function __wtf_release_object(obj: ptr) *)
+  let codegen_wtf_release_object () =
+    let _ = def_function release_object_fun_name ~params:[| ptr_ty |] ~ret_ty:none (fun ctx ->
+        let next_count = def_local ctx i32 in
+        block [|
+          (* next_count <- obj->strong_counter *)
+          local_set next_count (I32.load ~offset:8 (Ptr.local_get 0));
+
+          (* next_count <- next_count - 1 *)
+          local_set next_count I32.((local_get next_count) - (const_i32_of_int 1));
+
+          (* if next_counet != 0 *)
+          if_ (I32.local_get next_count)
+            (* obj->strong_counter <- next_count *)
+            (I32.store ~offset:8 ~ptr:(Ptr.local_get 0) (I32.local_get next_count))
+            (* else if (next_count == 0) *)
+            (Some
+              (* free_object(ptr) *)
+              (call_ free_object_fun_name [| Ptr.local_get 0 |] none)
+            );
+        |]
+      )
+    in
+    let _ = export_function release_object_fun_name release_object_fun_name in ()
+  in
+
   let _ = add_global_var ~name:free_object_var_name ptr_ty ~mut:true ~init:(const_i32_of_int 0) in
   let _ = add_global_var ~name:free_space_var_name ptr_ty ~mut:true
     ~init:(const_i32_of_int env.config.stack_size)
@@ -215,4 +264,6 @@ let codegen_allocator_facility (env: Codegen_env.t) =
   codegen_wtl_alloc_from_free_space();
   codegen_wtl_alloc();
   codegen_wtl_init_object();
-  codegen_wtl_free_object()
+  codegen_wtl_free_object();
+  codegen_wtf_retain_object();
+  codegen_wtf_release_object()

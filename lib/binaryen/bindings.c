@@ -558,3 +558,9 @@ CAMLprim value set_memory_bytecode(value * argv, int argn) {
   return set_memory(argv[0], argv[1], argv[2], argv[3], argv[4], argv[5],
     argv[6], argv[7]);
 }
+
+CAMLprim value set_debug_info(value on_bl) {
+  bool on = Bool_val(on_bl);
+  BinaryenSetDebugInfo(on);
+  return Val_unit;
+}

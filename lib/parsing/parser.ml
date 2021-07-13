@@ -31,41 +31,42 @@ and parse_program env : program =
     pprogram_comments = [];
   }
 
-and parse_statement env : statement =
+and parse_statement env : Statement.t =
+  let open Statement in
   let start_loc = Peek.loc env in
   let next = Peek.token env in
 
-  let pstmt_desc: statement_desc =
+  let spec: Statement.spec =
     match next with
     | Token.T_CLASS ->
-      Pstmt_class (parse_class env)
+      Class (parse_class env)
 
     | Token.T_FUNCTION ->
-      Pstmt_function (parse_function env)
+      Function_ (parse_function env)
 
     | Token.T_CONST ->
-      Pstmt_binding (parse_var_binding env Pvar_const)
+      Binding (parse_var_binding env Pvar_const)
 
     | Token.T_LET ->
-      Pstmt_binding (parse_var_binding env Pvar_let)
+      Binding (parse_var_binding env Pvar_let)
 
     | Token.T_SEMICOLON ->
       Eat.token env;
-      Pstmt_empty
+      Empty
 
     | Token.T_WHILE ->
       begin
         let start_loc = Peek.loc env in
         Eat.token env;
         Expect.token env Token.T_LPAREN;
-        let pwhile_test = parse_expression env in
+        let while_test = parse_expression env in
         Expect.token env Token.T_RPAREN;
-        let pwhile_block = parse_block env in
-        let pwhile_loc = with_start_loc env start_loc in
-        Pstmt_while {
-          pwhile_test;
-          pwhile_block;
-          pwhile_loc;
+        let while_block = parse_block env in
+        let while_loc = with_start_loc env start_loc in
+        While {
+          while_test;
+          while_block;
+          while_loc;
         }
       end
 
@@ -79,7 +80,7 @@ and parse_statement env : statement =
         | _ -> None
       in
       Expect.token env Token.T_SEMICOLON;
-      Pstmt_break id
+      Break id
 
     | Token.T_CONTINUE ->
       Eat.token env;
@@ -91,11 +92,11 @@ and parse_statement env : statement =
         | _ -> None
       in
       Expect.token env Token.T_SEMICOLON;
-      Pstmt_contintue id
+      Contintue id
 
     | Token.T_DEBUGGER ->
       Eat.token env;
-      Pstmt_debugger
+      Debugger
 
     | Token.T_RETURN ->
       Eat.token env;
@@ -103,36 +104,36 @@ and parse_statement env : statement =
       if next == Token.T_SEMICOLON then
         begin
           Eat.token env;
-          Pstmt_return None
+          Return None
         end
       else
         begin
           let expr = parse_expression env in
-          Pstmt_return(Some expr)
+          Return(Some expr)
         end
 
     | _ ->
       let expr = parse_expression env in
       if Peek.token env == Token.T_SEMICOLON then
-        Pstmt_semi expr
+        Semi expr
       else
-        Pstmt_expr expr
+        Expr expr
 
   in
 
   {
-    pstmt_desc;
-    pstmt_loc = with_start_loc env start_loc;
-    pstmt_loc_stack = [];
-    pstmt_attributes = [];
+    spec;
+    loc = with_start_loc env start_loc;
+    loc_stack = [];
+    attributes = [];
   }
 
-and parse_var_binding env kind =
+and parse_var_binding env kind: Statement.var_binding =
   let start_loc = Peek.loc env in
   Expect.token env Token.T_LET;
-  let pbinding_pat = parse_pattern env in
+  let binding_pat = parse_pattern env in
 
-  let pbinding_ty =
+  let binding_ty =
     if Peek.token env == Token.T_COLON then
       begin
         Eat.token env;
@@ -142,23 +143,24 @@ and parse_var_binding env kind =
   in
 
   Expect.token env Token.T_ASSIGN;
-  let pbinding_init = parse_expression env in
+  let binding_init = parse_expression env in
   Expect.token env Token.T_SEMICOLON;
   {
-    pbinding_kind = kind;
-    pbinding_loc = with_start_loc env start_loc;
-    pbinding_ty;
-    pbinding_pat;
-    pbinding_init;
+    binding_kind = kind;
+    binding_loc = with_start_loc env start_loc;
+    binding_ty;
+    binding_pat;
+    binding_init;
   }
 
-and parse_function env: _function =
+and parse_function env: Function.t =
+  let open Function in
   let start_loc = Peek.loc env in
   Expect.token env Token.T_FUNCTION;
   let id = parse_identifier env in
-  let pfun_params = parse_params env in
+  let params = parse_params env in
   let next = Peek.token env in
-  let pfun_return_ty =
+  let return_ty =
     match next with
     | Token.T_COLON ->
       begin
@@ -171,20 +173,20 @@ and parse_function env: _function =
   in
   let block = parse_block env in
   {
-    pfun_id = Some id;
-    pfun_params;
-    pfun_return_ty;
-    pfun_body = Pfun_block_body block;
-    pfun_loc = with_start_loc env start_loc;
-    pfun_comments = [];
+    id = Some id;
+    params;
+    return_ty;
+    body = Fun_block_body block;
+    loc = with_start_loc env start_loc;
+    comments = [];
   }
 
-and parse_params env =
-  let parse_param env =
+and parse_params env: Function.params =
+  let parse_param env: Function.param =
     let start_loc = Peek.loc env in
-    let pparam_rest = Eat.maybe env Token.T_ELLIPSIS in
-    let pparam_pat = parse_pattern env in
-    let pparam_ty =
+    let param_rest = Eat.maybe env Token.T_ELLIPSIS in
+    let param_pat = parse_pattern env in
+    let param_ty =
       if Peek.token env == Token.T_COLON then
         begin
           Eat.token env;
@@ -194,11 +196,11 @@ and parse_params env =
         None
     in
     {
-      pparam_pat;
-      pparam_ty;
-      pparam_init = None;
-      pparam_loc = with_start_loc env start_loc;
-      pparam_rest;
+      param_pat;
+      param_ty;
+      param_init = None;
+      param_loc = with_start_loc env start_loc;
+      param_rest;
     }
   in
 
@@ -216,11 +218,11 @@ and parse_params env =
 
   Expect.token env Token.T_RPAREN;
   {
-    pparams_content = List.rev (!content);
-    pparams_loc = with_start_loc env start_loc;
+    params_content = List.rev (!content);
+    params_loc = with_start_loc env start_loc;
   }
 
-and parse_block env =
+and parse_block env: Block.t =
   let start_pos = Peek.loc env in
   let content = ref [] in
 
@@ -232,8 +234,8 @@ and parse_block env =
 
   Expect.token env Token.T_RCURLY;
   {
-    pblk_body = List.rev (!content);
-    pblk_loc = with_start_loc env start_pos;
+    body = List.rev (!content);
+    loc = with_start_loc env start_pos;
   }
 
 and parse_identifier env : Identifier.t =
@@ -257,16 +259,16 @@ and parse_identifier env : Identifier.t =
       pident_loc;
     }
 
-and parse_class env : _class =
+and parse_class env : Statement._class =
   let start_loc = Peek.loc env in
   Eat.token env;  (* class *)
   let id = parse_identifier env in
   let body = parse_class_body env in
   {
-    pcls_id = Some id;
-    pcls_loc = with_start_loc env start_loc;
-    pcls_body = body;
-    pcls_comments = [];
+    cls_id = Some id;
+    cls_loc = with_start_loc env start_loc;
+    cls_body = body;
+    cls_comments = [];
   }
 
 and parse_visibility env =
@@ -286,7 +288,8 @@ and parse_visibility env =
 
   | _ -> None
 
-and parse_class_body env =
+and parse_class_body env: Statement.class_body =
+  let open Statement in
   let parse_element env =
     let start_pos = Peek.loc env in
     let v = parse_visibility env in
@@ -296,15 +299,15 @@ and parse_class_body env =
       begin
         Eat.token env; (* ( *)
         Expect.token env Token.T_RPAREN; (* ) *)
-        Pcls_method {
-          pcls_method_visiblity = v;
-          pcls_method_name = id;
-          pcls_method_loc = with_start_loc env start_pos;
+        Cls_method {
+          cls_method_visiblity = v;
+          cls_method_name = id;
+          cls_method_loc = with_start_loc env start_pos;
         }
       end
     else
       begin
-        let pcls_property_type = 
+        let cls_property_type = 
           if Peek.token env == Token.T_COLON then
             begin
               Eat.token env;
@@ -314,7 +317,7 @@ and parse_class_body env =
             None
         in
 
-        let pcls_property_init =
+        let cls_property_init =
           if Peek.token env == Token.T_ASSIGN then
             begin
               Eat.token env;
@@ -325,12 +328,12 @@ and parse_class_body env =
         in
 
         Expect.token env Token.T_SEMICOLON;
-        Pcls_property {
-          pcls_property_visiblity = v;
-          pcls_property_loc = with_start_loc env start_pos;
-          pcls_property_name = id;
-          pcls_property_type;
-          pcls_property_init;
+        Cls_property {
+          cls_property_visiblity = v;
+          cls_property_loc = with_start_loc env start_pos;
+          cls_property_name = id;
+          cls_property_type;
+          cls_property_init;
         }
     end
   in
@@ -346,14 +349,15 @@ and parse_class_body env =
 
   Expect.token env Token.T_RCURLY;  (* } *)
   {
-    pcls_body_elements = List.rev !tmp_body;
-    pcls_body_loc = with_start_loc env start_loc;
+    cls_body_elements = List.rev !tmp_body;
+    cls_body_loc = with_start_loc env start_loc;
   }
 
-and parse_expression env : expression =
+and parse_expression env : Expression.t =
   parse_binary_expression env
 
-and parse_binary_expression env =
+and parse_binary_expression env : Expression.t =
+  let open Expression in
   let rec parse_binary_enhance env left_expr left_token =
     let start_loc = Peek.loc env in
     let expr = parse_exponentialtion_expression env in
@@ -365,38 +369,38 @@ and parse_binary_expression env =
       Eat.token env;
       let right = parse_binary_enhance env expr right_token in
       let op = Asttypes.BinaryOp.from_token left_token in
-      let desc = Pexp_binary(op, left_expr, right) in
+      let spec = Binary(op, left_expr, right) in
       {
-        pexp_desc = desc;
-        pexp_loc = with_start_loc env start_loc;
-        pexp_loc_stack = [];
-        pexp_attributes = [];
+        spec;
+        loc = with_start_loc env start_loc;
+        loc_stack = [];
+        attributes = [];
       }
     ) else if left_prec == right_prec then (
       if left_prec <= 0 then
         expr
       else (
         let op = Asttypes.BinaryOp.from_token left_token in
-        let desc = Pexp_binary(op, left_expr, expr) in
+        let spec = Binary(op, left_expr, expr) in
         let binary =
           {
-            pexp_desc = desc;
-            pexp_loc = with_start_loc env start_loc;
-            pexp_loc_stack = [];
-            pexp_attributes = [];
+            spec;
+            loc = with_start_loc env start_loc;
+            loc_stack = [];
+            attributes = [];
           }
         in
         parse_binary_enhance env binary right_token
       )
     ) else (
       let op = Asttypes.BinaryOp.from_token left_token in
-      let desc = Pexp_binary(op, left_expr, expr) in
+      let spec = Binary(op, left_expr, expr) in
       let binary =
         {
-          pexp_desc = desc;
-          pexp_loc = with_start_loc env start_loc;
-          pexp_loc_stack = [];
-          pexp_attributes = [];
+          spec;
+          loc = with_start_loc env start_loc;
+          loc_stack = [];
+          attributes = [];
         }
       in
       if right_prec <= 0 then
@@ -422,7 +426,8 @@ and parse_binary_expression env =
 and parse_exponentialtion_expression env =
   parse_unary_expression env
 
-and parse_unary_expression env =
+and parse_unary_expression env: Expression.t =
+  let open Expression in
   let start_loc = Peek.loc env in
   let next = Peek.token env in
   match next with
@@ -434,19 +439,20 @@ and parse_unary_expression env =
       let op = Asttypes.UnaryOp.from_token next in
       Eat.token env;
       let expr = parse_unary_expression env in
-      let pexp_desc = Pexp_unary(op, expr) in
+      let spec = Unary(op, expr) in
       {
-        pexp_desc;
-        pexp_loc = with_start_loc env start_loc;
-        pexp_loc_stack = [];
-        pexp_attributes = [];
+        spec;
+        loc = with_start_loc env start_loc;
+        loc_stack = [];
+        attributes = [];
       }
     end
 
   | _ ->
     parse_update_expression env
 
-and parse_update_expression env =
+and parse_update_expression env : Expression.t =
+  let open Expression in
   let token_to_op =
     let open Asttypes.UpdateOp in
     function
@@ -463,12 +469,12 @@ and parse_update_expression env =
       Eat.token env;
       let expr = parse_unary_expression env in
       let op = token_to_op next in
-      let pexp_desc = Pexp_update(op, expr, true) in
+      let spec = Update(op, expr, true) in
       {
-        pexp_desc;
-        pexp_loc = with_start_loc env start_loc;
-        pexp_loc_stack = [];
-        pexp_attributes = [];
+        spec;
+        loc = with_start_loc env start_loc;
+        loc_stack = [];
+        attributes = [];
       }
     end
   | _ ->
@@ -481,12 +487,12 @@ and parse_update_expression env =
       begin
         Eat.token env;
         let op = token_to_op next in
-        let pexp_desc = Pexp_update(op, expr, false) in
+        let spec = Update(op, expr, false) in
         {
-          pexp_desc;
-          pexp_loc = with_start_loc env start_loc;
-          pexp_loc_stack = [];
-          pexp_attributes = [];
+          spec;
+          loc = with_start_loc env start_loc;
+          loc_stack = [];
+          attributes = [];
         }
       end
 
@@ -511,7 +517,8 @@ and parse_arguments env =
 
   List.rev !result
 
-and parse_left_handside_expression_allow_call env =
+and parse_left_handside_expression_allow_call env : Expression.t =
+  let open Expression in
   let rec loop env expr =
     let start_pos = Peek.loc env in
     let next = Peek.token env in
@@ -519,33 +526,33 @@ and parse_left_handside_expression_allow_call env =
     | Token.T_PERIOD ->  (* . *)
       Eat.token env;
       let id = parse_identifier env in
-      let spec = Pexp_member(expr, id) in
+      let spec = Member(expr, id) in
       let expr =
         {
-          pexp_desc = spec;
-          pexp_loc = with_start_loc env start_pos;
-          pexp_loc_stack = [];
-          pexp_attributes = [];
+          spec;
+          loc = with_start_loc env start_pos;
+          loc_stack = [];
+          attributes = [];
         }
       in
       loop env expr
 
     | Token.T_LPAREN ->  (* ( )*)
-      let pcall_params = parse_arguments env in
+      let call_params = parse_arguments env in
       let call =
         {
-          pcallee = expr;
-          pcall_params;
-          pcall_loc = with_start_loc env start_pos;
+          callee = expr;
+          call_params;
+          call_loc = with_start_loc env start_pos;
         }
       in
-      let desc = Pexp_call call in
+      let spec = Call call in
       let expr =
         {
-          pexp_desc = desc;
-          pexp_loc = with_start_loc env start_pos;
-          pexp_loc_stack = [];
-          pexp_attributes = [];
+          spec;
+          loc = with_start_loc env start_pos;
+          loc_stack = [];
+          attributes = [];
         }
       in
       loop env expr
@@ -559,49 +566,49 @@ and parse_left_handside_expression_allow_call env =
   let expr = parse_primary_expression env in
   loop env expr
 
-and parse_primary_expression env =
+and parse_primary_expression env : Expression.t =
   let start_loc = Peek.loc env in
   let next = Peek.token env in
 
-  let pexp_desc : expression_desc =
+  let spec : Expression.spec =
     match next with 
     | Token.T_IDENTIFIER _ ->
       let ident = parse_identifier env in
-      Pexp_identifier ident
+      Identifier ident
 
     | Token.T_NUMBER { raw; _ } ->
       Eat.token env;
-      Pexp_constant (Pconst_integer (raw, None))
+      Constant (Pconst_integer (raw, None))
 
     | Token.T_STRING (loc, value, _, _) ->
       Eat.token env;
-      Pexp_constant (Pconst_string (value, loc, None))
+      Constant (Pconst_string (value, loc, None))
 
     | Token.T_TRUE ->
       Eat.token env;
-      Pexp_constant (Pconst_boolean true)
+      Constant (Pconst_boolean true)
 
     | Token.T_FALSE ->
       Eat.token env;
-      Pexp_constant (Pconst_boolean false)
+      Constant (Pconst_boolean false)
 
     | Token.T_THROW ->
       Eat.token env;
-      Pexp_throw (parse_expression env)
+      Throw (parse_expression env)
 
     | Token.T_IF ->
       begin
         let start_loc = Peek.loc env in
         Eat.token env;
-        let pif_test = parse_expression env in
-        let pif_consequent = parse_statement env in
+        let if_test = parse_expression env in
+        let if_consequent = parse_statement env in
         let has_else = Eat.maybe env Token.T_ELSE in
-        let pif_alternative = if has_else then Some (parse_statement env) else None in
-        Pexp_if {
-          pif_test;
-          pif_consequent;
-          pif_alternative;
-          pif_loc = with_start_loc env start_loc;
+        let if_alternative = if has_else then Some (parse_statement env) else None in
+        If {
+          if_test;
+          if_consequent;
+          if_alternative;
+          if_loc = with_start_loc env start_loc;
         }
       end
 
@@ -621,7 +628,7 @@ and parse_primary_expression env =
         done;
 
         Expect.token env Token.T_RBRACKET;
-        Pexp_array (List.rev !result)
+        Array (List.rev !result)
       end
 
     | _ ->
@@ -632,33 +639,35 @@ and parse_primary_expression env =
   in
 
   {
-    pexp_desc;
-    pexp_loc = with_start_loc env start_loc;
-    pexp_loc_stack = [];
-    pexp_attributes = [];
+    spec;
+    loc = with_start_loc env start_loc;
+    loc_stack = [];
+    attributes = [];
   }
 
-and parse_pattern env : pattern =
+and parse_pattern env : Pattern.t =
+  let open Pattern in
   let start_loc = Peek.loc env in
   let next = Peek.token env in
-  let ppat_desc =
+  let spec =
     match next with
     | Token.T_IDENTIFIER _ ->
       let ident = parse_identifier env in
-      Ppat_identifier ident
+      Identifier ident
 
     | _ -> failwith "not implemented"
   in
 
   {
-    ppat_loc = with_start_loc env start_loc;
-    ppat_desc;
+    spec;
+    loc = with_start_loc env start_loc;
   }
 
-and parse_type env : _type =
+and parse_type env : Type.t =
+  let open Type in
   let start_loc = Peek.loc env in
   let id = parse_identifier env in
   {
-    pty_desc = Pty_ctor (id, []);
-    pty_loc = with_start_loc env start_loc;
+    spec = Ty_ctor (id, []);
+    loc = with_start_loc env start_loc;
   }

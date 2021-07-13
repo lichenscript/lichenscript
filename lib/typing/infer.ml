@@ -2,26 +2,26 @@
 open Core_kernel
 open Core_type
 open Waterlang_parsing
-open Typedtree
 
-let infer_class cls =
+let infer_class (cls: Typedtree.Statement._class) =
+  let open Typedtree in
   let (cls_methods, cls_props) =
     List.partition_map
       ~f:(function
-      | Tcls_method _method ->
+      | Statement.Cls_method _method ->
         First _method
 
-      | Tcls_property prop ->
+      | Statement.Cls_property prop ->
         Second prop
 
       )
-    cls.tcls_body.tcls_body_elements
+    cls.cls_body.cls_body_elements
   in
 
   let tcls_properties: TypeValue.class_property_type list =
     List.map
     ~f:(fun prop -> { TypeValue.
-        tcls_property_name = prop.tcls_property_name;
+        tcls_property_name = prop.cls_property_name;
         tcls_property_type = Unknown;
     })
     cls_props
@@ -42,13 +42,13 @@ let infer_class cls =
     tcls_methods;
   })
 
-let rec infer env (ty: Ast._type) =
-  let open Ast in
-  let { pty_desc; pty_loc } = ty in
-  match pty_desc with
-  | Pty_any -> TypeValue.Any
-  | Pty_var _ -> failwith "unreachable"
-  | Pty_ctor(id, _) ->
+let rec infer env (ty: Ast.Type.t) =
+  let open Ast.Type in
+  let { spec; loc } = ty in
+  match spec with
+  | Ty_any -> TypeValue.Any
+  | Ty_var _ -> failwith "unreachable"
+  | Ty_ctor(id, _) ->
     begin
       let sym = env
         |> Env.peek_scope
@@ -59,12 +59,12 @@ let rec infer env (ty: Ast._type) =
       | None ->
         Env.add_error env { Type_error.
           spec = CannotFindName id.pident_name;
-          loc = pty_loc;
+          loc;
         };
         TypeValue.Unknown
     end
 
-  | Pty_arrow(params, ret) ->
+  | Ty_arrow(params, ret) ->
     let params_types = List.map ~f:(fun ty -> ("<unknown>", infer env ty)) params in
     let params_ret = infer env ret in
     TypeValue.(Function {
