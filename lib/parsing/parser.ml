@@ -12,7 +12,7 @@ let with_start_loc env start_loc =
 let rec parse_attribute env : attribute =
   let start_loc = Peek.loc env in
   Expect.token env Token.T_AT;
-  let id = parse_identifier env in
+  let id = parse_identifier_with_keywords env in
   let attrib: string Asttypes.loc =
     { Asttypes.
       txt = id.pident_name;
@@ -265,14 +265,14 @@ and parse_block env: Block.t =
 
 and parse_identifier env : Identifier.t =
   let next = Peek.token env in
-  let pident_loc = Peek.loc env in
+  let start_loc = Peek.loc env in
   match next with
   | Token.T_IDENTIFIER ident ->
     Eat.token env;
     {
       Identifier.
       pident_name = ident.value;
-      pident_loc;
+      pident_loc = with_start_loc env start_loc;
     }
 
   | _ ->
@@ -281,8 +281,22 @@ and parse_identifier env : Identifier.t =
     Eat.token env;
     { Identifier.
       pident_name = "<unexpected>";
-      pident_loc;
+      pident_loc = with_start_loc env start_loc;
     }
+
+and parse_identifier_with_keywords env : Identifier.t =
+  let next = Peek.token env in
+  let start_loc = Peek.loc env in
+  if Token.is_keyword next then
+    let value = Token.value_of_token next in
+    Eat.token env;
+    {
+      Identifier.
+      pident_name = value;
+      pident_loc = with_start_loc env start_loc;
+    }
+  else
+    parse_identifier env
 
 and parse_class env : Statement._class =
   let start_loc = Peek.loc env in

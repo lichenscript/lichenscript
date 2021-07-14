@@ -489,3 +489,58 @@ let explanation_of_token ?(use_article = false) token =
     article ^ " " ^ value
   else
     value
+
+let is_keyword = function
+  | T_FUNCTION
+  | T_IF
+  | T_IN
+  | T_INSTANCEOF
+  | T_RETURN
+  | T_SWITCH
+  | T_THIS
+  | T_THROW
+  | T_TRY
+  | T_VAR
+  | T_WHILE
+  | T_WITH
+  | T_CONST
+  | T_LET
+  | T_NULL
+  | T_FALSE
+  | T_TRUE
+  | T_BREAK
+  | T_CASE
+  | T_CATCH
+  | T_CONTINUE
+  | T_DEFAULT
+  | T_DO
+  | T_FINALLY
+  | T_FOR
+  | T_CLASS
+  | T_EXTENDS
+  | T_STATIC
+  | T_ELSE
+  | T_NEW
+  | T_DELETE
+  | T_TYPEOF
+  | T_VOID
+  | T_ENUM
+  | T_EXPORT
+  | T_IMPORT
+  | T_SUPER
+  | T_IMPLEMENTS
+  | T_INTERFACE
+  | T_PACKAGE
+  | T_PRIVATE
+  | T_PROTECTED
+  | T_PUBLIC
+  | T_YIELD
+  | T_DEBUGGER
+  | T_DECLARE
+  | T_TYPE
+  | T_OPAQUE
+  | T_OF
+  | T_ASYNC
+  | T_AWAIT
+  | T_CHECKS -> true
+  | _ -> false
