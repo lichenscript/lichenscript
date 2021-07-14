@@ -9,7 +9,31 @@ let with_start_loc env start_loc =
   | Some loc -> Loc.btwn start_loc loc
   | None -> start_loc
 
-let rec parse_string source content = 
+let rec parse_attribute env : attribute =
+  let start_loc = Peek.loc env in
+  Expect.token env Token.T_AT;
+  let id = parse_identifier env in
+  let attrib: string Asttypes.loc =
+    { Asttypes.
+      txt = id.pident_name;
+      loc = with_start_loc env start_loc;
+    }
+  in
+  {
+    attr_name = attrib;
+    attr_payload = [];
+    attr_loc = with_start_loc env start_loc;
+  }
+
+and parse_attributes env : attributes =
+  let result = ref [] in
+  while (Peek.token env) == Token.T_AT do
+    let attrib = parse_attribute env in
+    result := attrib::!(result)
+  done;
+  List.rev !result
+
+and parse_string source content = 
   let env = Parser_env.init_env source content in
   let program = parse_program env in
   let errs = errors env in
@@ -34,6 +58,7 @@ and parse_program env : program =
 and parse_statement env : Statement.t =
   let open Statement in
   let start_loc = Peek.loc env in
+  let attributes = parse_attributes env in
   let next = Peek.token env in
 
   let spec: Statement.spec =
@@ -125,7 +150,7 @@ and parse_statement env : Statement.t =
     spec;
     loc = with_start_loc env start_loc;
     loc_stack = [];
-    attributes = [];
+    attributes;
   }
 
 and parse_var_binding env kind: Statement.var_binding =

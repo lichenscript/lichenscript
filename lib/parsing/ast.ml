@@ -27,7 +27,7 @@ type var_kind =
 
 type attribute = {
   attr_name : string Asttypes.loc;
-  attr_payload : string; (* modified *)
+  attr_payload : string list; (* modified *)
   attr_loc : Loc.t;
 }
 [@@deriving show]
