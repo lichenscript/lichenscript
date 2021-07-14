@@ -1,14 +1,5 @@
 module Loc = Waterlang_lex.Loc
 
-type constant =
-  | Pconst_integer of string * char option
-  | Pconst_char of char
-  (* 'c' *)
-  | Pconst_string of string * Loc.t * string option
-  | Pconst_float of string * char option
-  | Pconst_boolean of bool
-  [@@deriving show]
-
 type location_stack = Loc.t list
 [@@deriving show]
 
@@ -34,7 +25,21 @@ type attribute = {
 
 and attributes = attribute list
 
-module rec Expression : sig
+module%gen rec Literal : sig
+
+  type t =
+    | Integer of string * char option
+    | Char of char
+    (* 'c' *)
+    | String of string * Loc.t * string option
+    | Float of string * char option
+    | Boolean of bool
+    [@@deriving show]
+
+end
+ = Literal
+
+and Expression : sig
 
   type if_desc = {
     if_test: t;
@@ -50,7 +55,7 @@ module rec Expression : sig
   }
 
   and spec =
-    | Constant of constant
+    | Constant of Literal.t
     | Identifier of Identifier.t
     | Lambda of Function.t
     | Throw of t
@@ -216,6 +221,7 @@ and Type : sig
     | Ty_arrow of
       t list *  (* params*)
       t         (* result *)
+  [@@deriving show]
 
 end
   = Type

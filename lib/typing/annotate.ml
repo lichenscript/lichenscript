@@ -267,22 +267,22 @@ and annotate_pattern env (pat: Ast.Pattern.t) =
     loc;
   }
 
-and annotate_constant (env: Env.t) (cnst: Ast.constant) =
-  let open Ast in
+and annotate_constant env (cnst: Ast.Literal.t) =
+  let open Ast.Literal in
   match cnst with
-  | Pconst_integer _ ->
+  | Integer _ ->
     (cnst, Env.ty_i32 env)
 
-  | Pconst_char _ ->
+  | Char _ ->
     (cnst, Env.ty_char env)
 
-  | Pconst_float _ ->
+  | Float _ ->
     (cnst, Env.ty_f32 env)
 
-  | Pconst_string _ ->
+  | String _ ->
     (cnst, Env.ty_string env)
 
-  | Pconst_boolean _ ->
+  | Boolean _ ->
     (cnst, Env.ty_boolean env)
 
 and annotate_expression (env: Env.t) expr =

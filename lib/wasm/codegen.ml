@@ -97,17 +97,17 @@ module M (S: Dsl.BinaryenModule) = struct
     Some(local_set local_id init_exp)
 
   and codegen_constant env cnst =
-    let open Waterlang_parsing.Ast in
+    let open Waterlang_parsing.Ast.Literal in
     match cnst with
-    | Pconst_integer (content, _) ->
+    | Integer (content, _) ->
       let value = int_of_string content in
       const_i32_of_int value
 
-    | Pconst_float (content, _) ->
+    | Float (content, _) ->
       let value = float_of_string content in
       const_f64 value
 
-    | Pconst_string (content, _, _) ->
+    | String (content, _, _) ->
       Codegen_env.turn_on_string env;
       let value = Data_segment_allocator.add_static_string env.data_segment content in
       let open Data_segment_allocator in
@@ -118,15 +118,15 @@ module M (S: Dsl.BinaryenModule) = struct
           (const_i32_of_int str_len);
         |] i32
 
-    | Pconst_char ch ->
+    | Char ch ->
       let str = Char.to_string ch in
       let _ = Data_segment_allocator.add_static_string env.data_segment str in
       failwith "not implemented"
 
-    | Pconst_boolean true ->
+    | Boolean true ->
       const_i32_of_int 1
 
-    | Pconst_boolean false ->
+    | Boolean false ->
       const_i32_of_int 0
 
   and codegen_expression env expr: C_bindings.exp =

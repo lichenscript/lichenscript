@@ -16,8 +16,8 @@ let test_parser _ =
   }
   " in
   match result with
-  | Result.Ok _program ->
-    (* Ast.pp_program Format.std_formatter program; *)
+  | Result.Ok program ->
+    Ast.pp_program Format.std_formatter program;
     let _env = Waterlang_typing.Env.create () in
     (* let program = Waterlang_typing.Annotate.annotate env program in
     Waterlang_typing.Typecheck.type_check env program; *)

@@ -1,4 +1,4 @@
 (library
  (name waterlang_parsing)
  (libraries waterlang_lex)
- (preprocess (pps ppx_deriving.show)))
+ (preprocess (pps ppx_gen_rec ppx_deriving.std)))

@@ -603,19 +603,19 @@ and parse_primary_expression env : Expression.t =
 
     | Token.T_NUMBER { raw; _ } ->
       Eat.token env;
-      Constant (Pconst_integer (raw, None))
+      Constant (Literal.Integer (raw, None))
 
     | Token.T_STRING (loc, value, _, _) ->
       Eat.token env;
-      Constant (Pconst_string (value, loc, None))
+      Constant (Literal.String (value, loc, None))
 
     | Token.T_TRUE ->
       Eat.token env;
-      Constant (Pconst_boolean true)
+      Constant (Literal.Boolean true)
 
     | Token.T_FALSE ->
       Eat.token env;
-      Constant (Pconst_boolean false)
+      Constant (Literal.Boolean false)
 
     | Token.T_THROW ->
       Eat.token env;

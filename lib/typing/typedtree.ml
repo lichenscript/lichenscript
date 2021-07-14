@@ -23,7 +23,7 @@ module rec Expression : sig
   }
 
   and spec =
-    | Constant of Ast.constant
+    | Constant of Ast.Literal.t
     | Identifier of Core_type.VarSym.t
     | Lambda
     | Throw of t
