@@ -59,6 +59,7 @@ let rec check_statement env statement =
 
     )
 
+  | EnumDecl _
   | Empty -> ()
 
 and check_class env cls =

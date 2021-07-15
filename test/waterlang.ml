@@ -11,6 +11,11 @@ let test_parser _ =
     private __name: sring;
   }
 
+  enum Result {
+    Ok,
+    Error,
+  }
+
   @export
   function main(args, args2: string, ...rest) {
     let name = 3;

@@ -53,6 +53,9 @@ let rec annotate_statement env (stmt: Ast.Statement.t) =
         )
         expr_opt)
 
+    | EnumDecl enum ->
+      T.Statement.EnumDecl enum
+
     | Empty -> T.Statement.Empty
 
   in

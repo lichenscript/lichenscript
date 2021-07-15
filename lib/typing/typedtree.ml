@@ -82,6 +82,7 @@ and Statement : sig
     | Continue of Identifier.t option
     | Debugger
     | Return of Expression.t option
+    | EnumDecl of Ast.Enum.t
     | Empty
 
   and _class = {

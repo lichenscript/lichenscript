@@ -99,13 +99,23 @@ and TypeSym : sig
     props: TypeValue.t PropsMap.t;
   }
 
-  type spec =
+  and enum_member = {
+    enum_mem_name: string;
+    enum_mem_fields: t list;
+  }
+
+  and enum_type = {
+    enum_members: enum_member list;
+  }
+
+  and spec =
     | Primitive
     | Object 
     | Alias of TypeValue.t
     | Module_ of module_type
+    | Enum of enum_type
 
-  type t = {
+  and t = {
     builtin: bool;
     scope_id: int;
     name: string;
@@ -128,13 +138,23 @@ end = struct
     props: TypeValue.t PropsMap.t;
   }
 
-  type spec =
+  and enum_member = {
+    enum_mem_name: string;
+    enum_mem_fields: t list;
+  }
+
+  and enum_type = {
+    enum_members: enum_member list;
+  }
+
+  and spec =
     | Primitive
     | Object
     | Alias of TypeValue.t
     | Module_ of module_type
+    | Enum of enum_type
 
-  type t = {
+  and t = {
     builtin: bool;
     scope_id: int;
     name: string;

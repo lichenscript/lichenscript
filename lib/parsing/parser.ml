@@ -137,6 +137,56 @@ and parse_statement env : Statement.t =
           Return(Some expr)
         end
 
+    | Token.T_ENUM ->
+      let parse_member env =
+        let member_name = parse_identifier env in
+        let fields =
+          if (Peek.token env) == Token.T_LPAREN then (
+            let result = ref [] in
+            Eat.token env;
+
+            while (Peek.token env) <> Token.T_RPAREN do
+              let ty = parse_type env in
+              result := ty::(!result);
+              if (Peek.token env) <> Token.T_RPAREN then (
+                Expect.token env Token.T_COMMA
+              )
+            done;
+
+            Expect.token env Token.T_RPAREN;
+            List.rev !result
+          ) else
+            []
+        in
+
+        { Enum.
+          member_name;
+          fields;
+        }
+      in
+      let start_loc = Peek.loc env in
+      Eat.token env;
+      let name = parse_identifier env in
+      let members = ref [] in
+      Expect.token env Token.T_LCURLY;
+
+      while (Peek.token env) <> Token.T_RCURLY do
+        let member = parse_member env in
+        members := member::(!members);
+
+        if (Peek.token env) <> Token.T_RCURLY then (
+          Expect.token env Token.T_COMMA
+        );
+
+      done;
+
+      Expect.token env Token.T_RCURLY;
+      EnumDecl { Enum.
+        name;
+        members = List.rev !members;
+        loc = with_start_loc env start_loc;
+      }
+
     | _ ->
       let expr = parse_expression env in
       if Peek.token env == Token.T_SEMICOLON then

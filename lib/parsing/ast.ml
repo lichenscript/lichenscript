@@ -136,6 +136,7 @@ and Statement : sig
     | Contintue of Identifier.t option
     | Debugger
     | Return of Expression.t option
+    | EnumDecl of Enum.t
     | Empty
 
   and t = {
@@ -225,6 +226,23 @@ and Type : sig
 
 end
   = Type
+
+and Enum : sig
+  type member = {
+    member_name: Identifier.t;
+    fields: Type.t list;
+  }
+  [@@deriving show]
+
+  type t = {
+    name: Identifier.t;
+    members: member list;
+    loc: Loc.t
+  }
+  [@@deriving show]
+
+end
+  = Enum
 
 
 type program = {
