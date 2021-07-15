@@ -8,6 +8,7 @@ type t = {
   stack_size: int;
   init_mem_size: int;
   release: bool;
+  memory_bulk_operations: bool;
   data_segment_offset: int;
 }
 
@@ -17,5 +18,6 @@ let debug_default () =
     stack_size = 4 * 1024 * 1024;  (* 4M *)
     init_mem_size = 10 * 1024 * 1024;
     release = false;
+    memory_bulk_operations = false;
     data_segment_offset = 1024;
   }

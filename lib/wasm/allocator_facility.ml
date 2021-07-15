@@ -11,6 +11,32 @@ let wtf_alloc_fun_name = "__wtf_alloc"
 let retain_object_fun_name = "__wtf_retain_object"
 let release_object_fun_name = "__wtf_release_object"
 
+let codegen_memory_fill (env: Codegen_env.t) ~dest ~value ~size =
+  let module Dsl =
+    Dsl.Binaryen(struct
+      let ptr_ty = Codegen_env.ptr_ty env
+      let m = env.module_
+    end)
+  in
+  let open Dsl in
+  if env.config.memory_bulk_operations then
+    memory_fill ~dest ~value ~size
+  else
+    call_ memory_fill_fun_name [| dest; value; size |] none
+
+let codegen_memory_copy (env: Codegen_env.t) ~dest ~src ~size =
+  let module Dsl =
+    Dsl.Binaryen(struct
+      let ptr_ty = Codegen_env.ptr_ty env
+      let m = env.module_
+    end)
+  in
+  let open Dsl in
+  if env.config.memory_bulk_operations then
+    memory_copy ~dest ~src ~size
+  else
+    call_ memory_copy_fun_name [| dest; src; size |] none
+
 (**
   * global info
   *
@@ -144,8 +170,7 @@ let codegen_allocator_facility (env: Codegen_env.t) =
   (* function __wtl_init_object(obj: ptr) *)
   let codegen_wtl_init_object () =
     let _ = def_function init_object_fun_name ~params:[| ptr_ty |] ~ret_ty:none (fun _ ->
-        (* memory_fill ~dest:(Ptr.local_get 0) ~value:(const_i32_of_int 0) ~size:(const_i32_of_int 16) *)
-        call_ memory_fill_fun_name [| Ptr.local_get 0; const_i32_of_int 0; const_i32_of_int 16 |] none
+        codegen_memory_fill env ~dest:(Ptr.local_get 0) ~value:(const_i32_of_int 0) ~size:(const_i32_of_int 16)
       )
     in
     let _ = export_function init_object_fun_name init_object_fun_name in

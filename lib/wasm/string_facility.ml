@@ -52,8 +52,7 @@ let codegen_string_facility (env: Codegen_env.t) =
 
           local_set offset (binary add_i32 (Ptr.local_get new_ptr) (const_i32_of_int bytes_offset));
 
-          call_ Allocator_facility.memory_copy_fun_name [| Ptr.local_get offset; Ptr.local_get 0; I32.local_get str_bytes_size |] none;
-          (* memory_copy ~dest:(Ptr.local_get offset) ~src:(Ptr.local_get 1) ~size:(I32.local_get 2); *)
+          Allocator_facility.codegen_memory_copy env ~dest:(Ptr.local_get offset) ~src:(Ptr.local_get 0) ~size:(I32.local_get str_bytes_size);
 
           Ptr.local_get new_ptr
 
