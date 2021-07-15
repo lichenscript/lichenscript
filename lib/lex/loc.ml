@@ -3,7 +3,9 @@ type position = {
   line: int;
   column: int;
 }
-[@@deriving show]
+
+let pp_position formatter pos =
+  Format.fprintf formatter "(%d:%d)" pos.line pos.column
 
 type t = {
   source: File_key.t option;
