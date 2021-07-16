@@ -15,7 +15,7 @@ module Pattern = struct
 
 end
 
-module rec Expression : sig
+module%gen rec Expression : sig
   type t = {
     spec: spec;
     loc: Loc.t;
@@ -59,6 +59,7 @@ module rec Expression : sig
     if_alternative: Statement.t option;
     if_loc: Loc.t;
   }
+  [@@deriving show]
   
 end
   = Expression
@@ -68,6 +69,7 @@ and Statement : sig
   type t = {
     spec: spec;
     loc: Loc.t;
+    attributes: Ast.attributes;
   }
 
   and spec =
@@ -83,6 +85,7 @@ and Statement : sig
     | Debugger
     | Return of Expression.t option
     | EnumDecl of Ast.Enum.t
+    | Decl of Declare.t
     | Empty
 
   and _class = {
@@ -132,8 +135,7 @@ end
 
 and Function : sig
   type t = {
-    id: Core_type.VarSym.t;
-    params: params;
+    header: header;
     body: function_body;
     assoc_scope: Scope.t;
     loc: Loc.t;
@@ -146,6 +148,11 @@ and Function : sig
   and params = {
     params_content: param list;
     params_loc: Loc.t;
+  }
+
+  and header = {
+    id: Core_type.VarSym.t;
+    params: params;
   }
 
   and param = {
@@ -171,6 +178,18 @@ and Block : sig
 end
   = Block
 
+and Declare : sig
+  type spec =
+  | Function_ of Function.header
+
+  and t = {
+    spec: spec;
+    loc: Loc.t;
+  }
+  [@@deriving show]
+
+end
+  = Declare
 
 type program = {
   tprogram_statements: Statement.t list;

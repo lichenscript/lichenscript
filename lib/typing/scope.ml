@@ -49,10 +49,10 @@ let next_var_id scope =
   scope.var_counter <- scope.var_counter + 1;
   id
 
-let create_var_symbol scope name =
+let create_var_symbol ?(spec = VarSym.Internal) scope name =
   let id = next_var_id scope in
   let scope_id = scope.id in
-  let sym = VarSym.mk_local ~id_in_scope:id ~scope_id name in
+  let sym = VarSym.mk_local ~id_in_scope:id ~scope_id ~spec name in
   insert_var_symbol scope sym;
   sym
 

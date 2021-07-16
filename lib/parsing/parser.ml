@@ -10,6 +10,24 @@ let with_start_loc env start_loc =
   | None -> start_loc
 
 let rec parse_attribute env : attribute =
+  let rec parse_payload env list =
+    match Peek.token env with
+    | T_STRING(_, value, _, _) ->
+      let next_list = value::list in
+      Eat.token env;
+      if (Peek.token env) <> Token.T_RPAREN then (
+        Expect.token env Token.T_COMMA
+      );
+      parse_payload env next_list
+
+    | T_RPAREN ->
+      Eat.token env;
+      List.rev list
+
+    | _ ->
+      Expect.error env (Peek.token env);
+      List.rev list
+  in
   let start_loc = Peek.loc env in
   Expect.token env Token.T_AT;
   let id = parse_identifier_with_keywords env in
@@ -19,9 +37,16 @@ let rec parse_attribute env : attribute =
       loc = with_start_loc env start_loc;
     }
   in
+  let attr_payload =
+    if Peek.token env == Token.T_LPAREN then (
+      Eat.token env;
+      parse_payload env []
+    ) else
+      []
+  in
   {
     attr_name = attrib;
-    attr_payload = [];
+    attr_payload;
     attr_loc = with_start_loc env start_loc;
   }
 
@@ -187,6 +212,17 @@ and parse_statement env : Statement.t =
         loc = with_start_loc env start_loc;
       }
 
+    | Token.T_DECLARE ->
+      begin
+        Eat.token env;
+        let function_header = parse_function_header env in
+        let spec = Declare.Function_ function_header in
+        Statement.Decl { Declare.
+          spec;
+          loc = with_start_loc env start_loc;
+        }
+      end
+
     | _ ->
       let expr = parse_expression env in
       if Peek.token env == Token.T_SEMICOLON then
@@ -228,8 +264,7 @@ and parse_var_binding env kind: Statement.var_binding =
     binding_init;
   }
 
-and parse_function env: Function.t =
-  let open Function in
+and parse_function_header env: Function.header =
   let start_loc = Peek.loc env in
   Expect.token env Token.T_FUNCTION;
   let id = parse_identifier env in
@@ -246,13 +281,20 @@ and parse_function env: Function.t =
 
     | _ -> None
   in
+  { Function.
+    id = Some id;
+    params;
+    return_ty;
+    header_loc = with_start_loc env start_loc;
+  }
+
+and parse_function env: Function.t =
+  let open Function in
+  let start_loc = Peek.loc env in
+  let header = parse_function_header env in
   let block = parse_block env in
   {
-    header = {
-      id = Some id;
-      params;
-      return_ty;
-    };
+    header;
     body = Fun_block_body block;
     loc = with_start_loc env start_loc;
     comments = [];

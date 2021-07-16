@@ -6,7 +6,7 @@ module T = Typedtree
 
 let rec annotate_statement env (stmt: Ast.Statement.t) =
   let open Ast.Statement in
-  let { loc; spec = parser_spec; _; } = stmt in
+  let { loc; spec = parser_spec; attributes; _; } = stmt in
   let spec =
     match parser_spec with
     | Class cls ->
@@ -56,6 +56,18 @@ let rec annotate_statement env (stmt: Ast.Statement.t) =
     | EnumDecl enum ->
       T.Statement.EnumDecl enum
 
+    | Decl decl ->
+      let open Ast.Declare in
+      let { spec; loc; } = decl in
+      (match spec with
+      | Function_ signature ->
+        let annotated_header = annotate_function_header env signature in
+        let spec = T.Declare.Function_ annotated_header in
+        T.Statement.Decl {
+          spec;
+          loc;
+        })
+
     | Empty -> T.Statement.Empty
 
   in
@@ -63,9 +75,10 @@ let rec annotate_statement env (stmt: Ast.Statement.t) =
   { T.Statement.
     spec;
     loc;
+    attributes;
   }
 
-and annotate_function env (_function: Ast.Function.t) =
+and annotate_function_header env (header: Ast.Function.header) =
   let open Ast.Function in
   let annotate_param env param =
     let { param_pat; param_init; param_loc; param_ty; param_rest; _ } = param in
@@ -85,64 +98,74 @@ and annotate_function env (_function: Ast.Function.t) =
       param_rest = param_rest;
     }
   in
-  let { header; body; loc;  _; } = _function in
-  let { id; params; return_ty; } = header in
+  let { id; params; header_loc; return_ty; _; } = header in
   let name = (Option.value_exn id).pident_name in
-  let prev_scope = Env.peek_scope env in
+  let prev_scope: Scope.t = Env.peek_scope env in
   let var_sym = Scope.find_var_symbol prev_scope name in
+  match var_sym with
+  | Some tfun_id ->
+    begin
+      let params =
+        { T.Function.
+          params_content = List.map ~f:(annotate_param env) params.params_content;
+          params_loc = params.params_loc;
+        }
+      in
+      let return_ty =
+        return_ty
+        |> Option.map ~f:(Infer.infer env)
+        |> Option.value ~default:TypeValue.Unit
+      in
+      let fun_ty =
+        { TypeValue.
+          tfun_params = List.map
+            ~f:(fun param ->
+              T.Pattern.pp Format.str_formatter param.param_pat;
+              let param_name = Format.flush_str_formatter () in
+              (param_name, param.param_ty)
+            )
+            params.params_content;
+          tfun_ret = return_ty;
+        }
+      in
+      VarSym.set_def_type tfun_id (TypeValue.Function fun_ty);
+      { T.Function.
+        id = tfun_id;
+        params;
+      }
+    end
+  | None ->
+    begin
+      let err = Type_error.make_error header_loc (Type_error.CannotFindName name) in
+      Env.add_error env err;
+      raise (Type_error.Error err)
+    end
+
+
+and annotate_function env (_function: Ast.Function.t) =
+  let open Ast.Function in
+  let { header; body; loc;  _; } = _function in
+  let { return_ty; _ } = header in
+  let prev_scope = Env.peek_scope env in
   let scope = Scope.create ~prev:prev_scope prev_scope.id in
+  let annotated_header = annotate_function_header env header in
   Env.set_return_type env (Option.map ~f:(Infer.infer env) return_ty);
   Env.with_new_scope env scope (fun env ->
-    match var_sym with
-    | Some tfun_id ->
-      begin
-        let params =
-          { T.Function.
-            params_content = List.map ~f:(annotate_param env) params.params_content;
-            params_loc = params.params_loc;
-          }
-        in
-        let body = match body with
-          | Fun_block_body block ->
-            T.Function.Fun_block_body (annotate_block env block)
+    let body = match body with
+      | Fun_block_body block ->
+        T.Function.Fun_block_body (annotate_block env block)
 
-          | Fun_expression_body expr ->
-            T.Function.Fun_expression_body (annotate_expression env expr)
+      | Fun_expression_body expr ->
+        T.Function.Fun_expression_body (annotate_expression env expr)
 
-        in
-        let return_ty =
-          return_ty
-          |> Option.map ~f:(Infer.infer env)
-          |> Option.value ~default:TypeValue.Unit
-        in
-        let fun_ty =
-          { TypeValue.
-            tfun_params = List.map
-              ~f:(fun param ->
-                T.Pattern.pp Format.str_formatter param.param_pat;
-                let param_name = Format.flush_str_formatter () in
-                (param_name, param.param_ty)
-              )
-              params.params_content;
-            tfun_ret = return_ty;
-          }
-        in
-        VarSym.set_def_type tfun_id (TypeValue.Function fun_ty);
-        { T.Function.
-          id = tfun_id;
-          params;
-          body;
-          assoc_scope = scope;
-          loc;
-        }
-      end
+    in
+    { T.Function.
+      header = annotated_header;
+      body;
+      assoc_scope = scope;
+      loc;
+    }
 
-    | None ->
-      begin
-        let err = Type_error.make_error loc (Type_error.CannotFindName name) in
-        Env.add_error env err;
-        raise (Type_error.Error err)
-      end
   )
 
 and annotate_class env _class =
@@ -454,47 +477,50 @@ let pre_scan_definitions env program =
     let scope = Env.peek_scope env in
     let type_sym = Scope.find_type_symbol scope name in
     match type_sym with
-    | Some _ ->
+    | Some found ->
       begin
         let err = Type_error.make_error loc (Type_error.Redefinition name) in
-        Env.add_error env err
+        Env.add_error env err;
+        found
       end
 
     | None ->
       begin
         let open Core_type in
         let sym = TypeSym.create ~scope_id:scope.id name TypeSym.Primitive in
-        Scope.insert_type_symbol scope sym
+        Scope.insert_type_symbol scope sym;
+        sym
       end
   in
 
-  let find_or_add_var_sym name loc =
+  let find_or_add_var_sym ?(spec=Core_type.VarSym.Internal) name loc =
     let scope = Env.peek_scope env in
     let var_sym = Scope.find_var_symbol scope name in
     match var_sym with
-    | Some _ ->
+    | Some found ->
       begin
         let err = Type_error.make_error loc (Type_error.Redefinition name) in
-        Env.add_error env err
+        Env.add_error env err;
+        found
       end
 
     | None ->
-      let _ = Scope.create_var_symbol scope name in
-      ()
+      Scope.create_var_symbol ~spec scope name
 
   in
 
   List.iter
     ~f:(fun stmt ->
       let open Ast.Statement in
-      let { spec; _; } = stmt in
+      let { spec; attributes; _; } = stmt in
       match spec with
       | Class cls ->
         begin
           let { cls_id; cls_loc; _; } = cls in
           let id = Option.value_exn cls_id in
-          find_or_add_type_sym id.pident_name cls_loc;
-          find_or_add_var_sym id.pident_name cls_loc
+          let _ = find_or_add_type_sym id.pident_name cls_loc in
+          let _ = find_or_add_var_sym id.pident_name cls_loc in
+          ()
         end
 
       | Function_ _fun ->
@@ -503,8 +529,35 @@ let pre_scan_definitions env program =
           let { header; loc; _; } = _fun in
           let { id; _; } = header in
           let id = Option.value_exn id in
-          find_or_add_type_sym id.pident_name loc;
-          find_or_add_var_sym id.pident_name loc
+          let _ = find_or_add_type_sym id.pident_name loc in
+          let _  = find_or_add_var_sym id.pident_name loc in
+          ()
+        end
+
+      | Decl declare ->
+        begin
+          let open Ast.Declare in
+          let { spec; loc; _ } = declare in
+          match spec with
+          | Function_ signature ->
+            let external_attrib = List.find
+              ~f:Ast.(fun attr -> String.equal attr.attr_name.txt "external")
+              attributes
+            in
+            Option.iter
+              ~f:(fun attr ->
+                match attr.attr_payload with
+                | [ external_name; external_base_name ] ->
+                  let spec = Core_type.VarSym.ExternalMethod(external_name, external_base_name) in
+                  let id = Option.value_exn signature.id in
+                  let _ = find_or_add_type_sym id.pident_name loc in
+                  let _ = find_or_add_var_sym ~spec id.pident_name loc in
+                  ()
+
+                | _ -> failwith "not implemented"
+              )
+              external_attrib
+
         end
 
       | _ -> ()

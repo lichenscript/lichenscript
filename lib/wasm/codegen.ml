@@ -170,7 +170,8 @@ module M (S: Dsl.BinaryenModule) = struct
       |> List.to_array
     in
     match callee_sym.spec with
-    | Internal ->
+    | Internal
+    | ExternalMethod _ ->
       let get_function_name_by_callee callee =
         match callee.callee_spec with
         | (callee_sym, []) -> callee_sym.name
@@ -209,15 +210,8 @@ module M (S: Dsl.BinaryenModule) = struct
         |> unwrap_function_return_type
         |> (get_binaryen_ty_by_core_ty env)
       in
-      let name =
-        match call_var_sym.spec with
-        | ExternalMethod m -> m
-        | _ -> failwith "unreachable"
-      in
+      let name = call_var_sym.name in
       call_ name params return_ty
-
-    | ExternalMethod _ ->
-      failwith "not implemented"
 
   and codegen_function env function_ =
     let open Typedtree.Function in
@@ -231,7 +225,7 @@ module M (S: Dsl.BinaryenModule) = struct
       C_bindings.make_ty_multiples types_arr
     in
 
-    let params_ty = parms_type function_.params in
+    let params_ty = parms_type function_.header.params in
     let vars_ty =
       function_.assoc_scope.var_symbols
       |> Scope.SymbolTable.to_alist
@@ -284,10 +278,10 @@ module M (S: Dsl.BinaryenModule) = struct
     in
     let exp = block (Array.concat [block_contents; finalizers]) in
 
-    let id = function_.id in
+    let id = function_.header.id in
     let id_name = id.name in
     let ret_ty =
-      function_.id.def_type
+      id.def_type
       |> unwrap_function_return_type
       |> get_binaryen_ty_by_core_ty env
     in

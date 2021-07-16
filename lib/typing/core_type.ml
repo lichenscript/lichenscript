@@ -190,7 +190,7 @@ and VarSym : sig
   type spec =
   | Internal
   | ExternalModule of t PropsMap.t
-  | ExternalMethod of string
+  | ExternalMethod of string * string
 
   and t = {
     id_in_scope: int;
@@ -203,7 +203,7 @@ and VarSym : sig
     spec:        spec;
   }
 
-  val mk_local: id_in_scope:int -> scope_id:int -> string -> t
+  val mk_local: id_in_scope:int -> scope_id:int -> ?spec:spec -> string -> t
 
   val set_def_type: t -> TypeValue.t -> unit
 
@@ -214,7 +214,7 @@ end = struct
   type spec =
   | Internal
   | ExternalModule of t PropsMap.t
-  | ExternalMethod of string
+  | ExternalMethod of string * string
 
   and t = {
     id_in_scope: int;
@@ -227,7 +227,7 @@ end = struct
     spec:        spec;
   }
 
-  let mk_local ~id_in_scope ~scope_id name =
+  let mk_local ~id_in_scope ~scope_id ?(spec=Internal) name =
     {
       id_in_scope;
       name = name;
@@ -236,7 +236,7 @@ end = struct
       kind = Local;
       scope_id = scope_id;
       builtin = false;
-      spec = Internal;
+      spec;
     }
 
   let set_def_type t ty =

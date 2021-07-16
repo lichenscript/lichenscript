@@ -137,6 +137,7 @@ and Statement : sig
     | Debugger
     | Return of Expression.t option
     | EnumDecl of Enum.t
+    | Decl of Declare.t
     | Empty
 
   and t = {
@@ -201,6 +202,7 @@ and Function : sig
     id: Identifier.t option;
     params: params;
     return_ty: Type.t option;
+    header_loc: Loc.t;
   }
 
   and function_body =

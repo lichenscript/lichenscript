@@ -22,13 +22,13 @@ let make_default_module_sym scope =
   let log_method =
     { VarSym.
       id_in_scope = Scope.next_var_id scope;
-      name = "log";
+      name = "print";
       def_type = TypeValue.Unknown;
       def_loc = None;
       kind = Local;
       scope_id = Scope.id scope;
       builtin = true;
-      spec = Core_type.VarSym.ExternalMethod "__wtl_console_log"
+      spec = Core_type.VarSym.ExternalMethod("env", "console_log")
     }
   in
   PropsMap.set extern_module ~key:"log" ~data:log_method;

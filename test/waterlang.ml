@@ -7,6 +7,10 @@ let temp_dir_name = "/tmp/test_waterlang/"
 
 let test_parser _ =
   let result =  Parser.parse_string None "
+
+  @external(\"console\", \"log\")
+  declare function print(content: string);
+
   class Array {
     private __name: sring;
   }
@@ -89,9 +93,12 @@ let test_function_call _ =
 
 let test_string _ =
   let source = "
+    @external(\"console\", \"log\")
+    declare function print(content: string)
+
     function main() {
       let a: string = \"Hello World!\";
-      console.log(a);
+      print(a);
     }
   "
   in
