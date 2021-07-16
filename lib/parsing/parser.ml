@@ -248,9 +248,11 @@ and parse_function env: Function.t =
   in
   let block = parse_block env in
   {
-    id = Some id;
-    params;
-    return_ty;
+    header = {
+      id = Some id;
+      params;
+      return_ty;
+    };
     body = Fun_block_body block;
     loc = with_start_loc env start_loc;
     comments = [];

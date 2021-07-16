@@ -85,7 +85,8 @@ and annotate_function env (_function: Ast.Function.t) =
       param_rest = param_rest;
     }
   in
-  let { id; params; body; loc; return_ty; _; } = _function in
+  let { header; body; loc;  _; } = _function in
+  let { id; params; return_ty; } = header in
   let name = (Option.value_exn id).pident_name in
   let prev_scope = Env.peek_scope env in
   let var_sym = Scope.find_var_symbol prev_scope name in
@@ -499,7 +500,8 @@ let pre_scan_definitions env program =
       | Function_ _fun ->
         begin
           let open Ast.Function in
-          let { id; loc; _; } = _fun in
+          let { header; loc; _; } = _fun in
+          let { id; _; } = header in
           let id = Option.value_exn id in
           find_or_add_type_sym id.pident_name loc;
           find_or_add_var_sym id.pident_name loc

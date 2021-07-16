@@ -178,9 +178,7 @@ end
 and Function : sig
 
   type t = {
-    id: Identifier.t option;
-    params: params;
-    return_ty: Type.t option;
+    header: header;
     body: function_body;
     loc: Loc.t;
     comments: Loc.t Waterlang_lex.Comment.t list;
@@ -197,6 +195,12 @@ and Function : sig
     param_init: Expression.t option;
     param_loc: Loc.t;
     param_rest: bool;
+  }
+
+  and header = {
+    id: Identifier.t option;
+    params: params;
+    return_ty: Type.t option;
   }
 
   and function_body =
@@ -244,6 +248,19 @@ and Enum : sig
 end
   = Enum
 
+and Declare : sig
+
+  type spec =
+  | Function_ of Function.header
+
+  and t = {
+    spec: spec;
+    loc: Loc.t;
+  }
+  [@@deriving show]
+
+end
+  = Declare
 
 type program = {
   pprogram_statements: Statement.t list;
