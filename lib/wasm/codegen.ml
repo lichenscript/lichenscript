@@ -198,6 +198,9 @@ module M (S: Dsl.BinaryenModule) = struct
       in
       call_ callee_name params return_ty
 
+    | _ ->
+      failwith "unreachable"
+
   and codegen_function env function_ =
     let open Typedtree.Function in
     let params_ty = get_function_params_type env function_.header.params in

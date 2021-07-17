@@ -54,7 +54,9 @@ let rec annotate_statement env (stmt: Ast.Statement.t) =
         expr_opt)
 
     | EnumDecl enum ->
-      T.Statement.EnumDecl enum
+      begin
+        T.Statement.EnumDecl enum
+      end
 
     | Decl decl ->
       let open Ast.Declare in
@@ -562,6 +564,36 @@ let pre_scan_definitions env program =
               )
               external_attrib
 
+        end
+
+      | EnumDecl enum_decl ->
+        begin
+          let open Ast.Enum in
+          let { name; loc; _; } = enum_decl in
+          let spec: Core_type.VarSym.spec = 
+            let a_list =
+              List.mapi
+                ~f:(fun index member ->
+                  let field =
+                    { Core_type.VarSym.
+                      enum_id = index;
+                    }
+                  in
+                  (member.member_name.pident_name, field)
+                )
+                enum_decl.members
+            in
+            let enum_map = Core_type.PropsMap.of_alist a_list in
+            let unwrapped_enum =
+              match enum_map with
+              | `Ok emap -> emap
+              | _ -> failwith "unexpected"
+            in
+            Core_type.VarSym.Enum unwrapped_enum
+          in
+          let _ = find_or_add_type_sym name.pident_name loc in
+          let _  = find_or_add_var_sym ~spec name.pident_name loc in
+          ()
         end
 
       | _ -> ()

@@ -179,9 +179,14 @@ end
 
 and VarSym : sig
 
+  type enum_field = {
+    enum_id: int;
+  }
+
   type spec =
   | Internal
   | ExternalMethod of string * string
+  | Enum of enum_field PropsMap.t
 
   and t = {
     id_in_scope: int;
@@ -200,10 +205,14 @@ and VarSym : sig
   val pp: Format.formatter -> t -> unit
 
 end = struct
+  type enum_field = {
+    enum_id: int;
+  }
 
   type spec =
   | Internal
   | ExternalMethod of string * string
+  | Enum of enum_field PropsMap.t
 
   and t = {
     id_in_scope: int;
