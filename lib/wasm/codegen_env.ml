@@ -16,9 +16,10 @@ type t = {
   mutable facilities_flags: int;
   data_segment: Data_segment_allocator.t;
   mutable js_snippets: js_snippet list;
+  program: Waterlang_typing.Program.t;
 }
 
-let create ?output_filename config =
+let create ?output_filename config program =
   {
     module_ = C_bindings.make_module();
     output_filename = Option.value output_filename ~default:"test";
@@ -26,6 +27,7 @@ let create ?output_filename config =
     facilities_flags = 0;
     data_segment = Data_segment_allocator.init_with_begin_offset config.data_segment_offset;
     js_snippets = [];
+    program;
   }
 
 let turn_on_allocator env =

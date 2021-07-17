@@ -27,6 +27,17 @@ module M (S: Dsl.BinaryenModule) = struct
     | Unit -> none
     | _ -> unreachable
 
+
+  let get_function_params_type env params =
+    let open Typedtree.Function in
+    let { params_content; _; } = params in
+    let params_arr = List.to_array params_content in
+    let types_arr = Array.map
+      ~f:(fun param -> param.param_ty |> (get_binaryen_ty_by_core_ty env))
+      params_arr
+    in
+    C_bindings.make_ty_multiples types_arr
+
   let unwrap_function_return_type (ty: Core_type.TypeValue.t) =
     let open Core_type in
     match ty with
@@ -163,7 +174,7 @@ module M (S: Dsl.BinaryenModule) = struct
   and codegen_call env call =
     let open Typedtree.Expression in
     let open Core_type.VarSym in
-    let (callee_sym, prop_names) = call.callee.callee_spec in
+    let (callee_sym, _) = call.callee.callee_spec in
     let params =
       call.call_params
       |> List.map ~f:(codegen_expression env)
@@ -187,45 +198,9 @@ module M (S: Dsl.BinaryenModule) = struct
       in
       call_ callee_name params return_ty
 
-    | ExternalModule _mod ->
-      let call_var_sym: Core_type.VarSym.t =
-        List.fold
-        ~init:callee_sym
-        ~f:(fun sym name_spec ->
-          match sym.spec with
-          | Internal -> failwith "unreachable"
-          | ExternalModule mod_ ->
-            let child_name = match name_spec with
-              | `Property name -> name
-              | _ -> failwith "not implemented"
-            in
-            let next_sym = Core_type.PropsMap.find_exn mod_ child_name in
-            next_sym
-
-          | ExternalMethod _ -> failwith "not implemented")
-        prop_names
-      in
-      let return_ty =
-        call_var_sym.def_type
-        |> unwrap_function_return_type
-        |> (get_binaryen_ty_by_core_ty env)
-      in
-      let name = call_var_sym.name in
-      call_ name params return_ty
-
   and codegen_function env function_ =
     let open Typedtree.Function in
-    let parms_type params =
-      let { params_content; _; } = params in
-      let params_arr = List.to_array params_content in
-      let types_arr = Array.map
-        ~f:(fun param -> param.param_ty |> (get_binaryen_ty_by_core_ty env))
-        params_arr
-      in
-      C_bindings.make_ty_multiples types_arr
-    in
-
-    let params_ty = parms_type function_.header.params in
+    let params_ty = get_function_params_type env function_.header.params in
     let vars_ty =
       function_.assoc_scope.var_symbols
       |> Scope.SymbolTable.to_alist
@@ -289,9 +264,36 @@ module M (S: Dsl.BinaryenModule) = struct
     let _ = export_function id_name id_name in
     ()
 
-  and codegen_program env (program: Program.t) =
+  and codgen_external_method (env: Codegen_env.t) =
+    let scope = env.program.root_scope in
+    Scope.SymbolTable.to_alist scope.var_symbols
+    |> List.iter
+      ~f:(fun (key, value) ->
+        let open Core_type.VarSym in
+        let def_type = value.def_type in
+        match def_type with
+        | Core_type.TypeValue.Function fun_type ->
+          begin
+            let params_ty = 
+              fun_type.tfun_params
+              |> List.map ~f:(fun (_, t) -> get_binaryen_ty_by_core_ty env t)
+              |> List.to_array
+              |> C_bindings.make_ty_multiples
+            in
+            let ret_ty = get_binaryen_ty_by_core_ty env fun_type.tfun_ret in
+            match value.spec with
+            | ExternalMethod(extern_name, extern_base_name) ->
+              Dsl.import_function ~intern_name:key ~extern_name ~extern_base_name ~params_ty ~ret_ty
+            | _ -> ()
+
+          end
+        | _ -> ()
+
+      );
+
+  and codegen_program (env: Codegen_env.t) =
     C_bindings.set_debug_info (not env.config.release);
-    let { Program. tree } = program in
+    let { Program. tree; _; } = env.program in
     let { Typedtree. tprogram_statements } = tree in
     let _ = List.map ~f:(codegen_statements env) tprogram_statements in
 
@@ -303,28 +305,30 @@ module M (S: Dsl.BinaryenModule) = struct
       String_facility.codegen_string_facility env;
     );
 
+    codgen_external_method env;
+
     set_memory env
   
 end
 
 let codegen program config : string =
-  let env = Codegen_env.create config in
+  let env = Codegen_env.create config program in
   let module Cg = M(struct
       let m = env.module_
       let ptr_ty = Codegen_env.ptr_ty env
     end)
   in
-  Cg.codegen_program env program;
+  Cg.codegen_program env;
   let str = C_bindings.module_emit_text env.module_ in
   str
 
-let codegen_binary program env path : unit =
+let codegen_binary env path : unit =
   let module Cg = M(struct
       let m = env.module_
       let ptr_ty = Codegen_env.ptr_ty env
     end)
   in
-  Cg.codegen_program env program;
+  Cg.codegen_program env;
   C_bindings.module_emit_binary_to_file env.module_ path;
   let js_glue_content = Js_glue.dump_js_glue env in
   Out_channel.write_all (path ^ ".js") ~data:js_glue_content

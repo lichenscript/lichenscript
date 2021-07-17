@@ -7,12 +7,12 @@ exception ExpectedError of string
 
 let parse_string_to_program content =
   let result = Parser.parse_string None content in
+  let env = Waterlang_typing.Env.create () in
   let typed_tree =
     match result with
     | Result.Ok program ->
         begin
         (* Ast.pp_program Format.std_formatter program; *)
-        let env = Waterlang_typing.Env.create () in
         try (
           let program = Waterlang_typing.Annotate.annotate env program in
           Waterlang_typing.Typecheck.type_check env program;
@@ -48,7 +48,10 @@ let parse_string_to_program content =
           );
       assert false
   in
-  { Waterlang_typing.Program. tree = typed_tree }
+  { Waterlang_typing.Program.
+    tree = typed_tree;
+    root_scope = Waterlang_typing.Env.root_scope env;
+  }
 
 let parse_string_and_codegen content =
   let p = parse_string_to_program content in
@@ -60,5 +63,5 @@ let parse_string_and_codegen_to_path content path =
   let config = Config.debug_default () in
   let slices = String.split path ~on:'/' in
   let output_filename = List.last_exn slices in
-  let env = Codegen_env.create ~output_filename config in
-  Codegen.codegen_binary p env path
+  let env = Codegen_env.create ~output_filename config p in
+  Codegen.codegen_binary env path

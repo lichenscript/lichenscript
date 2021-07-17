@@ -8,7 +8,7 @@ let temp_dir_name = "/tmp/test_waterlang/"
 let test_parser _ =
   let result =  Parser.parse_string None "
 
-  @external(\"console\", \"log\")
+  @external(\"env\", \"console_log\")
   declare function print(content: string);
 
   class Array {
@@ -56,6 +56,7 @@ let test_codegen _ =
 
 let test_codegen_binary _ =
   let source = "
+    @export
     function main(a: i32, b: i32): i32 {
       return a + b;
     }
@@ -93,7 +94,7 @@ let test_function_call _ =
 
 let test_string _ =
   let source = "
-    @external(\"console\", \"log\")
+    @external(\"env\", \"console_log\")
     declare function print(content: string)
 
     function main() {

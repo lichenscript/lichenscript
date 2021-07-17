@@ -61,12 +61,16 @@ let rec annotate_statement env (stmt: Ast.Statement.t) =
       let { spec; loc; } = decl in
       (match spec with
       | Function_ signature ->
-        let annotated_header = annotate_function_header env signature in
-        let spec = T.Declare.Function_ annotated_header in
-        T.Statement.Decl {
-          spec;
-          loc;
-        })
+        let prev_scope = Env.peek_scope env in 
+        let scope = Scope.create ~prev:prev_scope prev_scope.id in
+        Env.with_new_scope env scope (fun env ->
+          let annotated_header = annotate_function_header env signature in
+          let spec = T.Declare.Function_ annotated_header in
+          T.Statement.Decl {
+            spec;
+            loc;
+          })
+        )
 
     | Empty -> T.Statement.Empty
 
@@ -100,7 +104,7 @@ and annotate_function_header env (header: Ast.Function.header) =
   in
   let { id; params; header_loc; return_ty; _; } = header in
   let name = (Option.value_exn id).pident_name in
-  let prev_scope: Scope.t = Env.peek_scope env in
+  let prev_scope: Scope.t = Option.value_exn ((Env.peek_scope env).prev) in
   let var_sym = Scope.find_var_symbol prev_scope name in
   match var_sym with
   | Some tfun_id ->
@@ -148,9 +152,9 @@ and annotate_function env (_function: Ast.Function.t) =
   let { return_ty; _ } = header in
   let prev_scope = Env.peek_scope env in
   let scope = Scope.create ~prev:prev_scope prev_scope.id in
-  let annotated_header = annotate_function_header env header in
   Env.set_return_type env (Option.map ~f:(Infer.infer env) return_ty);
   Env.with_new_scope env scope (fun env ->
+    let annotated_header = annotate_function_header env header in
     let body = match body with
       | Fun_block_body block ->
         T.Function.Fun_block_body (annotate_block env block)

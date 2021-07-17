@@ -1,11 +1,6 @@
 open Waterlang_lex
 open Core_kernel
 
-type kind =
-  | Local
-  | Global
-
-
 module PropsMap = Hashtbl.Make(String)
 
 module rec TypeValue : sig
@@ -67,7 +62,7 @@ end = struct
   | Unknown -> Format.pp_print_string formatter "unknown"
   | Any -> Format.pp_print_string formatter "any"
   | Unit -> Format.pp_print_string formatter "unit"
-  | Ctor sym -> Format.pp_print_string formatter (TypeSym.name sym)
+  | Ctor sym -> Format.fprintf formatter "%s" (TypeSym.name sym)
   | Class _ -> Format.pp_print_string formatter "Class"
   | Function fun_ ->
     pp_function_type formatter fun_
@@ -119,7 +114,6 @@ and TypeSym : sig
     builtin: bool;
     scope_id: int;
     name: string;
-    kind: kind;
     spec: spec;
   }
 
@@ -127,7 +121,7 @@ and TypeSym : sig
 
   val builtin: t -> bool
 
-  val create: ?builtin:bool -> ?kind:kind -> scope_id:int -> string -> spec -> t
+  val create: ?builtin:bool -> scope_id:int -> string -> spec -> t
 
   val create_module: unit -> module_type
 
@@ -158,7 +152,6 @@ end = struct
     builtin: bool;
     scope_id: int;
     name: string;
-    kind: kind;
     spec: spec;
   }
 
@@ -166,12 +159,11 @@ end = struct
 
   let builtin sym = sym.builtin
 
-  let create ?(builtin=false) ?(kind=Local)  ~scope_id name spec =
+  let create ?(builtin=false)  ~scope_id name spec =
     {
       builtin;
       scope_id;
       name;
-      kind;
       spec;
     }
 
@@ -189,7 +181,6 @@ and VarSym : sig
 
   type spec =
   | Internal
-  | ExternalModule of t PropsMap.t
   | ExternalMethod of string * string
 
   and t = {
@@ -197,7 +188,6 @@ and VarSym : sig
     name:        string;
     mutable def_type:    TypeValue.t;
     def_loc:     Loc.t option;
-    kind:        kind;
     scope_id:    int;
     builtin:     bool;
     spec:        spec;
@@ -213,7 +203,6 @@ end = struct
 
   type spec =
   | Internal
-  | ExternalModule of t PropsMap.t
   | ExternalMethod of string * string
 
   and t = {
@@ -221,7 +210,6 @@ end = struct
     name:        string;
     mutable def_type:    TypeValue.t;
     def_loc:     Loc.t option;
-    kind:        kind;
     scope_id:    int;
     builtin:     bool;
     spec:        spec;
@@ -233,7 +221,6 @@ end = struct
       name = name;
       def_type = TypeValue.Unknown;
       def_loc = None;
-      kind = Local;
       scope_id = scope_id;
       builtin = false;
       spec;
