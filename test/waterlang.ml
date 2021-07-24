@@ -23,6 +23,7 @@ let test_parser _ =
   @export
   function main(args, args2: string, ...rest) {
     let name = 3;
+    name = 4;
   }
   " in
   match result with

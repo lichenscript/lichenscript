@@ -195,7 +195,7 @@ and parse_statement env : Statement.t =
       let members = ref [] in
       Expect.token env Token.T_LCURLY;
 
-      while (Peek.token env) <> Token.T_RCURLY do
+      while (Peek.token env) <> Token.T_RCURLY && (Peek.token env) <> Token.T_EOF do
         let member = parse_member env in
         members := member::(!members);
 
@@ -328,7 +328,7 @@ and parse_params env: Function.params =
 
   let content = ref [] in
 
-  while Peek.token env <> Token.T_RPAREN do
+  while (Peek.token env) <> Token.T_RPAREN && (Peek.token env) <> Token.T_EOF do
     content := (parse_param env)::(!content);
     if Peek.token env <> Token.T_RPAREN then (
       Expect.token env Token.T_COMMA;
@@ -343,17 +343,25 @@ and parse_params env: Function.params =
 
 and parse_block env: Block.t =
   let start_pos = Peek.loc env in
-  let content = ref [] in
 
   Expect.token env Token.T_LCURLY;
 
-  while Peek.token env <> Token.T_RCURLY do
-    content := (parse_statement env)::(!content);
-  done;
+  let rec parse_content rst =
+    match Peek.token env with
+    | Token.T_RCURLY ->
+      Eat.token env;
+      List.rev rst
 
-  Expect.token env Token.T_RCURLY;
+    | Token.T_EOF -> List.rev rst
+    | _ ->
+      (
+        let stmt = parse_statement env in
+        parse_content (stmt::rst)
+      )
+  in
+
   {
-    body = List.rev (!content);
+    body = parse_content [];
     loc = with_start_loc env start_pos;
   }
 
@@ -487,6 +495,9 @@ and parse_class_body env: Statement.class_body =
   }
 
 and parse_expression env : Expression.t =
+  parse_assigment_expression env
+
+and parse_assigment_expression env : Expression.t =
   parse_binary_expression env
 
 and parse_binary_expression env : Expression.t =
