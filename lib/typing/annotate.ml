@@ -405,6 +405,11 @@ and annotate_expression (env: Env.t) expr =
       let expr = annotate_expression env expr in
       (T.Expression.Update(op, expr, prefix), TypeValue.Unknown)
 
+    | Assign (left, right) ->
+      let left' = annotate_pattern env left in
+      let right' = annotate_expression env right in
+      (T.Expression.Assign(left', right'), right'.val_)
+
   in
   { T.Expression.
     spec;

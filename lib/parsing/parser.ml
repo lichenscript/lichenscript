@@ -497,8 +497,43 @@ and parse_class_body env: Statement.class_body =
 and parse_expression env : Expression.t =
   parse_assigment_expression env
 
+and reinterpret_expression_as_pattern _env (expr: Expression.t) : Pattern.t =
+  let { Expression. spec; loc; _; } = expr in
+  match spec with
+  | Identifier  id ->
+    let pat = Pattern.Identifier id in
+    { Pattern.
+      spec = pat;
+      loc;
+    }
+
+  | _ ->
+    let err =
+      { Parse_error.
+        perr_loc = loc;
+        perr_spec = Parse_error.IsNotLeftValue;
+      }
+    in
+    Parse_error.error err
+
 and parse_assigment_expression env : Expression.t =
-  parse_binary_expression env
+  let start_pos = Peek.loc env in
+  let expr = parse_binary_expression env in
+  let next = Peek.token env in
+  match next with
+  | Token.T_ASSIGN ->
+    Eat.token env;
+    let left = reinterpret_expression_as_pattern env expr in
+    let right = parse_assigment_expression env in
+    let spec = Expression.Assign(left, right) in
+    {
+      spec;
+      loc = with_start_loc env start_pos;
+      loc_stack = [];
+      attributes = [];
+    }
+
+  | _ -> expr
 
 and parse_binary_expression env : Expression.t =
   let open Expression in

@@ -41,6 +41,8 @@ module%gen rec Expression : sig
     | Update of
       Asttypes.UpdateOp.t * t * bool
 
+    | Assign of Pattern.t * t
+
   and callee = {
     callee_spec: Core_type.VarSym.t * ([ `Property of string | `Expr of t ] list);
     callee_loc: Loc.t;

@@ -113,6 +113,17 @@ let test_string _ =
   Core.In_channel.close in_chan;
   assert_equal r "Hello World!\n"
 
+let test_assignment _ =
+  let source = "
+    function main() {
+      let a: i32 = 3;
+      a = 4;
+    }
+  "
+  in
+  let _result = Utils.parse_string_and_codegen source in
+  ()
+
 let suite =
   "TestParser" >::: [
     "test_parser" >:: test_parser;
@@ -121,6 +132,7 @@ let suite =
     "test_type_checking" >:: test_type_checking;
     "test_function_call" >:: test_function_call;
     "test_string" >:: test_string;
+    "test_assignment" >:: test_assignment;
   ]
 
 let () =

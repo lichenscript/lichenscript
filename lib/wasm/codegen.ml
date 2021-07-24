@@ -249,8 +249,8 @@ module M (S: Dsl.BinaryenModule) = struct
               in
               Some exp
 
-            | _ -> failwith "not implemented")
-          | _ -> failwith "not implemented"
+            | _ -> failwith "not implemented 1")
+          | _ -> failwith "not implemented 2"
         )
       |> List.to_array
     in

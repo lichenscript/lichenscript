@@ -17,6 +17,12 @@ let type_assinable left right =
   | _ ->
     false
 
+let unwrap_pattern_type _env pat =
+  let open Typedtree.Pattern in
+  match pat.spec with
+  | Typedtree.Pattern.Symbol _var_sym ->
+    TypeValue.Any
+
 let rec check_statement env statement =
   let open Typedtree.Statement in
   let { spec; loc; _; } = statement in
@@ -101,17 +107,13 @@ and check_block env blk =
 and check_binding env binding =
   let open Typedtree.Statement in
   let { binding_pat; binding_init; binding_loc; _ } = binding in
-  let left_val =
-    match binding_pat.spec with
-    | Typedtree.Pattern.Symbol _var_sym ->
-      TypeValue.Any
-  in
+  let left_val = unwrap_pattern_type env binding_pat in
   check_expression env binding_init;
   check_assignable env binding_loc left_val binding_init.val_
 
 and check_expression env (expr: Typedtree.Expression.t) =
   let open Typedtree.Expression in
-  let { spec; _; } = expr in
+  let { spec; loc; _; } = expr in
   match spec with
   | Constant _
   | Identifier _
@@ -175,6 +177,11 @@ and check_expression env (expr: Typedtree.Expression.t) =
 
   | Update (_, exp, _) ->
     check_expression env exp
+
+  | Assign (left, right) ->
+    let left_val = unwrap_pattern_type env left in
+    check_expression env right;
+    check_assignable env loc left_val right.val_
 
 and check_callee _env (callee: Typedtree.Expression.callee) =
   match callee.callee_spec with
