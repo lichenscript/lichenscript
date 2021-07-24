@@ -168,6 +168,14 @@ module M (S: Dsl.BinaryenModule) = struct
     | Call call ->
       codegen_call env call
 
+    | Assign(left, right) ->
+      let local_id =
+        match left.spec with
+        | Typedtree.Pattern.Symbol sym -> sym.id_in_scope
+      in
+      let expr = codegen_expression env right in
+      local_set local_id expr
+
     | _ ->
       unreachable_exp()
 
@@ -250,7 +258,11 @@ module M (S: Dsl.BinaryenModule) = struct
               Some exp
 
             | _ -> failwith "not implemented 1")
-          | _ -> failwith "not implemented 2"
+          | _ ->
+            let def_type_msg =
+              Format.asprintf "can not generate finalize for %s:%a" sym.name TypeValue.pp sym.def_type
+            in
+            failwith def_type_msg
         )
       |> List.to_array
     in

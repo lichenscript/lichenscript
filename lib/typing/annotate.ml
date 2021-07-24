@@ -283,7 +283,7 @@ and annotate_binding env (binding: Ast.Statement.var_binding) =
     binding_init;
   }
 
-and annotate_pattern env (pat: Ast.Pattern.t) =
+and annotate_pattern ?(def=true) env (pat: Ast.Pattern.t) =
   let open Ast.Pattern in
   let { spec; loc } = pat in
   let spec =
@@ -291,7 +291,12 @@ and annotate_pattern env (pat: Ast.Pattern.t) =
     | Identifier id ->
       begin
         let current_scope = Env.peek_scope env in
-        let sym = Scope.create_var_symbol current_scope id.pident_name in
+        let sym =
+          if def then
+            Scope.create_var_symbol current_scope id.pident_name
+          else
+            Option.value_exn (Scope.find_var_symbol current_scope id.pident_name)
+        in
         T.Pattern.Symbol sym
       end
   in
@@ -406,7 +411,7 @@ and annotate_expression (env: Env.t) expr =
       (T.Expression.Update(op, expr, prefix), TypeValue.Unknown)
 
     | Assign (left, right) ->
-      let left' = annotate_pattern env left in
+      let left' = annotate_pattern ~def:false env left in
       let right' = annotate_expression env right in
       (T.Expression.Assign(left', right'), right'.val_)
 

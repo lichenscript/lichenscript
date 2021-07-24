@@ -27,8 +27,8 @@ let test_parser _ =
   }
   " in
   match result with
-  | Result.Ok program ->
-    Ast.pp_program Format.std_formatter program;
+  | Result.Ok _program ->
+    (* Ast.pp_program Format.std_formatter program; *)
     let _env = Waterlang_typing.Env.create () in
     (* let program = Waterlang_typing.Annotate.annotate env program in
     Waterlang_typing.Typecheck.type_check env program; *)
@@ -121,8 +121,8 @@ let test_assignment _ =
     }
   "
   in
-  let _result = Utils.parse_string_and_codegen source in
-  ()
+  let result = Utils.parse_string_and_codegen source in
+  Format.printf "%s" result
 
 let suite =
   "TestParser" >::: [
