@@ -176,6 +176,29 @@ module M (S: Dsl.BinaryenModule) = struct
       let expr = codegen_expression env right in
       local_set local_id expr
 
+    | Block blk ->
+      let { Typedtree.Block. body; _; } = blk in
+      let exprs =
+        List.filter_map
+        ~f:(fun stmt -> codegen_statements env stmt)
+        body
+      in
+      Dsl.block (List.to_array exprs)
+
+    | If if_expr ->
+      let { Typedtree.Expression. if_test; if_consequent; if_alternative; _; } = if_expr in
+      let test = codegen_expression env if_test in
+      let cons = Option.value ~default:(block [||]) (codegen_statements env if_consequent) in
+      let alt =
+        Option.map
+        ~f:(fun stmt ->
+          let expr_opt = codegen_statements env stmt in
+          Option.value ~default:(block [||]) expr_opt
+        )
+        if_alternative
+      in
+      Dsl.if_ test cons alt
+
     | _ ->
       unreachable_exp()
 
