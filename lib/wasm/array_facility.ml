@@ -38,6 +38,7 @@ let codegen_array_facility (env: Codegen_env.t) =
       let current_length = def_local ctx i32 in
       let data_ptr = def_local ctx ptr_ty in
       let current_cap = def_local ctx i32 in
+      let data_offset = def_local ctx i32 in
       block [|
         local_set current_length (I32.load ~offset:16 (Ptr.local_get 0));
         local_set data_ptr (Ptr.load ~offset:20 (Ptr.local_get 0));
@@ -46,7 +47,17 @@ let codegen_array_facility (env: Codegen_env.t) =
         (* if cap is full *)
         if_ I32.(((local_get current_length) + (const_i32_of_int 1)) >= (local_get current_cap))
         (unreachable_exp ())
-        (Some (unreachable_exp ()));
+        (Some (block [|
+          (* data_offset = sizeof(i32) * current_length *)
+          I32.(local_set data_offset ((local_get current_length) * (const_i32_of_int 4)));
+
+          (* (data_ptr + data_offset)[12] = data *)
+          I32.(store ~offset:12 ~ptr:((local_get data_ptr) + (local_get data_offset)) (local_get 1));
+
+          (* ptr->length += 1 *)
+          I32.(store ~offset:16 ~ptr:(Ptr.local_get 0) ((local_get current_length) + (const_i32_of_int 1)));
+
+        |]));
 
       |]
     )
