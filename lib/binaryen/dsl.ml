@@ -22,6 +22,14 @@ module type BinaryenTypeContainer = sig
 
   val div_op: C_bindings.op
 
+  val gt_op: C_bindings.op
+
+  val ge_op: C_bindings.op
+
+  val lt_op: C_bindings.op
+
+  val le_op: C_bindings.op
+
 end
 
 module VarOperator (M: BinaryenModule) (T: BinaryenTypeContainer) = struct
@@ -62,6 +70,22 @@ module VarOperator (M: BinaryenModule) (T: BinaryenTypeContainer) = struct
       M.m T.div_op left right
 
   let (/) = div
+
+  let (>) left right =
+    C_bindings.make_exp_binary
+      M.m T.gt_op left right
+
+  let (<) left right =
+    C_bindings.make_exp_binary
+      M.m T.lt_op left right
+
+  let (>=) left right =
+    C_bindings.make_exp_binary
+      M.m T.ge_op left right
+
+  let (<=) left right =
+    C_bindings.make_exp_binary
+      M.m T.le_op left right
   
 end
 
@@ -199,6 +223,14 @@ module Binaryen (M: BinaryenModule) = struct
 
     let div_op = C_bindings.make_op_div_i32()
 
+    let gt_op = C_bindings.make_op_gt_i32()
+
+    let lt_op = C_bindings.make_op_lt_i32()
+
+    let ge_op = C_bindings.make_op_ge_i32()
+
+    let le_op = C_bindings.make_op_le_i32()
+
   end)
 
   module Ptr = VarOperator(M)(struct
@@ -212,6 +244,15 @@ module Binaryen (M: BinaryenModule) = struct
     let mul_op = C_bindings.make_op_mul_i32()
 
     let div_op = C_bindings.make_op_div_i32()
+
+    let gt_op = C_bindings.make_op_gt_i32()
+
+    let lt_op = C_bindings.make_op_lt_i32()
+
+    let ge_op = C_bindings.make_op_ge_i32()
+
+    let le_op = C_bindings.make_op_le_i32()
+
 
   end)
   

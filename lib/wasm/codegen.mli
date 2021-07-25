@@ -32,8 +32,17 @@ open Waterlang_typing
   * |----------------|----------|
   * | object layout  | 16 bytes |
   * | length         | i32      |
-  * | bytes          | ptr[]    |
+  * | data pointer   | ptr      |
   * |----------------|----------|
+  * Total: 24 bytes
+  *
+  * array data layout
+  * |----------------|-------|
+  * | total bytes    | i32   |
+  * | flag           | i32   |
+  * | capacity       | i32   |
+  * | data*          | ptr[] |
+  * Total: 12 bytes + sizeof(ptr) * capacity
   * 
   * user defined object
   * |----------------|----------|

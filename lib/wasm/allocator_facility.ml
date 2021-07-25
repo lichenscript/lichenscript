@@ -149,6 +149,8 @@ let codegen_allocator_facility (env: Codegen_env.t) =
                     (* current_free_obj <- current_free_obj->next *)
                     local_set current_free_obj (Ptr.load ~offset:8 (Ptr.local_get current_free_obj));
 
+                    break_ "find_free_obj";
+
                   |])));
 
               |])

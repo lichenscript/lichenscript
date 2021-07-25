@@ -201,6 +201,16 @@ CAMLprim value make_op_gt_i32 () {
   return caml_copy_int32(op);
 }
 
+CAMLprim value make_op_ge_i32 () {
+  BinaryenOp op = BinaryenGeSInt32();
+  return caml_copy_int32(op);
+}
+
+CAMLprim value make_op_le_i32 () {
+  BinaryenOp op = BinaryenLeSInt32();
+  return caml_copy_int32(op);
+}
+
 CAMLprim value make_op_eq_i32 () {
   BinaryenOp op = BinaryenEqInt32();
   return caml_copy_int32(op);

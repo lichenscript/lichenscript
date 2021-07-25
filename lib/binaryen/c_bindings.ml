@@ -51,6 +51,11 @@ external make_op_lt_i32: unit -> op = "make_op_lt_i32"
 
 external make_op_gt_i32: unit -> op = "make_op_gt_i32"
 
+
+external make_op_ge_i32: unit -> op = "make_op_ge_i32"
+
+external make_op_le_i32: unit -> op = "make_op_le_i32"
+
 external make_op_eq_i32: unit -> op = "make_op_eq_i32"
 
 external make_op_ne_i32: unit -> op = "make_op_ne_i32"
