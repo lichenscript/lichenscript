@@ -201,6 +201,16 @@ CAMLprim value make_op_gt_i32 () {
   return caml_copy_int32(op);
 }
 
+CAMLprim value make_op_eq_i32 () {
+  BinaryenOp op = BinaryenEqInt32();
+  return caml_copy_int32(op);
+}
+
+CAMLprim value make_op_ne_i32 () {
+  BinaryenOp op = BinaryenEqInt32();
+  return caml_copy_int32(op);
+}
+
 CAMLprim value make_literal_i32(value i) {
   value v = caml_alloc_custom(&literal_ops, sizeof(struct BinaryenLiteral), 0, 1);
   int32_t int_val = Int32_val(i);

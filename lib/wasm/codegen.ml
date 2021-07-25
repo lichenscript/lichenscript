@@ -96,6 +96,46 @@ module M (S: Dsl.BinaryenModule) = struct
     | Semi expr ->
       Some(codegen_expression env expr)
 
+    | While while_ ->
+      let name = "while_0" in
+      let prev_while_label = env.while_label in
+      env.while_label <- Some name;
+      let { Typedtree.Statement. while_test; while_block; _; } = while_ in
+      let test_expr = binary Dsl.eq_i32 (codegen_expression env while_test) (const_i32_of_int 0) in
+      let body = while_block.body in
+      let while_block' = block
+        (body
+        |> List.map ~f:(fun stmt ->
+          let expr = codegen_statements env stmt in
+          Option.value ~default:(unreachable_exp()) expr
+          )
+
+        |> List.rev
+        |> List.to_array
+        )
+      in
+      let result = block ~name
+        [|
+          loop "while_0_loop" (block [|
+            if_ test_expr (Dsl.break_ "while_0") None;
+            while_block';
+            break_ "while_0_loop";
+          |])
+        |]
+      in
+      env.while_label <- prev_while_label;
+      Some result
+
+    | Break _ ->
+      (match env.while_label with
+      | Some label_name ->
+        Some (break_ label_name)
+
+      | _ -> failwith "not in while, can not break"
+      )
+        
+
+
     | _ -> None
 
   and codegen_binding env binding: C_bindings.exp option =
@@ -140,6 +180,15 @@ module M (S: Dsl.BinaryenModule) = struct
     | Boolean false ->
       const_i32_of_int 0
 
+  and codegen_assign env (left, right) =
+    let local_id =
+      let open Typedtree.Pattern in
+      match left.spec with
+      | Symbol sym -> sym.id_in_scope
+    in
+    let expr = codegen_expression env right in
+    local_set local_id expr
+
   and codegen_expression env expr: C_bindings.exp =
     let open Typedtree.Expression in
     let { spec; _; } = expr in
@@ -149,6 +198,8 @@ module M (S: Dsl.BinaryenModule) = struct
       | Plus -> add_i32
       | Minus -> sub_i32
       | Mult -> mul_i32
+      | GreaterThan -> gt_i32
+      | LessThan -> lt_i32
       | _ -> failwith "not implemented"
     in
     match spec with
@@ -169,12 +220,7 @@ module M (S: Dsl.BinaryenModule) = struct
       codegen_call env call
 
     | Assign(left, right) ->
-      let local_id =
-        match left.spec with
-        | Typedtree.Pattern.Symbol sym -> sym.id_in_scope
-      in
-      let expr = codegen_expression env right in
-      local_set local_id expr
+      codegen_assign env (left, right)
 
     | Block blk ->
       let { Typedtree.Block. body; _; } = blk in

@@ -108,9 +108,7 @@ and parse_statement env : Statement.t =
       begin
         let start_loc = Peek.loc env in
         Eat.token env;
-        Expect.token env Token.T_LPAREN;
         let while_test = parse_expression env in
-        Expect.token env Token.T_RPAREN;
         let while_block = parse_block env in
         let while_loc = with_start_loc env start_loc in
         While {

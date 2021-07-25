@@ -115,18 +115,33 @@ let test_string _ =
 
 let test_assignment _ =
   let source = "
+    @external(\"env\", \"console_log\")
+    declare function print(content: string)
+
     function main() {
-      let a: i32 = 3;
-      a = if a {
-        4
-      } else {
-        5
-      };
+      let name: string = \"Hi\";
+      let counter: i32 = 0;
+      while 1 {
+        if counter > 10 {
+          break;
+        } else {
+          print(name);
+          counter = counter + 1;
+        }
+      }
     }
   "
   in
-  let result = Utils.parse_string_and_codegen source in
-  Format.printf "%s" result
+  (* let result = Utils.parse_string_and_codegen source in
+  Format.printf "%s" result *)
+  Core.Unix.mkdir_p temp_dir_name;
+  let test_output_name = temp_dir_name ^ "test_wtl_2" in
+  Format.printf "output name: %s" test_output_name;
+  Utils.parse_string_and_codegen_to_path source test_output_name;
+  let in_chan = Core.Unix.open_process_in ("node " ^ test_output_name ^ ".js" ) in
+  let r = Core.In_channel.input_all in_chan in
+  Core.In_channel.close in_chan;
+  print_string r
 
 let suite =
   "TestParser" >::: [

@@ -91,6 +91,10 @@ module Binaryen (M: BinaryenModule) = struct
 
   let gt_i32 = C_bindings.make_op_gt_i32 ()
 
+  let eq_i32 = C_bindings.make_op_eq_i32 ()
+
+  let ne_i32 = C_bindings.make_op_ne_i32 ()
+
   let any_ref = C_bindings.make_ty_any_ref ()
 
   let unreachable = C_bindings.make_ty_unreachable ()

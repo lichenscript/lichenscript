@@ -17,6 +17,7 @@ type t = {
   data_segment: Data_segment_allocator.t;
   mutable js_snippets: js_snippet list;
   program: Waterlang_typing.Program.t;
+  mutable while_label: string option;
 }
 
 let create ?output_filename config program =
@@ -28,6 +29,7 @@ let create ?output_filename config program =
     data_segment = Data_segment_allocator.init_with_begin_offset config.data_segment_offset;
     js_snippets = [];
     program;
+    while_label = None;
   }
 
 let turn_on_allocator env =
