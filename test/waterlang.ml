@@ -117,7 +117,11 @@ let test_assignment _ =
   let source = "
     function main() {
       let a: i32 = 3;
-      a = 4;
+      a = if a {
+        4
+      } else {
+        5
+      };
     }
   "
   in

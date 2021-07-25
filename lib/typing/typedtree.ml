@@ -43,6 +43,8 @@ module%gen rec Expression : sig
 
     | Assign of Pattern.t * t
 
+    | Block of Block.t
+
   and callee = {
     callee_spec: Core_type.VarSym.t * ([ `Property of string | `Expr of t ] list);
     callee_loc: Loc.t;
@@ -174,6 +176,7 @@ and Block : sig
   type t = {
     body: Statement.t list;
     loc: Loc.t;
+    val_: TypeValue.t;
   }
   [@@deriving show]
 

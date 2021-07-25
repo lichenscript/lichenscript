@@ -251,9 +251,17 @@ and annotate_block env block =
   let open Ast.Block in
   let { body; loc } = block in
   let body = List.map ~f:(annotate_statement env) body in
+  let val_ =
+    match List.last body with
+    | Some { Typedtree.Statement. spec = Expr expr; _;} ->
+      expr.val_
+
+    | _ -> TypeValue.Unit
+  in
   { T.Block.
     body;
     loc;
+    val_;
   }
 
 and annotate_binding env (binding: Ast.Statement.var_binding) =
@@ -414,6 +422,10 @@ and annotate_expression (env: Env.t) expr =
       let left' = annotate_pattern ~def:false env left in
       let right' = annotate_expression env right in
       (T.Expression.Assign(left', right'), right'.val_)
+
+    | Block blk ->
+      let blk' = annotate_block env blk in
+      ((T.Expression.Block blk'), blk'.val_)
 
   in
   { T.Expression.

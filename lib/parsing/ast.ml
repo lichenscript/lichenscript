@@ -67,6 +67,7 @@ and Expression : sig
     | Binary of Asttypes.BinaryOp.t * t * t
     | Update of Asttypes.UpdateOp.t * t * bool (* prefix *)
     | Assign of Pattern.t * t
+    | Block of Block.t
 
   and t = {
     spec: spec;

@@ -810,10 +810,21 @@ and parse_primary_expression env : Expression.t =
         Array (List.rev !result)
       end
 
+    | Token.T_LCURLY ->
+      let blk = parse_block env in
+      Block blk
+
     | _ ->
       let tok = Token.token_to_string next in
-      let str = Format.sprintf "not implemented %s" tok in
-      failwith str
+      let lex_error = Waterlang_lex.Lex_error.Unexpected tok in
+      let perr_spec = Parse_error.LexError lex_error in
+      let err =
+        { Parse_error.
+          perr_loc = with_start_loc env start_loc;
+          perr_spec;
+        }
+      in
+      Parse_error.error err
 
   in
 

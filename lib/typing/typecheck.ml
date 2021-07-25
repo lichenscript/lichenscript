@@ -183,6 +183,9 @@ and check_expression env (expr: Typedtree.Expression.t) =
     check_expression env right;
     check_assignable env loc left_val right.val_
 
+  | Block blk ->
+    check_block env blk
+
 and check_callee _env (callee: Typedtree.Expression.callee) =
   match callee.callee_spec with
   | (_, []) -> ()
