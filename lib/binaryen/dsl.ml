@@ -36,6 +36,8 @@ end
 
 module VarOperator (M: BinaryenModule) (T: BinaryenTypeContainer) = struct
 
+  let size = T.size
+
   let local_get index = C_bindings.make_exp_local_get M.m index T.ty
 
   let global_get name =

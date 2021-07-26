@@ -8,6 +8,8 @@ let free_space_var_name = "__wtf_free_space"
 let memory_copy_fun_name = "__wtl_memory_copy"
 let memory_fill_fun_name = "__wtl_memory_fill"
 let wtf_alloc_fun_name = "__wtf_alloc"
+
+let realloc_fun_name = "__wtf_realloc"
 let retain_object_fun_name = "__wtf_retain_object"
 let release_object_fun_name = "__wtf_release_object"
 
@@ -93,13 +95,17 @@ let codegen_allocator_facility (env: Codegen_env.t) =
   (* local 2: obj total size *)
   (* local 3: current free_object *)
   let codegen_wtl_alloc () =
-    let _ = def_function wtf_alloc_fun_name ~params:[| ptr_ty |] ~ret_ty:ptr_ty (fun ctx ->
+    let _ = def_function wtf_alloc_fun_name ~params:[| i32 |] ~ret_ty:ptr_ty (fun ctx ->
         let tmp_result = def_local ctx ptr_ty in
         let remain_size = def_local ctx i32 in
         let prev_free_obj = def_local ctx ptr_ty in
         let current_free_obj = def_local ctx ptr_ty in
 
         block ~ty:ptr_ty ~name:"fun_blk" [|
+          (* if (size == 0) return nullptr; *)
+          if' Ptr.((local_get 0) == (const_i32_of_int 0))
+            ~then':(break_ "fun_blk" ~value:(const_i32_of_int 0));
+
           (* Question: Is this neccessary? *)
           local_set prev_free_obj (const_i32_of_int 0);
 
@@ -162,6 +168,47 @@ let codegen_allocator_facility (env: Codegen_env.t) =
           Ptr.local_get tmp_result;
         |]
       )
+    in ()
+  in
+
+  let codegen_wtf_realloc () =
+    let _ = def_function realloc_fun_name ~params:[| ptr_ty; i32 |] ~ret_ty:ptr_ty (fun ctx ->
+      let current_size = def_local ctx ptr_ty in
+      let new_space = def_local ctx ptr_ty in
+      if' Ptr.((local_get 0) == (const_i32_of_int 0))
+        (* nullptr *)
+        ~then':(call_ wtf_alloc_fun_name [| I32.local_get 1 |] ptr_ty)
+        ~else':(block ~name:"main_logic" [|
+          (* current_size <- ptr->total_bytes *)
+          local_set current_size (I32.load ~offset:0 (Ptr.local_get 0));
+
+          (* is the last object on the heap *)
+          (* if (ptr + size == $free_object) *)
+          if' Ptr.(((local_get 0) + (local_get current_size)) == (global_get free_object_var_name))
+            ~then':(block [|
+              (* $free_object <- ptr + new_size *)
+              global_set free_object_var_name Ptr.((local_get 0) + (local_get 1));
+              (* ptr->total_bytes <- new_size *)
+              I32.store ~offset:0 ~ptr:(Ptr.local_get 0) (I32.local_get 1);
+              (* return ptr *)
+              break_ "main_logic" ~value:(Ptr.local_get 0);
+            |]);
+
+          (* new_space <- wtf_alloc(new_size) *)
+          local_set new_space (call_ wtf_alloc_fun_name [| I32.local_get 1 |] ptr_ty);
+
+          (* memcpy(new_space, ptr, current_size) *)
+          codegen_memory_copy env ~dest:(Ptr.local_get new_space) ~src:(Ptr.local_get 0) ~size:(I32.local_get current_size);
+
+          (* new_space->total_bytes <- new_size *)
+          I32.store ~offset:0 ~ptr:(Ptr.local_get new_space) (I32.local_get 1);
+
+          (* free(ptr) *)
+          call_ free_object_fun_name [| Ptr.local_get 0 |] none;
+
+          Ptr.local_get new_space
+        |])
+    )
     in
     ()
   in
@@ -172,8 +219,7 @@ let codegen_allocator_facility (env: Codegen_env.t) =
         codegen_memory_fill env ~dest:(Ptr.local_get 0) ~value:(const_i32_of_int 0) ~size:(const_i32_of_int 16)
       )
     in
-    let _ = export_function init_object_fun_name init_object_fun_name in
-    ()
+    let _ = export_function init_object_fun_name init_object_fun_name in ()
   in
 
   (* function __wtl_free_object(obj: ptr) *)
@@ -286,6 +332,7 @@ let codegen_allocator_facility (env: Codegen_env.t) =
   codegen_wtf_next_align_size();
   codegen_wtl_alloc_from_free_space();
   codegen_wtl_alloc();
+  codegen_wtf_realloc();
   codegen_wtl_init_object();
   codegen_wtl_free_object();
   codegen_wtf_retain_object();

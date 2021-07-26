@@ -41,11 +41,10 @@ let codegen_array_facility (env: Codegen_env.t) =
       let data_offset = def_local ctx i32 in
       let target_cap = def_local ctx i32 in
       let array_data_size = def_local ctx i32 in
-      let array_data_ptr = def_local ctx ptr_ty in
       block [|
         local_set current_length (I32.load ~offset:16 (Ptr.local_get 0));
         local_set data_ptr (Ptr.load ~offset:20 (Ptr.local_get 0));
-        local_set current_cap (Ptr.load ~offset:8 (Ptr.local_get data_ptr));
+        local_set current_cap (I32.load ~offset:8 (I32.local_get data_ptr));
 
         (* if cap is full *)
         if' I32.(((local_get current_length) + (const_i32_of_int 1)) >= (local_get current_cap))
@@ -55,13 +54,20 @@ let codegen_array_facility (env: Codegen_env.t) =
               ~then':(const_i32_of_int 4)
               ~else':I32.((const_i32_of_int 2) * (local_get current_cap)));
 
-          (* array_data_size <- 12 + 4 * target_cap *)
+          (* array_data_size <- 12 + sizeof(ptr) * target_cap *)
           local_set array_data_size
-            I32.((const_i32_of_int 12) + (const_i32_of_int 4) * (local_get target_cap));
+            I32.((const_i32_of_int 12) + (const_i32_of_int Ptr.size) * (local_get target_cap));
 
-          (* array_data_ptr <- wtf_alloc_fun(array_data_size) *)
-          local_set array_data_ptr
-            (call_ Allocator_facility.wtf_alloc_fun_name [| I32.local_get array_data_size |] ptr_ty);
+          (* data_ptr <- wtf_realloc_fun(array_data_ptr, array_data_size) *)
+          local_set data_ptr
+            (call_ Allocator_facility.realloc_fun_name
+              [| Ptr.local_get data_ptr; I32.local_get array_data_size; |] ptr_ty);
+
+          (* data_ptr->capacity <- target_cp *)
+          (I32.store ~offset:8 ~ptr:(Ptr.local_get data_ptr) (I32.local_get target_cap));
+
+          (* ptr->data_ptr <- data_ptr *)
+          Ptr.store ~offset:20 ~ptr:(Ptr.local_get 0) (Ptr.local_get data_ptr);
 
         |]);
 
