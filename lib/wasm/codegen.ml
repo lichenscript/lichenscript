@@ -117,7 +117,7 @@ module M (S: Dsl.BinaryenModule) = struct
       let result = block ~name
         [|
           loop "while_0_loop" (block [|
-            if_ test_expr (Dsl.break_ "while_0") None;
+            if' test_expr ~then':(Dsl.break_ "while_0");
             while_block';
             break_ "while_0_loop";
           |])
@@ -243,7 +243,7 @@ module M (S: Dsl.BinaryenModule) = struct
         )
         if_alternative
       in
-      Dsl.if_ test cons alt
+      Dsl.if' test ~then':cons ?else':alt
 
     | _ ->
       unreachable_exp()

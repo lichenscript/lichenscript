@@ -30,6 +30,8 @@ module type BinaryenTypeContainer = sig
 
   val le_op: C_bindings.op
 
+  val eq_op: C_bindings.op
+
 end
 
 module VarOperator (M: BinaryenModule) (T: BinaryenTypeContainer) = struct
@@ -86,6 +88,10 @@ module VarOperator (M: BinaryenModule) (T: BinaryenTypeContainer) = struct
   let (<=) left right =
     C_bindings.make_exp_binary
       M.m T.le_op left right
+
+  let (==) left right =
+    C_bindings.make_exp_binary
+      M.m T.eq_op left right
   
 end
 
@@ -162,7 +168,7 @@ module Binaryen (M: BinaryenModule) = struct
 
   let return_ = C_bindings.make_exp_return M.m
 
-  let if_ = C_bindings.make_exp_if M.m
+  let if' ?else' test ~then' = C_bindings.make_exp_if M.m test then' else'
 
   let loop = C_bindings.make_exp_loop M.m
 
@@ -231,6 +237,8 @@ module Binaryen (M: BinaryenModule) = struct
 
     let le_op = C_bindings.make_op_le_i32()
 
+    let eq_op = C_bindings.make_op_eq_i32()
+
   end)
 
   module Ptr = VarOperator(M)(struct
@@ -253,6 +261,7 @@ module Binaryen (M: BinaryenModule) = struct
 
     let le_op = C_bindings.make_op_le_i32()
 
+    let eq_op = C_bindings.make_op_eq_i32()
 
   end)
   

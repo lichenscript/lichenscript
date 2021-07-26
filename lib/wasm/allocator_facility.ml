@@ -107,8 +107,8 @@ let codegen_allocator_facility (env: Codegen_env.t) =
           local_set current_free_obj (Ptr.global_get free_object_var_name);
 
           loop "find_free_obj" (
-            if_ (Ptr.local_get current_free_obj)  (* check free objects *)
-              (block ~ty:none [|
+            if' (Ptr.local_get current_free_obj)  (* check free objects *)
+              ~then':(block ~ty:none [|
                 (* total_size <- (current_free_obj->total_bytes) *)
                 local_set
                   remain_size
@@ -116,32 +116,30 @@ let codegen_allocator_facility (env: Codegen_env.t) =
                     (Ptr.local_get current_free_obj));
 
                 (* if (remain_size > required_size) *)
-                (if_ (binary gt_i32 (I32.local_get remain_size) (I32.local_get 0))
+                (if' (binary gt_i32 (I32.local_get remain_size) (I32.local_get 0))
                   (* return current free_object *)
-                  (block ~ty:none [|
+                  ~then':(block ~ty:none [|
                     (* tmp_result <- $__wtl_free_obj *)
                     local_set tmp_result (Ptr.global_get free_object_var_name);
 
-                    (if_ (Ptr.local_get prev_free_obj)
+                    (if' (Ptr.local_get prev_free_obj)
                       (* has prev free object *)
                       (* prev_free_obj->next <- current_free_obj->next *)
-                      (Ptr.store ~offset:8 ~ptr:(Ptr.local_get prev_free_obj)
+                      ~then':(Ptr.store ~offset:8 ~ptr:(Ptr.local_get prev_free_obj)
                         (Ptr.load ~offset:8 (Ptr.local_get current_free_obj)))
 
-                      (* else *)
                       (* no prev object *)
                       (* $__wtl_free_obj <- (ptr->next_free_obj) *)
-                      (Some (global_set
+                      ~else':(global_set
                         free_object_var_name
-                        (Ptr.load ~offset:8 (Ptr.local_get 0)))));
+                        (Ptr.load ~offset:8 (Ptr.local_get 0))));
 
                     (* return tmp result *)
                     break_ "fun_blk" ~value:(Ptr.local_get tmp_result);
 
                   |])
-                  (* else *)
                   (* check next node on linked-list *)
-                  (Some (block ~ty:none [|
+                  ~else':(block ~ty:none [|
 
                     (* prev_free_obj <- curent_free_obj *)
                     local_set prev_free_obj (Ptr.local_get current_free_obj);
@@ -151,15 +149,14 @@ let codegen_allocator_facility (env: Codegen_env.t) =
 
                     break_ "find_free_obj";
 
-                  |])));
+                  |]));
 
               |])
-
               (* no suitable free obj found, alloca from free space *)
-              (Some (block [|
+              ~else':(block [|
                 local_set tmp_result (call_ wtf_alloc_from_free_space_fun_name [| Ptr.local_get 0 |] ptr_ty);
                 break_ "fun_blk" ~value:(Ptr.local_get tmp_result);
-              |]))
+              |])
           );
 
           Ptr.local_get tmp_result;
@@ -228,14 +225,13 @@ let codegen_allocator_facility (env: Codegen_env.t) =
           local_set next_count I32.((local_get next_count) - (const_i32_of_int 1));
 
           (* if next_counet != 0 *)
-          if_ (I32.local_get next_count)
+          if' (I32.local_get next_count)
             (* obj->strong_counter <- next_count *)
-            (I32.store ~offset:8 ~ptr:(Ptr.local_get 0) (I32.local_get next_count))
+            ~then':(I32.store ~offset:8 ~ptr:(Ptr.local_get 0) (I32.local_get next_count))
             (* else if (next_count == 0) *)
-            (Some
-              (* free_object(ptr) *)
-              (call_ free_object_fun_name [| Ptr.local_get 0 |] none)
-            );
+            (* free_object(ptr) *)
+            ~else':(call_ free_object_fun_name [| Ptr.local_get 0 |] none)
+          ;
         |]
       )
     in
