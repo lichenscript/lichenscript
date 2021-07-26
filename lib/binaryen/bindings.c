@@ -543,7 +543,7 @@ CAMLprim value set_memory(value module, value initial_int, value max_int, value 
   for (mlsize_t i = 0; i < types_len; i++) {
     value tmp = Field(segments, i);
     segments_c[i] = Bytes_val(tmp);
-    segments_size[i] = caml_string_length(segments_c[i]);
+    segments_size[i] = caml_string_length(tmp);
   }
 
   types_len = caml_array_length(segmentPassive);
@@ -570,7 +570,7 @@ CAMLprim value set_memory(value module, value initial_int, value max_int, value 
   }
 
   bool shared = Bool_val(shared_bl);
-  BinaryenSetMemory(*ref, initial, maximum, export_name, segments_c, segment_passive_arr, offsets, segments_size, segments_len, shared);
+  BinaryenSetMemory(*ref, initial, maximum, export_name, (const char**)segments_c, segment_passive_arr, offsets, segments_size, segments_len, shared);
   return Val_unit;
 }
 

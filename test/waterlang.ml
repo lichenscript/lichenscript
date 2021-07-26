@@ -104,6 +104,9 @@ let test_string _ =
     }
   "
   in
+  let result = Utils.parse_string_and_codegen source in
+  Format.printf "%s" result;
+
   Core.Unix.mkdir_p temp_dir_name;
   let test_output_name = temp_dir_name ^ "test_wtl" in
   Format.printf "output name: %s" test_output_name;
