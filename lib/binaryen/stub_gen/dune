@@ -1,0 +1,3 @@
+(executable
+ (name stub_gen)
+ (libraries core ctypes ctypes.stubs))

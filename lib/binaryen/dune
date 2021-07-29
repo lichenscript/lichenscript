@@ -1,8 +1,12 @@
 (library
  (name binaryen)
- (libraries core_kernel)
+ (libraries core_kernel ctypes)
  (foreign_stubs
   (language c)
   (names bindings))
  (c_library_flags (-lbinaryen))
  (flags :standard -cclib -lbinaryen))
+
+(rule
+ (targets b.ml)
+ (action (run ./stub_gen/stub_gen.exe)))
