@@ -167,7 +167,7 @@ CAMLprim value make_ty_multiples(value arr) {
     types[i] = t;
   }
 
-  BinaryenType result = BinaryenTypeAuto(types, size);
+  BinaryenType result = BinaryenTypeCreate(types, size);
   return caml_copy_int64(result);
 }
 
