@@ -178,7 +178,7 @@ let codegen_allocator_facility (env: Codegen_env.t) =
       if' Ptr.((local_get 0) == (const_i32_of_int 0))
         (* nullptr *)
         ~then':(call_ wtf_alloc_fun_name [ I32.local_get 1 ] ptr_ty)
-        ~else':(block ~name:"main_logic" [
+        ~else':(block ~name:"main_logic" ~ty:(ptr_ty) [
           (* current_size <- ptr->total_bytes *)
           local_set current_size (I32.load ~offset:0 (Ptr.local_get 0));
 

@@ -183,5 +183,8 @@ module Bindings (F : Cstubs.FOREIGN) = struct
 
   let clean_binary_result = F.foreign "clean_binary_result"
     F.(binary_result @-> returning void)
+
+  let dump_bytes_to_path = F.foreign "dump_bytes_to_path"
+    F.(ptr void @-> size_t @-> string @-> returning void)
   
 end

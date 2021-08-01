@@ -21,8 +21,11 @@ let type_multiples params =
   let params_len = Unsigned.UInt32.of_int (List.length params) in
   Bound.type_multiples (Ctypes.CArray.start params_arr) params_len
 
-let emit_binary m _path =
+let emit_binary m path =
   let result = Bound.emit_binary m "" in
+  let bytes = Ctypes.getf result Bound.binary_result_binary in
+  let raw_size = Ctypes.getf result Bound.binary_result_size in
+  Bound.dump_bytes_to_path bytes raw_size path;
   Bound.clean_binary_result result
 
 module type BinaryenModule = sig
