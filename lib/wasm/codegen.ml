@@ -1,13 +1,13 @@
 open Core_kernel
-open Binaryen
+open Binaryen.Dsl
 open Codegen_env
 open Waterlang_typing
 
-module M (S: Dsl.BinaryenModule) = struct
-  module Dsl = Dsl.Binaryen(S)
+module M (S: BinaryenModule) = struct
+  module Dsl = Binaryen(S)
   open Dsl
 
-  let get_binaryen_ty_by_core_ty env (ty: Core_type.TypeValue.t): C_bindings.ty =
+  let get_binaryen_ty_by_core_ty env (ty: Core_type.TypeValue.t): Bound.binary_type =
     let open Core_type in
     match ty with
     | Ctor sym ->
@@ -31,12 +31,11 @@ module M (S: Dsl.BinaryenModule) = struct
   let get_function_params_type env params =
     let open Typedtree.Function in
     let { params_content; _; } = params in
-    let params_arr = List.to_array params_content in
-    let types_arr = Array.map
+    let types_arr = List.map
       ~f:(fun param -> param.param_ty |> (get_binaryen_ty_by_core_ty env))
-      params_arr
+      params_content
     in
-    C_bindings.make_ty_multiples types_arr
+    type_multiples types_arr
 
   let unwrap_function_return_type (ty: Core_type.TypeValue.t) =
     let open Core_type in
@@ -47,30 +46,29 @@ module M (S: Dsl.BinaryenModule) = struct
     | _ -> TypeValue.Unknown
 
   let set_memory env =
-    let strings: bytes array = env.data_segment.allocated_str
+    let strings: bytes list = env.data_segment.allocated_str
       |> Data_segment_allocator.StaticStringPool.to_alist
       |> List.map ~f:(fun (_, value) ->
         let open Data_segment_allocator in
         Buffer.contents_bytes value.data
         )
-      |> List.to_array
     in
-    let passitive = Array.init ~f:(fun _ -> false) (Array.length strings) in
-    let offsets = Array.init
+    let passitive = List.init ~f:(fun _ -> false) (List.length strings) in
+    let offsets = List.init
       ~f:(fun _ ->
         let offset = env.config.data_segment_offset in
         const_i32_of_int offset
       )
-      (Array.length strings)
+      (List.length strings)
     in
     let mem_size = env.config.init_mem_size / (64 * 1024) in
-    C_bindings.set_memory
+    set_memory
       env.module_
       mem_size
       mem_size
       "memory" strings passitive offsets false
 
-  let rec codegen_statements env stat: C_bindings.exp option =
+  let rec codegen_statements env stat: Bound.expression option =
     let open Typedtree.Statement in
     let { spec; _; } = stat in
     match spec with
@@ -111,17 +109,16 @@ module M (S: Dsl.BinaryenModule) = struct
           )
 
         |> List.rev
-        |> List.to_array
         )
       in
       let result = block ~name
-        [|
-          loop "while_0_loop" (block [|
+        [
+          loop "while_0_loop" (block [
             if' test_expr ~then':(Dsl.break_ "while_0");
             while_block';
             break_ "while_0_loop";
-          |])
-        |]
+          ])
+        ]
       in
       env.while_label <- prev_while_label;
       Some result
@@ -138,7 +135,7 @@ module M (S: Dsl.BinaryenModule) = struct
 
     | _ -> None
 
-  and codegen_binding env binding: C_bindings.exp option =
+  and codegen_binding env binding: Bound.expression option =
     let init_exp = codegen_expression env binding.binding_init in
     let open Core_type.VarSym in
     let local_id =
@@ -164,10 +161,10 @@ module M (S: Dsl.BinaryenModule) = struct
       let open Data_segment_allocator in
       let str_len = String.length content in
       call_ String_facility.init_string_fun_name_static
-        [|
+        [
           const_i32_of_int value.offset;
           (const_i32_of_int str_len);
-        |] i32
+        ] i32
 
     | Char ch ->
       let str = Char.to_string ch in
@@ -189,7 +186,7 @@ module M (S: Dsl.BinaryenModule) = struct
     let expr = codegen_expression env right in
     local_set local_id expr
 
-  and codegen_expression env expr: C_bindings.exp =
+  and codegen_expression env expr: Bound.expression =
     let open Typedtree.Expression in
     let { spec; _; } = expr in
     let convert_op raw =
@@ -229,17 +226,17 @@ module M (S: Dsl.BinaryenModule) = struct
         ~f:(fun stmt -> codegen_statements env stmt)
         body
       in
-      Dsl.block (List.to_array exprs)
+      Dsl.block exprs
 
     | If if_expr ->
       let { Typedtree.Expression. if_test; if_consequent; if_alternative; _; } = if_expr in
       let test = codegen_expression env if_test in
-      let cons = Option.value ~default:(block [||]) (codegen_statements env if_consequent) in
+      let cons = Option.value ~default:(block []) (codegen_statements env if_consequent) in
       let alt =
         Option.map
         ~f:(fun stmt ->
           let expr_opt = codegen_statements env stmt in
-          Option.value ~default:(block [||]) expr_opt
+          Option.value ~default:(block []) expr_opt
         )
         if_alternative
       in
@@ -255,7 +252,6 @@ module M (S: Dsl.BinaryenModule) = struct
     let params =
       call.call_params
       |> List.map ~f:(codegen_expression env)
-      |> List.to_array
     in
     match callee_sym.spec with
     | Internal
@@ -286,7 +282,6 @@ module M (S: Dsl.BinaryenModule) = struct
       |> Scope.SymbolTable.to_alist
       |> List.map
           ~f:(fun (_, var_sym) -> Core_type.VarSym.(get_binaryen_ty_by_core_ty env var_sym.def_type))
-      |> List.to_array
 
     in
     let { body; _; } = function_ in
@@ -296,19 +291,16 @@ module M (S: Dsl.BinaryenModule) = struct
         begin
           let open Typedtree.Block in
           let { body; _; } = block in
-          let expressions = 
-            body
-            |> List.filter_map ~f:(codegen_statements env)
-          in
-          List.to_array expressions
+          body
+          |> List.filter_map ~f:(codegen_statements env)
         end
 
       | Fun_expression_body expr ->
-        [| codegen_expression env expr |]
+        [ codegen_expression env expr ]
 
     in
 
-    let finalizers: C_bindings.exp array =
+    let finalizers: Bound.expression list =
       function_.assoc_scope.var_symbols
       |> Scope.SymbolTable.to_alist
       |> List.filter_map
@@ -322,7 +314,7 @@ module M (S: Dsl.BinaryenModule) = struct
             | TypeSym.Primitive -> None
             | TypeSym.Object ->
               let exp =
-                call_ Allocator_facility.release_object_fun_name [| Ptr.local_get sym.id_in_scope |] none
+                call_ Allocator_facility.release_object_fun_name [ Ptr.local_get sym.id_in_scope ] none
               in
               Some exp
 
@@ -333,9 +325,8 @@ module M (S: Dsl.BinaryenModule) = struct
             in
             failwith def_type_msg
         )
-      |> List.to_array
     in
-    let exp = block (Array.concat [block_contents; finalizers]) in
+    let exp = block (List.concat [block_contents; finalizers]) in
 
     let id = function_.header.id in
     let id_name = id.name in
@@ -361,8 +352,7 @@ module M (S: Dsl.BinaryenModule) = struct
             let params_ty = 
               fun_type.tfun_params
               |> List.map ~f:(fun (_, t) -> get_binaryen_ty_by_core_ty env t)
-              |> List.to_array
-              |> C_bindings.make_ty_multiples
+              |> type_multiples
             in
             let ret_ty = get_binaryen_ty_by_core_ty env fun_type.tfun_ret in
             match value.spec with
@@ -376,7 +366,7 @@ module M (S: Dsl.BinaryenModule) = struct
       );
 
   and codegen_program (env: Codegen_env.t) =
-    C_bindings.set_debug_info (not env.config.release);
+    Bound.set_debug_info (not env.config.release);
     let { Program. tree; _; } = env.program in
     let { Typedtree. tprogram_statements } = tree in
     let _ = List.map ~f:(codegen_statements env) tprogram_statements in
@@ -403,7 +393,7 @@ let codegen program config : string =
     end)
   in
   Cg.codegen_program env;
-  let str = C_bindings.module_emit_text env.module_ in
+  let str = Bound.emit_text env.module_ in
   str
 
 let codegen_binary env path : unit =
@@ -413,6 +403,6 @@ let codegen_binary env path : unit =
     end)
   in
   Cg.codegen_program env;
-  C_bindings.module_emit_binary_to_file env.module_ path;
+  emit_binary env.module_ path;
   let js_glue_content = Js_glue.dump_js_glue env in
   Out_channel.write_all (path ^ ".js") ~data:js_glue_content

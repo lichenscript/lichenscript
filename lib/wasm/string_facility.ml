@@ -1,11 +1,11 @@
-open Binaryen
+open Binaryen.Dsl
 
 let init_string_fun_name = "__wtl_init_string"
 let init_string_fun_name_static = "__wtl_init_string_static"
 
 let codegen_string_facility (env: Codegen_env.t) =
   let module Dsl =
-    Dsl.Binaryen(struct
+    Binaryen(struct
       let ptr_ty = Codegen_env.ptr_ty env
       let m = env.module_
     end)
@@ -14,10 +14,10 @@ let codegen_string_facility (env: Codegen_env.t) =
 
   (* function __init_string_fun_name(obj: ptr) *)
   let codegen_init_string () =
-    let _ = def_function init_string_fun_name ~params:[| ptr_ty |] ~ret_ty:none (fun _ ->
+    let _ = def_function init_string_fun_name ~params:[ ptr_ty ] ~ret_ty:none (fun _ ->
         call_
           Allocator_facility.init_object_fun_name
-          [| Ptr.local_get 0 |]
+          [ Ptr.local_get 0 ]
           none
       )
     in
@@ -29,22 +29,22 @@ let codegen_string_facility (env: Codegen_env.t) =
   let codegen_init_string_static () =
     let length_offset = 16 in
     let bytes_offset = 24 in
-    let _ = def_function init_string_fun_name_static ~params:[| ptr_ty; i32 |] ~ret_ty:ptr_ty (fun ctx ->
+    let _ = def_function init_string_fun_name_static ~params:[ ptr_ty; i32 ] ~ret_ty:ptr_ty (fun ctx ->
         let new_ptr = def_local ctx ptr_ty in
         let str_bytes_size = def_local ctx i32 in
         let need_size = def_local ctx i32 in
         let offset = def_local ctx ptr_ty in
-        block ~ty:ptr_ty [|
+        block ~ty:ptr_ty [
           local_set str_bytes_size (binary mul_i32 (binary add_i32 (I32.local_get 1) (const_i32_of_int 1)) (const_i32_of_int 2));
 
           local_set need_size (binary add_i32 (I32.local_get str_bytes_size) (const_i32_of_int bytes_offset));
 
           (* alloc new object *)
-          local_set new_ptr (call_ Allocator_facility.wtf_alloc_fun_name [| Ptr.local_get need_size |] ptr_ty);
+          local_set new_ptr (call_ Allocator_facility.wtf_alloc_fun_name [ Ptr.local_get need_size ] ptr_ty);
 
           call_
             Allocator_facility.init_object_fun_name
-            [| Ptr.local_get new_ptr |]
+            [ Ptr.local_get new_ptr ]
             none
           ;
 
@@ -56,7 +56,7 @@ let codegen_string_facility (env: Codegen_env.t) =
 
           Ptr.local_get new_ptr
 
-        |]
+        ]
       )
     in
     let _ = export_function init_string_fun_name_static init_string_fun_name_static in

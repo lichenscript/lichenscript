@@ -1,5 +1,5 @@
 open Core_kernel
-open Binaryen
+open Binaryen.Dsl
 
 let allocator_facility_flag = 0b00000001
 let string_facility_flag    = 0b00000010
@@ -10,7 +10,7 @@ type js_snippet = {
 }
 
 type t = {
-  module_: C_bindings.m;
+  module_: Bound.module_;
   output_filename: string;
   config: Config.t;
   mutable facilities_flags: int;
@@ -22,7 +22,7 @@ type t = {
 
 let create ?output_filename config program =
   {
-    module_ = C_bindings.make_module();
+    module_ = module_create ();
     output_filename = Option.value output_filename ~default:"test";
     config;
     facilities_flags = 0;
@@ -47,11 +47,9 @@ let needs_string env =
 
 let ptr_ty env =
   match env.config.arch with
-  | Config.ARCH_WASM32 ->
-    C_bindings.make_ty_int32 ()
+  | Config.ARCH_WASM32 -> i32
 
-  | Config.ARCH_WASM64 ->
-    C_bindings.make_ty_int64 ()
+  | Config.ARCH_WASM64 -> i64
 
 let ptr_size env =
   match env.config.arch with
