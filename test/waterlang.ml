@@ -28,7 +28,6 @@ let test_parser _ =
   " in
   match result with
   | Result.Ok _program ->
-    (* Ast.pp_program Format.std_formatter program; *)
     let _env = Waterlang_typing.Env.create () in
     (* let program = Waterlang_typing.Annotate.annotate env program in
     Waterlang_typing.Typecheck.type_check env program; *)
@@ -46,14 +45,15 @@ let test_parser _ =
     assert false
 
 let test_codegen _ =
-  let source = "
+  let _source = "
     function main(a: i32, b: i32): i32 {
       return a + b;
     }
     "
   in
-  let result = Utils.parse_string_and_codegen source in
-  Format.printf "%s" result
+  ()
+  (* let result = Utils.parse_string_and_codegen source in
+  Format.printf "%s" result *)
 
 let test_codegen_binary _ =
   let source = "
@@ -146,6 +146,23 @@ let test_assignment _ =
   Core.In_channel.close in_chan;
   print_string r
 
+let test_array _ =
+  let source = "
+
+  function main() {
+    let arr = [];
+  }
+  "
+  in
+  Core.Unix.mkdir_p temp_dir_name;
+  let test_output_name = temp_dir_name ^ "test_wtl_arr" in
+  Format.printf "output name: %s" test_output_name;
+  Utils.parse_string_and_codegen_to_path source test_output_name;
+  let in_chan = Core.Unix.open_process_in ("node " ^ test_output_name ^ ".js" ) in
+  let r = Core.In_channel.input_all in_chan in
+  Core.In_channel.close in_chan;
+  print_string r
+
 let suite =
   "TestParser" >::: [
     "test_parser" >:: test_parser;
@@ -155,6 +172,7 @@ let suite =
     "test_function_call" >:: test_function_call;
     "test_string" >:: test_string;
     "test_assignment" >:: test_assignment;
+    "test_array" >:: test_array;
   ]
 
 let () =
