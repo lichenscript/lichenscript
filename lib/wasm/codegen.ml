@@ -10,7 +10,7 @@ module M (S: BinaryenModule) = struct
   let get_binaryen_ty_by_core_ty env (ty: Core_type.TypeValue.t): Bound.binary_type =
     let open Core_type in
     match ty with
-    | Ctor sym ->
+    | Ctor(sym, []) ->
       if (TypeSym.builtin sym) then (
         match (TypeSym.name sym) with
         | "i32" -> i32
@@ -309,7 +309,7 @@ module M (S: BinaryenModule) = struct
           let open VarSym in
           let open TypeValue in
           match sym.def_type with
-          | Ctor type_sym ->
+          | Ctor(type_sym, []) ->
             (match type_sym.spec with
             | TypeSym.Primitive -> None
             | TypeSym.Object ->

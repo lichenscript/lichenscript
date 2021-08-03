@@ -2,17 +2,35 @@ open Core_kernel
 open Core_type
 open Typedtree
 
-let type_assinable left right =
+let rec type_assinable left right =
   let open TypeValue in
   match (left, right) with
   | (Any, _)
   | (_, Any)
   | (Unknown, Unknown) -> true
-  | (Ctor left_sym, Ctor right_sym) ->
+  | (Ctor(left_sym, []), Ctor(right_sym, [])) ->
     if phys_equal left_sym right_sym then
       true
     else
       false
+
+  | (Ctor(left_sym, left_args), Ctor(right_sym, right_args)) -> (
+      if phys_equal left_sym right_sym then (
+        let value = List.fold2
+          ~init:true
+          ~f:(fun acc left right ->
+            (* TODO: check equal, not assignable *)
+            let value = type_assinable left right in
+            acc && value
+          )
+          left_args right_args
+        in
+        match value with
+        | Ok v -> v
+        | Unequal_lengths -> false
+      ) else
+        false
+    )
 
   | _ ->
     false
@@ -198,7 +216,7 @@ and check_callee _env (callee: Typedtree.Expression.callee) =
         let open Core_type.TypeValue in
         let open Core_type.TypeSym in
         match acc with
-        | Ctor { spec = Module_ mod_; _; } ->
+        | Ctor({ spec = Module_ mod_; _; }, []) ->
           let prop_opt = Core_type.PropsMap.find mod_.props prop_name in
           Option.value_exn prop_opt
 

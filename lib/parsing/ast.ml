@@ -227,6 +227,9 @@ and Type : sig
     | Ty_ctor of Identifier.t * t list
       (* List<int> *)
 
+    | Ty_arr of t
+      (* T[] *)
+
     | Ty_arrow of
       t list *  (* params*)
       t         (* result *)

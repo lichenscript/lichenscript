@@ -48,20 +48,38 @@ let rec infer env (ty: Ast.Type.t) =
   match spec with
   | Ty_any -> TypeValue.Any
   | Ty_var _ -> failwith "unreachable"
-  | Ty_ctor(id, _) ->
+  | Ty_ctor(id, args) ->
     begin
       let sym = env
         |> Env.peek_scope
         |> (fun scope -> Scope.find_type_symbol scope id.pident_name)
       in
       match sym with
-      | Some sym -> TypeValue.Ctor sym
+      | Some sym ->
+        let args =
+          List.map
+            ~f:(infer env)
+            args
+        in
+        TypeValue.Ctor(sym, args)
+
       | None ->
         Env.add_error env { Type_error.
           spec = CannotFindName id.pident_name;
           loc;
         };
         TypeValue.Unknown
+    end
+
+  | Ty_arr t ->
+    begin
+      let sym = env
+        |> Env.peek_scope
+        |> (fun scope -> Scope.find_type_symbol scope "Array")
+      in
+      let sym = Option.value_exn sym in
+      let arg = infer env t in
+      TypeValue.Ctor(sym, [ arg ])
     end
 
   | Ty_arrow(params, ret) ->

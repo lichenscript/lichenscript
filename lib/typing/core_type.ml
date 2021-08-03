@@ -8,7 +8,7 @@ module rec TypeValue : sig
     | Unknown
     | Any
     | Unit
-    | Ctor of TypeSym.t
+    | Ctor of TypeSym.t * (t list)
     | Class of class_type
     | Function of function_type
     | Array of t
@@ -37,7 +37,7 @@ end = struct
     | Unknown
     | Any
     | Unit
-    | Ctor of TypeSym.t
+    | Ctor of TypeSym.t * (t list)
     | Class of class_type
     | Function of function_type
     | Array of t
@@ -62,7 +62,21 @@ end = struct
   | Unknown -> Format.pp_print_string formatter "unknown"
   | Any -> Format.pp_print_string formatter "any"
   | Unit -> Format.pp_print_string formatter "unit"
-  | Ctor sym -> Format.fprintf formatter "%s" (TypeSym.name sym)
+  | Ctor(sym, []) -> Format.fprintf formatter "%s" (TypeSym.name sym)
+  | Ctor(sym, args) ->
+    begin
+      let args_content =
+        List.fold
+          ~init:""
+          ~f:(fun acc arg ->
+            let arg_content = Format.asprintf "%a, " pp arg in
+            acc ^ arg_content
+          )
+          args
+      in
+      Format.fprintf formatter "%s<%s>" (TypeSym.name sym) args_content
+    end
+
   | Class _ -> Format.pp_print_string formatter "Class"
   | Function fun_ ->
     pp_function_type formatter fun_

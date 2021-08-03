@@ -338,7 +338,7 @@ and annotate_expression (env: Env.t) expr =
     match spec with
     | Constant cnst ->
       let (cnst, ty_val) = annotate_constant env cnst in
-      (T.Expression.Constant cnst, TypeValue.Ctor ty_val)
+      (T.Expression.Constant cnst, TypeValue.Ctor(ty_val, []))
 
     | Identifier id ->
       begin
@@ -393,7 +393,7 @@ and annotate_expression (env: Env.t) expr =
 
       let open TypeValue in
       (match expr.val_ with
-      | Ctor { TypeSym. spec = Module_ mod_; _; } ->
+      | Ctor({ TypeSym. spec = Module_ mod_; _; }, []) ->
         let name = field.pident_name in
         let field_type_opt = PropsMap.find mod_.props name in
         (match field_type_opt with
@@ -411,7 +411,7 @@ and annotate_expression (env: Env.t) expr =
     | Binary (op, left, right) ->
       let left = annotate_expression env left in
       let right = annotate_expression env right in
-      let ty_val = TypeValue.Ctor (Env.ty_i32 env) in
+      let ty_val = TypeValue.Ctor (Env.ty_i32 env, []) in
       (T.Expression.Binary(op, left, right), ty_val)
 
     | Update (op, expr, prefix) ->
@@ -448,7 +448,7 @@ and annotate_call env (call: Ast.Expression.call) =
             let open Core_type.TypeSym in
             let open Identifier in
             let ty = match acc with
-              | Ctor { spec = Module_ mod_; _; } ->
+              | Ctor({ spec = Module_ mod_; _; }, []) ->
                 let name = id.pident_name in
                 let prop_opt = Core_type.PropsMap.find mod_.props name in
                 Option.value_exn prop_opt
