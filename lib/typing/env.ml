@@ -20,6 +20,7 @@ let make_default_type_sym scope =
     ("f64", Primitive);
     ("char", Primitive);
     ("string", Object);
+    ("Array", Object);
     ("boolean", Primitive);
   |] in
   Array.iter

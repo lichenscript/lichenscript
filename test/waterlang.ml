@@ -150,7 +150,7 @@ let test_array _ =
   let source = "
 
   function main() {
-    let arr = [];
+    let arr: i32[] = [];
   }
   "
   in

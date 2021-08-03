@@ -852,10 +852,31 @@ and parse_pattern env : Pattern.t =
   }
 
 and parse_type env : Type.t =
-  let open Type in
-  let start_loc = Peek.loc env in
-  let id = parse_identifier env in
-  {
-    spec = Ty_ctor (id, []);
-    loc = with_start_loc env start_loc;
-  }
+  let parse_type_without_arr env =
+    let open Type in
+    let start_loc = Peek.loc env in
+    let id = parse_identifier env in
+    {
+      spec = Ty_ctor (id, []);
+      loc = with_start_loc env start_loc;
+    }
+  in
+  let rec parse_type_with_arr env base_type =
+    let start_loc = Peek.loc env in
+    let next = Peek.token env in
+    match next with
+    | Token.T_LBRACKET ->
+      Eat.token env;
+      Expect.token env Token.T_RBRACKET;
+      let combined =
+        { Type.
+          spec = Ty_arr base_type;
+          loc = with_start_loc env start_loc;
+        }
+      in
+      parse_type_with_arr env combined
+
+    | _ -> base_type
+  in
+  let base_type = parse_type_without_arr env in
+  parse_type_with_arr env base_type

@@ -66,11 +66,12 @@ end = struct
   | Ctor(sym, args) ->
     begin
       let args_content =
-        List.fold
+        List.foldi
           ~init:""
-          ~f:(fun acc arg ->
-            let arg_content = Format.asprintf "%a, " pp arg in
-            acc ^ arg_content
+          ~f:(fun index acc arg ->
+            let suffix = if phys_equal index ((List.length args) - 1) then "" else ", " in
+            let arg_content = Format.asprintf "%a" pp arg in
+            acc ^ arg_content ^ suffix
           )
           args
       in

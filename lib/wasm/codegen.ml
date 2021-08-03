@@ -319,9 +319,17 @@ module M (S: BinaryenModule) = struct
               Some exp
 
             | _ -> failwith "not implemented 1")
+
+          | Ctor({ TypeSym. name="Array"; builtin = true; _; }, [ _arg ]) ->
+            (* TODO: depent on arg *)
+            let exp =
+              call_ Array_facility.array_finalize [ Ptr.local_get sym.id_in_scope ] none
+            in
+            Some exp
+
           | _ ->
             let def_type_msg =
-              Format.asprintf "can not generate finalize for %s:%a" sym.name TypeValue.pp sym.def_type
+              Format.asprintf "can not generate finalizer for %s: %a" sym.name TypeValue.pp sym.def_type
             in
             failwith def_type_msg
         )

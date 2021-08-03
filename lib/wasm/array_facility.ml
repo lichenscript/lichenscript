@@ -6,6 +6,8 @@ let array_length_fun_name = "__wtf_i32_array_length"
 
 let array_push_fun_name = "__wtf_i32_array_push"
 
+let array_finalize = "__wtf_i32_array_finalize"
+
 let codegen_array_facility (env: Codegen_env.t) =
   let module Dsl =
     Binaryen(struct
@@ -86,6 +88,14 @@ let codegen_array_facility (env: Codegen_env.t) =
     let _ = export_function array_push_fun_name array_push_fun_name in ()
   in
 
+  let codegen_i32_array_finalize () =
+    let _ = def_function array_finalize ~params:[ ptr_ty ] ~ret_ty:none (fun _ ->
+      unreachable_exp()
+    ) in
+    let _ = export_function array_finalize array_finalize in ()
+  in
+
   codegen_init_i32_array ();
   codegen_i32_array_length ();
-  codegen_i32_array_push ()
+  codegen_i32_array_push ();
+  codegen_i32_array_finalize ()
