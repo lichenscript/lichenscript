@@ -17,10 +17,23 @@ let codegen_array_facility (env: Codegen_env.t) =
   in
   let open Dsl in
 
+  let def_cap = 4 in
+
   (* function __wtf_init_i32_array(capacity: i32) *)
   let codegen_init_i32_array () =
-    let _ = def_function init_array_fun_name ~params:[ i32 ] ~ret_ty:ptr_ty (fun _ ->
-      unreachable_exp()
+    let _ = def_function init_array_fun_name ~params:[ i32 ] ~ret_ty:ptr_ty (fun ctx ->
+      let tmp_result = def_local ctx ptr_ty in
+      let data_obj_ptr = def_local ctx ptr_ty in
+      let data_need_size = def_local ctx i32 in
+      let array_size = 24 in
+      block ~ty:ptr_ty [
+        local_set tmp_result (call_ Allocator_facility.wtf_alloc_fun_name [ (const_i32_of_int array_size) ] ptr_ty);
+        local_set data_need_size I32.((const_i32_of_int 12) + (const_i32_of_int Ptr.size) * (const_i32_of_int def_cap));
+        local_set data_obj_ptr (call_ Allocator_facility.wtf_alloc_fun_name [ I32.local_get data_need_size ] ptr_ty);
+        Ptr.store ~offset:20 ~ptr:(Ptr.local_get tmp_result) (Ptr.local_get data_obj_ptr);
+        Ptr.store ~offset:16 ~ptr:(Ptr.local_get tmp_result) (const_i32_of_int 0);
+        Ptr.local_get tmp_result;
+      ]
     )
     in
     let _ = export_function init_array_fun_name init_array_fun_name in ()
@@ -90,7 +103,7 @@ let codegen_array_facility (env: Codegen_env.t) =
 
   let codegen_i32_array_finalize () =
     let _ = def_function array_finalize ~params:[ ptr_ty ] ~ret_ty:none (fun _ ->
-      unreachable_exp()
+      call_ Allocator_facility.free_object_fun_name [ (Ptr.local_get 0) ] none
     ) in
     let _ = export_function array_finalize array_finalize in ()
   in

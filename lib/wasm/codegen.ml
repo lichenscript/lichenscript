@@ -10,7 +10,7 @@ module M (S: BinaryenModule) = struct
   let get_binaryen_ty_by_core_ty env (ty: Core_type.TypeValue.t): Bound.binary_type =
     let open Core_type in
     match ty with
-    | Ctor(sym, []) ->
+    | Ctor(sym, _) ->
       if (TypeSym.builtin sym) then (
         match (TypeSym.name sym) with
         | "i32" -> i32
@@ -19,6 +19,7 @@ module M (S: BinaryenModule) = struct
         | "f64" -> f64
         | "char" -> i32
         | "boolean" -> i32
+        | "Array"
         | "string" -> (Codegen_env.ptr_ty env)
         | _ -> unreachable
       ) else
@@ -130,8 +131,6 @@ module M (S: BinaryenModule) = struct
 
       | _ -> failwith "not in while, can not break"
       )
-        
-
 
     | _ -> None
 
