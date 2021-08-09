@@ -69,17 +69,17 @@ module M (S: BinaryenModule) = struct
       mem_size
       "memory" strings passitive offsets false
 
-  let rec codegen_statements env stat: Bound.expression option =
+  let rec codegen_statements env stat: Bound.expression list =
     let open Typedtree.Statement in
     let { spec; _; } = stat in
     match spec with
     | Function_ fun_ ->
       codegen_function env fun_;
-      None
+      []
     
     | Expr expr ->
       let expr_result = codegen_expression env expr in
-      Some expr_result
+      [ expr_result ]
 
     | Return expr_opt ->
       let expr = Option.map
@@ -87,13 +87,17 @@ module M (S: BinaryenModule) = struct
         expr_opt
       in
       let return_expr = return_ expr in
-      Some return_expr
+      [ return_expr ]
 
     | Binding binding ->
-      codegen_binding env binding
+      let binding_opt = codegen_binding env binding in
+      (match binding_opt with
+      | Some b -> [ b ]
+      | None -> []
+      )
 
     | Semi expr ->
-      Some(codegen_expression env expr)
+      [ codegen_expression env expr ]
 
     | While while_ ->
       let name = "while_0" in
@@ -104,12 +108,8 @@ module M (S: BinaryenModule) = struct
       let body = while_block.body in
       let while_block' = block
         (body
-        |> List.map ~f:(fun stmt ->
-          let expr = codegen_statements env stmt in
-          Option.value ~default:(unreachable_exp()) expr
-          )
-
-        |> List.rev
+        |> List.map ~f:(fun stmt -> codegen_statements env stmt)
+        |> List.concat
         )
       in
       let result = block ~name
@@ -122,17 +122,17 @@ module M (S: BinaryenModule) = struct
         ]
       in
       env.while_label <- prev_while_label;
-      Some result
+      [ result ]
 
     | Break _ ->
       (match env.while_label with
       | Some label_name ->
-        Some (break_ label_name)
+        [ break_ label_name ]
 
       | _ -> failwith "not in while, can not break"
       )
 
-    | _ -> None
+    | _ -> []
 
   and codegen_binding env binding: Bound.expression option =
     let init_exp = codegen_expression env binding.binding_init in
@@ -221,21 +221,20 @@ module M (S: BinaryenModule) = struct
     | Block blk ->
       let { Typedtree.Block. body; _; } = blk in
       let exprs =
-        List.filter_map
-        ~f:(fun stmt -> codegen_statements env stmt)
         body
+        |> List.concat_map ~f:(fun stmt -> codegen_statements env stmt)
       in
       Dsl.block exprs
 
     | If if_expr ->
       let { Typedtree.Expression. if_test; if_consequent; if_alternative; _; } = if_expr in
       let test = codegen_expression env if_test in
-      let cons = Option.value ~default:(block []) (codegen_statements env if_consequent) in
+      let cons = block (codegen_statements env if_consequent) in
       let alt =
         Option.map
         ~f:(fun stmt ->
           let expr_opt = codegen_statements env stmt in
-          Option.value ~default:(block []) expr_opt
+          block expr_opt
         )
         if_alternative
       in
@@ -291,7 +290,7 @@ module M (S: BinaryenModule) = struct
           let open Typedtree.Block in
           let { body; _; } = block in
           body
-          |> List.filter_map ~f:(codegen_statements env)
+          |> List.concat_map ~f:(codegen_statements env)
         end
 
       | Fun_expression_body expr ->
