@@ -74,12 +74,14 @@ module M (S: BinaryenModule) = struct
     let { spec; _; } = stat in
     match spec with
     | Function_ fun_ ->
+      (* TODO: only allow in root scope *)
       codegen_function env fun_;
       []
     
+    | Semi expr
     | Expr expr ->
       let expr_result = codegen_expression env expr in
-      [ expr_result ]
+      [ drop expr_result ]
 
     | Return expr_opt ->
       let expr = Option.map
@@ -95,9 +97,6 @@ module M (S: BinaryenModule) = struct
       | Some b -> [ b ]
       | None -> []
       )
-
-    | Semi expr ->
-      [ codegen_expression env expr ]
 
     | While while_ ->
       let name = Codegen_env.gen_label_name env in

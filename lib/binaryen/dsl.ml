@@ -175,6 +175,8 @@ module Binaryen (M: BinaryenModule) = struct
 
   let global_get = Bound.expr_global_get M.m
 
+  let drop = Bound.expr_drop M.m
+
   let store ~bytes ~offset ~align ~ptr ~value ~ty =
     Bound.expr_store M.m bytes offset align ptr value ty
 

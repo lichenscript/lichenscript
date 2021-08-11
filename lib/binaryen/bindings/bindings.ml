@@ -169,6 +169,9 @@ module Bindings (F : Cstubs.FOREIGN) = struct
   let expr_global_set = F.foreign "BinaryenGlobalSet"
     F.(module_ @-> string @-> expression @-> returning expression)
 
+  let expr_drop = F.foreign "BinaryenDrop"
+    F.(module_ @-> expression @-> returning expression)
+
   let set_memory = F.foreign "BinaryenSetMemory"
     F.(module_ @-> int @-> int @-> string @-> ptr string @-> ptr bool @-> ptr expression @-> ptr uint32_t @-> size_t @-> bool @-> returning void)
 

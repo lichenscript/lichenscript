@@ -18,17 +18,25 @@ module CodegenScope : sig
 
   val next_label: t -> string
 
+  val next_temp_value_id: t -> T.Core_type.TypeValue.t -> int
+
   val make: T.Scope.t -> t
   
 end = struct
+  module TempValueMap = Map.Make(Int)
+
   type t = {
     typed_scope: T.Scope.t option;
     mutable name_counter: int;
+    mutable temp_value_distributor: int;
+    mutable temp_value_type: T.Core_type.TypeValue.t TempValueMap.t;
   }
 
   let root = {
     typed_scope = None;
     name_counter = 0;
+    temp_value_distributor = 0;
+    temp_value_type = TempValueMap.empty;
   }
 
   let next_label scope =
@@ -38,10 +46,21 @@ end = struct
     let base_name = "scope_" ^ (string_of_int current_count) in
     base_name
 
-  let make scope = {
-    typed_scope = Some scope;
-    name_counter = 0;
-  }
+  let next_temp_value_id scope ty =
+    let current_value = scope.temp_value_distributor in
+    scope.temp_value_type <- TempValueMap.set scope.temp_value_type ~key:current_value ~data:ty;
+    scope.temp_value_distributor <- current_value + 1;
+    current_value
+
+  let make scope =
+    let open T.Scope in
+    let vars_count = SymbolTable.length scope.var_symbols in
+    {
+      typed_scope = Some scope;
+      name_counter = 0;
+      temp_value_distributor = vars_count;
+      temp_value_type = TempValueMap.empty;
+    }
   
 end
 
