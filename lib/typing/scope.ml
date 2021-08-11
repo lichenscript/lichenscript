@@ -6,6 +6,7 @@ module SymbolTable = Hashtbl.Make_binable(String)
 type t = {
   prev: t option;
   id: int;
+  name: string;
   var_symbols: VarSym.t SymbolTable.t;
   type_symbols: TypeSym.t SymbolTable.t;
   mutable var_counter: int;
@@ -13,10 +14,11 @@ type t = {
 
 let id scope = scope.id
 
-let create ?prev id =
+let create ?prev id name =
   {
     prev;
     id;
+    name;
     var_symbols = SymbolTable.create ();
     type_symbols = SymbolTable.create ();
     var_counter = 0;

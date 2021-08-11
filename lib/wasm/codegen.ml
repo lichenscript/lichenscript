@@ -100,7 +100,8 @@ module M (S: BinaryenModule) = struct
       [ codegen_expression env expr ]
 
     | While while_ ->
-      let name = "while_0" in
+      let name = Codegen_env.gen_label_name env in
+      let loop_name = name ^ "_loop" in
       let prev_while_label = env.while_label in
       env.while_label <- Some name;
       let { Typedtree.Statement. while_test; while_block; _; } = while_ in
@@ -114,10 +115,10 @@ module M (S: BinaryenModule) = struct
       in
       let result = block ~name
         [
-          loop "while_0_loop" (block [
-            if' test_expr ~then':(Dsl.break_ "while_0");
+          loop loop_name (block [
+            if' test_expr ~then':(Dsl.break_ name);
             while_block';
-            break_ "while_0_loop";
+            break_ loop_name;
           ])
         ]
       in
@@ -282,68 +283,71 @@ module M (S: BinaryenModule) = struct
           ~f:(fun (_, var_sym) -> Core_type.VarSym.(get_binaryen_ty_by_core_ty env var_sym.def_type))
 
     in
-    let { body; _; } = function_ in
-    let block_contents =
-      match body with
-      | Fun_block_body block ->
-        begin
-          let open Typedtree.Block in
-          let { body; _; } = block in
-          body
-          |> List.concat_map ~f:(codegen_statements env)
-        end
+    let { body; assoc_scope; _; } = function_ in
+    let wrap_scope = CodegenScope.make assoc_scope in
+    Codegen_env.with_scope env wrap_scope (fun env ->
+      let block_contents =
+        match body with
+        | Fun_block_body block ->
+          begin
+            let open Typedtree.Block in
+            let { body; _; } = block in
+            body
+            |> List.concat_map ~f:(codegen_statements env)
+          end
 
-      | Fun_expression_body expr ->
-        [ codegen_expression env expr ]
+        | Fun_expression_body expr ->
+          [ codegen_expression env expr ]
 
-    in
+      in
 
-    let finalizers: Bound.expression list =
-      function_.assoc_scope.var_symbols
-      |> Scope.SymbolTable.to_alist
-      |> List.filter_map
-        ~f:(fun (_, (sym: Core_type.VarSym.t)) ->
-          let open Core_type in
-          let open VarSym in
-          let open TypeValue in
-          match sym.def_type with
-          | Ctor(type_sym, []) ->
-            (match type_sym.spec with
-            | TypeSym.Primitive -> None
-            | TypeSym.Object ->
+      let finalizers: Bound.expression list =
+        function_.assoc_scope.var_symbols
+        |> Scope.SymbolTable.to_alist
+        |> List.filter_map
+          ~f:(fun (_, (sym: Core_type.VarSym.t)) ->
+            let open Core_type in
+            let open VarSym in
+            let open TypeValue in
+            match sym.def_type with
+            | Ctor(type_sym, []) ->
+              (match type_sym.spec with
+              | TypeSym.Primitive -> None
+              | TypeSym.Object ->
+                let exp =
+                  call_ Allocator_facility.release_object_fun_name [ Ptr.local_get sym.id_in_scope ] none
+                in
+                Some exp
+
+              | _ -> failwith "not implemented 1")
+
+            | Ctor({ TypeSym. name="Array"; builtin = true; _; }, [ _arg ]) ->
+              (* TODO: depent on arg *)
               let exp =
-                call_ Allocator_facility.release_object_fun_name [ Ptr.local_get sym.id_in_scope ] none
+                call_ Array_facility.array_finalize [ Ptr.local_get sym.id_in_scope ] none
               in
               Some exp
 
-            | _ -> failwith "not implemented 1")
+            | _ ->
+              let def_type_msg =
+                Format.asprintf "can not generate finalizer for %s: %a" sym.name TypeValue.pp sym.def_type
+              in
+              failwith def_type_msg
+          )
+      in
+      let exp = block (List.concat [block_contents; finalizers]) in
 
-          | Ctor({ TypeSym. name="Array"; builtin = true; _; }, [ _arg ]) ->
-            (* TODO: depent on arg *)
-            let exp =
-              call_ Array_facility.array_finalize [ Ptr.local_get sym.id_in_scope ] none
-            in
-            Some exp
-
-          | _ ->
-            let def_type_msg =
-              Format.asprintf "can not generate finalizer for %s: %a" sym.name TypeValue.pp sym.def_type
-            in
-            failwith def_type_msg
-        )
-    in
-    let exp = block (List.concat [block_contents; finalizers]) in
-
-    let id = function_.header.id in
-    let id_name = id.name in
-    let ret_ty =
-      id.def_type
-      |> unwrap_function_return_type
-      |> get_binaryen_ty_by_core_ty env
-    in
-    let _fun = Dsl.function_ ~name:id_name ~params_ty ~ret_ty ~vars_ty ~content:exp in
-    let _ = export_function id_name id_name in
-    ()
+      let id = function_.header.id in
+      let id_name = id.name in
+      let ret_ty =
+        id.def_type
+        |> unwrap_function_return_type
+        |> get_binaryen_ty_by_core_ty env
+      in
+      let _fun = Dsl.function_ ~name:id_name ~params_ty ~ret_ty ~vars_ty ~content:exp in
+      let _ = export_function id_name id_name in
+      ()
+    )
 
   and codgen_external_method (env: Codegen_env.t) =
     let scope = env.program.root_scope in

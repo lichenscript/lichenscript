@@ -4,6 +4,12 @@ open Waterlang_parsing
 
 module T = Typedtree
 
+let gen_scope_name_by_fun_header (header: Ast.Function.header) =
+  (match header.id with
+  | Some id -> id.pident_name
+  | _ -> "anonymous"
+  )
+
 let rec annotate_statement env (stmt: Ast.Statement.t) =
   let open Ast.Statement in
   let { loc; spec = parser_spec; attributes; _; } = stmt in
@@ -64,7 +70,8 @@ let rec annotate_statement env (stmt: Ast.Statement.t) =
       (match spec with
       | Function_ signature ->
         let prev_scope = Env.peek_scope env in 
-        let scope = Scope.create ~prev:prev_scope prev_scope.id in
+        let scope_name = gen_scope_name_by_fun_header signature in
+        let scope = Scope.create ~prev:prev_scope prev_scope.id scope_name in
         Env.with_new_scope env scope (fun env ->
           let annotated_header = annotate_function_header env signature in
           let spec = T.Declare.Function_ annotated_header in
@@ -150,10 +157,11 @@ and annotate_function_header env (header: Ast.Function.header) =
 
 and annotate_function env (_function: Ast.Function.t) =
   let open Ast.Function in
-  let { header; body; loc;  _; } = _function in
+  let { header; body; loc; _; } = _function in
   let { return_ty; _ } = header in
   let prev_scope = Env.peek_scope env in
-  let scope = Scope.create ~prev:prev_scope prev_scope.id in
+  let scope_name = gen_scope_name_by_fun_header header in
+  let scope = Scope.create ~prev:prev_scope prev_scope.id scope_name in
   Env.set_return_type env (Option.map ~f:(Infer.infer env) return_ty);
   Env.with_new_scope env scope (fun env ->
     let annotated_header = annotate_function_header env header in

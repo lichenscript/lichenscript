@@ -32,7 +32,7 @@ let make_default_type_sym scope =
     names
 
 let create () =
-  let root_scope = Scope.create 0 in
+  let root_scope = Scope.create 0 "root" in
   let env =
     {
       root_scope;
