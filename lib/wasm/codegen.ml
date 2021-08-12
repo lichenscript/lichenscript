@@ -28,7 +28,6 @@ module M (S: BinaryenModule) = struct
     | Unit -> none
     | _ -> unreachable
 
-
   let get_function_params_type env params =
     let open Typedtree.Function in
     let { params_content; _; } = params in
@@ -279,11 +278,11 @@ module M (S: BinaryenModule) = struct
       function_.assoc_scope.var_symbols
       |> Scope.SymbolTable.to_alist
       |> List.map
-          ~f:(fun (_, var_sym) -> Core_type.VarSym.(get_binaryen_ty_by_core_ty env var_sym.def_type))
+         ~f:(fun (_, var_sym) -> Core_type.VarSym.(get_binaryen_ty_by_core_ty env var_sym.def_type))
 
     in
     let { body; assoc_scope; _; } = function_ in
-    let wrap_scope = CodegenScope.make assoc_scope in
+    let wrap_scope = CodegenScope.make assoc_scope function_.header in
     Codegen_env.with_scope env wrap_scope (fun env ->
       let block_contents =
         match body with

@@ -12,6 +12,10 @@ type js_snippet = {
 }
 
 module CodegenScope : sig
+  type local_type =
+  | Variable
+  | TempValue
+
   type t
 
   val root: t
@@ -20,23 +24,29 @@ module CodegenScope : sig
 
   val next_temp_value_id: t -> T.Core_type.TypeValue.t -> int
 
-  val make: T.Scope.t -> t
+  val make: T.Scope.t -> T.Typedtree.Function.header -> t
+
+  val to_alist: t -> (int * (T.Core_type.TypeValue.t * local_type)) list
   
 end = struct
+  type local_type =
+  | Variable
+  | TempValue
+
   module TempValueMap = Map.Make(Int)
 
   type t = {
     typed_scope: T.Scope.t option;
     mutable name_counter: int;
     mutable temp_value_distributor: int;
-    mutable temp_value_type: T.Core_type.TypeValue.t TempValueMap.t;
+    mutable local_vars: (T.Core_type.TypeValue.t * local_type) TempValueMap.t;
   }
 
   let root = {
     typed_scope = None;
     name_counter = 0;
     temp_value_distributor = 0;
-    temp_value_type = TempValueMap.empty;
+    local_vars = TempValueMap.empty;
   }
 
   let next_label scope =
@@ -48,19 +58,29 @@ end = struct
 
   let next_temp_value_id scope ty =
     let current_value = scope.temp_value_distributor in
-    scope.temp_value_type <- TempValueMap.set scope.temp_value_type ~key:current_value ~data:ty;
+    scope.local_vars <- TempValueMap.set scope.local_vars ~key:current_value ~data:(ty, TempValue);
     scope.temp_value_distributor <- current_value + 1;
     current_value
 
-  let make scope =
+  let make scope header =
     let open T.Scope in
+    let open T.Typedtree.Function in
+    let local_vars = List.foldi
+      ~init:TempValueMap.empty
+      ~f:(fun index acc item ->
+        TempValueMap.set ~key:index ~data:(item.param_ty, Variable) acc
+      )
+      header.params.params_content
+    in
     let vars_count = SymbolTable.length scope.var_symbols in
     {
       typed_scope = Some scope;
       name_counter = 0;
       temp_value_distributor = vars_count;
-      temp_value_type = TempValueMap.empty;
+      local_vars;
     }
+
+  let to_alist scope = TempValueMap.to_alist scope.local_vars
   
 end
 
