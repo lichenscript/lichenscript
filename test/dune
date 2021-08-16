@@ -1,5 +1,5 @@
 (test
- (name waterlang)
+ (name waterlang_test)
  (libraries
   waterlang_lex
   waterlang_parsing
