@@ -1,9 +1,9 @@
 (executable
  (public_name waterlang)
+ (modes byte js)
  (name waterlang)
  (libraries
   waterlang_lex
   waterlang_parsing
   waterlang_typing
-  waterlang_wasm
-  core))
+  waterlang_wasm))

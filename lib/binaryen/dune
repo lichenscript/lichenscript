@@ -6,7 +6,8 @@
   (names b)
   (flags -Wno-incompatible-pointer-types))
  (c_library_flags (-lbinaryen))
- (flags :standard -cclib -lbinaryen))
+ (flags :standard -cclib -lbinaryen)
+ (js_of_ocaml (javascript_files runtime.js)))
 
 (rule
  (targets b.ml)
