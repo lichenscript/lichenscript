@@ -28,15 +28,15 @@ static inline uint32_t hash_string16(const uint16_t *str,
 
 // -511 - 512 is the range in the pool
 static WTValue* InitI64Pool(WTMalloc malloc_method) {
-    WTValue* result = malloc_method(sizeof(WTBoxedI64) * I64_POOL_SIZE);
+    WTValue* result = malloc_method(sizeof(WTBox64) * I64_POOL_SIZE);
 
     int i;
     for (i = 0; i < I64_POOL_SIZE; i++) {
         int val = I64_POOL_SIZE / 2 - i;
-        WTBoxedI64* ptr = malloc_method(sizeof(WTBoxedI64));
-        ptr->value = val;
+        WTBox64* ptr = malloc_method(sizeof(WTBox64));
+        ptr->i64 = val;
         ptr->header.count = WT_NO_GC;
-        result[i].type = WT_BOXED_I64;
+        result[i].type = WT_TY_BOXED_I64;
         result[i].ptr_val = (WTObject*)ptr;
     }
 
@@ -77,30 +77,34 @@ static void FreeArray(WTRuntime* rt, WTArray* arr) {
 
 static void FreeObject(WTRuntime* rt, WTValue val) {
     switch (val.type) {
-    case WT_LAMBDA:
+    case WT_TY_LAMBDA:
         FreeLambda(rt, (WTLambda*)val.ptr_val);
         break;
 
-    case WT_CLASS_OBJECT:
+    case WT_TY_CLASS_OBJECT:
         FreeClassObject(rt, (WTClassObject*)val.ptr_val);
         break;
 
-    case WT_ARRAY:
+    case WT_TY_ARRAY:
         FreeArray(rt, (WTArray*)val.ptr_val);
         break;
         
-    case WT_STRING:
-    case WT_SYMBOL:
-    case WT_CLASS_OBJECT_META:
-    case WT_BOXED_I64:
-    case WT_BOXED_U64:
-    case WT_BOXED_F64:
+    case WT_TY_STRING:
+    case WT_TY_SYMBOL:
+    case WT_TY_CLASS_OBJECT_META:
+    case WT_TY_BOXED_I64:
+    case WT_TY_BOXED_U64:
+    case WT_TY_BOXED_F64:
         rt->free_method(val.ptr_val);
         break;
     
     default:
-        printf("[waterlang] internal error, unkown type: %d\n", val.type);
-        abort();
+        if (val.type >= WT_TY_MAX) {
+            // variant
+        } else {
+            printf("[waterlang] internal error, unkown type: %d\n", val.type);
+            abort();
+        }
         break;
     }
 }
@@ -156,7 +160,7 @@ void WTRetain(WTValue val) {
 }
 
 void WTRelease(WTRuntime* rt, WTValue val) {
-    if (val.type >= 0) {
+    if (val.type <= 0) {
         return;
     }
     if (val.ptr_val->header.count == WT_NO_GC) {
@@ -176,11 +180,11 @@ WTValue WTNewStringFromCStringLen(WTRuntime* rt, const unsigned char* content, u
     WTString* result = rt->malloc_method(acquire_len);
     memset(result, 0, acquire_len);
 
-    WTInitObject(&result->header, WT_STRING);
+    WTInitObject(&result->header, WT_TY_STRING);
 
     memcpy(result->content, content, len);
     
-    return (WTValue){ { .ptr_val = (WTObject*)result }, WT_STRING };
+    return (WTValue){ { .ptr_val = (WTObject*)result }, WT_TY_STRING };
 }
 
 WTValue WTNewStringFromCString(WTRuntime* rt, const unsigned char* content) {
@@ -188,7 +192,7 @@ WTValue WTNewStringFromCString(WTRuntime* rt, const unsigned char* content) {
 }
 
 WTValue WTNewSymbolLen(WTRuntime* rt, const char* content, uint32_t len) {
-    WTValue result = MK_NULL;
+    WTValue result = MK_NULL();
     // WTString* result = NULL;
     uint32_t symbol_hash = hash_string8((const uint8_t*)content, len, rt->seed);
     uint32_t symbol_bucket_index = symbol_hash % rt->symbol_bucket_size;
@@ -198,7 +202,7 @@ WTValue WTNewSymbolLen(WTRuntime* rt, const char* content, uint32_t len) {
     WTString* str_ptr = NULL;
 
     while (1) {
-        if (bucket_at_index->content.type == WT_NULL) {
+        if (bucket_at_index->content.type == WT_TY_NULL) {
             break;
         }
 
@@ -215,14 +219,14 @@ WTValue WTNewSymbolLen(WTRuntime* rt, const char* content, uint32_t len) {
     }
 
     // symbol not found
-    if (result.type == WT_NULL) {
+    if (result.type == WT_TY_NULL) {
         result = WTNewStringFromCStringLen(rt, (const unsigned char*)content, len);
-        result.type = WT_SYMBOL;
+        result.type = WT_TY_SYMBOL;
         str_ptr = (WTString*)result.ptr_val;
         str_ptr->header.count = WT_NO_GC;
         str_ptr->hash = hash_string8((const unsigned char*)content, len, rt->seed);
 
-        if (bucket_at_index->content.type == WT_NULL) {
+        if (bucket_at_index->content.type == WT_TY_NULL) {
             bucket_at_index->content = result;
         } else {
             new_bucket = malloc(sizeof(WTSymbolBucket));
@@ -248,7 +252,7 @@ WTClassObject* WTNewClassObject(WTRuntime* rt, WTClassObjectMeta* meta, uint32_t
     WTClassObject* result = rt->malloc_method(sizeof(WTClassObject));
     memset(result, 0, acquire_len);
 
-    WTInitObject(&result->header, WT_CLASS_OBJECT);
+    WTInitObject(&result->header, WT_TY_CLASS_OBJECT);
     
     return result;
 }

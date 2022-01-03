@@ -8,19 +8,20 @@ typedef void(*WTFree)(void*);
 #define WT_NO_GC 0xFFFFFFFF
 
 typedef enum WTObjectType {
-    WT_BOXED_F64 = -44,
-    WT_BOXED_U64 = -33,
-    WT_BOXED_I64 = -32,
-    WT_CLASS_OBJECT = -20,
-    WT_ARRAY = -16,
-    WT_CLASS_OBJECT_META = -4,
-    WT_LAMBDA = -3,
-    WT_SYMBOL = -2,
-    WT_STRING = -1,
-    WT_NULL = 0,
-    WT_I32 = 1,
-    WT_F32 = 2,
-    WT_BOOL = 3,
+    WT_TY_BOOL = -3,
+    WT_TY_F32 = -2,
+    WT_TY_I32 = -1,
+    WT_TY_NULL = 0,
+    WT_TY_STRING = 1,
+    WT_TY_SYMBOL,
+    WT_TY_LAMBDA,
+    WT_TY_CLASS_OBJECT_META,
+    WT_TY_ARRAY = 16,
+    WT_TY_CLASS_OBJECT,
+    WT_TY_BOXED_I64 = 24,
+    WT_TY_BOXED_U64,
+    WT_TY_BOXED_F64,
+    WT_TY_MAX = 63,
 } WTObjectType;
 
 #define WT_OBJ_HEADER WTObjectHeader header;
@@ -65,9 +66,28 @@ typedef struct WTValue {
     WTObjectType type;
 } WTValue;
 
-#define MK_NULL() (WTValue) { { .int_val = 0 }, WT_NULL }
-#define MK_I32(v) (WTValue) { { .int_val = v }, WT_I32 }
-#define WTL_ADD_I32(l, r) MK_I32(l.int_val + r.int_val)
+static WTValue WTTrue = { { .int_val = 1 }, WT_TY_BOOL };
+static WTValue WTFalse = { { .int_val = 0 }, WT_TY_BOOL };
+
+#define MK_NULL() (WTValue) { { .int_val = 0 }, WT_TY_NULL }
+#define MK_I32(v) (WTValue) { { .int_val = v }, WT_TY_I32 }
+#define MK_F32(v) (WTValue) { { .float_val = v }, WT_TY_F32 }
+#define MK_BOOL(v) (WTValue) { { .int_val = v }, WT_TY_BOOL }
+#define MK_VARIANT_CLOSED(v) (WTValue) { { .int_val = v }, (WT_TY_MAX + (v << 6)) }
+#define WT_I32_EQ(l, r) MK_BOOL(l.int_val == r.int_val)
+#define WT_I32_NOT_EQ(l, r) MK_BOOL(l.int_val != r.int_val)
+#define WT_I32_LT(l, r) MK_BOOL(l.int_val < r.int_val)
+#define WT_I32_LTEQ(l, r) MK_BOOL(l.int_val <= r.int_val)
+#define WT_I32_GT(l, r) MK_BOOL(l.int_val > r.int_val)
+#define WT_I32_GTEQ(l, r) MK_BOOL(l.int_val >= r.int_val)
+#define WT_I32_PLUS(l, r) MK_I32(l.int_val + r.int_val)
+#define WT_I32_MINUS(l, r) MK_I32(l.int_val - r.int_val)
+#define WT_I32_MULT(l, r) MK_I32(l.int_val * r.int_val)
+#define WT_I32_DIV(l, r) MK_I32(l.int_val / r.int_val)
+#define WT_I32_LEFT_SHIFT(l, r) MK_I32(l.int_val << r.int_val)
+#define WT_I32_RIGHT_SHIFT(l, r) MK_I32(l.int_val >> r.int_val)
+#define WT_I32_BIT_OR(l, r) MK_I32(l.int_val | r.int_val)
+#define WT_I32_BIT_AND(l, r) MK_I32(l.int_val & r.int_val)
 
 #endif
 
@@ -83,20 +103,14 @@ typedef struct WTSymbolBucket {
     struct WTSymbolBucket* next;
 } WTSymbolBucket;
 
-typedef struct WTBoxedI64 {
+typedef struct WTBox64 {
     WT_OBJ_HEADER
-    int64_t value;
-} WTBoxedI64;
-
-typedef struct WTBoxedU64 {
-    WT_OBJ_HEADER
-    int64_t value;
-} WTBoxedU64;
-
-typedef struct WTBoxedF64 {
-    WT_OBJ_HEADER
-    double value;
-} WTBoxedF64;
+    union {
+        int64_t  i64;
+        uint64_t u64;
+        double   f64;
+    };
+} WTBox64;
 
 typedef struct WTRuntime {
     WTMalloc malloc_method;

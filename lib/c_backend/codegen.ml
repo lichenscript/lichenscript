@@ -1,5 +1,4 @@
 open Core_kernel
-open Waterlang_parsing
 open Waterlang_typing
 open Waterlang_typing.Typedtree
 
@@ -7,6 +6,7 @@ type t = {
   indent: string;
   mutable indent_level: int;
   buffer: Buffer.t;
+  mutable tmp_vars_counter: int;
 }
 
 let create ?(indent="    ") () =
@@ -14,6 +14,7 @@ let create ?(indent="    ") () =
     indent;
     indent_level = 0;
     buffer = Buffer.create 1024;
+    tmp_vars_counter = 0;
   }
 
 let ps env content = Buffer.add_string env.buffer content
@@ -40,10 +41,21 @@ let rec codegen_statement env stmt =
   match spec with
   | Class _ -> ()
   | Expr expr -> codegen_expression env expr
-  | Semi _ -> ()
+  | Semi expr -> (
+    codegen_expression env expr;
+    ps env ";"
+  )
   | Function_ fun_ -> codegen_function env fun_
-  | While _
-  | Binding _
+  | While _ -> ()
+
+  | Binding binding -> (
+    let { binding_pat; binding_init; _ } = binding in
+    codegen_pattern env binding_pat;
+    ps env " = ";
+    codegen_expression env binding_init;
+    ps env ";"
+  )
+
   | Block _
   | Break _
   | Continue _
@@ -62,7 +74,7 @@ let rec codegen_statement env stmt =
     ps env ";"
   )
 
-  | EnumDecl _
+  | EnumDecl _ -> ()
   | Decl _
   | Empty -> ()
 
@@ -74,48 +86,109 @@ and codegen_expression env (expr: Typedtree.Expression.t) =
   let open Expression in
   let { spec; _ } = expr in
   match spec with
-  | Constant _
-  | Identifier _
+  | Constant cnst -> (
+    let open Waterlang_parsing.Ast.Literal in
+    match cnst with
+    | Integer (raw, _) -> (
+      ps env Primitives.Value.mk_i32;
+      ps env "(";
+      ps env raw;
+      ps env ")"
+    )
+
+    | Char ch -> (
+      ps env "'";
+      ps env (Char.to_string ch);
+      ps env "'";
+    )
+
+    | String (str, _, _) -> (
+      let len = String.length str in
+      ps env Primitives.Value.new_string_len;
+      ps env "(rt, ";
+      ps env "\"";
+      ps env str;
+      ps env "\", ";
+      ps env (Int.to_string len);
+      ps env ")"
+    )
+
+    | Float (str, _) -> (
+      ps env Primitives.Value.mk_f32;
+      ps env "(";
+      ps env str;
+      ps env ")"
+    )
+
+    | Boolean true ->
+      ps env Primitives.Constant._true
+
+    | Boolean false ->
+      ps env Primitives.Constant._false
+  )
+
+  | Identifier sym -> (
+    let name = Core_type.VarSym.name sym in
+    ps env name
+  )
+
   | Lambda
   | Throw _
   | If _
-  | Array _
+  | Array _ -> ()
+
   | Call _
   | Member _
   | Unary _ -> ()
 
-  | Binary (Asttypes.BinaryOp.Plus, { spec = Identifier left_sym; _ }, { spec = Identifier right_sym; _}) -> (
-    let left_id_name = Core_type.VarSym.name left_sym in
-    let right_id_name = Core_type.VarSym.name right_sym in
-    ps env "WTL_ADD_I32(";
-    ps env left_id_name;
+  | Binary (op, left_id, right_id) -> (
+    let op_name = Primitives.Bin.prim op in
+    ps env op_name;
+    ps env "(";
+    codegen_expression env left_id;
     ps env ", ";
-    ps env right_id_name;
+    codegen_expression env right_id;
     ps env ")"
   )
 
-  | Binary _
+  | Update _ -> ()
 
-  | Update _
-  | Assign _
+  | Assign(left, right) -> (
+    codegen_pattern env left;
+    ps env " = ";
+    codegen_expression env right;
+    ps env ";"
+  )
+
   | Block  _ -> ()
+
+and codegen_function_block (env: t) block =
+  let open Block in
+  let { body; _ } = block in
+  let max_tmp_val = ref 0 in
+  List.iter
+    ~f:(fun stmt ->
+      env.tmp_vars_counter <- 0;
+      print_indents env;
+      codegen_statement env stmt;
+      endl env;
+
+      if env.tmp_vars_counter > !max_tmp_val then (
+        max_tmp_val := env.tmp_vars_counter
+      )
+    )
+    body;
+  !max_tmp_val
 
 and codegen_function env (_fun: Typedtree.Function.t) =
   let open Function in
   let codegen_function_body body =
     match body with
     | Fun_block_body block -> (
-      let open Block in
-      let { body; _ } = block in
-      List.iter
-        ~f:(fun stmt ->
-          print_indents env;
-          codegen_statement env stmt;
-          endl env
-        )
-        body;
+      codegen_function_block env block
     )
-    | Fun_expression_body _ -> ()
+    | Fun_expression_body _ ->
+      failwith "not implemented"
   in
   let fun_name = Core_type.VarSym.name _fun.header.id in
   ps env "WTValue ";
@@ -143,11 +216,16 @@ and codegen_function env (_fun: Typedtree.Function.t) =
 
     endl env;
 
-    codegen_function_body body;
-
-    endl env
+    ignore (codegen_function_body body);
   );
 
   ps env "}"
+
+and codegen_pattern env pat =
+  let open Pattern in
+  let { spec; _ } = pat in
+  match spec with
+  | Symbol sym ->
+    ps env (Core_type.VarSym.name sym)
 
 let contents env = Buffer.contents env.buffer
