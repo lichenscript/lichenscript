@@ -1,0 +1,9 @@
+(library
+ (name waterlang_js)
+ (libraries
+  waterlang_typing
+  waterlang_lex
+  waterlang_parsing
+  core_kernel
+ )
+ (preprocess (pps ppx_deriving.show)))
