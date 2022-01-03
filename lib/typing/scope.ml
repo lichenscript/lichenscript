@@ -56,5 +56,8 @@ let create_var_symbol ?(spec = VarSym.Internal) scope name =
   insert_var_symbol scope sym;
   sym
 
+let vars scope =
+  SymbolTable.to_alist scope.var_symbols
+
 let pp formatter scope =
   Format.fprintf formatter "Scope(%d)" scope.id

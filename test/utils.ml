@@ -47,17 +47,13 @@ let parse_string_to_program content =
           );
       assert false
   in
-  { Waterlang_typing.Program.
-    tree = typed_tree;
-    root_scope = Waterlang_typing.Env.root_scope env;
-  }
+  typed_tree
 
-(* let parse_string_and_codegen content =
+let parse_string_and_codegen content =
   let p = parse_string_to_program content in
-  let config = Config.debug_default () in
-  Codegen.codegen p config
+  Waterlang_c.codegen p
 
-let parse_string_and_codegen_to_path content path =
+(* let parse_string_and_codegen_to_path content path =
   let p = parse_string_to_program content in
   let config = Config.debug_default () in
   let slices = String.split path ~on:'/' in

@@ -65,7 +65,9 @@ typedef struct WTValue {
     WTObjectType type;
 } WTValue;
 
-#define MK_NULL (WTValue) { { .int_val = 0 }, WT_NULL }
+#define MK_NULL() (WTValue) { { .int_val = 0 }, WT_NULL }
+#define MK_I32(v) (WTValue) { { .int_val = v }, WT_I32 }
+#define WTL_ADD_I32(l, r) MK_I32(l.int_val + r.int_val)
 
 #endif
 

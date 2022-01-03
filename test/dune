@@ -4,6 +4,7 @@
   waterlang_lex
   waterlang_parsing
   waterlang_typing
+  waterlang_c
   core
   core_kernel
   ounit2))
