@@ -2,8 +2,10 @@
 #include "runtime.h"
 #include "string.h"
 #include "time.h"
+#include "stdio.h"
 
-#define WTL_INIT_SYMBOL_BUCKET_SIZE 128
+#define WT_INIT_SYMBOL_BUCKET_SIZE 128
+#define I64_POOL_SIZE 1024
 
 static inline uint32_t hash_string8(const uint8_t *str, size_t len, uint32_t h)
 {
@@ -24,75 +26,184 @@ static inline uint32_t hash_string16(const uint16_t *str,
     return h;
 }
 
-WTLRuntime* WTLNewRuntime() {
-    WTLRuntime* runtime = (WTLRuntime*)malloc(sizeof(WTLRuntime));
+// -511 - 512 is the range in the pool
+static WTValue* InitI64Pool(WTMalloc malloc_method) {
+    WTValue* result = malloc_method(sizeof(WTBoxedI64) * I64_POOL_SIZE);
+
+    int i;
+    for (i = 0; i < I64_POOL_SIZE; i++) {
+        int val = I64_POOL_SIZE / 2 - i;
+        WTBoxedI64* ptr = malloc_method(sizeof(WTBoxedI64));
+        ptr->value = val;
+        ptr->header.count = WT_NO_GC;
+        result[i].type = WT_BOXED_I64;
+        result[i].ptr_val = (WTObject*)ptr;
+    }
+
+    return result;
+}
+
+static void FreeObject(WTRuntime* rt, WTValue val);
+
+static void FreeLambda(WTRuntime* rt, WTLambda* obj) {
+    size_t i;
+    for (i = 0; i < obj->captured_values_size; i++) {
+        WTRelease(rt, obj->captured_values[i]);
+    }
+
+    rt->free_method(obj);
+}
+
+static void FreeClassObject(WTRuntime* rt, WTClassObject* clsObj) {
+    size_t i;
+    for (i = 0; i < clsObj->properties_size; i++) {
+        WTRelease(rt, clsObj->properties[i]);
+    }
+
+    rt->free_method(clsObj);
+}
+
+static void FreeClassObjectMeta(WTRuntime* rt, WTClassObjectMeta* meta) {
+
+    rt->free_method(meta);
+}
+
+static void FreeArray(WTRuntime* rt, WTArray* arr) {
+    uint32_t i;
+    for (i = 0; i < arr->len; i++) {
+        WTRelease(rt, arr->data[i]);
+    }
+}
+
+static void FreeObject(WTRuntime* rt, WTValue val) {
+    switch (val.type) {
+    case WT_LAMBDA:
+        FreeLambda(rt, (WTLambda*)val.ptr_val);
+        break;
+
+    case WT_CLASS_OBJECT:
+        FreeClassObject(rt, (WTClassObject*)val.ptr_val);
+        break;
+
+    case WT_ARRAY:
+        FreeArray(rt, (WTArray*)val.ptr_val);
+        break;
+        
+    case WT_STRING:
+    case WT_SYMBOL:
+    case WT_CLASS_OBJECT_META:
+    case WT_BOXED_I64:
+    case WT_BOXED_U64:
+    case WT_BOXED_F64:
+        rt->free_method(val.ptr_val);
+        break;
+    
+    default:
+        printf("[waterlang] internal error, unkown type: %d\n", val.type);
+        abort();
+        break;
+    }
+}
+
+WTRuntime* WTNewRuntime() {
+    WTRuntime* runtime = (WTRuntime*)malloc(sizeof(WTRuntime));
     runtime->malloc_method = malloc;
     runtime->free_method = free;
 
     runtime->seed = time(NULL);
 
-    size_t bucket_size = sizeof(WTLSymbolBucket) * WTL_INIT_SYMBOL_BUCKET_SIZE;
-    WTLSymbolBucket* buckets = runtime->malloc_method(bucket_size);
+    size_t bucket_size = sizeof(WTSymbolBucket) * WT_INIT_SYMBOL_BUCKET_SIZE;
+    WTSymbolBucket* buckets = runtime->malloc_method(bucket_size);
     memset(buckets, 0, bucket_size);
 
     runtime->symbol_buckets = buckets;
-    runtime->symbol_bucket_size = WTL_INIT_SYMBOL_BUCKET_SIZE;
+    runtime->symbol_bucket_size = WT_INIT_SYMBOL_BUCKET_SIZE;
     runtime->symbol_len = 0;
+
+    runtime->i64_pool = InitI64Pool(runtime->malloc_method);
 
     return runtime;
 }
 
-void WTLRetain(WTLObject* obj) {
-    if (obj->header.count == WTL_NO_GC) {
-        return;
+void WTFreeRuntime(WTRuntime* rt) {
+    uint32_t i;
+    WTSymbolBucket* bucket_ptr;
+    WTSymbolBucket* next;
+    for (i = 0; i < rt->symbol_bucket_size; i++) {
+        bucket_ptr = rt->symbol_buckets[i].next;
+        while (bucket_ptr != NULL) {
+            next = bucket_ptr->next;
+            FreeObject(rt, bucket_ptr->content);
+            bucket_ptr = next;
+        }
     }
-    obj->header.count++;
+
+    free(rt->symbol_buckets);
+
+    free(rt->i64_pool);
+
+    free(rt);
 }
 
-void WTLRelease(WTLRuntime* rt, WTLObject* obj) {
-    if (obj->header.count == WTL_NO_GC) {
+void WTRetain(WTValue val) {
+    if (val.type >= 0) {
         return;
     }
-    if (--obj->header.count == 0) {
-        rt->free_method(obj);
+    if (val.ptr_val->header.count == WT_NO_GC) {
+        return;
+    }
+    val.ptr_val->header.count++;
+}
+
+void WTRelease(WTRuntime* rt, WTValue val) {
+    if (val.type >= 0) {
+        return;
+    }
+    if (val.ptr_val->header.count == WT_NO_GC) {
+        return;
+    }
+    if (--val.ptr_val->header.count == 0) {
+        FreeObject(rt, val);
     }
 }
 
-void WTLInitObject(WTLObjectHeader* header, WTLObjectType obj_type) {
+void WTInitObject(WTObjectHeader* header, WTObjectType obj_type) {
     header->count = 1;
-    header->type = obj_type;
 }
 
-WTLString* WTLNewStringFromCStringLen(WTLRuntime* rt, const unsigned char* content, uint32_t len) {
-    uint32_t acquire_len = sizeof(WTLString) + len + 1;
-    WTLString* result = rt->malloc_method(acquire_len);
+WTValue WTNewStringFromCStringLen(WTRuntime* rt, const unsigned char* content, uint32_t len) {
+    uint32_t acquire_len = sizeof(WTString) + len + 1;
+    WTString* result = rt->malloc_method(acquire_len);
     memset(result, 0, acquire_len);
 
-    WTLInitObject(&result->header, WTL_STRING);
+    WTInitObject(&result->header, WT_STRING);
 
     memcpy(result->content, content, len);
     
-    return result;
+    return (WTValue){ WT_STRING, { .ptr_val = (WTObject*)result } };
 }
 
-WTLString* WTLNewStringFromCString(WTLRuntime* rt, const unsigned char* content) {
-    return WTLNewStringFromCStringLen(rt, content, strlen((const char*)content));
+WTValue WTNewStringFromCString(WTRuntime* rt, const unsigned char* content) {
+    return WTNewStringFromCStringLen(rt, content, strlen((const char*)content));
 }
 
-WTLString* WTLNewSymbolLen(WTLRuntime* rt, const char* content, uint32_t len) {
-    WTLString* result = NULL;
+WTValue WTNewSymbolLen(WTRuntime* rt, const char* content, uint32_t len) {
+    WTValue result = MK_NULL;
+    // WTString* result = NULL;
     uint32_t symbol_hash = hash_string8((const uint8_t*)content, len, rt->seed);
     uint32_t symbol_bucket_index = symbol_hash % rt->symbol_bucket_size;
 
-    WTLSymbolBucket* bucket_at_index = &rt->symbol_buckets[symbol_bucket_index];
-    WTLSymbolBucket* new_bucket = NULL;
+    WTSymbolBucket* bucket_at_index = &rt->symbol_buckets[symbol_bucket_index];
+    WTSymbolBucket* new_bucket = NULL;
+    WTString* str_ptr = NULL;
 
     while (1) {
-        if (bucket_at_index->content == NULL) {
+        if (bucket_at_index->content.type == WT_NULL) {
             break;
         }
 
-        if (strcmp((const char *)bucket_at_index->content->content, content) == 0) {
+        str_ptr = (WTString*)bucket_at_index->content.ptr_val;
+        if (strcmp((const char *)str_ptr->content, content) == 0) {
             result = bucket_at_index->content;
             break;
         }
@@ -104,16 +215,17 @@ WTLString* WTLNewSymbolLen(WTLRuntime* rt, const char* content, uint32_t len) {
     }
 
     // symbol not found
-    if (result == NULL) {
-        result = WTLNewStringFromCStringLen(rt, (const unsigned char*)content, len);
-        result->header.count = WTL_NO_GC;
-        result->header.type = WTL_STRING;
-        result->hash = hash_string8((const unsigned char*)content, len, rt->seed);
+    if (result.type == WT_NULL) {
+        result = WTNewStringFromCStringLen(rt, (const unsigned char*)content, len);
+        result.type = WT_SYMBOL;
+        str_ptr = (WTString*)result.ptr_val;
+        str_ptr->header.count = WT_NO_GC;
+        str_ptr->hash = hash_string8((const unsigned char*)content, len, rt->seed);
 
-        if (bucket_at_index->content == NULL) {
+        if (bucket_at_index->content.type == WT_NULL) {
             bucket_at_index->content = result;
         } else {
-            new_bucket = malloc(sizeof(WTLSymbolBucket));
+            new_bucket = malloc(sizeof(WTSymbolBucket));
             new_bucket->content = result;
             new_bucket->next = NULL;
 
@@ -127,16 +239,16 @@ WTLString* WTLNewSymbolLen(WTLRuntime* rt, const char* content, uint32_t len) {
     return result;
 }
 
-WTLString* WTLNewSymbol(WTLRuntime* rt, const char* content) {
-    return WTLNewSymbolLen(rt, content, strlen(content));
+WTValue WTNewSymbol(WTRuntime* rt, const char* content) {
+    return WTNewSymbolLen(rt, content, strlen(content));
 }
 
-WTLClassObject* WTLNewClassObject(WTLRuntime* rt, WTLClassObjectMeta* meta, uint32_t slot_count) {
-    uint32_t acquire_len = sizeof(WTLClassObject) + sizeof(uint64_t) * slot_count;
-    WTLClassObject* result = rt->malloc_method(sizeof(WTLClassObject));
+WTClassObject* WTNewClassObject(WTRuntime* rt, WTClassObjectMeta* meta, uint32_t slot_count) {
+    uint32_t acquire_len = sizeof(WTClassObject) + sizeof(uint64_t) * slot_count;
+    WTClassObject* result = rt->malloc_method(sizeof(WTClassObject));
     memset(result, 0, acquire_len);
 
-    WTLInitObject(&result->header, WTL_CLASS_OBJECT);
+    WTInitObject(&result->header, WT_CLASS_OBJECT);
     
     return result;
 }

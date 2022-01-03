@@ -198,6 +198,8 @@ and VarSym : sig
     spec:        spec;
   }
 
+  val name: t -> string
+
   val mk_local: id_in_scope:int -> scope_id:int -> ?spec:spec -> string -> t
 
   val set_def_type: t -> TypeValue.t -> unit
@@ -223,6 +225,8 @@ end = struct
     builtin:     bool;
     spec:        spec;
   }
+
+  let name sym = sym.name
 
   let mk_local ~id_in_scope ~scope_id ?(spec=Internal) name =
     {

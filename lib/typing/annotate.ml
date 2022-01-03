@@ -628,6 +628,8 @@ let annotate env (program: Ast.program) =
   let tprogram_statements =
     List.map ~f:(annotate_statement env) pprogram_statements
   in
+  let root_scope = Env.root_scope env in
   { T.
     tprogram_statements;
+    root_scope;
   }

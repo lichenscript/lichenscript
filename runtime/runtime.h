@@ -2,112 +2,163 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-typedef void*(*WTLMalloc)(size_t);
-typedef void(*WTLFree)(void*);
+typedef void*(*WTMalloc)(size_t);
+typedef void(*WTFree)(void*);
 
-#define WTL_NO_GC 0xFFFFFFFF
+#define WT_NO_GC 0xFFFFFFFF
 
-typedef enum WTLObjectType {
-    WTL_STRING = 1,
-    WTL_SYMBOL,
-    WTL_CLASS_OBJECT_META,
-    WTL_CLASS_OBJECT,
-    WTL_ARRAY8 = 16,
-    WTL_ARRAY16,
-    WTL_ARRAY32,
-    WTL_ARRAY64,
-} WTLObjectType;
+typedef enum WTObjectType {
+    WT_BOXED_F64 = -44,
+    WT_BOXED_U64 = -33,
+    WT_BOXED_I64 = -32,
+    WT_CLASS_OBJECT = -20,
+    WT_ARRAY = -16,
+    WT_CLASS_OBJECT_META = -4,
+    WT_LAMBDA = -3,
+    WT_SYMBOL = -2,
+    WT_STRING = -1,
+    WT_NULL = 0,
+    WT_I32 = 1,
+    WT_F32 = 2,
+    WT_BOOL = 3,
+} WTObjectType;
 
-#define WTL_OBJ_HEADER WTLObjectHeader header;
+#define WT_OBJ_HEADER WTObjectHeader header;
 
-typedef struct WTLObjectHeader {
-    uint32_t      count;
-    WTLObjectType type;
-} WTLObjectHeader;
+typedef struct WTObjectHeader {
+    uint32_t     count;
+} WTObjectHeader;
 
-typedef struct WTLObject {
-    WTL_OBJ_HEADER
-} WTLObject;
+typedef struct WTObject {
+    WT_OBJ_HEADER
+} WTObject;
 
-typedef struct WTLString {
-    WTL_OBJ_HEADER
+// #if INTPTR_MAX >= INT64_MAX
+// #define WT_PTR64
+// #endif
+
+#ifdef WT_PTR64
+
+// in 64bit mode, WTValue is 128bit
+// int64_t and double are encoded in the value
+typedef struct WTValue {
+    WTObjectType type;
+    union {
+        int32_t   i32_val;  // bool
+        float     f32_val;
+        WTObject* ptr_val;
+        double    f64_val;
+        int64_t   i64_val;
+    };
+} WTValue;
+
+#else
+
+// in 64bit mode, WTValue is 128bit
+// int64_t and double are encoded in the value
+typedef struct WTValue {
+    WTObjectType type;
+    union {
+        int       int_val;  // bool
+        float     float_val;
+        WTObject* ptr_val;
+    };
+} WTValue;
+
+#define MK_NULL (WTValue) { WT_NULL, { .int_val = 0 } }
+
+#endif
+
+typedef struct WTString {
+    WT_OBJ_HEADER
     uint32_t length;
     uint32_t hash;
     unsigned char content[];
-} WTLString;
+} WTString;
 
-typedef struct WTLSymbolBucket {
-    WTLString* content;
-    struct WTLSymbolBucket* next;
-} WTLSymbolBucket;
+typedef struct WTSymbolBucket {
+    WTValue content;
+    struct WTSymbolBucket* next;
+} WTSymbolBucket;
 
-typedef struct WTLRuntime {
-    WTLMalloc malloc_method;
-    WTLFree free_method;
+typedef struct WTBoxedI64 {
+    WT_OBJ_HEADER
+    int64_t value;
+} WTBoxedI64;
+
+typedef struct WTBoxedU64 {
+    WT_OBJ_HEADER
+    int64_t value;
+} WTBoxedU64;
+
+typedef struct WTBoxedF64 {
+    WT_OBJ_HEADER
+    double value;
+} WTBoxedF64;
+
+typedef struct WTRuntime {
+    WTMalloc malloc_method;
+    WTFree free_method;
     uint32_t seed;
-    WTLSymbolBucket* symbol_buckets;
+    WTSymbolBucket* symbol_buckets;
     uint32_t symbol_bucket_size;
     uint32_t symbol_len;
-} WTLRuntime;
+    WTValue* i64_pool;
+} WTRuntime;
 
-typedef struct WTLProgram {
-    WTLRuntime* runtime;
-} WTLProgram;
+typedef struct WTProgram {
+    WTRuntime* runtime;
+} WTProgram;
 
-WTLRuntime* WTLNewRuntime();
+WTRuntime* WTNewRuntime();
+void WTFreeRuntime(WTRuntime* rt);
 
-void WTLRetain(WTLObject* obj);
-void WTLRelease(WTLRuntime* rt, WTLObject* obj);
+void WTRetain(WTValue obj);
+void WTRelease(WTRuntime* rt, WTValue obj);
 
-WTLString* WTLNewStringFromCStringLen(WTLRuntime* rt, const unsigned char* content, uint32_t len);
-WTLString* WTLNewStringFromCString(WTLRuntime* rt, const unsigned char* content);
+typedef struct WTLambda {
+    WT_OBJ_HEADER
+    void*   c_fun;
+    size_t  captured_values_size;
+    WTValue captured_values[];
+} WTLambda;
 
-WTLString* WTLNewSymbolLen(WTLRuntime* rt, const char* content, uint32_t len);
-WTLString* WTLNewSymbol(WTLRuntime* rt, const char* content);
+WTValue WTNewStringFromCStringLen(WTRuntime* rt, const unsigned char* content, uint32_t len);
+WTValue WTNewStringFromCString(WTRuntime* rt, const unsigned char* content);
 
-typedef struct WTLArray8 {
-    WTL_OBJ_HEADER
+WTValue WTNewSymbolLen(WTRuntime* rt, const char* content, uint32_t len);
+WTValue WTNewSymbol(WTRuntime* rt, const char* content);
+
+typedef struct WTArray {
+    WT_OBJ_HEADER
     uint32_t len;
     uint32_t capacity;
-    uint8_t  data[];
-} WTLArray8;
-
-typedef struct WTLArray32 {
-    WTL_OBJ_HEADER
-    uint32_t len;
-    uint32_t capacity;
-    uint32_t data[];
-} WTLArray32;
-
-typedef struct WTLArray64 {
-    WTL_OBJ_HEADER
-    uint32_t len;
-    uint32_t capacity;
-    uint64_t data[];
-} WTLArray64;
+    WTValue* data;
+} WTArray;
 
 // A global unique ID for class method
-typedef uint64_t WTLClassObjectMethodID;
+typedef uint64_t WTClassObjectMethodID;
 
-typedef struct WTLClassObjectMethod {
-    WTLClassObjectMethodID id;
+typedef struct WTClassObjectMethod {
+    WTClassObjectMethodID id;
     const char* name;
     void* fun_ptr;
-    struct WTLClassObjectMethod* next;
-} WTLClassObjectMethod;
+    struct WTClassObjectMethod* next;
+} WTClassObjectMethod;
 
-typedef struct WTLClassObjectMeta {
-    WTL_OBJ_HEADER
+typedef struct WTClassObjectMeta {
+    WT_OBJ_HEADER
     const char* name;  // class name
-    WTLClassObjectMethod* methods;
-} WTLClassObjectMeta;
+    WTClassObjectMethod* methods;
+} WTClassObjectMeta;
 
 // ClassClassObjectMethodString("hello")  // slow
 // ClassClassObjectMethodID(123)  // quick
-typedef struct WTLClassObject {
-    WTL_OBJ_HEADER
-    WTLClassObjectMeta* meta;
-    uint64_t properties[];
-} WTLClassObject;
+typedef struct WTClassObject {
+    WT_OBJ_HEADER
+    WTClassObjectMeta* meta;
+    size_t    properties_size;
+    WTValue   properties[];
+} WTClassObject;
 
-WTLClassObject* WTLNewClassObject(WTLRuntime* rt, WTLClassObjectMeta* meta, uint32_t slot_count);
+WTClassObject* WTNewClassObject(WTRuntime* rt, WTClassObjectMeta* meta, uint32_t slot_count);

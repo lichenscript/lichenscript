@@ -197,6 +197,7 @@ end
   = Declare
 
 type program = {
+  root_scope: Scope.t;
   tprogram_statements: Statement.t list;
 }
 [@@deriving show]
