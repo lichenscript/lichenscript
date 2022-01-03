@@ -1,8 +1,0 @@
-(library
- (name binaryen)
- (libraries core_kernel)
- (foreign_stubs
-  (language c)
-  (names bindings))
- (c_library_flags (-lbinaryen))
- (flags :standard -cclib -lbinaryen))

@@ -1,7 +1,6 @@
 open Core_kernel
 open Waterlang_lex
 open Waterlang_parsing
-open Waterlang_wasm
 
 exception ExpectedError of string
 
@@ -53,7 +52,7 @@ let parse_string_to_program content =
     root_scope = Waterlang_typing.Env.root_scope env;
   }
 
-let parse_string_and_codegen content =
+(* let parse_string_and_codegen content =
   let p = parse_string_to_program content in
   let config = Config.debug_default () in
   Codegen.codegen p config
@@ -64,4 +63,4 @@ let parse_string_and_codegen_to_path content path =
   let slices = String.split path ~on:'/' in
   let output_filename = List.last_exn slices in
   let env = Codegen_env.create ~output_filename config p in
-  Codegen.codegen_binary env path
+  Codegen.codegen_binary env path *)

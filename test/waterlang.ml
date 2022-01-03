@@ -45,7 +45,7 @@ let test_parser _ =
         );
     assert false
 
-let test_codegen _ =
+(* let test_codegen _ =
   let source = "
     function main(a: i32, b: i32): i32 {
       return a + b;
@@ -144,17 +144,17 @@ let test_assignment _ =
   let in_chan = Core.Unix.open_process_in ("node " ^ test_output_name ^ ".js" ) in
   let r = Core.In_channel.input_all in_chan in
   Core.In_channel.close in_chan;
-  print_string r
+  print_string r *)
 
 let suite =
   "TestParser" >::: [
     "test_parser" >:: test_parser;
-    "test_codegen" >:: test_codegen;
+    (* "test_codegen" >:: test_codegen;
     "test_codegen_binary" >:: test_codegen_binary;
     "test_type_checking" >:: test_type_checking;
     "test_function_call" >:: test_function_call;
     "test_string" >:: test_string;
-    "test_assignment" >:: test_assignment;
+    "test_assignment" >:: test_assignment; *)
   ]
 
 let () =
