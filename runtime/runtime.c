@@ -180,7 +180,7 @@ WTValue WTNewStringFromCStringLen(WTRuntime* rt, const unsigned char* content, u
 
     memcpy(result->content, content, len);
     
-    return (WTValue){ WT_STRING, { .ptr_val = (WTObject*)result } };
+    return (WTValue){ { .ptr_val = (WTObject*)result }, WT_STRING };
 }
 
 WTValue WTNewStringFromCString(WTRuntime* rt, const unsigned char* content) {

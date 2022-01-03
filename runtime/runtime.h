@@ -57,15 +57,15 @@ typedef struct WTValue {
 // in 64bit mode, WTValue is 128bit
 // int64_t and double are encoded in the value
 typedef struct WTValue {
-    WTObjectType type;
     union {
         int       int_val;  // bool
         float     float_val;
         WTObject* ptr_val;
     };
+    WTObjectType type;
 } WTValue;
 
-#define MK_NULL (WTValue) { WT_NULL, { .int_val = 0 } }
+#define MK_NULL (WTValue) { { .int_val = 0 }, WT_NULL }
 
 #endif
 
