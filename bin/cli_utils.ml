@@ -1,3 +1,4 @@
+open Core
 
 module TermColor = struct
 
@@ -20,3 +21,6 @@ module TermColor = struct
   let enable_auto_wrap = "\x1b[?7h"
   
 end
+
+let print_error_prefix () =
+  Out_channel.print_string (TermColor.red ^ "Error: " ^ TermColor.reset)

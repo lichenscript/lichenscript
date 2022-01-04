@@ -6,5 +6,4 @@
   waterlang_parsing
   waterlang_typing
   waterlang_c
-  core
-  toml))
+  core))
