@@ -3,6 +3,8 @@ open Core_type
 
 type t = {
   root_scope: Scope.t;
+  type_provider: Type_provider.provider;
+  open_domains: string array list;
   mutable current_scope: Scope.t;
   mutable errors: Type_error.t list;
   mutable scope_counter: int;
@@ -30,11 +32,13 @@ let make_default_type_sym scope =
     )
     names
 
-let create () =
+let create ?(type_provider=Type_provider.default_provider) ?(open_domains=[]) () =
   let root_scope = Scope.create 0 in
   let env =
     {
       root_scope;
+      type_provider;
+      open_domains;
       current_scope = root_scope;
       errors = [];
       scope_counter = 1;

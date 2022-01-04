@@ -10,7 +10,10 @@ exception FileNotFound of string
 
 let parse_string_to_program file_key content =
   let result = Parser.parse_string file_key content in
-  let env = Waterlang_typing.Env.create () in
+  let open_domains = [
+    [| "std"; "preclude" |]
+  ] in
+  let env = Waterlang_typing.Env.create () ~open_domains in
   let typed_tree, include_module_ids =
     match result with
     | Result.Ok { tree; include_module_ids } ->
@@ -94,7 +97,9 @@ let compile_file_path ~package_name ~std_dir entry_file_path =
   );
   try
     let env = create () in
+    (* load standard library *)
     load_library_by_dir [] env (Option.value_exn std_dir);
+    (* open std.preclude to module scope *)
     let content = In_channel.read_all entry_file_path in
     let file_key = File_key.SourceFile entry_file_path in
     let _typed_tree = parse_string_to_program (Some file_key) content in

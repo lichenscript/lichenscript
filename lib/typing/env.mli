@@ -1,7 +1,7 @@
 
 type t
 
-val create: unit -> t
+val create: ?type_provider:Type_provider.provider -> ?open_domains:(string array list) -> unit -> t
 
 val root_scope: t -> Scope.t
 
