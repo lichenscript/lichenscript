@@ -16,11 +16,11 @@ let error t = raise (Error [t])
 
 module PP = struct
 
-  let error err =
+  let error formatter err =
     let { perr_spec; _ } = err in
     match perr_spec with
-    | LexError lex_err -> Lex_error.PP.error lex_err
-    | IsNotLeftValue -> "Element is not a left value"
-    | MalformedUnicode -> "Malformed unicode"
+    | LexError lex_err -> Format.fprintf formatter "%s" (Lex_error.PP.error lex_err)
+    | IsNotLeftValue -> Format.fprintf formatter "Element is not a left value"
+    | MalformedUnicode -> Format.fprintf formatter "Malformed unicode"
 
 end

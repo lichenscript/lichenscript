@@ -76,6 +76,7 @@ type t =
   | T_PRIVATE
   | T_PROTECTED
   | T_PUBLIC
+  | T_MODULE
   | T_YIELD
   | T_DEBUGGER
   | T_DECLARE
@@ -238,6 +239,7 @@ let token_to_string = function
   | T_PRIVATE -> "T_PRIVATE"
   | T_PROTECTED -> "T_PROTECTED"
   | T_PUBLIC -> "T_PUBLIC"
+  | T_MODULE -> "T_MODULE"
   | T_YIELD -> "T_YIELD"
   | T_DEBUGGER -> "T_DEBUGGER"
   | T_DECLARE -> "T_DECLARE"
@@ -388,6 +390,7 @@ let value_of_token = function
   | T_PRIVATE -> "private"
   | T_PROTECTED -> "protected"
   | T_PUBLIC -> "public"
+  | T_MODULE -> "module"
   | T_YIELD -> "yield"
   | T_DEBUGGER -> "debugger"
   | T_DECLARE -> "declare"

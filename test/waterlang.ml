@@ -45,7 +45,7 @@ let test_parser _ =
     |> List.rev
     |> List.iter
        (fun error ->
-         let str = Parse_error.PP.error error in
+         let str = Format.asprintf "%a" Parse_error.PP.error error in
          let { Loc. line; column; } = error.perr_loc.start in
          Format.printf "%d:%d %s\n" line column str;
         );
