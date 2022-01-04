@@ -3,6 +3,11 @@ open Ast
 open Parser_env
 open Waterlang_lex
 
+type parse_result = {
+  tree: Ast.program;
+  include_module_ids: string list;
+}
+
 let with_start_loc env start_loc =
   let loc = last_loc env in
   match loc with
@@ -64,8 +69,13 @@ and parse_string source content =
   let errs = errors env in
   if List.length errs > 0 then
     Result.Error errs
-  else 
-    Result.Ok program
+  else  (
+    let include_module_ids = Parser_env.include_module_ids env in
+    Result.Ok {
+      tree = program;
+      include_module_ids;
+    }
+  )
 
 and parse_program env : program =
   let stmts = ref [] in
@@ -276,6 +286,7 @@ and parse_statement env : Statement.t =
 and parse_module_decl ?visibility env =
   Expect.token env Token.T_MODULE;
   let id = parse_identifier env in
+  Parser_env.add_include_module_id env id.pident_name;
   { Statement.
     mod_visibility = visibility;
     mod_name = id;

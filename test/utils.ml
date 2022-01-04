@@ -9,7 +9,7 @@ let parse_string_to_program content =
   let env = Waterlang_typing.Env.create () in
   let typed_tree =
     match result with
-    | Result.Ok program ->
+    | Result.Ok { tree = program; _ } ->
         begin
         (* Ast.pp_program Format.std_formatter program; *)
         try (

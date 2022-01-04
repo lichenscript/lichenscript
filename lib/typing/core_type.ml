@@ -185,7 +185,7 @@ and VarSym : sig
 
   type spec =
   | Internal
-  | ExternalMethod of string * string
+  | ExternalMethod of string
   | Enum of enum_field PropsMap.t
 
   and t = {
@@ -213,7 +213,7 @@ end = struct
 
   type spec =
   | Internal
-  | ExternalMethod of string * string
+  | ExternalMethod of string
   | Enum of enum_field PropsMap.t
 
   and t = {

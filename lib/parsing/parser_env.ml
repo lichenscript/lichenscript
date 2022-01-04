@@ -108,6 +108,7 @@ type env = {
   lookahead: Lookahead.t ref;
   token_sink: (token_sink_result -> unit) option ref;
   source: File_key.t option;
+  mutable include_module_ids: string list;
   mutable scope: Parse_scope.t;
 }
 
@@ -134,8 +135,14 @@ let init_env source content =
     source;
     lookahead = ref (Lookahead.create lex_env);
     token_sink = ref None;
+    include_module_ids = [];
     scope = Parse_scope.create Parse_scope.PScope_Module;
   }
+
+let include_module_ids env = List.rev env.include_module_ids
+
+let add_include_module_id env id =
+  env.include_module_ids <- id::env.include_module_ids
 
 let with_scope env scope cb =
   let prev_scope = env.scope in

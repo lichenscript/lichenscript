@@ -11,12 +11,12 @@ exception FileNotFound of string
 let parse_string_to_program file_key content =
   let result = Parser.parse_string file_key content in
   let env = Waterlang_typing.Env.create () in
-  let typed_tree =
+  let typed_tree, include_module_ids =
     match result with
-    | Result.Ok program ->
+    | Result.Ok { tree; include_module_ids } ->
       begin
         (* Ast.pp_program Format.std_formatter program; *)
-        let program = Waterlang_typing.Annotate.annotate env program in
+        let program = Waterlang_typing.Annotate.annotate env tree in
         Typecheck.type_check env program;
 
         let typecheck_errors = Waterlang_typing.Env.errors env in
@@ -24,14 +24,14 @@ let parse_string_to_program file_key content =
           raise (TypeCheckError typecheck_errors)
         );
 
-        program
+        (program, include_module_ids)
         
       end
 
     | Result.Error errs ->
       raise (ParseError errs)
   in
-  typed_tree
+  typed_tree, include_module_ids
 
 module ModuleMap = Hashtbl.Make(String)
 
@@ -43,21 +43,38 @@ let create () = {
   module_map = ModuleMap.create ();
 }
 
-let load_library_by_dir env std_dir =
+let get_mod_id id_list =
+  Module.get_id_str (List.rev id_list |> List.to_array)
+
+let rec load_library_by_dir id_list env std_dir =
   let abs_path = Filename.realpath std_dir in
 
-  let lib_entry_file = Filename.concat abs_path "lib.wt" in
-  (match (Sys.file_exists lib_entry_file) with
-  | `No -> raise (FileNotFound lib_entry_file)
-  | _ -> ()
-  );
+  let lib_name = Filename.dirname abs_path in
 
-  let entry_file_content = In_channel.read_all lib_entry_file in
-  let file_key = File_key.LibFile lib_entry_file in
-  let typed_tree = parse_string_to_program (Some file_key) entry_file_content in
-  
-  let _mod = Module.create abs_path typed_tree in
-  ModuleMap.set env.module_map ~key:abs_path ~data:_mod
+  let module_id = lib_name::id_list in
+  let module_id_str = get_mod_id module_id in
+  match ModuleMap.find env.module_map module_id_str with
+  | Some _ -> ()
+  | None -> (
+    let lib_entry_file = Filename.concat abs_path "lib.wt" in
+    (match (Sys.file_exists lib_entry_file) with
+    | `No -> raise (FileNotFound lib_entry_file)
+    | _ -> ()
+    );
+
+    let entry_file_content = In_channel.read_all lib_entry_file in
+    let file_key = File_key.LibFile lib_entry_file in
+    let typed_tree, child_modules = parse_string_to_program (Some file_key) entry_file_content in
+    
+    let id = List.rev (lib_name::id_list) |> List.to_array in
+    let _mod = Module.create ~path:abs_path ~id ~id_str:module_id_str typed_tree in
+    ModuleMap.set env.module_map ~key:abs_path ~data:_mod;
+    List.iter
+      ~f:(fun item ->
+        load_library_by_dir module_id env (Filename.concat std_dir item)
+      )
+      child_modules
+  )
 
 let print_loc_title ~prefix loc_opt =
   Loc. (
@@ -77,7 +94,7 @@ let compile_file_path ~package_name ~std_dir entry_file_path =
   );
   try
     let env = create () in
-    load_library_by_dir env (Option.value_exn std_dir);
+    load_library_by_dir [] env (Option.value_exn std_dir);
     let content = In_channel.read_all entry_file_path in
     let file_key = File_key.SourceFile entry_file_path in
     let _typed_tree = parse_string_to_program (Some file_key) content in
@@ -112,7 +129,12 @@ let compile_file_path ~package_name ~std_dir entry_file_path =
       let start = loc.start in
       Format.printf "%d:%d %a\n" start.line start.column Type_error.PP.error_spec spec
 
-    | e ->
+    (* | e ->
       let string = Exn.to_string e in
       print_error_prefix ();
-      Out_channel.printf "%s\n" string
+      Out_channel.printf "%s\n" string;
+      let stack = Printexc.get_backtrace () in
+      Out_channel.print_string TermColor.grey;
+      Out_channel.print_string stack;
+      Out_channel.print_string TermColor.reset;
+      Out_channel.print_endline "" *)

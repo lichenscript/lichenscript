@@ -3,6 +3,10 @@ type env
 
 val init_env: Waterlang_lex.File_key.t option -> string -> env
 
+val include_module_ids: env -> string list
+
+val add_include_module_id: env -> string -> unit
+
 val with_scope: env -> Parse_scope.t -> (unit -> 'a) -> 'a
 
 val scope: env -> Parse_scope.t

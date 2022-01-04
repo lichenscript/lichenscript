@@ -574,14 +574,14 @@ let pre_scan_definitions env program =
             Option.iter
               ~f:(fun attr ->
                 match attr.attr_payload with
-                | [ external_name; external_base_name ] ->
-                  let spec = Core_type.VarSym.ExternalMethod(external_name, external_base_name) in
+                | [ external_name ] ->
+                  let spec = Core_type.VarSym.ExternalMethod external_name in
                   let id = Option.value_exn signature.id in
                   let _ = find_or_add_type_sym id.pident_name loc in
                   let _ = find_or_add_var_sym ~spec id.pident_name loc in
                   ()
 
-                | _ -> failwith "not implemented"
+                | _ -> failwith "not implemented 2"
               )
               external_attrib
 
