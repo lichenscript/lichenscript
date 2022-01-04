@@ -28,3 +28,5 @@ let create ~path ~id ~id_str typed_tree =
     source = path;
     typed_tree;
   }
+
+let typed_tree env = env.typed_tree

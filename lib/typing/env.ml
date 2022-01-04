@@ -1,3 +1,4 @@
+open Base
 open Core_kernel
 open Core_type
 
@@ -47,6 +48,21 @@ let create ?(type_provider=Type_provider.default_provider) ?(open_domains=[]) ()
   in
   make_default_type_sym root_scope;
   env
+
+(* iterate the open domains *)
+let resolve_open_domain env name =
+  List.fold_until  
+    ~init:None
+    ~f:(fun acc item ->
+      let test = env.type_provider#resolve (item, [| name |]) in
+      match test with
+      | Some var ->
+        Continue_or_stop.Stop (Some var)
+      | None ->
+        Continue_or_stop.Continue acc
+    )
+    env.open_domains
+    ~finish:(fun acc -> acc)
 
 let root_scope env = env.root_scope
 

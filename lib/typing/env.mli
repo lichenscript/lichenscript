@@ -3,6 +3,8 @@ type t
 
 val create: ?type_provider:Type_provider.provider -> ?open_domains:(string array list) -> unit -> t
 
+val resolve_open_domain: t -> string -> Core_type.VarSym.t option
+
 val root_scope: t -> Scope.t
 
 val set_current_scope: t -> Scope.t -> unit

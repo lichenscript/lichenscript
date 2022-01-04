@@ -8,12 +8,12 @@ exception ParseError of Parse_error.t list
 exception TypeCheckError of Type_error.t list
 exception FileNotFound of string
 
-let parse_string_to_program file_key content =
+let parse_string_to_program ~file_key ~type_provider content =
   let result = Parser.parse_string file_key content in
   let open_domains = [
     [| "std"; "preclude" |]
   ] in
-  let env = Waterlang_typing.Env.create () ~open_domains in
+  let env = Waterlang_typing.Env.create () ~open_domains ~type_provider in
   let typed_tree, include_module_ids =
     match result with
     | Result.Ok { tree; include_module_ids } ->
@@ -49,10 +49,34 @@ let create () = {
 let get_mod_id id_list =
   Module.get_id_str (List.rev id_list |> List.to_array)
 
+let create_type_provider env : Type_provider.provider =
+  object
+
+    method resolve (mod_arr, local_arr) =
+      let mod_id = Module.get_id_str mod_arr in
+      match ModuleMap.find env.module_map mod_id with
+      | Some _mod -> (
+        let typed_tree = Module.typed_tree _mod in
+        let { Typedtree. root_scope; _ } = typed_tree in
+        if Array.length local_arr = 1 then (
+          let first_name = Array.get local_arr 0 in
+          Format.eprintf "find mod: %s name: %s\n" mod_id first_name;
+          Scope.find_var_symbol root_scope first_name
+        ) else
+          None
+      )
+      | None -> None
+
+  end
+
+let dirname path =
+  let parts = Filename.parts path in
+  List.last_exn parts
+
 let rec load_library_by_dir id_list env std_dir =
   let abs_path = Filename.realpath std_dir in
 
-  let lib_name = Filename.dirname abs_path in
+  let lib_name = dirname abs_path in
 
   let module_id = lib_name::id_list in
   let module_id_str = get_mod_id module_id in
@@ -67,11 +91,13 @@ let rec load_library_by_dir id_list env std_dir =
 
     let entry_file_content = In_channel.read_all lib_entry_file in
     let file_key = File_key.LibFile lib_entry_file in
-    let typed_tree, child_modules = parse_string_to_program (Some file_key) entry_file_content in
-    
+    let type_provider = create_type_provider env in
+    let typed_tree, child_modules =
+      parse_string_to_program ~file_key:(Some file_key) ~type_provider entry_file_content
+    in
     let id = List.rev (lib_name::id_list) |> List.to_array in
     let _mod = Module.create ~path:abs_path ~id ~id_str:module_id_str typed_tree in
-    ModuleMap.set env.module_map ~key:abs_path ~data:_mod;
+    ModuleMap.set env.module_map ~key:module_id_str ~data:_mod;
     List.iter
       ~f:(fun item ->
         load_library_by_dir module_id env (Filename.concat std_dir item)
@@ -102,7 +128,10 @@ let compile_file_path ~package_name ~std_dir entry_file_path =
     (* open std.preclude to module scope *)
     let content = In_channel.read_all entry_file_path in
     let file_key = File_key.SourceFile entry_file_path in
-    let _typed_tree = parse_string_to_program (Some file_key) content in
+    let type_provider = create_type_provider env in
+    let _typed_tree =
+      parse_string_to_program ~file_key:(Some file_key) ~type_provider content
+    in
     Format.printf "compile %s for %s\n" entry_file_path package_name;
   with
     | FileNotFound path ->

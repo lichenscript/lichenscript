@@ -353,9 +353,17 @@ and annotate_expression (env: Env.t) expr =
 
         | None ->
           begin
-            let err = Type_error.make_error loc (Type_error.CannotFindName id.pident_name) in
-            Env.add_error env err;
-            raise (Type_error.Error err)
+            (* find the open domain, external variables *)
+            let test = Env.resolve_open_domain env id.pident_name in
+            match test with
+            | Some sym ->
+              (T.Expression.Identifier sym, sym.def_type)
+
+            | None ->
+              let err = Type_error.make_error loc (Type_error.CannotFindName id.pident_name) in
+              Env.add_error env err;
+              raise (Type_error.Error err)
+
           end
       end
 

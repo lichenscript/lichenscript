@@ -1,6 +1,6 @@
 
 type provider = <
-  resolve: string array -> Core_type.TypeValue.t option
+  resolve: (string array * string array) -> Core_type.VarSym.t option
 >
 
 let default_provider: provider = object
