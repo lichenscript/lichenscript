@@ -127,6 +127,8 @@ and TypeSym : sig
 
   val pp: Format.formatter -> t -> unit
 
+  val (==): t -> t -> bool
+
 end = struct
   type module_type = {
     props: TypeValue.t PropsMap.t;
@@ -174,6 +176,16 @@ end = struct
 
   let pp formatter (sym: t) =
     Format.pp_print_string formatter sym.name
+
+  let (==) left right =
+    match (left.builtin, right.builtin) with
+    | (true, true) ->
+      String.equal left.name right.name
+
+    | (false, false) ->
+      phys_equal left right
+
+    | _ -> false
   
 end
 

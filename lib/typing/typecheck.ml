@@ -9,7 +9,7 @@ let type_assinable left right =
   | (_, Any)
   | (Unknown, Unknown) -> true
   | (Ctor left_sym, Ctor right_sym) ->
-    if phys_equal left_sym right_sym then
+    if TypeSym.(left_sym == right_sym) then
       true
     else
       false

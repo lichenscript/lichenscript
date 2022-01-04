@@ -60,7 +60,6 @@ let create_type_provider env : Type_provider.provider =
         let { Typedtree. root_scope; _ } = typed_tree in
         if Array.length local_arr = 1 then (
           let first_name = Array.get local_arr 0 in
-          Format.eprintf "find mod: %s name: %s\n" mod_id first_name;
           Scope.find_var_symbol root_scope first_name
         ) else
           None
@@ -111,7 +110,7 @@ let print_loc_title ~prefix loc_opt =
     | Some source -> (
       print_error_prefix ();
       let source_str = Format.asprintf "%a" Waterlang_lex.File_key.pp source in
-      Out_channel.printf "%s in %s\n" prefix (TermColor.grey ^ source_str ^ TermColor.reset)
+      Out_channel.printf "%s in %s\n" prefix (TermColor.bold ^ source_str ^ TermColor.reset)
     )
     | None -> ()
   )
@@ -129,10 +128,13 @@ let compile_file_path ~package_name ~std_dir entry_file_path =
     let content = In_channel.read_all entry_file_path in
     let file_key = File_key.SourceFile entry_file_path in
     let type_provider = create_type_provider env in
-    let _typed_tree =
+    let typed_tree, _ =
       parse_string_to_program ~file_key:(Some file_key) ~type_provider content
     in
-    Format.printf "compile %s for %s\n" entry_file_path package_name;
+    (* TODO: compile other modules *)
+    let output = Waterlang_c.codegen typed_tree in
+    Format.printf "%s\n" output
+    (* write to files *)
   with
     | FileNotFound path ->
       print_error_prefix ();
@@ -141,8 +143,10 @@ let compile_file_path ~package_name ~std_dir entry_file_path =
     | TypeCheckError errors ->
       List.iter
         ~f:(fun err ->
-          let err_str = Format.asprintf "%a" Waterlang_typing.Type_error.PP.error err in
-          Out_channel.printf "%s\n" err_str
+          let { Type_error. spec; loc } = err in
+          print_loc_title ~prefix:"type error" loc;
+          let start = loc.start in
+          Format.printf "%d:%d %a\n" start.line start.column Type_error.PP.error_spec spec
         )
         errors
 

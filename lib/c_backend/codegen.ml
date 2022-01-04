@@ -137,7 +137,34 @@ and codegen_expression env (expr: Typedtree.Expression.t) =
   | If _
   | Array _ -> ()
 
-  | Call _
+  | Call call -> (
+    let { callee; call_params; _ } = call in
+    let { callee_spec; _ } = callee in
+    match callee_spec with
+    | sym, [] -> (
+      match sym.spec with
+      | Core_type.VarSym.ExternalMethod ext_method_name -> (
+        ps env ext_method_name;
+        ps env "(";
+        let params_len_m1 = (List.length call_params) - 1 in
+        List.iteri
+          ~f:(fun index item ->
+            codegen_expression env item;
+            if index <> params_len_m1 then (
+              ps env ", "
+            )
+          )
+          call_params;
+        ps env ")"
+      )
+      | _ ->
+      failwith "not implemented"
+    )
+    | _ ->
+      failwith "not implemented"
+
+  )
+
   | Member _
   | Unary _ -> ()
 
