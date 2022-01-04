@@ -58,7 +58,6 @@ and Expression : sig
     | Constant of Literal.t
     | Identifier of Identifier.t
     | Lambda of Function.t
-    | Throw of t
     | If of if_desc
     | Array of t list
     | Call of call
@@ -102,8 +101,11 @@ and Statement : sig
   }
 
   and class_method = {
+    cls_method_static: bool;
     cls_method_visiblity: visibility option;
     cls_method_name: Identifier.t;
+    cls_method_params: Function.params;
+    cls_method_body: Block.t;
     cls_method_loc: Loc.t;
   }
 

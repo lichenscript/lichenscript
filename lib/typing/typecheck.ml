@@ -120,9 +120,6 @@ and check_expression env (expr: Typedtree.Expression.t) =
   | Lambda
     -> ()
 
-  | Throw expr ->
-    check_expression env expr
-
   | If _if ->
     begin
       let { if_test; if_consequent; if_alternative; _; } = _if in

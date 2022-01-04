@@ -133,7 +133,6 @@ and codegen_expression env (expr: Typedtree.Expression.t) =
   )
 
   | Lambda
-  | Throw _
   | If _
   | Array _ -> ()
 

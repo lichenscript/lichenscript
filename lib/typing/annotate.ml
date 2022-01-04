@@ -356,10 +356,6 @@ and annotate_expression (env: Env.t) expr =
           end
       end
 
-    | Throw expr ->
-      let t = annotate_expression env expr in
-      (T.Expression.Throw t, TypeValue.Unknown) 
-
     | Lambda _ -> (T.Expression.Lambda, TypeValue.Unknown)
 
     | If { if_test; if_consequent; if_alternative; if_loc; } ->

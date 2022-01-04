@@ -26,7 +26,6 @@ module%gen rec Expression : sig
     | Constant of Ast.Literal.t
     | Identifier of Core_type.VarSym.t
     | Lambda
-    | Throw of t
     | If of if_desc
     | Array of t list
     | Call of call

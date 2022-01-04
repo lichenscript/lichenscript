@@ -12,7 +12,13 @@ let test_parser _ =
   declare function print(content: string);
 
   class Array {
+
     private __name: sring;
+
+    public static New() {
+
+    }
+
   }
 
   enum Result {

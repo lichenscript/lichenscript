@@ -432,15 +432,26 @@ and parse_class_body env: Statement.class_body =
   let parse_element env =
     let start_pos = Peek.loc env in
     let v = parse_visibility env in
+
+    let cls_method_static =
+      if Peek.token env == Token.T_STATIC then (
+        Eat.token env;
+        true
+      ) else false
+    in
+
     let id = parse_identifier env in
 
     if Peek.token env == Token.T_LPAREN then
       begin
-        Eat.token env; (* ( *)
-        Expect.token env Token.T_RPAREN; (* ) *)
+        let params = parse_params env in
+        let block = parse_block env in
         Cls_method {
+          cls_method_static;
           cls_method_visiblity = v;
           cls_method_name = id;
+          cls_method_params = params;
+          cls_method_body = block;
           cls_method_loc = with_start_loc env start_pos;
         }
       end
@@ -768,10 +779,6 @@ and parse_primary_expression env : Expression.t =
     | Token.T_FALSE ->
       Eat.token env;
       Constant (Literal.Boolean false)
-
-    | Token.T_THROW ->
-      Eat.token env;
-      Throw (parse_expression env)
 
     | Token.T_IF ->
       begin
