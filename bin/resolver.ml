@@ -49,14 +49,13 @@ let parse_string_to_program content =
   in
   typed_tree
 
-let parse_string_and_codegen content =
-  let p = parse_string_to_program content in
-  Waterlang_c.codegen p
+let rec build_task ~package_name ~entry_dir task =
+  let { Task. entry_file; _ } = task in
+  let entry_file_path = Filename.concat entry_dir entry_file in
+  compile_file_path ~package_name entry_file_path
 
-(* let parse_string_and_codegen_to_path content path =
-  let p = parse_string_to_program content in
-  let config = Config.debug_default () in
-  let slices = String.split path ~on:'/' in
-  let output_filename = List.last_exn slices in
-  let env = Codegen_env.create ~output_filename config p in
-  Codegen.codegen_binary env path *)
+and compile_file_path ~package_name entry_file_path =
+  let content = In_channel.read_all entry_file_path in
+  let _typed_tree = parse_string_to_program content in
+  Format.printf "compie %s for %s\n" entry_file_path package_name;
+  ()

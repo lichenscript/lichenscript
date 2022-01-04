@@ -1,0 +1,8 @@
+[package]
+name = "hello_world"
+version = "0.1.0"
+authors = ["Vincent Chan <okcdz@diverse.space>"]
+
+[[bin]]
+name = "hello_world"
+path = "main.wt"

@@ -3,4 +3,8 @@
  (name main)
  (libraries
   waterlang_lex
-  waterlang_parsing))
+  waterlang_parsing
+  waterlang_typing
+  waterlang_c
+  core
+  toml))
