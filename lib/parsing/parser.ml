@@ -221,6 +221,42 @@ and parse_statement env : Statement.t =
         }
       end
 
+    | Token.T_PUBLIC
+    | Token.T_PROTECTED
+    | Token.T_PRIVATE ->
+      begin
+        let visibility =
+          match next with
+          | Token.T_PUBLIC -> Pvisibility_public
+          | Token.T_PROTECTED -> Pvisibility_protected
+          | Token.T_PRIVATE -> Pvisibility_private
+          | _ -> failwith "unreachable"
+        in
+        Eat.token env;
+        if Parse_scope.((scope env).ty = Parse_scope.PScope_Module) then (
+          let next = Peek.token env in
+          match next with
+          | Token.T_FUNCTION ->
+            Function_ (parse_function ~visibility env)
+
+          | Token.T_MODULE ->
+            Module (parse_module_decl ~visibility env)
+
+          | _ ->
+            Parser_env.error_unexpected env;
+            failwith "unreachable"
+        ) else (
+          let err =
+            {
+              Parse_error.
+              perr_loc = start_loc;
+              perr_spec = Parse_error.VisibilityNoOnTopLevel;
+            }
+          in
+          Parse_error.error err
+        )
+      end
+
     | _ ->
       let expr = parse_expression env in
       if Peek.token env == Token.T_SEMICOLON then
@@ -235,6 +271,14 @@ and parse_statement env : Statement.t =
     loc = with_start_loc env start_loc;
     loc_stack = [];
     attributes;
+  }
+
+and parse_module_decl ?visibility env =
+  Expect.token env Token.T_MODULE;
+  let id = parse_identifier env in
+  { Statement.
+    mod_visibility = visibility;
+    mod_name = id;
   }
 
 and parse_var_binding env kind: Statement.var_binding =
@@ -286,17 +330,21 @@ and parse_function_header env: Function.header =
     header_loc = with_start_loc env start_loc;
   }
 
-and parse_function env: Function.t =
+and parse_function ?visibility env: Function.t =
   let open Function in
-  let start_loc = Peek.loc env in
-  let header = parse_function_header env in
-  let block = parse_block env in
-  {
-    header;
-    body = Fun_block_body block;
-    loc = with_start_loc env start_loc;
-    comments = [];
-  }
+  let fun_scope = Parse_scope.create ~prev:(scope env) Parse_scope.PString_Function in
+  with_scope env fun_scope (fun () ->
+    let start_loc = Peek.loc env in
+    let header = parse_function_header env in
+    let block = parse_block env in
+    {
+      visibility;
+      header;
+      body = Fun_block_body block;
+      loc = with_start_loc env start_loc;
+      comments = [];
+    }
+  )
 
 and parse_params env: Function.params =
   let parse_param env: Function.param =

@@ -15,6 +15,9 @@ let rec annotate_statement env (stmt: Ast.Statement.t) =
       cls.tcls_id.value <- ty_val; *)
       T.Statement.Class cls
 
+    | Module { mod_visibility; mod_name } ->
+      T.Statement.Module { mod_visibility; mod_name }
+
     | Expr expr ->
       T.Statement.Expr (annotate_expression env expr)
 

@@ -87,6 +87,11 @@ and Statement : sig
     cls_comments: Loc.t Waterlang_lex.Comment.t list;
   }
 
+  and _module = {
+    mod_visibility: visibility option;
+    mod_name: Identifier.t;
+  }
+
   and class_body = {
     cls_body_elements: class_body_element list;
     cls_body_loc: Loc.t;
@@ -129,6 +134,7 @@ and Statement : sig
   }
 
   and spec =
+    | Module of _module
     | Class of _class
     | Expr of Expression.t (* Expr without trailing semi-colon. *)
     | Semi of Expression.t (* Expr with a trailing semi-colon. *)
@@ -183,6 +189,7 @@ end
 and Function : sig
 
   type t = {
+    visibility: visibility option;
     header: header;
     body: function_body;
     loc: Loc.t;

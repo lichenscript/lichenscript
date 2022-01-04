@@ -30,6 +30,8 @@ let rec check_statement env statement =
   | Class cls ->
     check_class env cls
 
+  | Module _ -> ()
+
   | Expr expr
   | Semi expr ->
     check_expression env expr

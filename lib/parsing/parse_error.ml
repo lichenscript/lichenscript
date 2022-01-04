@@ -9,6 +9,7 @@ and spec =
   | LexError of Waterlang_lex.Lex_error.t
   | IsNotLeftValue
   | MalformedUnicode
+  | VisibilityNoOnTopLevel
 
 exception Error of t list
 
@@ -22,5 +23,6 @@ module PP = struct
     | LexError lex_err -> Format.fprintf formatter "%s" (Lex_error.PP.error lex_err)
     | IsNotLeftValue -> Format.fprintf formatter "Element is not a left value"
     | MalformedUnicode -> Format.fprintf formatter "Malformed unicode"
+    | VisibilityNoOnTopLevel -> Format.fprintf formatter "Visibility modifiers are only allowed on top-leveled scope"
 
 end

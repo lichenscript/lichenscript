@@ -59,6 +59,17 @@ let load_library_by_dir env std_dir =
   let _mod = Module.create abs_path typed_tree in
   ModuleMap.set env.module_map ~key:abs_path ~data:_mod
 
+let print_loc_title ~prefix loc_opt =
+  Loc. (
+    match loc_opt.source with
+    | Some source -> (
+      print_error_prefix ();
+      let source_str = Format.asprintf "%a" Waterlang_lex.File_key.pp source in
+      Out_channel.printf "%s in %s\n" prefix (TermColor.grey ^ source_str ^ TermColor.reset)
+    )
+    | None -> ()
+  )
+
 let compile_file_path ~package_name ~std_dir entry_file_path =
   if Option.is_none std_dir then (
     Format.printf "std library is not found\n";
@@ -89,25 +100,17 @@ let compile_file_path ~package_name ~std_dir entry_file_path =
       List.iter
         ~f:(fun err ->
           let { Parse_error. perr_loc; _ } = err in
-          Loc. (
-            match perr_loc.source with
-            | Some source -> (
-              print_error_prefix ();
-              let source_str = Format.asprintf "%a" Waterlang_lex.File_key.pp source in
-              Out_channel.printf "parse error in %s\n" (TermColor.grey ^ source_str ^ TermColor.reset)
-            )
-            | None -> ()
-          );
+          print_loc_title ~prefix:"parse error" perr_loc;
           let start = perr_loc.start in
           Format.printf "%d:%d %a\n" start.line start.column Parse_error.PP.error err
         )
         errors
 
     | Type_error.Error e ->
-      Type_error.PP.error Format.str_formatter e;
-      let err_str = Format.asprintf "%a" Type_error.PP.error e in
-      print_error_prefix ();
-      Out_channel.printf "%s\n" err_str
+      let { Type_error. spec; loc } = e in
+      print_loc_title ~prefix:"type error" loc;
+      let start = loc.start in
+      Format.printf "%d:%d %a\n" start.line start.column Type_error.PP.error_spec spec
 
     | e ->
       let string = Exn.to_string e in

@@ -77,6 +77,7 @@ and Statement : sig
 
   and spec =
     | Class of _class
+    | Module of _module
     | Expr of Expression.t
     | Semi of Expression.t
     | Function_ of Function.t
@@ -95,6 +96,11 @@ and Statement : sig
     cls_id: Core_type.TypeSym.t;
     cls_loc: Loc.t;
     cls_body: class_body;
+  }
+
+  and _module = {
+    mod_visibility: Ast.visibility option;
+    mod_name: Identifier.t;
   }
 
   and class_body = {

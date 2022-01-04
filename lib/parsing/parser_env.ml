@@ -108,6 +108,7 @@ type env = {
   lookahead: Lookahead.t ref;
   token_sink: (token_sink_result -> unit) option ref;
   source: File_key.t option;
+  mutable scope: Parse_scope.t;
 }
 
 let lookahead ~i env =
@@ -133,7 +134,17 @@ let init_env source content =
     source;
     lookahead = ref (Lookahead.create lex_env);
     token_sink = ref None;
+    scope = Parse_scope.create Parse_scope.PScope_Module;
   }
+
+let with_scope env scope cb =
+  let prev_scope = env.scope in
+  env.scope <- scope;
+  let result = cb () in
+  env.scope <- prev_scope;
+  result
+
+let scope env = env.scope
 
 let in_function env = env.in_function
 

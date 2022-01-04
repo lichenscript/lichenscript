@@ -39,7 +39,8 @@ let rec codegen_statement env stmt =
   let open Statement in
   let { spec; _ } = stmt in
   match spec with
-  | Class _ -> ()
+  | Class _
+  | Module _ -> ()
   | Expr expr -> codegen_expression env expr
   | Semi expr -> (
     codegen_expression env expr;
