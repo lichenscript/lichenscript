@@ -7,9 +7,13 @@ let help_message = {|
 wtc <entry> [args]
 
 |} ^ TermColor.bold ^ "Options:" ^ TermColor.reset ^ {|
-  --lib             Build a library
-  --std <dir>       Specific the directorey of std library
-  -h, --help        Show help message
+  --lib                 Build a library
+  --build-dir <dir>     Specify a directory to build,
+                        a temp directory will be used if this is not specified.
+  --std <dir>           Specify the directorey of std library.
+                        If this is not passed, use the builtin version.
+  --platform <platform> native/wasm/js, default: native
+  -h, --help            Show help message
 
 |}
 
@@ -18,6 +22,8 @@ let rec main () =
   let args = Sys.get_argv () in
   let entry = ref None in
   let std = ref None in
+  let buildDir = ref None in
+  let platform = ref "native" in
   while !index < (Array.length args) do
     let item = Array.get args !index in
     index := !index + 1;
@@ -32,6 +38,24 @@ let rec main () =
         ignore (exit 1)
       );
       std := Some (Array.get args !index);
+      index := !index + 1;
+    )
+
+    | "--build-dir" -> (
+      if !index >= (Array.length args) then (
+        Format.printf "not enough args for --build-dir\n";
+        ignore (exit 1)
+      );
+      buildDir := Some (Array.get args !index);
+      index := !index + 1;
+    )
+
+    | "--platform" -> (
+      if !index >= (Array.length args) then (
+        Format.printf "not enough args for --platform\n";
+        ignore (exit 1)
+      );
+      platform := (Array.get args !index);
       index := !index + 1;
     )
 
