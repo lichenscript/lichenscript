@@ -8,7 +8,9 @@ wtc <entry> [args]
 
 |} ^ TermColor.bold ^ "Options:" ^ TermColor.reset ^ {|
   --lib                 Build a library
-  --build-dir <dir>     Specify a directory to build,
+  --base <dir>          Base directory to resolve modules,
+                        default: current directory
+  --build-dir, -D <dir> Specify a directory to build,
                         a temp directory will be used if this is not specified.
   --std <dir>           Specify the directorey of std library.
                         If this is not passed, use the builtin version.
@@ -24,6 +26,7 @@ let rec main () =
   let std = ref None in
   let buildDir = ref None in
   let platform = ref "native" in
+  let baseDir = ref Filename.current_dir_name in
   while !index < (Array.length args) do
     let item = Array.get args !index in
     index := !index + 1;
@@ -41,7 +44,7 @@ let rec main () =
       index := !index + 1;
     )
 
-    | "--build-dir" -> (
+    | "--build-dir" | "-D" -> (
       if !index >= (Array.length args) then (
         Format.printf "not enough args for --build-dir\n";
         ignore (exit 1)
@@ -56,6 +59,15 @@ let rec main () =
         ignore (exit 1)
       );
       platform := (Array.get args !index);
+      index := !index + 1;
+    )
+
+    | "--base" -> (
+      if !index >= (Array.length args) then (
+        Format.printf "not enough args for --base\n";
+        ignore (exit 1)
+      );
+      baseDir := (Array.get args !index) |> Filename.realpath;
       index := !index + 1;
     )
 

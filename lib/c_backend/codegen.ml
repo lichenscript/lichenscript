@@ -225,23 +225,23 @@ and codegen_function env (_fun: Typedtree.Function.t) =
   endl env;
 
   with_indent env (fun () ->
-    print_indents env;
-    ps env "WTValue ";
     let { assoc_scope; body; _ } = _fun in
     let vars = Scope.vars assoc_scope in
     let vars_len_m1 = (List.length vars) - 1 in
-
-    List.iteri
-      ~f:(fun index (name, _item) ->
-        ps env name;
-        if index <> vars_len_m1 then
-          ps env ", "
-        else
-          ps env ";"
-      )
-      vars;
-
-    endl env;
+    if vars_len_m1 >= 0 then (
+      print_indents env;
+      ps env "WTValue ";
+      List.iteri
+        ~f:(fun index (name, _item) ->
+          ps env name;
+          if index <> vars_len_m1 then
+            ps env ", "
+          else ()
+        )
+        vars;
+      ps env ";";
+      endl env;
+    );
 
     ignore (codegen_function_body body);
   );
