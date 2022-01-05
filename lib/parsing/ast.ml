@@ -115,6 +115,7 @@ and Statement : sig
     cls_method_params: Function.params;
     cls_method_body: Block.t option;
     cls_method_loc: Loc.t;
+    cls_method_return_ty: Type.t option;
   }
 
   and class_body_element =

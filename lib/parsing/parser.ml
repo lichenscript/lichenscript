@@ -541,6 +541,13 @@ and parse_class_body env: Statement.class_body =
     if Peek.token env = Token.T_LPAREN then
       begin
         let params = parse_params env in
+        let cls_method_return_ty =
+          if Peek.token env = Token.T_COLON then (
+            Eat.token env;
+            Some (parse_type env)
+          ) else
+            None
+        in
         let cls_method_body =
           if Peek.token env = Token.T_SEMICOLON then (
             Eat.token env;
@@ -556,6 +563,7 @@ and parse_class_body env: Statement.class_body =
           cls_method_params = params;
           cls_method_body;
           cls_method_loc = with_start_loc env start_pos;
+          cls_method_return_ty;
         }
       end
     else
@@ -966,7 +974,23 @@ and parse_type env : Type.t =
   let open Type in
   let start_loc = Peek.loc env in
   let id = parse_identifier env in
+  let args = ref [] in
+
+  if Peek.token env = Token.T_LESS_THAN then (
+    Eat.token env;
+
+    while Peek.token env <> Token.T_GREATER_THAN do
+      let t = parse_type env in
+      args := t::(!args);
+      if Peek.token env <> Token.T_GREATER_THAN then (
+        Expect.token env Token.T_COMMA;
+      )
+    done;
+
+    Expect.token env Token.T_GREATER_THAN
+  );
+
   {
-    spec = Ty_ctor (id, []);
+    spec = Ty_ctor (id, List.rev !args);
     loc = with_start_loc env start_loc;
   }

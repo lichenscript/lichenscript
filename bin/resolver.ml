@@ -136,7 +136,8 @@ let rec compile_file_path ~package_name ~std_dir ~build_dir entry_file_path =
     let mod_name = entry_file_path |> Filename.dirname |> dirname in
     let output_path = write_to_file build_dir mod_name output in
     write_runtime_files (Option.value_exn build_dir);
-    write_makefiles (Option.value_exn build_dir) [ (mod_name, output_path) ];
+    let bin_name = entry_file_path |> dirname |> (Filename.chop_extension) in
+    write_makefiles ~bin_name (Option.value_exn build_dir) [ (mod_name, output_path) ];
   with
     | FileNotFound path ->
       print_error_prefix ();
@@ -203,7 +204,7 @@ and write_runtime_files build_dir =
     )
     Embed.contents
 
-and write_makefiles build_dir mods =
+and write_makefiles ~bin_name build_dir mods =
   let output_path = Filename.concat build_dir "Makefile" in
   let open Makefile in
   let c_srcs = List.fold ~init:"runtime.c" ~f:(fun acc (m, _) -> (acc ^ " " ^ m ^ ".c")) mods in
@@ -212,7 +213,7 @@ and write_makefiles build_dir mods =
       {
         entry_name = "all";
         deps = List.concat [ ["runtime"]; (List.map ~f:(fun (m, _) -> m) mods)];
-        content = "cc " ^ c_srcs ^ " -o main";
+        content = Format.sprintf "cc %s -o %s" c_srcs bin_name;
       };
       {
         entry_name = "runtime";

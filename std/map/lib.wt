@@ -1,0 +1,10 @@
+
+class Map<K, V> {
+
+    @external("wt_std_map_set")
+    set(key: K, v: V);
+
+    @external("wt_std_map_get")
+    get(key: K): Option<V>;
+
+}
