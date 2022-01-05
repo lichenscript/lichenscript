@@ -135,9 +135,11 @@ let rec compile_file_path ~package_name ~std_dir ~build_dir entry_file_path =
     let output = Waterlang_c.codegen typed_tree in
     let mod_name = entry_file_path |> Filename.dirname |> dirname in
     let output_path = write_to_file build_dir mod_name output in
-    write_runtime_files (Option.value_exn build_dir);
+    let build_dir = Option.value_exn build_dir in
+    write_runtime_files build_dir;
     let bin_name = entry_file_path |> dirname |> (Filename.chop_extension) in
-    write_makefiles ~bin_name (Option.value_exn build_dir) [ (mod_name, output_path) ];
+    write_makefiles ~bin_name build_dir [ (mod_name, output_path) ];
+    run_make_in_dir build_dir;
   with
     | FileNotFound path ->
       print_error_prefix ();
@@ -231,3 +233,15 @@ and write_makefiles ~bin_name build_dir mods =
   ] in
   let data = to_string entries in
   Out_channel.write_all output_path ~data
+
+and run_make_in_dir build_dir =
+  Out_channel.printf "Spawn to build in %s\n" (TermColor.bold ^ build_dir ^ TermColor.reset);
+  Out_channel.flush Out_channel.stdout;
+  Out_channel.flush Out_channel.stderr;
+  match Unix.fork () with
+  | `In_the_child -> 
+    Unix.chdir build_dir;
+    Unix.exec ~prog:"make" ~argv:["make";] () |> ignore
+
+  | `In_the_parent pid ->
+    ignore (Unix.waitpid pid)
