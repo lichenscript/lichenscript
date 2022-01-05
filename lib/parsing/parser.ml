@@ -485,9 +485,15 @@ and parse_class env : Statement._class =
   let start_loc = Peek.loc env in
   Eat.token env;  (* class *)
   let id = parse_identifier env in
+  let cls_type_vars =
+    if (Peek.token env) = Token.T_LESS_THAN then
+      parse_type_vars env
+    else []
+  in
   let body = parse_class_body env in
   {
     cls_id = Some id;
+    cls_type_vars;
     cls_loc = with_start_loc env start_loc;
     cls_body = body;
     cls_comments = [];
@@ -523,18 +529,32 @@ and parse_class_body env: Statement.class_body =
       ) else false
     in
 
+    let attributes =
+      if (Peek.token env) = Token.T_AT then
+        parse_attributes env
+      else
+        []
+    in
+
     let id = parse_identifier env in
 
-    if Peek.token env == Token.T_LPAREN then
+    if Peek.token env = Token.T_LPAREN then
       begin
         let params = parse_params env in
-        let block = parse_block env in
+        let cls_method_body =
+          if Peek.token env = Token.T_SEMICOLON then (
+            Eat.token env;
+            None
+          ) else
+            Some (parse_block env)
+        in
         Cls_method {
+          cls_method_attributes = attributes;
           cls_method_static;
           cls_method_visiblity = v;
           cls_method_name = id;
           cls_method_params = params;
-          cls_method_body = block;
+          cls_method_body;
           cls_method_loc = with_start_loc env start_pos;
         }
       end
@@ -562,6 +582,7 @@ and parse_class_body env: Statement.class_body =
 
         Expect.token env Token.T_SEMICOLON;
         Cls_property {
+          cls_property_attributes = attributes;
           cls_property_visiblity = v;
           cls_property_loc = with_start_loc env start_pos;
           cls_property_name = id;

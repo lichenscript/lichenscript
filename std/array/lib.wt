@@ -1,0 +1,7 @@
+
+class Array<T> {
+
+    @external("wt_std_array_push")
+    push(item: T);
+
+}

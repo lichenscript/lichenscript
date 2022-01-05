@@ -81,10 +81,11 @@ end
 and Statement : sig
 
   type _class = {
-    cls_id:       Identifier.t option;
-    cls_loc:      Loc.t;
-    cls_body:     class_body;
-    cls_comments: Loc.t Waterlang_lex.Comment.t list;
+    cls_id:        Identifier.t option;
+    cls_type_vars: Identifier.t list;
+    cls_loc:       Loc.t;
+    cls_body:      class_body;
+    cls_comments:  Loc.t Waterlang_lex.Comment.t list;
   }
 
   and _module = {
@@ -98,6 +99,7 @@ and Statement : sig
   }
 
   and class_property = {
+    cls_property_attributes: attributes;
     cls_property_visiblity: visibility option;
     cls_property_loc: Loc.t;
     cls_property_name: Identifier.t;
@@ -106,11 +108,12 @@ and Statement : sig
   }
 
   and class_method = {
+    cls_method_attributes: attributes;
     cls_method_static: bool;
     cls_method_visiblity: visibility option;
     cls_method_name: Identifier.t;
     cls_method_params: Function.params;
-    cls_method_body: Block.t;
+    cls_method_body: Block.t option;
     cls_method_loc: Loc.t;
   }
 

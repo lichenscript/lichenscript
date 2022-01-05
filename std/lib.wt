@@ -1,2 +1,3 @@
 
 public module preclude;
+public module array;
