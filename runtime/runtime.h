@@ -122,7 +122,7 @@ typedef struct WTRuntime {
     WTValue* i64_pool;
 } WTRuntime;
 
-typedef WTValue (*WTCFunction)(WTRuntime* rt, WTValue this, uint32_t arg_len, WTValue* args);
+typedef WTValue (*WTCFunction)(WTRuntime* rt, WTValue this, int32_t arg_len, WTValue* args);
 
 typedef struct WTProgram {
     WTRuntime* runtime;
@@ -184,4 +184,4 @@ typedef struct WTClassObject {
 
 WTClassObject* WTNewClassObject(WTRuntime* rt, WTClassObjectMeta* meta, uint32_t slot_count);
 
-WTValue wt_std_print(WTRuntime* rt, WTValue this, uint32_t arg_len, WTValue* args);
+WTValue wt_std_print(WTRuntime* rt, WTValue this, int arg_len, WTValue* args);

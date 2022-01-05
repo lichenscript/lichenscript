@@ -301,8 +301,8 @@ static void std_print_val(WTRuntime* rt, WTValue val) {
 
 }
 
-WTValue wt_std_print(WTRuntime* rt, WTValue this, uint32_t arg_len, WTValue* args) {
-    for (uint32_t i = 0; i < arg_len; i++) {
+WTValue wt_std_print(WTRuntime* rt, WTValue this, int arg_len, WTValue* args) {
+    for (int i = 0; i < arg_len; i++) {
         std_print_val(rt, args[i]);
     }
     printf("\n");

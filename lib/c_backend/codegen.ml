@@ -284,7 +284,7 @@ and codegen_function env (_fun: Typedtree.Function.t) =
   ps env "WTValue ";
   ps env "wt_";
   ps env fun_name;
-  ps env "(WTRuntime* rt, WTValue this, uint32_t arg_len, WTValue* args)";
+  ps env "(WTRuntime* rt, WTValue this, int arg_len, WTValue* args)";
   ps env " {";
   endl env;
 
