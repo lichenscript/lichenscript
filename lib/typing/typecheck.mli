@@ -1,2 +1,2 @@
 
-val type_check: Env.t -> Typedtree.program -> unit
+val type_check: Typedtree.program -> Type_error.t list

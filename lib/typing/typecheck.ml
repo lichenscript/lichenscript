@@ -2,6 +2,39 @@ open Core_kernel
 open Core_type
 open Typedtree
 
+module TypecheckEnv : sig
+
+  type t
+
+  val create: unit -> t
+
+  val add_error: t -> Type_error.t -> unit
+
+  val return_type: t -> TypeValue.t option
+
+  val errors: t -> Type_error.t list
+  
+end = struct
+
+  type t = {
+    mutable errors: Type_error.t list;
+    mutable return_type: TypeValue.t option;
+  }
+
+  let create () = {
+    errors = [];
+    return_type = None;
+  }
+
+  let add_error env err =
+    env.errors <- err::env.errors
+
+  let return_type env = env.return_type
+
+  let errors env = List.rev env.errors
+  
+end
+
 let type_assinable left right =
   let open TypeValue in
   match (left, right) with
@@ -56,7 +89,7 @@ let rec check_statement env statement =
   | Continue _
   | Debugger -> ()
   | Return expr_opt -> 
-    let expected = Option.value ~default:TypeValue.Unit (Env.return_type env) in
+    let expected = Option.value ~default:TypeValue.Unit (TypecheckEnv.return_type env) in
     (match expr_opt with
     | Some expr ->
       check_expression env expr;
@@ -91,7 +124,7 @@ and check_class env cls =
     )
     cls_body_elements
 
-and check_function (env: Env.t) _fun =
+and check_function (env: TypecheckEnv.t) _fun =
   let open Typedtree.Function in
   let { body;  _; } = _fun in
   match body with
@@ -154,14 +187,14 @@ and check_expression env (expr: Typedtree.Expression.t) =
         match result with
         | Unequal_lengths ->
           let err = Type_error.make_error call_loc (Type_error.ParamsMismatch callee_type) in
-          Env.add_error env err
+          TypecheckEnv.add_error env err
 
         | _ -> ()
       end
 
     | _ ->
       let err = Type_error.make_error call_loc (Type_error.NotCallable callee_type) in
-      Env.add_error env err
+      TypecheckEnv.add_error env err
     )
 
   | Member (expr, _field) ->
@@ -211,23 +244,28 @@ and check_assignable env loc left right =
   if not (type_assinable left right) then (
     let spec = Type_error.NotAssignable(left, right) in
     let err = {Type_error. loc; spec } in
-    Env.add_error env err
+    TypecheckEnv.add_error env err
   )
 
 and check_returnable env loc expected actual =
   if not (type_assinable expected actual) then (
     let spec = Type_error.CannotReturn(expected, actual) in
     let err = {Type_error. loc; spec } in
-    Env.add_error env err
+    TypecheckEnv.add_error env err
   )
 
 and check_passable env loc ~name ~(def: TypeValue.t) ~(actual: TypeValue.t) =
   if not (type_assinable def actual) then (
     let spec = Type_error.CannotPassParam(name, def, actual) in
     let err = {Type_error. loc; spec } in
-    Env.add_error env err
+    TypecheckEnv.add_error env err
   )
 
-let type_check env program =
+let type_check_intern env program =
   let { tprogram_statements; _; } = program in
   List.iter ~f:(check_statement env) tprogram_statements
+
+let type_check program =
+  let env = TypecheckEnv.create () in
+  type_check_intern env program;
+  TypecheckEnv.errors env

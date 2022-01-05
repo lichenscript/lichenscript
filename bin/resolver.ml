@@ -167,6 +167,7 @@ let rec compile_file_path ~package_name ~std_dir ~build_dir entry_file_path =
     let env = create ~find_paths:[ Option.value_exn std_dir ] () in
     (* load standard library *)
     (* parse_and_annotate_find_paths *)
+    parse_and_annotate_find_paths env;
     load_library_by_dir [] env (Option.value_exn std_dir);
     (* open std.preclude to module scope *)
     let content = In_channel.read_all entry_file_path in
