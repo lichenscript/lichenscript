@@ -253,6 +253,7 @@ and Enum : sig
 
   type t = {
     name: Identifier.t;
+    type_vars: Identifier.t list;
     members: member list;
     loc: Loc.t
   }

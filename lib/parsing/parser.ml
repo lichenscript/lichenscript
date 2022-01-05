@@ -200,6 +200,14 @@ and parse_statement env : Statement.t =
       let start_loc = Peek.loc env in
       Eat.token env;
       let name = parse_identifier env in
+
+      let type_vars =
+        if Peek.token env = Token.T_LESS_THAN then
+          parse_type_vars env
+        else
+          []
+      in
+
       let members = ref [] in
       Expect.token env Token.T_LCURLY;
 
@@ -216,6 +224,7 @@ and parse_statement env : Statement.t =
       Expect.token env Token.T_RCURLY;
       EnumDecl { Enum.
         name;
+        type_vars;
         members = List.rev !members;
         loc = with_start_loc env start_loc;
       }
@@ -282,6 +291,21 @@ and parse_statement env : Statement.t =
     loc_stack = [];
     attributes;
   }
+
+and parse_type_vars env =
+  let result = ref [] in
+  Expect.token env Token.T_LESS_THAN;
+
+  while (Peek.token env) <> Token.T_GREATER_THAN do
+    let id = parse_identifier env in
+    result := id::!result;
+    if (Peek.token env) = Token.T_COMMA then (
+      Eat.token env
+    )
+  done;
+
+  Expect.token env Token.T_GREATER_THAN;
+  List.rev !result
 
 and parse_module_decl ?visibility env =
   Expect.token env Token.T_MODULE;
