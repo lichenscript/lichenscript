@@ -256,3 +256,55 @@ WTClassObject* WTNewClassObject(WTRuntime* rt, WTClassObjectMeta* meta, uint32_t
     
     return result;
 }
+
+void WTRunMain(WTProgram* program) {
+    if (program->main_fun == NULL) {
+        return;
+    }
+    program->main_fun(program->runtime, MK_NULL(), 0, NULL);
+}
+
+static void std_print_string(WTString* str) {
+    printf("%s", str->content);
+}
+
+static void std_print_val(WTRuntime* rt, WTValue val) {
+    switch (val.type)
+    {
+    case WT_TY_BOOL:
+        if (val.int_val) {
+            printf("true");
+        } else {
+            printf("false");
+        }
+        break;
+
+    case WT_TY_F32:
+        printf("%f", val.float_val);
+        break;
+
+    case WT_TY_I32:
+        printf("%d", val.int_val);
+        break;
+
+    case WT_TY_NULL:
+        printf("()");
+        break;
+
+    case WT_TY_STRING:
+        std_print_string((WTString*)val.ptr_val);
+        break;
+    
+    default:
+        break;
+    }
+
+}
+
+WTValue wt_std_print(WTRuntime* rt, WTValue this, uint32_t arg_len, WTValue* args) {
+    for (uint32_t i = 0; i < arg_len; i++) {
+        std_print_val(rt, args[i]);
+    }
+    printf("\n");
+    return MK_NULL();
+}

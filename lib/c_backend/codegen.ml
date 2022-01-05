@@ -42,6 +42,7 @@ let rec codegen_statement env stmt =
   | Class _
   | Module _ -> ()
   | Expr expr -> (
+    ps env "return ";
     codegen_expression env expr;
     ps env ";"
   )
@@ -114,7 +115,7 @@ and codegen_expression env (expr: Typedtree.Expression.t) =
       let len = String.length str in
       ps env Primitives.Value.new_string_len;
       ps env "(rt, ";
-      ps env "\"";
+      ps env "(const unsigned char*)\"";
       ps env str;
       ps env "\", ";
       ps env (Int.to_string len);
@@ -152,8 +153,9 @@ and codegen_expression env (expr: Typedtree.Expression.t) =
       match sym.spec with
       | Core_type.VarSym.ExternalMethod ext_method_name -> (
         ps env ext_method_name;
-        ps env "(";
-        let params_len_m1 = (List.length call_params) - 1 in
+        let params_len = List.length call_params in
+        let params_len_m1 = params_len - 1 in
+        ps env ("(rt, MK_NULL(), " ^ (Int.to_string params_len) ^ ", (WTValue[]){ ");
         List.iteri
           ~f:(fun index item ->
             codegen_expression env item;
@@ -162,7 +164,7 @@ and codegen_expression env (expr: Typedtree.Expression.t) =
             )
           )
           call_params;
-        ps env ")"
+        ps env "})"
       )
       | _ ->
       failwith "not implemented"

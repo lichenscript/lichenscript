@@ -1,3 +1,3 @@
 
-@external("wt_print")
+@external("wt_std_print")
 declare function print(content: string);
