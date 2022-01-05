@@ -115,7 +115,7 @@ let print_loc_title ~prefix loc_opt =
     | None -> ()
   )
 
-let compile_file_path ~package_name ~std_dir entry_file_path =
+let rec compile_file_path ~package_name ~std_dir ~build_dir entry_file_path =
   if Option.is_none std_dir then (
     Format.printf "std library is not found\n";
     ignore (exit 1)
@@ -133,8 +133,8 @@ let compile_file_path ~package_name ~std_dir entry_file_path =
     in
     (* TODO: compile other modules *)
     let output = Waterlang_c.codegen typed_tree in
-    Format.printf "%s\n" output
-    (* write to files *)
+    let mod_name = entry_file_path |> Filename.dirname |> dirname in
+    write_to_file build_dir mod_name output
   with
     | FileNotFound path ->
       print_error_prefix ();
@@ -176,3 +176,18 @@ let compile_file_path ~package_name ~std_dir entry_file_path =
       Out_channel.print_string stack;
       Out_channel.print_string TermColor.reset;
       Out_channel.print_endline "" *)
+
+and write_to_file build_dir mod_name content =
+  let build_dir =
+    match build_dir with
+    | Some v -> v
+    | None -> Filename.concat Filename.temp_dir_name "waterlang"
+  in
+  (match Sys.file_exists build_dir with
+  | `No -> (
+    Unix.mkdir_p build_dir
+  )
+  | _ -> ()
+  );
+  let output_file_path = Filename.concat build_dir (mod_name ^ ".c") in
+  Out_channel.write_all output_file_path ~data:content
