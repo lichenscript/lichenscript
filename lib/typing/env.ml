@@ -4,7 +4,6 @@ open Core_type
 
 type t = {
   root_scope: Scope.t;
-  type_provider: Type_provider.provider;
   open_domains: string array list;
   mutable current_scope: Scope.t;
   mutable errors: Type_error.t list;
@@ -33,12 +32,11 @@ let make_default_type_sym scope =
     )
     names
 
-let create ?(type_provider=Type_provider.default_provider) ?(open_domains=[]) () =
+let create ?(open_domains=[]) () =
   let root_scope = Scope.create 0 in
   let env =
     {
       root_scope;
-      type_provider;
       open_domains;
       current_scope = root_scope;
       errors = [];
@@ -48,21 +46,6 @@ let create ?(type_provider=Type_provider.default_provider) ?(open_domains=[]) ()
   in
   make_default_type_sym root_scope;
   env
-
-(* iterate the open domains *)
-let resolve_open_domain env name =
-  List.fold_until  
-    ~init:None
-    ~f:(fun acc item ->
-      let test = env.type_provider#resolve (item, [| name |]) in
-      match test with
-      | Some var ->
-        Continue_or_stop.Stop (Some var)
-      | None ->
-        Continue_or_stop.Continue acc
-    )
-    env.open_domains
-    ~finish:(fun acc -> acc)
 
 let root_scope env = env.root_scope
 

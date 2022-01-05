@@ -1,11 +1,15 @@
 open Core
 open Waterlang_typing
 
+type file = {
+	path: string;
+  typed_tree: Typedtree.program;
+}
+
 type t = {
   id: string array;
   id_str: string;
-  source: string;
-  typed_tree: Typedtree.program;
+  mutable files: file list;
 }
 
 let get_id_str id =
@@ -21,12 +25,17 @@ let get_id_str id =
   done;
   Buffer.contents buf
 
-let create ~path ~id ~id_str typed_tree =
+let create ~id ~id_str () =
   {
     id;
     id_str;
-    source = path;
-    typed_tree;
+    files = [];
   }
 
-let typed_tree env = env.typed_tree
+let add_file env file =
+  env.files <- file::env.files
+
+let files env = List.rev env.files
+
+let set_files env files =
+  env.files <- files

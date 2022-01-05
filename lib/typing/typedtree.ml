@@ -25,6 +25,7 @@ module%gen rec Expression : sig
   and spec =
     | Constant of Ast.Literal.t
     | Identifier of Core_type.VarSym.t
+    | UnresolvedIdentifier of Identifier.t
     | Lambda
     | If of if_desc
     | Array of t list

@@ -109,9 +109,7 @@ and build_command args index =
     build_entry (Option.value_exn !entry) !std !buildDir
 
 and build_entry (entry: string) std_dir build_dir =
-  let abs_path = Filename.realpath entry in
-  let package_name = Filename.dirname abs_path in
-  Resolver.compile_file_path ~package_name ~std_dir ~build_dir entry
+  Resolver.compile_file_path ~std_dir ~build_dir entry
 
 ;;
 

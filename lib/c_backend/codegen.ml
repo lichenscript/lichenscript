@@ -195,6 +195,7 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
     pss env name
   )
 
+  | UnresolvedIdentifier _
   | Lambda
   | If _
   | Array _ -> ()

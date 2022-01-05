@@ -358,7 +358,8 @@ and annotate_expression (env: Env.t) expr =
           (T.Expression.Identifier sym, sym.def_type)
 
         | None ->
-          begin
+          (T.Expression.UnresolvedIdentifier id, TypeValue.Unknown)
+          (* begin
             (* find the open domain, external variables *)
             let test = Env.resolve_open_domain env id.pident_name in
             match test with
@@ -370,7 +371,7 @@ and annotate_expression (env: Env.t) expr =
               Env.add_error env err;
               raise (Type_error.Error err)
 
-          end
+          end *)
       end
 
     | Lambda _ -> (T.Expression.Lambda, TypeValue.Unknown)
