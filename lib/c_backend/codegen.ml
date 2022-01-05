@@ -27,6 +27,7 @@ type stmt_env = {
   env: t;
   stmt_buffer: Buffer.t;
   mutable stmt_prepend_lines: string list;
+  mutable stmt_append_lines: string list;
   mutable tmp_vars_counter: int;
 }
 
@@ -34,6 +35,7 @@ let create_stmt_env env = {
   env;
   stmt_buffer = Buffer.create 128;
   stmt_prepend_lines = [];
+  stmt_append_lines = [];
   tmp_vars_counter = 0;
 }
 
@@ -71,7 +73,7 @@ let rec codegen_statement (env: stmt_env) stmt =
   | Class _
   | Module _ -> ()
   | Expr expr -> (
-    pss env "return ";
+    pss env "ret = ";
     codegen_expression env expr;
     pss env ";"
   )
@@ -159,14 +161,19 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
     )
 
     | String (str, _, _) -> (
+      let id = env.tmp_vars_counter in
+      env.tmp_vars_counter <- env.tmp_vars_counter + 1;
+
       let len = String.length str in
-      pss env Primitives.Value.new_string_len;
-      pss env "(rt, ";
-      pss env "(const unsigned char*)\"";
-      pss env str;
-      pss env "\", ";
-      pss env (Int.to_string len);
-      pss env ")"
+      let prepend_content = Format.sprintf "t[%d] = %s(rt, (const unsigned char*)\"%s\", %d);" id Primitives.Value.new_string_len str len in
+      let append_content = Format.sprintf "%s(rt, t[%d]);" Primitives.Value.release id in
+
+      env.stmt_prepend_lines <- prepend_content::(env.stmt_prepend_lines);
+      env.stmt_append_lines <- append_content::(env.stmt_append_lines);
+
+      pss env "t[";
+      pss env (Int.to_string id);
+      pss env "]";
     )
 
     | Float (str, _) -> (
@@ -249,8 +256,7 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
 and codegen_function_block (env: t) block =
   let open Block in
   let { body; _ } = block in
-  let max_tmp_val = ref 0 in
-  let stmt_envs = List.map
+  List.map
     ~f:(fun stmt ->
       let prev_buffer = env.buffer in
       env.buffer <- Buffer.create 128;
@@ -262,27 +268,7 @@ and codegen_function_block (env: t) block =
       env.buffer <- prev_buffer;
       stmt_env
     )
-    body;
-  in
-  List.iter
-    ~f:(fun stmt ->
-      List.iter
-        ~f:(fun line ->
-          print_indents env;
-          ps env line;
-          endl env;
-        )
-       (List.rev stmt.stmt_prepend_lines);
-      let content = Buffer.contents stmt.stmt_buffer in
-      print_indents env;
-      ps env content;
-      endl env;
-      if stmt.tmp_vars_counter > !max_tmp_val then (
-        max_tmp_val := stmt.tmp_vars_counter
-      )
-    )
-    stmt_envs;
-  !max_tmp_val
+    body
 
 and codegen_function env (_fun: Typedtree.Function.t) =
   let open Function in
@@ -306,6 +292,11 @@ and codegen_function env (_fun: Typedtree.Function.t) =
     let { assoc_scope; body; _ } = _fun in
     let vars = Scope.vars assoc_scope in
     let vars_len_m1 = (List.length vars) - 1 in
+
+    print_indents env;
+    ps env "WTValue ret;";
+    endl env;
+
     if vars_len_m1 >= 0 then (
       print_indents env;
       ps env "WTValue ";
@@ -321,7 +312,46 @@ and codegen_function env (_fun: Typedtree.Function.t) =
       endl env;
     );
 
-    ignore (codegen_function_body body);
+    let stmts = codegen_function_body body in
+    let max_tmp_value = List.fold ~init:0
+      ~f:(fun acc item -> if item.tmp_vars_counter > acc then item.tmp_vars_counter else acc)
+      stmts
+    in
+
+    if max_tmp_value > 0 then (
+      print_indents env;
+      ps env "WTValue t[";
+      ps env (Int.to_string max_tmp_value);
+      ps env "];";
+      endl env;
+    );
+
+    List.iter
+      ~f:(fun stmt_env ->
+        List.iter
+          ~f:(fun line ->
+            print_indents env;
+            ps env line;
+            endl env
+          )
+          stmt_env.stmt_prepend_lines;
+        let content = Buffer.contents stmt_env.stmt_buffer in
+        print_indents env;
+        ps env content;
+        endl env;
+        List.iter
+          ~f:(fun line ->
+            print_indents env;
+            ps env line;
+            endl env
+          )
+          stmt_env.stmt_append_lines;
+      )
+      stmts;
+
+    print_indents env;
+    ps env "return ret;";
+    endl env;
   );
 
   ps env "}"

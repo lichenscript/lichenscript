@@ -9,6 +9,8 @@ module Value = struct
   let new_string = "WTNewStringFromCString"
 
   let new_string_len = "WTNewStringFromCStringLen"
+
+  let release = "WTRelease"
   
 end
 
