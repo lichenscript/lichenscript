@@ -257,11 +257,11 @@ WTClassObject* WTNewClassObject(WTRuntime* rt, WTClassObjectMeta* meta, uint32_t
     return result;
 }
 
-void WTRunMain(WTProgram* program) {
+WTValue WTRunMain(WTProgram* program) {
     if (program->main_fun == NULL) {
-        return;
+        return MK_NULL();
     }
-    program->main_fun(program->runtime, MK_NULL(), 0, NULL);
+    return program->main_fun(program->runtime, MK_NULL(), 0, NULL);
 }
 
 static void std_print_string(WTString* str) {

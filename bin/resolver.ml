@@ -206,12 +206,13 @@ and write_runtime_files build_dir =
 and write_makefiles build_dir mods =
   let output_path = Filename.concat build_dir "Makefile" in
   let open Makefile in
+  let c_srcs = List.fold ~init:"runtime.c" ~f:(fun acc (m, _) -> (acc ^ " " ^ m ^ ".c")) mods in
   let entries = List.concat [
     [
       {
         entry_name = "all";
         deps = List.concat [ ["runtime"]; (List.map ~f:(fun (m, _) -> m) mods)];
-        content = ";"
+        content = "cc " ^ c_srcs ^ " -o main";
       };
       {
         entry_name = "runtime";

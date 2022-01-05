@@ -129,7 +129,7 @@ typedef struct WTProgram {
     WTCFunction main_fun;
 } WTProgram;
 
-void WTRunMain(WTProgram* program);
+WTValue WTRunMain(WTProgram* program);
 
 WTRuntime* WTNewRuntime();
 void WTFreeRuntime(WTRuntime* rt);
