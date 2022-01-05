@@ -1,3 +1,9 @@
+(*
+ * 1. annotate parsed tree to typed tree
+ * 2. resolve top-level variables internally
+ * 
+ * deeper variables resolution remains to type-check phase
+ *)
 open Core_kernel
 open Core_type
 open Waterlang_parsing

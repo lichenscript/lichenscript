@@ -6,7 +6,8 @@
   waterlang_parsing
   waterlang_typing
   waterlang_c
-  core))
+  core
+  re))
 
 (rule
  (targets embed.ml)

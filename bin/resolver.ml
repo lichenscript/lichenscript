@@ -40,10 +40,12 @@ module ModuleMap = Hashtbl.Make(String)
 
 type t = {
   module_map: Module.t ModuleMap.t;
+  find_paths: string list;
 }
 
-let create () = {
+let create ~find_paths () = {
   module_map = ModuleMap.create ();
+  find_paths;
 }
 
 let get_mod_id id_list =
@@ -68,14 +70,14 @@ let create_type_provider env : Type_provider.provider =
 
   end
 
-let dirname path =
+let last_piece_of_path path =
   let parts = Filename.parts path in
   List.last_exn parts
 
 let rec load_library_by_dir id_list env std_dir =
   let abs_path = Filename.realpath std_dir in
 
-  let lib_name = dirname abs_path in
+  let lib_name = last_piece_of_path abs_path in
 
   let module_id = lib_name::id_list in
   let module_id_str = get_mod_id module_id in
@@ -115,14 +117,56 @@ let print_loc_title ~prefix loc_opt =
     | None -> ()
   )
 
+let allow_suffix = Re.Pcre.regexp "^(.+)\\.wt$"
+
+let compile_file_to_path _env _names path =
+  let _file_content = In_channel.read_all path in
+  let _file_key = File_key.LibFile path in
+  ()
+
+(* recursive all files in the path *)
+let parse_and_annotate_path env path =
+  let rec iterate names path =
+    let children = Sys.ls_dir path in
+    List.iter
+      ~f:(fun item ->
+        let child_path = Filename.concat path item in
+        if Sys.is_file_exn child_path then (
+          let test_result = Re.exec allow_suffix child_path |> Re.Group.all in
+          if Array.length test_result > 1 then  (* is a .wt file *)
+            compile_file_to_path env (List.rev names) child_path
+          else ()
+        ) else if Sys.is_directory_exn child_path then (
+          let mod_name = last_piece_of_path child_path in
+          iterate (mod_name::names) child_path
+        )
+      )
+      children
+  in
+  let mod_root_name = last_piece_of_path path in
+  iterate [mod_root_name] path
+
+let parse_and_annotate_find_paths env =
+  List.iter ~f:(parse_and_annotate_path env) env.find_paths
+
+(*
+ * 1. parse all files with .wt of find path
+ * 2. parse all program files with .wt of find path
+ * 3. type check one by one
+ *
+ * All the files should be annotated before type check,
+ * because cyclic dependencies is allowed.
+ * Annotated parsed tree remain the "holes" to type check
+ *)
 let rec compile_file_path ~package_name ~std_dir ~build_dir entry_file_path =
   if Option.is_none std_dir then (
     Format.printf "std library is not found\n";
     ignore (exit 1)
   );
   try
-    let env = create () in
+    let env = create ~find_paths:[ Option.value_exn std_dir ] () in
     (* load standard library *)
+    (* parse_and_annotate_find_paths *)
     load_library_by_dir [] env (Option.value_exn std_dir);
     (* open std.preclude to module scope *)
     let content = In_channel.read_all entry_file_path in
@@ -133,11 +177,11 @@ let rec compile_file_path ~package_name ~std_dir ~build_dir entry_file_path =
     in
     (* TODO: compile other modules *)
     let output = Waterlang_c.codegen typed_tree in
-    let mod_name = entry_file_path |> Filename.dirname |> dirname in
+    let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
     let output_path = write_to_file build_dir mod_name output in
     let build_dir = Option.value_exn build_dir in
     write_runtime_files build_dir;
-    let bin_name = entry_file_path |> dirname |> (Filename.chop_extension) in
+    let bin_name = entry_file_path |> last_piece_of_path |> (Filename.chop_extension) in
     write_makefiles ~bin_name build_dir [ (mod_name, output_path) ];
     run_make_in_dir build_dir;
   with
