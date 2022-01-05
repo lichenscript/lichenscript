@@ -2,9 +2,18 @@ open Cli_utils
 open Core
 
 let help_message = {|
-
 |} ^ TermColor.bold ^ "Usage:" ^ TermColor.reset ^ {|
-wtc <entry> [args]
+wtc <command> [<args>]
+
+|} ^ TermColor.bold ^ "Subcommands" ^ TermColor.reset ^ {|
+  build
+  run
+
+|}
+
+let build_help_message = {|
+|} ^ TermColor.bold ^ "Usage:" ^ TermColor.reset ^ {|
+wtc build <entry> [<args>]
 
 |} ^ TermColor.bold ^ "Options:" ^ TermColor.reset ^ {|
   --lib                 Build a library
@@ -22,6 +31,24 @@ wtc <entry> [args]
 let rec main () = 
   let index = ref 1 in
   let args = Sys.get_argv () in
+  if Array.length args < 2 then (
+    Format.print_string help_message;
+    ignore (exit 1)
+  );
+  let command = Array.get args !index in
+  index := !index + 1;
+  match command with
+  | "build" -> build_command args index
+  | _ -> (
+    Format.printf "unkown command %s\n" command;
+    ignore (exit 1)
+  )
+
+and build_command args index =
+  if !index >= (Array.length args) then (
+    Format.printf "%s" build_help_message;
+    ignore (exit 1)
+  );
   let entry = ref None in
   let std = ref None in
   let buildDir = ref None in
@@ -32,7 +59,7 @@ let rec main () =
     index := !index + 1;
     match item with
     | "-h" | "--help" ->
-      Format.printf "%s" help_message;
+      Format.printf "%s" build_help_message;
       ignore (exit 0)
 
     | "--std" -> (
