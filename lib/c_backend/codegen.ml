@@ -41,7 +41,10 @@ let rec codegen_statement env stmt =
   match spec with
   | Class _
   | Module _ -> ()
-  | Expr expr -> codegen_expression env expr
+  | Expr expr -> (
+    codegen_expression env expr;
+    ps env ";"
+  )
   | Semi expr -> (
     codegen_expression env expr;
     ps env ";"
@@ -223,8 +226,9 @@ and codegen_function env (_fun: Typedtree.Function.t) =
   in
   let fun_name = Core_type.VarSym.name _fun.header.id in
   ps env "WTValue ";
+  ps env "wt_";
   ps env fun_name;
-  ps env "(WTRuntime* rt, WTValue* args, uint32_t arg_len)";
+  ps env "(WTRuntime* rt, WTValue this, uint32_t arg_len, WTValue* args)";
   ps env " {";
   endl env;
 

@@ -134,7 +134,8 @@ let rec compile_file_path ~package_name ~std_dir ~build_dir entry_file_path =
     (* TODO: compile other modules *)
     let output = Waterlang_c.codegen typed_tree in
     let mod_name = entry_file_path |> Filename.dirname |> dirname in
-    write_to_file build_dir mod_name output
+    write_to_file build_dir mod_name output;
+    write_runtime_files (Option.value_exn build_dir)
   with
     | FileNotFound path ->
       print_error_prefix ();
@@ -191,3 +192,11 @@ and write_to_file build_dir mod_name content =
   );
   let output_file_path = Filename.concat build_dir (mod_name ^ ".c") in
   Out_channel.write_all output_file_path ~data:content
+
+and write_runtime_files build_dir =
+  List.iter
+    ~f:(fun (name, content) ->
+      let output_path = Filename.concat build_dir name in
+      Out_channel.write_all output_path ~data:content
+    )
+    Embed.contents

@@ -7,3 +7,7 @@
   waterlang_typing
   waterlang_c
   core))
+
+(rule
+ (targets embed.ml)
+ (action (run ../file_packer/file_packer.exe ../runtime/runtime.h ../runtime/runtime.c -o embed.ml)))
