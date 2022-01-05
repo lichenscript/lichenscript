@@ -134,8 +134,9 @@ let rec compile_file_path ~package_name ~std_dir ~build_dir entry_file_path =
     (* TODO: compile other modules *)
     let output = Waterlang_c.codegen typed_tree in
     let mod_name = entry_file_path |> Filename.dirname |> dirname in
-    write_to_file build_dir mod_name output;
-    write_runtime_files (Option.value_exn build_dir)
+    let output_path = write_to_file build_dir mod_name output in
+    write_runtime_files (Option.value_exn build_dir);
+    write_makefiles (Option.value_exn build_dir) [ (mod_name, output_path) ];
   with
     | FileNotFound path ->
       print_error_prefix ();
@@ -178,7 +179,7 @@ let rec compile_file_path ~package_name ~std_dir ~build_dir entry_file_path =
       Out_channel.print_string TermColor.reset;
       Out_channel.print_endline "" *)
 
-and write_to_file build_dir mod_name content =
+and write_to_file build_dir mod_name content: string =
   let build_dir =
     match build_dir with
     | Some v -> v
@@ -191,7 +192,8 @@ and write_to_file build_dir mod_name content =
   | _ -> ()
   );
   let output_file_path = Filename.concat build_dir (mod_name ^ ".c") in
-  Out_channel.write_all output_file_path ~data:content
+  Out_channel.write_all output_file_path ~data:content;
+  output_file_path
 
 and write_runtime_files build_dir =
   List.iter
@@ -200,3 +202,30 @@ and write_runtime_files build_dir =
       Out_channel.write_all output_path ~data:content
     )
     Embed.contents
+
+and write_makefiles build_dir mods =
+  let output_path = Filename.concat build_dir "Makefile" in
+  let open Makefile in
+  let entries = List.concat [
+    [
+      {
+        entry_name = "all";
+        deps = List.concat [ ["runtime"]; (List.map ~f:(fun (m, _) -> m) mods)];
+        content = ";"
+      };
+      {
+        entry_name = "runtime";
+        deps = ["runtime.c"; "runtime.h"];
+        content = "cc -c runtime.c";
+      }
+    ];
+    List.map
+      ~f:(fun (m, output) -> {
+        entry_name = m;
+        deps = [];
+        content = "cc -c " ^ (Filename.basename output)
+      })
+      mods;
+  ] in
+  let data = to_string entries in
+  Out_channel.write_all output_path ~data
