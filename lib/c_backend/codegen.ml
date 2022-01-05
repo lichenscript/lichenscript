@@ -19,8 +19,22 @@ int main() {
 type t = {
   indent: string;
   mutable indent_level: int;
-  buffer: Buffer.t;
+  mutable buffer: Buffer.t;
+  mutable statements: string list;
+}
+
+type stmt_env = {
+  env: t;
+  stmt_buffer: Buffer.t;
+  mutable stmt_prepend_lines: string list;
   mutable tmp_vars_counter: int;
+}
+
+let create_stmt_env env = {
+  env;
+  stmt_buffer = Buffer.create 128;
+  stmt_prepend_lines = [];
+  tmp_vars_counter = 0;
 }
 
 let create ?(indent="    ") () =
@@ -28,10 +42,11 @@ let create ?(indent="    ") () =
     indent;
     indent_level = 0;
     buffer = Buffer.create 1024;
-    tmp_vars_counter = 0;
+    statements = [];
   }
 
 let ps env content = Buffer.add_string env.buffer content
+let pss env content = Buffer.add_string env.stmt_buffer content
 
 let endl env = ps env "\n"
 
@@ -49,30 +64,30 @@ let with_indent env cb =
   env.indent_level <- prev_indent;
   result
 
-let rec codegen_statement env stmt =
+let rec codegen_statement (env: stmt_env) stmt =
   let open Statement in
   let { spec; _ } = stmt in
   match spec with
   | Class _
   | Module _ -> ()
   | Expr expr -> (
-    ps env "return ";
+    pss env "return ";
     codegen_expression env expr;
-    ps env ";"
+    pss env ";"
   )
   | Semi expr -> (
     codegen_expression env expr;
-    ps env ";"
+    pss env ";"
   )
-  | Function_ fun_ -> codegen_function env fun_
+  | Function_ fun_ -> codegen_function env.env fun_
   | While _ -> ()
 
   | Binding binding -> (
     let { binding_pat; binding_init; _ } = binding in
     codegen_pattern env binding_pat;
-    ps env " = ";
+    pss env " = ";
     codegen_expression env binding_init;
-    ps env ";"
+    pss env ";"
   )
 
   | Block _
@@ -81,16 +96,16 @@ let rec codegen_statement env stmt =
   | Debugger -> ()
 
   | Return expr_opt -> (
-    ps env "return";
+    pss env "return";
     (match expr_opt with
     | Some expr -> (
-      ps env " ";
+      pss env " ";
       codegen_expression env expr
     )
 
     | None -> ()
     );
-    ps env ";"
+    pss env ";"
   )
 
   | EnumDecl _ -> ()
@@ -103,7 +118,12 @@ and codegen_program env (program: Typedtree.program) =
 #include <stdint.h>
 #include "runtime.h"
 |};
-  List.iter ~f:(codegen_statement env) tprogram_statements;
+  List.iter
+    ~f:(fun stmt ->
+      let stmt_env = create_stmt_env env in
+      codegen_statement stmt_env stmt
+    )
+    tprogram_statements;
 
   (* if user has a main function *)
   let test_main = Scope.find_var_symbol root_scope "main" in
@@ -118,7 +138,7 @@ and codegen_program env (program: Typedtree.program) =
 
   | None -> ()
 
-and codegen_expression env (expr: Typedtree.Expression.t) =
+and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
   let open Expression in
   let { spec; _ } = expr in
   match spec with
@@ -126,46 +146,46 @@ and codegen_expression env (expr: Typedtree.Expression.t) =
     let open Waterlang_parsing.Ast.Literal in
     match cnst with
     | Integer (raw, _) -> (
-      ps env Primitives.Value.mk_i32;
-      ps env "(";
-      ps env raw;
-      ps env ")"
+      pss env Primitives.Value.mk_i32;
+      pss env "(";
+      pss env raw;
+      pss env ")"
     )
 
     | Char ch -> (
-      ps env "'";
-      ps env (Char.to_string ch);
-      ps env "'";
+      pss env "'";
+      pss env (Char.to_string ch);
+      pss env "'";
     )
 
     | String (str, _, _) -> (
       let len = String.length str in
-      ps env Primitives.Value.new_string_len;
-      ps env "(rt, ";
-      ps env "(const unsigned char*)\"";
-      ps env str;
-      ps env "\", ";
-      ps env (Int.to_string len);
-      ps env ")"
+      pss env Primitives.Value.new_string_len;
+      pss env "(rt, ";
+      pss env "(const unsigned char*)\"";
+      pss env str;
+      pss env "\", ";
+      pss env (Int.to_string len);
+      pss env ")"
     )
 
     | Float (str, _) -> (
-      ps env Primitives.Value.mk_f32;
-      ps env "(";
-      ps env str;
-      ps env ")"
+      pss env Primitives.Value.mk_f32;
+      pss env "(";
+      pss env str;
+      pss env ")"
     )
 
     | Boolean true ->
-      ps env Primitives.Constant._true
+      pss env Primitives.Constant._true
 
     | Boolean false ->
-      ps env Primitives.Constant._false
+      pss env Primitives.Constant._false
   )
 
   | Identifier sym -> (
     let name = Core_type.VarSym.name sym in
-    ps env name
+    pss env name
   )
 
   | Lambda
@@ -179,19 +199,19 @@ and codegen_expression env (expr: Typedtree.Expression.t) =
     | sym, [] -> (
       match sym.spec with
       | Core_type.VarSym.ExternalMethod ext_method_name -> (
-        ps env ext_method_name;
+        pss env ext_method_name;
         let params_len = List.length call_params in
         let params_len_m1 = params_len - 1 in
-        ps env ("(rt, MK_NULL(), " ^ (Int.to_string params_len) ^ ", (WTValue[]){ ");
+        pss env ("(rt, MK_NULL(), " ^ (Int.to_string params_len) ^ ", (WTValue[]){ ");
         List.iteri
           ~f:(fun index item ->
             codegen_expression env item;
             if index <> params_len_m1 then (
-              ps env ", "
+              pss env ", "
             )
           )
           call_params;
-        ps env "})"
+        pss env "})"
       )
       | _ ->
       failwith "not implemented"
@@ -206,41 +226,62 @@ and codegen_expression env (expr: Typedtree.Expression.t) =
 
   | Binary (op, left_id, right_id) -> (
     let op_name = Primitives.Bin.prim op in
-    ps env op_name;
-    ps env "(";
+    pss env op_name;
+    pss env "(";
     codegen_expression env left_id;
-    ps env ", ";
+    pss env ", ";
     codegen_expression env right_id;
-    ps env ")"
+    pss env ")"
   )
 
   | Update _ -> ()
 
   | Assign(left, right) -> (
     codegen_pattern env left;
-    ps env " = ";
+    pss env " = ";
     codegen_expression env right;
-    ps env ";"
+    pss env ";"
   )
 
   | Block  _ -> ()
 
+(* return the number of temp values *)
 and codegen_function_block (env: t) block =
   let open Block in
   let { body; _ } = block in
   let max_tmp_val = ref 0 in
-  List.iter
+  let stmt_envs = List.map
     ~f:(fun stmt ->
-      env.tmp_vars_counter <- 0;
-      print_indents env;
-      codegen_statement env stmt;
-      endl env;
+      let prev_buffer = env.buffer in
+      env.buffer <- Buffer.create 128;
+      
+      let stmt_env = create_stmt_env env in
+      codegen_statement stmt_env stmt;
 
-      if env.tmp_vars_counter > !max_tmp_val then (
-        max_tmp_val := env.tmp_vars_counter
-      )
+      env.statements <- (Buffer.contents env.buffer)::env.statements;
+      env.buffer <- prev_buffer;
+      stmt_env
     )
     body;
+  in
+  List.iter
+    ~f:(fun stmt ->
+      List.iter
+        ~f:(fun line ->
+          print_indents env;
+          ps env line;
+          endl env;
+        )
+       (List.rev stmt.stmt_prepend_lines);
+      let content = Buffer.contents stmt.stmt_buffer in
+      print_indents env;
+      ps env content;
+      endl env;
+      if stmt.tmp_vars_counter > !max_tmp_val then (
+        max_tmp_val := stmt.tmp_vars_counter
+      )
+    )
+    stmt_envs;
   !max_tmp_val
 
 and codegen_function env (_fun: Typedtree.Function.t) =
@@ -290,6 +331,6 @@ and codegen_pattern env pat =
   let { spec; _ } = pat in
   match spec with
   | Symbol sym ->
-    ps env (Core_type.VarSym.name sym)
+    pss env (Core_type.VarSym.name sym)
 
 let contents env = Buffer.contents env.buffer
