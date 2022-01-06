@@ -80,50 +80,7 @@ end
   = Expression
 and Statement : sig
 
-  type _class = {
-    cls_id:        Identifier.t option;
-    cls_type_vars: Identifier.t list;
-    cls_loc:       Loc.t;
-    cls_body:      class_body;
-    cls_comments:  Loc.t Waterlang_lex.Comment.t list;
-  }
-
-  and _module = {
-    mod_visibility: visibility option;
-    mod_name: Identifier.t;
-  }
-
-  and class_body = {
-    cls_body_elements: class_body_element list;
-    cls_body_loc: Loc.t;
-  }
-
-  and class_property = {
-    cls_property_attributes: attributes;
-    cls_property_visiblity: visibility option;
-    cls_property_loc: Loc.t;
-    cls_property_name: Identifier.t;
-    cls_property_type: Type.t option;
-    cls_property_init: Expression.t option;
-  }
-
-  and class_method = {
-    cls_method_attributes: attributes;
-    cls_method_static: bool;
-    cls_method_visiblity: visibility option;
-    cls_method_name: Identifier.t;
-    cls_method_params: Function.params;
-    cls_method_body: Block.t option;
-    cls_method_loc: Loc.t;
-    cls_method_return_ty: Type.t option;
-  }
-
-  and class_body_element =
-    | Cls_method of class_method
-    | Cls_property of class_property
-
-
-  and while_desc = {
+  type while_desc = {
     while_test: Expression.t;
     while_block: Block.t;
     while_loc: Loc.t;
@@ -138,11 +95,8 @@ and Statement : sig
   }
 
   and spec =
-    | Module of _module
-    | Class of _class
     | Expr of Expression.t (* Expr without trailing semi-colon. *)
     | Semi of Expression.t (* Expr with a trailing semi-colon. *)
-    | Function_ of Function.t
     | While of while_desc
     | Binding of var_binding
     | Block of Block.t
@@ -150,8 +104,6 @@ and Statement : sig
     | Contintue of Identifier.t option
     | Debugger
     | Return of Expression.t option
-    | EnumDecl of Enum.t
-    | Decl of Declare.t
     | Empty
 
   and t = {
@@ -266,22 +218,75 @@ and Enum : sig
 end
   = Enum
 
-and Declare : sig
+(* represeng top-level defintion *)
+and Declaration : sig
+
+  type declare_spec =
+  | DeclFunction of Function.header
+
+  and declare = {
+    decl_spec: declare_spec;
+    decl_loc: Loc.t;
+  }
+
+  and _class = {
+    cls_id:        Identifier.t option;
+    cls_type_vars: Identifier.t list;
+    cls_loc:       Loc.t;
+    cls_body:      class_body;
+    cls_comments:  Loc.t Waterlang_lex.Comment.t list;
+  }
+
+  and class_body = {
+    cls_body_elements: class_body_element list;
+    cls_body_loc: Loc.t;
+  }
+
+  and class_property = {
+    cls_property_attributes: attributes;
+    cls_property_visiblity: visibility option;
+    cls_property_loc: Loc.t;
+    cls_property_name: Identifier.t;
+    cls_property_type: Type.t option;
+    cls_property_init: Expression.t option;
+  }
+
+  and class_method = {
+    cls_method_attributes: attributes;
+    cls_method_static: bool;
+    cls_method_visiblity: visibility option;
+    cls_method_name: Identifier.t;
+    cls_method_params: Function.params;
+    cls_method_body: Block.t option;
+    cls_method_loc: Loc.t;
+    cls_method_return_ty: Type.t option;
+  }
+
+  and class_body_element =
+    | Cls_method of class_method
+    | Cls_property of class_property
+  [@@deriving show]
 
   type spec =
-  | Function_ of Function.header
+    | Class of _class
+    | Function_ of Function.t
+    | Declare of declare
+    | Enum of Enum.t
+    [@@deriving show]
 
-  and t = {
+  type t = {
     spec: spec;
     loc: Loc.t;
+    attributes: attributes;
   }
   [@@deriving show]
 
 end
-  = Declare
+  = Declaration
 
 type program = {
-  pprogram_statements: Statement.t list;
+  pprogram_export: Export.t;
+  pprogram_declarations: Declaration.t list;
   pprogram_comments: Loc.t Waterlang_lex.Comment.t list;
 }
 [@@deriving show]

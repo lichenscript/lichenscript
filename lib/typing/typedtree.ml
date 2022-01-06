@@ -77,11 +77,8 @@ and Statement : sig
   }
 
   and spec =
-    | Class of _class
-    | Module of _module
     | Expr of Expression.t
     | Semi of Expression.t
-    | Function_ of Function.t
     | While of while_desc
     | Binding of var_binding
     | Block of Block.t
@@ -89,41 +86,7 @@ and Statement : sig
     | Continue of Identifier.t option
     | Debugger
     | Return of Expression.t option
-    | EnumDecl of Ast.Enum.t
-    | Decl of Declare.t
     | Empty
-
-  and _class = {
-    cls_id: Core_type.TypeSym.t;
-    cls_loc: Loc.t;
-    cls_body: class_body;
-  }
-
-  and _module = {
-    mod_visibility: Ast.visibility option;
-    mod_name: Identifier.t;
-  }
-
-  and class_body = {
-    cls_body_elements: class_body_element list;
-    cls_body_loc: Loc.t;
-  }
-
-  and class_property = {
-    cls_property_visibility: Ast.visibility;
-    cls_property_loc: Loc.t;
-    cls_property_name: Identifier.t;
-    cls_property_init: Expression.t option;
-  }
-
-  and class_method = {
-    cls_method_visibility: Ast.visibility;
-    cls_method_loc: Loc.t;
-  }
-
-  and class_body_element =
-    | Cls_method of class_method
-    | Cls_property of class_property
 
   and var_binding = {
     binding_kind: Ast.var_kind;
@@ -189,18 +152,61 @@ and Block : sig
 end
   = Block
 
-and Declare : sig
-  type spec =
+and Declaration : sig
+
+  type declare_spec =
   | Function_ of Function.header
 
-  and t = {
-    spec: spec;
-    loc: Loc.t;
+  and declare = {
+    declare_spec: declare_spec;
+    declare_loc: Loc.t;
   }
-  [@@deriving show]
+
+  and _class = {
+    cls_id: Core_type.TypeSym.t;
+    cls_loc: Loc.t;
+    cls_body: class_body;
+  }
+
+  and class_body = {
+    cls_body_elements: class_body_element list;
+    cls_body_loc: Loc.t;
+  }
+
+  and class_property = {
+    cls_property_visibility: Ast.visibility;
+    cls_property_loc: Loc.t;
+    cls_property_name: Identifier.t;
+    cls_property_init: Expression.t option;
+  }
+
+  and class_method = {
+    cls_method_visibility: Ast.visibility;
+    cls_method_loc: Loc.t;
+  }
+
+  and class_body_element =
+    | Cls_method of class_method
+    | Cls_property of class_property
+    [@@deriving show]
+
+  type spec =
+    | Class of _class
+    | Function_ of Function.t
+    | Declare of declare
+    | Enum of Ast.Enum.t
+    [@@deriving show]
+
+  type t =
+    {
+      spec: spec;
+      loc: Loc.t;
+      attributes: Ast.attributes;
+    }
+    [@@deriving show]
 
 end
-  = Declare
+ = Declaration
 
 type program = {
   root_scope: Scope.t;

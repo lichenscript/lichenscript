@@ -3,6 +3,10 @@ type env
 
 val init_env: Waterlang_lex.File_key.t option -> string -> env
 
+val add_export: env -> Export.tuple -> unit
+
+val get_export: env -> Export.t
+
 val include_module_ids: env -> string list
 
 val add_include_module_id: env -> string -> unit

@@ -78,16 +78,155 @@ and parse_string source content =
   )
 
 and parse_program env : program =
-  let stmts = ref [] in
+  let decls = ref [] in
 
   while Peek.token env <> Token.T_EOF do
-    let stmt = parse_statement env in
-    stmts := stmt::(!stmts)
+    let decl = parse_declaration env in
+    decls := decl::(!decls)
   done;
 
   {
-    pprogram_statements = List.rev !stmts;
+    pprogram_export = Parser_env.get_export env;
+    pprogram_declarations = List.rev !decls;
     pprogram_comments = [];
+  }
+
+and parse_declaration env : Declaration.t =
+  let open Declaration in
+  let start_loc = Peek.loc env in
+  let attributes = parse_attributes env in
+  let next = Peek.token env in
+  let spec: Declaration.spec =
+    match next with
+    | Token.T_CLASS ->
+      Class (parse_class env)
+
+    | Token.T_FUNCTION ->
+      Function_ (parse_function env)
+
+    | Token.T_ENUM ->
+      let parse_member env =
+        let member_name = parse_identifier env in
+        let fields =
+          if (Peek.token env) == Token.T_LPAREN then (
+            let result = ref [] in
+            Eat.token env;
+
+            while (Peek.token env) <> Token.T_RPAREN do
+              let ty = parse_type env in
+              result := ty::(!result);
+              if (Peek.token env) <> Token.T_RPAREN then (
+                Expect.token env Token.T_COMMA
+              )
+            done;
+
+            Expect.token env Token.T_RPAREN;
+            List.rev !result
+          ) else
+            []
+        in
+
+        { Enum.
+          member_name;
+          fields;
+        }
+      in
+      let start_loc = Peek.loc env in
+      Eat.token env;
+      let name = parse_identifier env in
+
+      let type_vars =
+        if Peek.token env = Token.T_LESS_THAN then
+          parse_type_vars env
+        else
+          []
+      in
+
+      let members = ref [] in
+      Expect.token env Token.T_LCURLY;
+
+      while (Peek.token env) <> Token.T_RCURLY && (Peek.token env) <> Token.T_EOF do
+        let member = parse_member env in
+        members := member::(!members);
+
+        if (Peek.token env) <> Token.T_RCURLY then (
+          Expect.token env Token.T_COMMA
+        );
+
+      done;
+
+      Expect.token env Token.T_RCURLY;
+      Enum { Enum.
+        name;
+        type_vars;
+        members = List.rev !members;
+        loc = with_start_loc env start_loc;
+      }
+
+    | Token.T_DECLARE ->
+      begin
+        Eat.token env;
+        let function_header = parse_function_header env in
+        let spec = Declaration.DeclFunction function_header in
+        Declaration.Declare {
+          decl_spec = spec;
+          decl_loc = with_start_loc env start_loc;
+        }
+      end
+
+    | Token.T_PUBLIC
+    | Token.T_PROTECTED
+    | Token.T_PRIVATE ->
+      begin
+        let visibility =
+          match next with
+          | Token.T_PUBLIC -> Pvisibility_public
+          | Token.T_PROTECTED -> Pvisibility_protected
+          | Token.T_PRIVATE -> Pvisibility_private
+          | _ -> failwith "unreachable"
+        in
+        Eat.token env;
+        if Parse_scope.((scope env).ty = Parse_scope.PScope_Module) then (
+          let next = Peek.token env in
+          match next with
+          | Token.T_FUNCTION -> (
+            let fun_ = parse_function ~visibility env in
+            let { Function. header = { id; _ }; loc; _ } = fun_ in
+            let name = 
+              match id with
+              | Some id -> id.pident_name
+              | _ -> failwith "unreachable"
+            in
+
+            Parser_env.add_export env (name, loc);
+
+            Function_ fun_
+          )
+
+          | _ ->
+            Parser_env.error_unexpected env;
+            failwith "unreachable"
+        ) else (
+          let err =
+            {
+              Parse_error.
+              perr_loc = start_loc;
+              perr_spec = Parse_error.VisibilityNoOnTopLevel;
+            }
+          in
+          Parse_error.error err
+        )
+      end
+
+    | _ ->
+      Parser_env.error_unexpected env;
+      failwith "unreachable"
+
+  in
+  {
+    spec;
+    loc = with_start_loc env start_loc;
+    attributes;
   }
 
 and parse_statement env : Statement.t =
@@ -98,12 +237,6 @@ and parse_statement env : Statement.t =
 
   let spec: Statement.spec =
     match next with
-    | Token.T_CLASS ->
-      Class (parse_class env)
-
-    | Token.T_FUNCTION ->
-      Function_ (parse_function env)
-
     | Token.T_CONST ->
       Binding (parse_var_binding env Pvar_const)
 
@@ -170,112 +303,6 @@ and parse_statement env : Statement.t =
           Return(Some expr)
         end
 
-    | Token.T_ENUM ->
-      let parse_member env =
-        let member_name = parse_identifier env in
-        let fields =
-          if (Peek.token env) == Token.T_LPAREN then (
-            let result = ref [] in
-            Eat.token env;
-
-            while (Peek.token env) <> Token.T_RPAREN do
-              let ty = parse_type env in
-              result := ty::(!result);
-              if (Peek.token env) <> Token.T_RPAREN then (
-                Expect.token env Token.T_COMMA
-              )
-            done;
-
-            Expect.token env Token.T_RPAREN;
-            List.rev !result
-          ) else
-            []
-        in
-
-        { Enum.
-          member_name;
-          fields;
-        }
-      in
-      let start_loc = Peek.loc env in
-      Eat.token env;
-      let name = parse_identifier env in
-
-      let type_vars =
-        if Peek.token env = Token.T_LESS_THAN then
-          parse_type_vars env
-        else
-          []
-      in
-
-      let members = ref [] in
-      Expect.token env Token.T_LCURLY;
-
-      while (Peek.token env) <> Token.T_RCURLY && (Peek.token env) <> Token.T_EOF do
-        let member = parse_member env in
-        members := member::(!members);
-
-        if (Peek.token env) <> Token.T_RCURLY then (
-          Expect.token env Token.T_COMMA
-        );
-
-      done;
-
-      Expect.token env Token.T_RCURLY;
-      EnumDecl { Enum.
-        name;
-        type_vars;
-        members = List.rev !members;
-        loc = with_start_loc env start_loc;
-      }
-
-    | Token.T_DECLARE ->
-      begin
-        Eat.token env;
-        let function_header = parse_function_header env in
-        let spec = Declare.Function_ function_header in
-        Statement.Decl { Declare.
-          spec;
-          loc = with_start_loc env start_loc;
-        }
-      end
-
-    | Token.T_PUBLIC
-    | Token.T_PROTECTED
-    | Token.T_PRIVATE ->
-      begin
-        let visibility =
-          match next with
-          | Token.T_PUBLIC -> Pvisibility_public
-          | Token.T_PROTECTED -> Pvisibility_protected
-          | Token.T_PRIVATE -> Pvisibility_private
-          | _ -> failwith "unreachable"
-        in
-        Eat.token env;
-        if Parse_scope.((scope env).ty = Parse_scope.PScope_Module) then (
-          let next = Peek.token env in
-          match next with
-          | Token.T_FUNCTION ->
-            Function_ (parse_function ~visibility env)
-
-          | Token.T_MODULE ->
-            Module (parse_module_decl ~visibility env)
-
-          | _ ->
-            Parser_env.error_unexpected env;
-            failwith "unreachable"
-        ) else (
-          let err =
-            {
-              Parse_error.
-              perr_loc = start_loc;
-              perr_spec = Parse_error.VisibilityNoOnTopLevel;
-            }
-          in
-          Parse_error.error err
-        )
-      end
-
     | _ ->
       let expr = parse_expression env in
       if Peek.token env == Token.T_SEMICOLON then
@@ -306,15 +333,6 @@ and parse_type_vars env =
 
   Expect.token env Token.T_GREATER_THAN;
   List.rev !result
-
-and parse_module_decl ?visibility env =
-  Expect.token env Token.T_MODULE;
-  let id = parse_identifier env in
-  Parser_env.add_include_module_id env id.pident_name;
-  { Statement.
-    mod_visibility = visibility;
-    mod_name = id;
-  }
 
 and parse_var_binding env kind: Statement.var_binding =
   let start_loc = Peek.loc env in
@@ -481,7 +499,7 @@ and parse_identifier_with_keywords env : Identifier.t =
   else
     parse_identifier env
 
-and parse_class env : Statement._class =
+and parse_class env : Declaration._class =
   let start_loc = Peek.loc env in
   Eat.token env;  (* class *)
   let id = parse_identifier env in
@@ -516,8 +534,8 @@ and parse_visibility env =
 
   | _ -> None
 
-and parse_class_body env: Statement.class_body =
-  let open Statement in
+and parse_class_body env: Declaration.class_body =
+  let open Declaration in
   let parse_element env =
     let start_pos = Peek.loc env in
     let v = parse_visibility env in
