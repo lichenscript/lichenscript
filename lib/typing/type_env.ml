@@ -3,14 +3,17 @@
  **)
 
 (* num -> [] *)
-let deps: int list ResizableArray.t = ResizableArray.make 1024
+let type_env: ResizableArray.t = ResizableArray.make 1024
 
-(* cached the reuslt *)
-let cached = ResizableArray.make 1024
-
-let new_id ?(ty=Core_type.TypeValue.Unknown) deps_int () =
-  let id = ResizableArray.size deps in
-  ResizableArray.push deps deps_int;
-  ResizableArray.push cached ty;
+let new_id ty =
+  let id = ResizableArray.size type_env in
+  ResizableArray.push type_env ty;
   id
 
+let update_node id node =
+  ResizableArray.set type_env id node
+
+let size () = ResizableArray.size type_env
+
+let get_node id =
+  ResizableArray.get type_env id

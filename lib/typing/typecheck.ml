@@ -2,6 +2,7 @@
  * Type check deeply, check every expressions
  **)
 open Core_kernel
+(*
 open Core_type
 open Typedtree
 
@@ -361,4 +362,42 @@ let type_check_intern env program =
 let type_check ?(type_provider=Type_provider.default_provider) ?(open_domains=[]) program =
   let env = TypecheckEnv.create ~type_provider ~open_domains program.root_scope in
   let program = type_check_intern env program in
-  program, (TypecheckEnv.errors env)
+  program, (TypecheckEnv.errors env) *)
+
+module IntHash = Hashtbl.Make(Int)
+
+let type_check _program =
+  let visited_set = Hash_set.create (module Int) in
+  let reversed_map = IntHash.create () in
+
+  let no_deps = ref [] in
+  let size = Type_env.size () in
+
+  for i = 0 to (size - 1) do
+    let node = Type_env.get_node i in
+    let deps = node.deps in
+    match deps with
+    | [] -> (
+      no_deps := i::(!no_deps)
+    )
+    | _ ->
+      List.iter
+        ~f:(fun dep ->
+          match IntHash.find reversed_map dep with
+          | Some exist ->
+            IntHash.set reversed_map ~key:dep ~data:(i::exist)
+          | None ->
+            IntHash.set reversed_map ~key:dep ~data:[i]
+        )
+        deps
+  done;
+
+  let iterate_node node_id =
+      let node = Type_env.get_node node_id in
+      node.check();
+      Hash_set.add visited_set node_id
+  in
+
+  List.iter ~f:iterate_node !no_deps;
+
+  []

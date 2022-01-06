@@ -15,7 +15,7 @@ let parse_string_to_typed_tree ~file_key content =
     | Result.Ok { tree; _ } ->
       begin
         (* Ast.pp_program Format.std_formatter program; *)
-        Waterlang_typing.Annotate.annotate env tree
+        Waterlang_typing.Annotate.annotate_program env tree
       end
 
     | Result.Error errs ->
@@ -63,7 +63,7 @@ let create ~find_paths () = {
   find_paths;
 }
 
-let create_type_provider env : Type_provider.provider =
+let _create_type_provider env : Type_provider.provider =
   object
 
     method resolve (mod_arr, local_arr) =
@@ -75,10 +75,10 @@ let create_type_provider env : Type_provider.provider =
           ~init:None
           ~f:(fun _ file ->
             let typed_tree = Module.(file.typed_tree) in
-            let { Typedtree. root_scope; _ } = typed_tree in
+            let { Typedtree. tprogram_scope; _ } = typed_tree in
             if Array.length local_arr = 1 then (
               let first_name = Array.get local_arr 0 in
-              match Scope.find_var_symbol root_scope first_name with
+              match Scope.find_var_symbol tprogram_scope first_name with
               | Some sym -> Base.Continue_or_stop.Stop (Some sym)
               | None -> Base.Continue_or_stop.Continue None
             ) else
@@ -194,18 +194,18 @@ let parse_and_annotate_find_paths env =
   List.iter ~f:(parse_and_annotate_path env) env.find_paths
 
 let typecheck_all_modules env =
-  let type_provider = create_type_provider env in
+  (* let type_provider = create_type_provider env in *)
   ModuleMap.iter
     ~f:(fun m -> 
       let files = Module.files m in
       let files =
         List.map
           ~f:(fun file ->
-            let typed_tree, errors = Typecheck.type_check ~type_provider file.typed_tree in
+            let errors = Typecheck.type_check file.typed_tree in
             if (List.length errors) > 0 then (
               raise (TypeCheckError errors)
             );
-            { file with typed_tree }
+            { file with typed_tree = file.typed_tree }
           )
           files
       in

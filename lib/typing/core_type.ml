@@ -1,4 +1,3 @@
-open Waterlang_lex
 open Core_kernel
 
 module PropsMap = Hashtbl.Make(String)
@@ -8,10 +7,15 @@ module rec TypeValue : sig
     | Unknown
     | Any
     | Unit
-    | Ctor of TypeSym.t
+    | Ctor of string * (int list)
     | Class of class_type
-    | Function of function_type
+    | Function of int * int
+    | Module of module_type
     | Array of t
+
+  and module_type = {
+    export: t;
+  }
 
   and class_type = {
     tcls_extends:    t option;
@@ -33,14 +37,20 @@ module rec TypeValue : sig
   val pp_function_type: Format.formatter -> function_type -> unit
 
 end = struct
+
   type t =
     | Unknown
     | Any
     | Unit
-    | Ctor of TypeSym.t
+    | Ctor of string * (int list)
     | Class of class_type
-    | Function of function_type
+    | Function of int * int
+    | Module of module_type
     | Array of t
+
+  and module_type = {
+    export: t;
+  }
 
   and class_type = {
     tcls_extends:    t option;
@@ -58,16 +68,19 @@ end = struct
     tfun_ret: t;
   }
 
-  let rec pp formatter = function
-  | Unknown -> Format.pp_print_string formatter "unknown"
-  | Any -> Format.pp_print_string formatter "any"
-  | Unit -> Format.pp_print_string formatter "unit"
-  | Ctor sym -> Format.fprintf formatter "%s" (TypeSym.name sym)
-  | Class _ -> Format.pp_print_string formatter "Class"
-  | Function fun_ ->
-    pp_function_type formatter fun_
+  let rec pp formatter ty =
+    match ty with
+    | Unknown -> Format.pp_print_string formatter "unknown"
+    | Any -> Format.pp_print_string formatter "any"
+    | Unit -> Format.pp_print_string formatter "unit"
+    | Ctor(sym, _) -> Format.fprintf formatter "%s<>" sym
+    | Class _ -> Format.pp_print_string formatter "Class"
+    | Function _ ->
+      Format.pp_print_string formatter "function"
 
-  | Array _ -> Format.pp_print_string formatter "Array"
+    | Module _ -> Format.pp_print_string formatter "module"
+
+    | Array _ -> Format.pp_print_string formatter "Array"
 
   and pp_function_type formatter fun_ =
     Format.pp_print_string formatter "(";
@@ -112,7 +125,6 @@ and TypeSym : sig
 
   and t = {
     builtin: bool;
-    scope_id: int;
     name: string;
     spec: spec;
   }
@@ -121,7 +133,7 @@ and TypeSym : sig
 
   val builtin: t -> bool
 
-  val create: ?builtin:bool -> scope_id:int -> string -> spec -> t
+  val create: ?builtin:bool -> string -> spec -> t
 
   val create_module: unit -> module_type
 
@@ -152,7 +164,6 @@ end = struct
 
   and t = {
     builtin: bool;
-    scope_id: int;
     name: string;
     spec: spec;
   }
@@ -161,10 +172,9 @@ end = struct
 
   let builtin sym = sym.builtin
 
-  let create ?(builtin=false)  ~scope_id name spec =
+  let create ?(builtin=false)  name spec =
     {
       builtin;
-      scope_id;
       name;
       spec;
     }
@@ -189,72 +199,18 @@ end = struct
   
 end
 
-and VarSym : sig
+let none () = ()
 
-  type enum_field = {
-    enum_id: int;
-  }
+type node = {
+  loc: Waterlang_lex.Loc.t;
+  value: TypeValue.t;
+  deps: int list;
+  check: unit -> unit;
+}
 
-  type spec =
-  | Internal
-  | ExternalMethod of string
-  | Enum of enum_field PropsMap.t
-
-  and t = {
-    id_in_scope: int;
-    name:        string;
-    mutable def_type:    TypeValue.t;
-    def_loc:     Loc.t option;
-    scope_id:    int;
-    builtin:     bool;
-    spec:        spec;
-  }
-
-  val name: t -> string
-
-  val mk_local: id_in_scope:int -> scope_id:int -> ?spec:spec -> string -> t
-
-  val set_def_type: t -> TypeValue.t -> unit
-
-  val pp: Format.formatter -> t -> unit
-
-end = struct
-  type enum_field = {
-    enum_id: int;
-  }
-
-  type spec =
-  | Internal
-  | ExternalMethod of string
-  | Enum of enum_field PropsMap.t
-
-  and t = {
-    id_in_scope: int;
-    name:        string;
-    mutable def_type:    TypeValue.t;
-    def_loc:     Loc.t option;
-    scope_id:    int;
-    builtin:     bool;
-    spec:        spec;
-  }
-
-  let name sym = sym.name
-
-  let mk_local ~id_in_scope ~scope_id ?(spec=Internal) name =
-    {
-      id_in_scope;
-      name = name;
-      def_type = TypeValue.Unknown;
-      def_loc = None;
-      scope_id = scope_id;
-      builtin = false;
-      spec;
-    }
-
-  let set_def_type t ty =
-    t.def_type <- ty
-
-  let pp formatter sym =
-    Format.fprintf formatter "VarSym('%s')" sym.name
-  
-end
+let unknown = {
+  loc = Waterlang_lex.Loc.none;
+  value = TypeValue.Unknown;
+  deps = [];
+  check = none;
+}

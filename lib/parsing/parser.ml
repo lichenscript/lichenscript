@@ -79,6 +79,7 @@ and parse_string source content =
 
 and parse_program env : program =
   let decls = ref [] in
+  let start_loc = Peek.loc env in
 
   while Peek.token env <> Token.T_EOF do
     let decl = parse_declaration env in
@@ -89,6 +90,7 @@ and parse_program env : program =
     pprogram_export = Parser_env.get_export env;
     pprogram_declarations = List.rev !decls;
     pprogram_comments = [];
+    pprogram_loc = with_start_loc env start_loc;
   }
 
 and parse_declaration env : Declaration.t =
@@ -192,11 +194,7 @@ and parse_declaration env : Declaration.t =
           | Token.T_FUNCTION -> (
             let fun_ = parse_function ~visibility env in
             let { Function. header = { id; _ }; loc; _ } = fun_ in
-            let name = 
-              match id with
-              | Some id -> id.pident_name
-              | _ -> failwith "unreachable"
-            in
+            let name = id.pident_name in
 
             Parser_env.add_export env (name, loc);
 
@@ -283,7 +281,7 @@ and parse_statement env : Statement.t =
         | _ -> None
       in
       Expect.token env Token.T_SEMICOLON;
-      Contintue id
+      Continue id
 
     | Token.T_DEBUGGER ->
       Eat.token env;
@@ -315,7 +313,6 @@ and parse_statement env : Statement.t =
   {
     spec;
     loc = with_start_loc env start_loc;
-    loc_stack = [];
     attributes;
   }
 
@@ -377,7 +374,7 @@ and parse_function_header env: Function.header =
     | _ -> None
   in
   { Function.
-    id = Some id;
+    id;
     params;
     return_ty;
     header_loc = with_start_loc env start_loc;
@@ -393,7 +390,7 @@ and parse_function ?visibility env: Function.t =
     {
       visibility;
       header;
-      body = Fun_block_body block;
+      body = block;
       loc = with_start_loc env start_loc;
       comments = [];
     }
@@ -668,7 +665,6 @@ and parse_assigment_expression env : Expression.t =
     {
       spec;
       loc = with_start_loc env start_pos;
-      loc_stack = [];
       attributes = [];
     }
 
@@ -691,7 +687,6 @@ and parse_binary_expression env : Expression.t =
       {
         spec;
         loc = with_start_loc env start_loc;
-        loc_stack = [];
         attributes = [];
       }
     ) else if left_prec == right_prec then (
@@ -704,7 +699,6 @@ and parse_binary_expression env : Expression.t =
           {
             spec;
             loc = with_start_loc env start_loc;
-            loc_stack = [];
             attributes = [];
           }
         in
@@ -717,7 +711,6 @@ and parse_binary_expression env : Expression.t =
         {
           spec;
           loc = with_start_loc env start_loc;
-          loc_stack = [];
           attributes = [];
         }
       in
@@ -761,7 +754,6 @@ and parse_unary_expression env: Expression.t =
       {
         spec;
         loc = with_start_loc env start_loc;
-        loc_stack = [];
         attributes = [];
       }
     end
@@ -791,7 +783,6 @@ and parse_update_expression env : Expression.t =
       {
         spec;
         loc = with_start_loc env start_loc;
-        loc_stack = [];
         attributes = [];
       }
     end
@@ -809,7 +800,6 @@ and parse_update_expression env : Expression.t =
         {
           spec;
           loc = with_start_loc env start_loc;
-          loc_stack = [];
           attributes = [];
         }
       end
@@ -849,7 +839,6 @@ and parse_left_handside_expression_allow_call env : Expression.t =
         {
           spec;
           loc = with_start_loc env start_pos;
-          loc_stack = [];
           attributes = [];
         }
       in
@@ -869,7 +858,6 @@ and parse_left_handside_expression_allow_call env : Expression.t =
         {
           spec;
           loc = with_start_loc env start_pos;
-          loc_stack = [];
           attributes = [];
         }
       in
@@ -966,7 +954,6 @@ and parse_primary_expression env : Expression.t =
   {
     spec;
     loc = with_start_loc env start_loc;
-    loc_stack = [];
     attributes = [];
   }
 

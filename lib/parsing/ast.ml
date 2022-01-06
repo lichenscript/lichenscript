@@ -71,7 +71,6 @@ and Expression : sig
   and t = {
     spec: spec;
     loc: Loc.t;
-    loc_stack: location_stack;
     attributes: attributes;
   }
   [@@deriving show]
@@ -101,7 +100,7 @@ and Statement : sig
     | Binding of var_binding
     | Block of Block.t
     | Break of Identifier.t option
-    | Contintue of Identifier.t option
+    | Continue of Identifier.t option
     | Debugger
     | Return of Expression.t option
     | Empty
@@ -109,7 +108,6 @@ and Statement : sig
   and t = {
     spec: spec;
     loc: Loc.t;
-    loc_stack: location_stack;
     attributes: attributes;
   }
   [@@deriving show]
@@ -147,7 +145,7 @@ and Function : sig
   type t = {
     visibility: visibility option;
     header: header;
-    body: function_body;
+    body: Block.t;
     loc: Loc.t;
     comments: Loc.t Waterlang_lex.Comment.t list;
   }
@@ -166,15 +164,11 @@ and Function : sig
   }
 
   and header = {
-    id: Identifier.t option;
+    id: Identifier.t;
     params: params;
     return_ty: Type.t option;
     header_loc: Loc.t;
   }
-
-  and function_body =
-    | Fun_block_body of Block.t
-    | Fun_expression_body of Expression.t
   [@@deriving show]
 
 end
@@ -188,7 +182,6 @@ and Type : sig
 
   and spec =
     | Ty_any
-    | Ty_var of string
     | Ty_ctor of Identifier.t * t list
       (* List<int> *)
 
@@ -288,5 +281,6 @@ type program = {
   pprogram_export: Export.t;
   pprogram_declarations: Declaration.t list;
   pprogram_comments: Loc.t Waterlang_lex.Comment.t list;
+  pprogram_loc: Loc.t;
 }
 [@@deriving show]

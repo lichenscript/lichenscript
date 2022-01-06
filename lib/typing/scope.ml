@@ -5,18 +5,14 @@ module SymbolTable = Hashtbl.Make_binable(String)
 
 type t = {
   prev: t option;
-  id: int;
-  var_symbols: VarSym.t SymbolTable.t;
+  var_symbols: int SymbolTable.t;
   type_symbols: TypeSym.t SymbolTable.t;
   mutable var_counter: int;
 }
 
-let id scope = scope.id
-
-let create ?prev id =
+let create ?prev () =
   {
     prev;
-    id;
     var_symbols = SymbolTable.create ();
     type_symbols = SymbolTable.create ();
     var_counter = 0;
@@ -36,8 +32,7 @@ let rec find_type_symbol scope name =
   | None ->
     Option.(scope.prev >>= (fun parent -> find_type_symbol parent name))
 
-let insert_var_symbol (scope: t) (sym: VarSym.t) =
-  let name = sym.name in
+let insert_var_symbol (scope: t) name (sym: int) =
   SymbolTable.set scope.var_symbols ~key:name ~data:sym
 
 let insert_type_symbol (scope: t) (sym: TypeSym.t) =
@@ -49,15 +44,10 @@ let next_var_id scope =
   scope.var_counter <- scope.var_counter + 1;
   id
 
-let create_var_symbol ?(spec = VarSym.Internal) scope name =
-  let id = next_var_id scope in
-  let scope_id = scope.id in
-  let sym = VarSym.mk_local ~id_in_scope:id ~scope_id ~spec name in
-  insert_var_symbol scope sym;
-  sym
-
 let vars scope =
   SymbolTable.to_alist scope.var_symbols
 
-let pp formatter scope =
-  Format.fprintf formatter "Scope(%d)" scope.id
+let pp formatter _scope =
+  Format.fprintf formatter "Scope"
+
+let root_scope = create ()

@@ -1,6 +1,5 @@
 open Waterlang_lex
 open Waterlang_parsing
-open Core_type
 
 module Pattern = struct
 
@@ -10,7 +9,7 @@ module Pattern = struct
   }
 
   and spec =
-  | Symbol of Core_type.VarSym.t
+  | Symbol of int
   [@@deriving show]
 
 end
@@ -19,13 +18,13 @@ module%gen rec Expression : sig
   type t = {
     spec: spec;
     loc: Loc.t;
-    mutable val_: TypeValue.t;
+    ty_var: int;
+    attributes: Ast.attributes;
   }
 
   and spec =
     | Constant of Ast.Literal.t
-    | Identifier of Core_type.VarSym.t
-    | UnresolvedIdentifier of Identifier.t
+    | Identifier of int
     | Lambda
     | If of if_desc
     | Array of t list
@@ -46,9 +45,9 @@ module%gen rec Expression : sig
     | Block of Block.t
 
   and callee = {
-    callee_spec: Core_type.VarSym.t * ([ `Property of string | `Expr of t ] list);
+    callee_spec: int * ([ `Property of string | `Expr of t ] list);
     callee_loc: Loc.t;
-    callee_ty: Core_type.TypeValue.t
+    callee_ty_var: int;
   }
 
   and call = {
@@ -91,7 +90,7 @@ and Statement : sig
   and var_binding = {
     binding_kind: Ast.var_kind;
     binding_loc: Loc.t;
-    binding_ty: TypeValue.t option;
+    binding_ty_var: int; 
     binding_pat: Pattern.t;
     binding_init: Expression.t;
   }
@@ -109,14 +108,10 @@ end
 and Function : sig
   type t = {
     header: header;
-    body: function_body;
-    assoc_scope: Scope.t;
-    loc: Loc.t;
+    body: Block.t;
+    comments: Loc.t Waterlang_lex.Comment.t list;
+    ty_var: int;
   }
-
-  and function_body =
-    | Fun_block_body of Block.t
-    | Fun_expression_body of Expression.t
 
   and params = {
     params_content: param list;
@@ -124,13 +119,13 @@ and Function : sig
   }
 
   and header = {
-    id: Core_type.VarSym.t;
+    id: int;
     params: params;
   }
 
   and param = {
     param_pat: Pattern.t;
-    param_ty: Core_type.TypeValue.t;
+    param_ty: int;
     param_init: Expression.t option;
     param_loc: Loc.t;
     param_rest: bool;
@@ -145,7 +140,7 @@ and Block : sig
   type t = {
     body: Statement.t list;
     loc: Loc.t;
-    val_: TypeValue.t;
+    return_ty: int;
   }
   [@@deriving show]
 
@@ -160,10 +155,11 @@ and Declaration : sig
   and declare = {
     declare_spec: declare_spec;
     declare_loc: Loc.t;
+    declare_ty_var: int;
   }
 
   and _class = {
-    cls_id: Core_type.TypeSym.t;
+    cls_id: int;
     cls_loc: Loc.t;
     cls_body: class_body;
   }
@@ -209,8 +205,9 @@ end
  = Declaration
 
 type program = {
-  root_scope: Scope.t;
-  tprogram_statements: Statement.t list;
+  tprogram_declarations: Declaration.t list;
+  tprogram_scope: Scope.t;
+  ty_var: int;
 }
 [@@deriving show]
 

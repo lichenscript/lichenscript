@@ -1,5 +1,5 @@
 
-open Core_kernel
+(* open Core_kernel
 open Core_type
 open Waterlang_parsing
 
@@ -70,4 +70,4 @@ let rec infer env (ty: Ast.Type.t) =
     TypeValue.(Function {
       tfun_params = params_types;
       tfun_ret = params_ret;
-    })
+    }) *)

@@ -13,8 +13,8 @@ let parse_string_to_program content =
         begin
         (* Ast.pp_program Format.std_formatter program; *)
         try (
-          let program = Waterlang_typing.Annotate.annotate env program in
-          let program, typecheck_errors = Waterlang_typing.Typecheck.type_check program in
+          let program = Waterlang_typing.Annotate.annotate_program env program in
+          let typecheck_errors = Waterlang_typing.Typecheck.type_check program in
 
           if not (List.is_empty typecheck_errors) then (
             List.iter

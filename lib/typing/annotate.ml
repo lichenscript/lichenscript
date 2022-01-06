@@ -10,640 +10,374 @@ open Waterlang_parsing
 
 module T = Typedtree
 
-let rec annotate_statement env (stmt: Ast.Statement.t) =
+let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
   let open Ast.Statement in
-  let { loc; spec = parser_spec; attributes; _; } = stmt in
-  let spec =
-    match parser_spec with
-    | Class cls ->
-      let cls = annotate_class env cls in
-      (* let ty_val = Infer.infer_class cls in
-      cls.tcls_id.value <- ty_val; *)
-      T.Statement.Class cls
-
-    | Module { mod_visibility; mod_name } ->
-      T.Statement.Module { mod_visibility; mod_name }
-
-    | Expr expr ->
-      T.Statement.Expr (annotate_expression env expr)
-
-    | Semi expr ->
-      T.Statement.Semi (annotate_expression env expr)
-
-    | Function_ _fun ->
-      T.Statement.Function_ (annotate_function env _fun)
-
-    | While { while_test; while_block; while_loc; } ->
-      let while_test = annotate_expression env while_test in
-      let while_block = annotate_block env while_block in
-      T.Statement.While {
-        while_test;
-        while_block;
-        while_loc = while_loc;
-      }
-
-    | Binding binding ->
-      T.Statement.Binding (annotate_binding env binding)
-
-    | Block block ->
-      T.Statement.Block (annotate_block env block)
-
-    | Break id -> T.Statement.Break id
-    | Contintue id -> T.Statement.Continue id
-    | Debugger -> T.Statement.Debugger
-    | Return expr_opt ->
-      T.Statement.Return (Option.map
-        ~f:(function expr ->
-          let annotated_expr = annotate_expression env expr in
-          if Option.is_none (Env.return_type env) then (
-            Env.set_return_type env (Some annotated_expr.val_);
-          );
-          annotated_expr
-        )
-        expr_opt)
-
-    | EnumDecl enum ->
-      begin
-        T.Statement.EnumDecl enum
-      end
-
-    | Decl decl ->
-      let open Ast.Declare in
-      let { spec; loc; } = decl in
-      (match spec with
-      | Function_ signature ->
-        let prev_scope = Env.peek_scope env in 
-        let scope = Scope.create ~prev:prev_scope prev_scope.id in
-        Env.with_new_scope env scope (fun env ->
-          let annotated_header = annotate_function_header env signature in
-          let spec = T.Declare.Function_ annotated_header in
-          T.Statement.Decl {
-            spec;
-            loc;
-          })
-        )
-
-    | Empty -> T.Statement.Empty
-
-  in
-
-  { T.Statement.
-    spec;
-    loc;
-    attributes;
-  }
-
-and annotate_function_header env (header: Ast.Function.header) =
-  let open Ast.Function in
-  let annotate_param env param =
-    let { param_pat; param_init; param_loc; param_ty; param_rest; _ } = param in
-    let param_pat: T.Pattern.t = annotate_pattern env param_pat in
-    let param_ty = param_ty
-      |> Option.map ~f:(Infer.infer env)
-      |> Option.value ~default:Core_type.TypeValue.Unknown
-    in
-    match param_pat.spec with
-      | T.Pattern.Symbol sym ->
-        Core_type.VarSym.set_def_type sym param_ty;
-    { T.Function.
-      param_pat;
-      param_ty;
-      param_init = Option.map ~f:(annotate_expression env) param_init;
-      param_loc = param_loc;
-      param_rest = param_rest;
-    }
-  in
-  let { id; params; header_loc; return_ty; _; } = header in
-  let name = (Option.value_exn id).pident_name in
-  let prev_scope: Scope.t = Option.value_exn ((Env.peek_scope env).prev) in
-  let var_sym = Scope.find_var_symbol prev_scope name in
-  match var_sym with
-  | Some tfun_id ->
-    begin
-      let params =
-        { T.Function.
-          params_content = List.map ~f:(annotate_param env) params.params_content;
-          params_loc = params.params_loc;
-        }
-      in
-      let return_ty =
-        return_ty
-        |> Option.map ~f:(Infer.infer env)
-        |> Option.value ~default:TypeValue.Unit
-      in
-      let fun_ty =
-        { TypeValue.
-          tfun_params = List.map
-            ~f:(fun param ->
-              T.Pattern.pp Format.str_formatter param.param_pat;
-              let param_name = Format.flush_str_formatter () in
-              (param_name, param.param_ty)
-            )
-            params.params_content;
-          tfun_ret = return_ty;
-        }
-      in
-      VarSym.set_def_type tfun_id (TypeValue.Function fun_ty);
-      { T.Function.
-        id = tfun_id;
-        params;
-      }
-    end
-  | None ->
-    begin
-      let err = Type_error.make_error header_loc (Type_error.CannotFindName name) in
-      Env.add_error env err;
-      raise (Type_error.Error err)
-    end
-
-
-and annotate_function env (_function: Ast.Function.t) =
-  let open Ast.Function in
-  let { header; body; loc;  _; } = _function in
-  let { return_ty; _ } = header in
-  let prev_scope = Env.peek_scope env in
-  let scope = Scope.create ~prev:prev_scope prev_scope.id in
-  Env.set_return_type env (Option.map ~f:(Infer.infer env) return_ty);
-  Env.with_new_scope env scope (fun env ->
-    let annotated_header = annotate_function_header env header in
-    let body = match body with
-      | Fun_block_body block ->
-        T.Function.Fun_block_body (annotate_block env block)
-
-      | Fun_expression_body expr ->
-        T.Function.Fun_expression_body (annotate_expression env expr)
-
-    in
-    { T.Function.
-      header = annotated_header;
-      body;
-      assoc_scope = scope;
-      loc;
-    }
-
-  )
-
-and annotate_class env _class =
-  let open Ast.Statement in
-  let annotate_body env cls_body =
-    let { cls_body_elements; cls_body_loc } = cls_body in
-    let cls_body_elements =
-      List.map
-        ~f:(function
-        | Cls_method _method ->
-          begin
-            let { cls_method_visiblity; cls_method_loc; _ } = _method in
-            let cls_method_visibility =
-              Option.value ~default:Ast.Pvisibility_private cls_method_visiblity
-            in
-            T.Statement.Cls_method {
-              cls_method_visibility;
-              cls_method_loc;
-            }
-          end
-
-        | Cls_property prop ->
-          begin
-            let {
-              cls_property_visiblity;
-              cls_property_loc;
-              cls_property_name;
-              (* pcls_property_type; *)
-              cls_property_init;
-              _;
-            } = prop
-            in
-            let cls_property_visibility =
-              Option.value ~default:Ast.Pvisibility_private cls_property_visiblity
-            in
-            let cls_property_init = Option.map ~f:(annotate_expression env) cls_property_init in
-            T.Statement.Cls_property {
-              cls_property_visibility;
-              cls_property_loc = cls_property_loc;
-              cls_property_name = cls_property_name;
-              cls_property_init;
-            }
-          end
-
-        )
-        cls_body_elements
-    in
-    { T.Statement.
-      cls_body_elements;
-      cls_body_loc = cls_body_loc;
-    }
-  in
-
-  let { cls_id; cls_loc; cls_body; _; } = _class in
-  let id = Option.value_exn cls_id in
-  let scope = Env.peek_scope env in
-  let type_sym_opt = Scope.find_type_symbol scope id.pident_name in
-  match type_sym_opt with
-  | Some cls_id ->
-    begin
-      let cls_body: T.Statement.class_body = annotate_body env cls_body in
-      { T.Statement.
-        cls_id;
-        cls_loc;
-        cls_body;
-      }
-    end
-
-  | None ->
-    begin
-      let err = Type_error.make_error cls_loc (Type_error.CannotFindName id.pident_name) in
-      Env.add_error env err;
-      raise (Type_error.Error err)
-    end
-
-and annotate_block env block =
-  let open Ast.Block in
-  let { body; loc } = block in
-  let body = List.map ~f:(annotate_statement env) body in
-  let val_ =
-    match List.last body with
-    | Some { Typedtree.Statement. spec = Expr expr; _;} ->
-      expr.val_
-
-    | _ -> TypeValue.Unit
-  in
-  { T.Block.
-    body;
-    loc;
-    val_;
-  }
-
-and annotate_binding env (binding: Ast.Statement.var_binding) =
-  let open Ast.Statement in
-  let { binding_kind; binding_loc; binding_ty; binding_pat; binding_init } = binding in
-  let binding_init = annotate_expression env binding_init in
-  let binding_ty: TypeValue.t option = Option.map ~f:(Infer.infer env) binding_ty in
-  let binding_pat = annotate_pattern env binding_pat in
-
-  T.Pattern.(
-    match binding_pat.spec with
-    | Symbol sym ->
-      (match binding_ty with
-      | Some t ->
-        sym.def_type <- t
-
-      | None ->
-        sym.def_type <- binding_init.val_)
-
-  );
-
-  { T.Statement.
-    binding_kind;
-    binding_loc;
-    binding_ty;
-    binding_pat;
-    binding_init;
-  }
-
-and annotate_pattern ?(def=true) env (pat: Ast.Pattern.t) =
-  let open Ast.Pattern in
-  let { spec; loc } = pat in
-  let spec =
+  let { spec; loc; attributes; _ } = stmt in
+  let deps, spec =
     match spec with
-    | Identifier id ->
-      begin
-        let current_scope = Env.peek_scope env in
-        let sym =
-          if def then
-            Scope.create_var_symbol current_scope id.pident_name
-          else
-            Option.value_exn (Scope.find_var_symbol current_scope id.pident_name)
-        in
-        T.Pattern.Symbol sym
-      end
+    | Expr expr -> (
+      let expr = annotate_expression ~prev_deps env expr in 
+      let ty_var = T.Expression.(expr.ty_var) in
+
+      [ty_var], (T.Statement.Expr expr)
+    )
+
+    | Semi expr -> (
+      let expr = annotate_expression ~prev_deps env expr in 
+      let ty_var = T.Expression.(expr.ty_var) in
+
+      let node = {
+        value = TypeValue.Unit;
+        loc;
+        deps = [ty_var];
+        check = none;  (* TODO: check expr is empty *)
+      } in
+
+      let id = Type_env.new_id node in
+      [id], (T.Statement.Semi expr)
+    )
+
+    | While _
+    | Binding _
+    | Block _
+    | Break _
+    | Continue _
+    | Debugger
+    | Return _
+    | Empty -> prev_deps, failwith "not implment"
   in
-  { T.Pattern.
-    spec;
-    loc;
-  }
+  deps, { T.Statement. spec; loc; attributes }
 
-and annotate_constant env (cnst: Ast.Literal.t) =
-  let open Ast.Literal in
-  match cnst with
-  | Integer _ ->
-    (cnst, Env.ty_i32 env)
-
-  | Char _ ->
-    (cnst, Env.ty_char env)
-
-  | Float _ ->
-    (cnst, Env.ty_f32 env)
-
-  | String _ ->
-    (cnst, Env.ty_string env)
-
-  | Boolean _ ->
-    (cnst, Env.ty_boolean env)
-
-and annotate_expression (env: Env.t) expr =
+and annotate_expression ~prev_deps env expr : T.Expression.t =
   let open Ast.Expression in
-  let { spec; loc; _; } = expr in
-  let (spec, ty_val) =
+  let { spec; loc; attributes; } = expr in
+  let ty_var, spec = 
     match spec with
-    | Constant cnst ->
-      let (cnst, ty_val) = annotate_constant env cnst in
-      (T.Expression.Constant cnst, TypeValue.Ctor ty_val)
+    | Constant cnst -> (
+      let open Ast.Literal in
+      let ty_var =
+        match cnst with
+        | Integer _ ->
+          Type_env.new_id {
+            value = TypeValue.Ctor("i32", []);
+            loc;
+            deps = [];
+            check = none;
+          }
 
-    | Identifier id ->
-      begin
-        let current_scope = Env.peek_scope env in
-        let var_sym_opt = Scope.find_var_symbol current_scope id.pident_name in
-        match var_sym_opt with
-        | Some sym ->
-          (T.Expression.Identifier sym, sym.def_type)
+        | Char _ ->
+          Type_env.new_id {
+            value = TypeValue.Ctor("char", []);
+            loc;
+            deps = [];
+            check = none;
+          }
 
-        | None ->
-          (T.Expression.UnresolvedIdentifier id, TypeValue.Unknown)
-          (* begin
-            (* find the open domain, external variables *)
-            let test = Env.resolve_open_domain env id.pident_name in
-            match test with
-            | Some sym ->
-              (T.Expression.Identifier sym, sym.def_type)
+        (* 'c' *)
+        | String _ ->
+          Type_env.new_id {
+            value = TypeValue.Ctor("string", []);
+            loc;
+            deps = [];
+            check = none;
+          }
 
-            | None ->
-              let err = Type_error.make_error loc (Type_error.CannotFindName id.pident_name) in
-              Env.add_error env err;
-              raise (Type_error.Error err)
+        | Float _ ->
+          Type_env.new_id {
+            value = TypeValue.Ctor("f32", []);
+            loc;
+            deps = [];
+            check = none;
+          }
 
-          end *)
-      end
+        | Boolean _ -> 
+          Type_env.new_id {
+            value = TypeValue.Ctor("boolean", []);
+            loc;
+            deps = [];
+            check = none;
+          }
 
-    | Lambda _ -> (T.Expression.Lambda, TypeValue.Unknown)
-
-    | If { if_test; if_consequent; if_alternative; if_loc; } ->
-      let if_test = annotate_expression env if_test in
-      let if_consequent = annotate_statement env if_consequent in
-      let if_alternative = Option.map ~f:(annotate_statement env) if_alternative in
-      (T.Expression.If {
-        if_test;
-        if_consequent;
-        if_alternative;
-        if_loc;
-      }, TypeValue.Unknown)
-
-    | Array arr ->
-      (T.Expression.Array
-        (List.map ~f:(annotate_expression env) arr),
-        TypeValue.Unknown)
-    
-    | Call call -> annotate_call env call
-
-    | Member (expr, field) ->
-
-      let expr = annotate_expression env expr in
-
-      let add_cannot_read_name_error name =
-          let spec = Type_error.CannotReadMember(name, expr.val_) in
-          let err = { Type_error. spec; loc; } in
-          Env.add_error env err;
-          raise (Type_error.Error err)
       in
 
-      let open TypeValue in
-      (match expr.val_ with
-      | Ctor { TypeSym. spec = Module_ mod_; _; } ->
-        let name = field.pident_name in
-        let field_type_opt = PropsMap.find mod_.props name in
-        (match field_type_opt with
-        | Some field_type ->
-          (T.Expression.Member(expr, field), field_type)
-        | None -> add_cannot_read_name_error field.pident_name)
+      ty_var, (T.Expression.Constant cnst)
+    )
 
-      | _ -> 
-        add_cannot_read_name_error field.pident_name)
+    | Identifier id -> (
+      let name = id.pident_name in
+      let ty_var = Type_env.new_id {
+        value = TypeValue.Ctor(name, []);
+        loc;
+        deps = [];
+        check = none;
+      } in
+      ty_var, (T.Expression.Identifier ty_var)
+    )
 
-    | Unary (op, expr) ->
-      let expr = annotate_expression env expr in
-      (T.Expression.Unary(op, expr), TypeValue.Unknown)
+    | Lambda _
+    | If _
+    | Array _ 
+    | Call _ ->
 
-    | Binary (op, left, right) ->
-      let left = annotate_expression env left in
-      let right = annotate_expression env right in
-      let ty_val = TypeValue.Ctor (Env.ty_i32 env) in
-      (T.Expression.Binary(op, left, right), ty_val)
+    (* | Call call -> (
+      let { callee; call_params; call_loc; } = call in
 
-    | Update (op, expr, prefix) ->
-      let expr = annotate_expression env expr in
-      (T.Expression.Update(op, expr, prefix), TypeValue.Unknown)
+      let callee = annotate_expression ~prev_deps env callee in
+      let call_params = List.map ~f:(annotate_expression ~prev_deps env) call_params in
 
-    | Assign (left, right) ->
-      let left' = annotate_pattern ~def:false env left in
-      let right' = annotate_expression env right in
-      (T.Expression.Assign(left', right'), right'.val_)
+      let ty_var = Type_env.new_id {
+        value = TypeValue.Unknown;
+        loc;
+        deps = [ T.Expression.(callee.ty_var) ];
+        check = none;
+      } in
 
-    | Block blk ->
-      let blk' = annotate_block env blk in
-      ((T.Expression.Block blk'), blk'.val_)
+      ty_var, (T.Expression.Call { callee; call_params; call_loc })
+    ) *)
+      0, failwith "not implemented"
 
+    | Member _
+    | Unary _
+    | Binary _
+    | Update _
+    | Assign _ -> 0, failwith "not implemented"
+    | Block block -> (
+      let block = annotate_block ~prev_deps env block in
+      T.Block.(block.return_ty), (T.Expression.Block block)
+    )
   in
   { T.Expression.
     spec;
     loc;
-    val_ = ty_val;
+    attributes;
+    ty_var;
   }
 
-and annotate_call env (call: Ast.Expression.call) =
-  let open Ast.Expression in
-  let rec cast_member_to_callee (expr: T.Expression.t) props =
-    match expr.spec with
-    | T.Expression.Identifier id ->
-      let (ty, props) = props
-        |> List.rev
-        |> List.fold_map
-          ~init:id.def_type
-          ~f:(fun acc id ->
-            let open Core_type.TypeValue in
-            let open Core_type.TypeSym in
-            let open Identifier in
-            let ty = match acc with
-              | Ctor { spec = Module_ mod_; _; } ->
-                let name = id.pident_name in
-                let prop_opt = Core_type.PropsMap.find mod_.props name in
-                Option.value_exn prop_opt
-
-              | _ -> Unknown
-            in
-            let prop = `Property id.pident_name  in
-            ty, prop
-          )
-      in
-      let callee_item = (id, props) in
-      (callee_item, ty)
-
-    | T.Expression.Member(new_expr, id) ->
-      cast_member_to_callee new_expr (id::props)
-
-    | _ ->
-      let spec = Type_error.NotCallable expr.val_ in
-      let err = Type_error.make_error expr.loc spec in
-      Env.add_error env err;
-      raise (Type_error.Error err)
-
-  and cast_expr_to_callee (expr: T.Expression.t): T.Expression.callee =
-    let (spec, callee_ty) = cast_member_to_callee expr [] in
-    { T.Expression.
-      callee_spec = spec;
-      callee_loc = expr.loc;
-      callee_ty;
-    }
-
+and annotate_block ~prev_deps env block =
+  let open Ast.Block in
+  let { body; loc } = block in
+  let body_dep, body_stmts =
+    List.fold_map
+      ~init:prev_deps
+      ~f:(fun prev_deps stmt ->
+        annotate_statement ~prev_deps env stmt
+      )
+      body
   in
-  let { callee; call_params; call_loc } = call in
-  let tcallee = annotate_expression env callee in
-  let return_ty =
-    match tcallee.val_ with
-    | TypeValue.Function fun_ -> fun_.tfun_ret
-    | _ -> TypeValue.Unknown
-  in
-  let call_params = List.map ~f:(annotate_expression env) call_params in
-  (T.Expression.Call {
-    callee = cast_expr_to_callee tcallee;
-    call_params;
-    call_loc = call_loc;
-  }, return_ty)
+  let node = {
+    value = TypeValue.Unknown;
+    deps = body_dep;
+    loc;
+    check = none;
+  } in
+  let return_ty = Type_env.new_id node in
+  { T.Block.
+    body = body_stmts;
+    loc;
+    return_ty;
+  }
 
-(**
- * pre-scan symbol of root-level definitions of
- * class/function/struct/enum
- *)
-let pre_scan_definitions env program =
-  let { Ast. pprogram_statements; _; } = program in
-
-  let find_or_add_type_sym name loc =
-    let scope = Env.peek_scope env in
-    let type_sym = Scope.find_type_symbol scope name in
-    match type_sym with
-    | Some found ->
-      begin
-        let err = Type_error.make_error loc (Type_error.Redefinition name) in
-        Env.add_error env err;
-        found
-      end
-
-    | None ->
-      begin
-        let open Core_type in
-        let sym = TypeSym.create ~scope_id:scope.id name TypeSym.Primitive in
-        Scope.insert_type_symbol scope sym;
-        sym
-      end
-  in
-
-  let find_or_add_var_sym ?(spec=Core_type.VarSym.Internal) name loc =
-    let scope = Env.peek_scope env in
-    let var_sym = Scope.find_var_symbol scope name in
-    match var_sym with
-    | Some found ->
-      begin
-        let err = Type_error.make_error loc (Type_error.Redefinition name) in
-        Env.add_error env err;
-        found
-      end
-
-    | None ->
-      Scope.create_var_symbol ~spec scope name
-
-  in
-
-  List.iter
-    ~f:(fun stmt ->
-      let open Ast.Statement in
-      let { spec; attributes; _; } = stmt in
-      match spec with
-      | Class cls ->
-        begin
-          let { cls_id; cls_loc; _; } = cls in
-          let id = Option.value_exn cls_id in
-          let _ = find_or_add_type_sym id.pident_name cls_loc in
-          let _ = find_or_add_var_sym id.pident_name cls_loc in
-          ()
-        end
-
-      | Function_ _fun ->
-        begin
-          let open Ast.Function in
-          let { header; loc; _; } = _fun in
-          let { id; _; } = header in
-          let id = Option.value_exn id in
-          let _ = find_or_add_type_sym id.pident_name loc in
-          let _  = find_or_add_var_sym id.pident_name loc in
-          ()
-        end
-
-      | Decl declare ->
-        begin
-          let open Ast.Declare in
-          let { spec; loc; _ } = declare in
-          match spec with
-          | Function_ signature ->
-            let external_attrib = List.find
-              ~f:Ast.(fun attr -> String.equal attr.attr_name.txt "external")
-              attributes
-            in
-            Option.iter
-              ~f:(fun attr ->
-                match attr.attr_payload with
-                | [ external_name ] ->
-                  let spec = Core_type.VarSym.ExternalMethod external_name in
-                  let id = Option.value_exn signature.id in
-                  let _ = find_or_add_type_sym id.pident_name loc in
-                  let _ = find_or_add_var_sym ~spec id.pident_name loc in
-                  ()
-
-                | _ -> failwith "not implemented 2"
-              )
-              external_attrib
-
-        end
-
-      | EnumDecl enum_decl ->
-        begin
-          let open Ast.Enum in
-          let { name; loc; _; } = enum_decl in
-          let spec: Core_type.VarSym.spec = 
-            let a_list =
-              List.mapi
-                ~f:(fun index member ->
-                  let field =
-                    { Core_type.VarSym.
-                      enum_id = index;
-                    }
-                  in
-                  (member.member_name.pident_name, field)
-                )
-                enum_decl.members
-            in
-            let enum_map = Core_type.PropsMap.of_alist a_list in
-            let unwrapped_enum =
-              match enum_map with
-              | `Ok emap -> emap
-              | _ -> failwith "unexpected"
-            in
-            Core_type.VarSym.Enum unwrapped_enum
-          in
-          let _ = find_or_add_type_sym name.pident_name loc in
-          let _  = find_or_add_var_sym ~spec name.pident_name loc in
-          ()
-        end
-
-      | _ -> ()
+and annotate_declaration env decl : T.Declaration.t =
+  let open Ast.Declaration in
+  let { spec; loc; attributes } = decl in
+  let spec =
+    match spec with
+    | Class _class -> (
+      T.Declaration.Class (annotate_class env decl)
     )
-    pprogram_statements
 
-let annotate env (program: Ast.program) =
-  pre_scan_definitions env program;
-  let { Ast. pprogram_statements; _; } = program in
-  let tprogram_statements =
-    List.map ~f:(annotate_statement env) pprogram_statements
+    | Function_ _fun -> T.Declaration.Function_ (annotate_function env _fun)
+    | Declare _ -> failwith "not implementation"
+    | Enum enum -> T.Declaration.Enum enum
+
   in
-  let root_scope = Env.root_scope env in
-  { T.
-    tprogram_statements;
-    root_scope;
+  { T.Declaration. spec; loc; attributes }
+
+and annotate_class _env _cls =
+  failwith "not implement"
+
+and annoate_pattern _env pat =
+  let open Ast.Pattern in
+  let { spec; loc } = pat in
+  let id, spec =
+    match spec with
+    | Identifier _ident -> (
+      let node = {
+        Core_type.
+        loc;
+        value = TypeValue.Unknown;
+        check = none;
+        deps = [];
+      } in
+      let id = Type_env.new_id node in
+      id, (T.Pattern.Symbol id)
+    )
+  in
+  { T.Pattern. spec; loc }, id
+
+and annotate_type env ty =
+  let open Ast.Type in
+  let { spec; loc } = ty in
+  let deps = ref [] in
+  let value =
+    match spec with
+    | Ty_any -> TypeValue.Any
+    | Ty_ctor(ctor, params) -> (
+      let { Identifier. pident_name; _ } = ctor in
+      (* TODO: find ctor in the scope *)
+      let params = List.map ~f:(annotate_type env) params in
+      deps := List.concat [ !deps; params ];
+      TypeValue.Ctor (pident_name, params)
+    )
+    | Ty_arrow (params, result) -> (
+      let params_types = List.map ~f:(annotate_type env) params in
+      let return_type = annotate_type env result in
+      deps := List.concat [ !deps; params_types; [ return_type ] ];
+      let ctor_type = Type_env.new_id {
+        deps = params_types;
+        value = TypeValue.Unknown;
+        loc;
+        check = none;
+      } in
+      TypeValue.Function(ctor_type, return_type)
+    )
+  in
+  let node = {
+    loc;
+    value;
+    deps = !deps;
+    check = none;
+  } in
+  Type_env.new_id node
+
+and annotate_function env fun_ =
+  let open Ast.Function in
+
+  let annoate_param param =
+    let { param_pat; param_ty; param_init = _init; param_loc; param_rest } = param in
+    let param_pat, param_ty_id = annoate_pattern env param_pat in
+    let deps = ref [ param_ty_id ] in
+    Option.iter
+      ~f:(fun ty ->
+        let param_ty = annotate_type env ty in
+        deps := param_ty::!deps
+      )
+      param_ty
+    ;
+    let node = {
+      loc = param_loc;
+      value = TypeValue.Unknown;
+      deps = !deps;
+      check = none;  (* check init *)
+    } in
+    let node_id = Type_env.new_id node in
+    { T.Function.
+      param_pat;
+      param_ty = param_ty_id;
+      param_init = None;  (* TODO *)
+      param_loc;
+      param_rest;
+    }, node_id
+  in
+
+  let annoate_params params = 
+    let { params_content; params_loc } = params in
+    let params, params_types = List.map ~f:annoate_param params_content |> List.unzip in
+    let node = {
+      loc = params_loc;
+      value = TypeValue.Unknown;
+      deps = params_types;
+      check = none;  (* check init *)
+    } in
+    params, (Type_env.new_id node)
+  in
+
+  let { visibility = _visibility; header; body; loc; comments; } = fun_ in
+
+  let name_node = {
+    loc = header.id.pident_loc;
+    value = TypeValue.Unknown;
+    deps = [];
+    check = none;
+  } in
+  let name_id = Type_env.new_id name_node in
+
+  let params, params_type = annoate_params header.params in
+
+  let body = annotate_block ~prev_deps:[params_type] env body in
+
+  let return_node = {
+    loc;
+    value = TypeValue.Unknown;
+    deps = [body.return_ty];
+    check = none;
+  } in
+  let return_id = Type_env.new_id return_node in
+
+  Type_env.update_node name_id {
+    name_node with
+    value = TypeValue.Function (params_type, return_id);
+    deps = [ params_type; return_id ];
+    check = none;
+  };
+  { T.Function.
+    header = {
+      id = params_type;
+      params = {
+        params_content = params;
+        params_loc = header.params.params_loc;
+      };
+    };
+    body;
+    ty_var = name_id;
+    comments;
   }
+
+let annotate_program env (program: Ast.program) =
+  let { Ast. pprogram_declarations; pprogram_loc; _; } = program in
+  let tprogram_declarations = List.map ~f:(annotate_declaration env) pprogram_declarations in
+
+  let deps =
+    List.fold
+      ~init:[]
+      ~f:(fun acc decl -> 
+        let open T.Declaration in
+        let { spec; _ } = decl in
+        match spec with
+        | Class cls -> (
+          let { cls_id; _} = cls in
+          cls_id::acc
+        )
+
+        | Function_ _fun -> (
+          let open T.Function in
+          let { ty_var; _ } = _fun in
+          ty_var::acc
+        )
+
+        | Declare declare -> (
+          let { declare_ty_var; _ } = declare in
+          declare_ty_var::acc
+        )
+
+        | Enum _ -> failwith "not implement"
+        
+      )
+      tprogram_declarations
+  in
+
+  let val_ =
+    {
+      value = TypeValue.Unknown;
+      loc = pprogram_loc;
+      deps;
+      check = (fun () -> ());
+    }
+  in
+  let ty_var = Type_env.new_id val_ in
+  let tree = { T.
+    tprogram_declarations;
+    tprogram_scope = Env.root_scope env;
+    ty_var
+  } in
+  tree

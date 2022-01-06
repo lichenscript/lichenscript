@@ -26,25 +26,29 @@ let make_default_type_sym scope =
   |] in
   Array.iter
     ~f:(fun (name, spec) ->
-      let scope_id = Scope.id scope in
-      let sym = TypeSym.create ~builtin:true  ~scope_id name spec in
+      let sym = TypeSym.create ~builtin:true  name spec in
       Scope.insert_type_symbol scope sym;
     )
     names
 
+let has_make_default = ref false
+
 let create ?(open_domains=[]) () =
-  let root_scope = Scope.create 0 in
+  let mod_scope = Scope.create ~prev:(Scope.root_scope) () in
   let env =
     {
-      root_scope;
+      root_scope = Scope.root_scope;
       open_domains;
-      current_scope = root_scope;
+      current_scope = mod_scope;
       errors = [];
       scope_counter = 1;
       return_type = None;
     }
   in
-  make_default_type_sym root_scope;
+  if not !has_make_default then (
+    make_default_type_sym Scope.root_scope;
+    has_make_default := true
+  );
   env
 
 let root_scope env = env.root_scope
