@@ -3,6 +3,7 @@ open Core_kernel
 open Core_type
 
 type t = {
+  ctx: Type_context.t;
   root_scope: Scope.t;
   open_domains: string array list;
   mutable current_scope: Scope.t;
@@ -11,7 +12,7 @@ type t = {
   mutable return_type: TypeValue.t option;
 }
 
-let make_default_type_sym scope =
+let make_default_type_sym ctx scope =
   let open TypeSym in
   let names = [|
     ("u32", Primitive);
@@ -27,16 +28,24 @@ let make_default_type_sym scope =
   Array.iter
     ~f:(fun (name, spec) ->
       let sym = TypeSym.create ~builtin:true  name spec in
-      Scope.insert_type_symbol scope sym;
+      let node = {
+        value = TypeValue.TypeDef sym;
+        loc = Waterlang_lex.Loc.none;
+        deps = [];
+        check = none;
+      } in
+      let id = Type_context.new_id ctx node in
+      Scope.insert_type_symbol scope name id;
     )
     names
 
 let has_make_default = ref false
 
-let create ?(open_domains=[]) () =
+let create ?(open_domains=[]) ctx =
   let mod_scope = Scope.create ~prev:(Scope.root_scope) () in
   let env =
     {
+      ctx;
       root_scope = Scope.root_scope;
       open_domains;
       current_scope = mod_scope;
@@ -46,10 +55,12 @@ let create ?(open_domains=[]) () =
     }
   in
   if not !has_make_default then (
-    make_default_type_sym Scope.root_scope;
+    make_default_type_sym ctx Scope.root_scope;
     has_make_default := true
   );
   env
+
+let ctx env = env.ctx
 
 let root_scope env = env.root_scope
 

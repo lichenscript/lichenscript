@@ -33,7 +33,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
         check = none;  (* TODO: check expr is empty *)
       } in
 
-      let id = Type_env.new_id node in
+      let id = Type_context.new_id (Env.ctx env) node in
       [id], (T.Statement.Semi expr)
     )
 
@@ -100,45 +100,20 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let ty_var =
         match cnst with
         | Integer _ ->
-          Type_env.new_id {
-            value = TypeValue.Ctor("i32", []);
-            loc;
-            deps = [];
-            check = none;
-          }
+          Option.value_exn (Scope.find_type_symbol (Env.root_scope env) "i32")
 
         | Char _ ->
-          Type_env.new_id {
-            value = TypeValue.Ctor("char", []);
-            loc;
-            deps = [];
-            check = none;
-          }
+          Option.value_exn (Scope.find_type_symbol (Env.root_scope env) "char")
 
         (* 'c' *)
         | String _ ->
-          Type_env.new_id {
-            value = TypeValue.Ctor("string", []);
-            loc;
-            deps = [];
-            check = none;
-          }
+          Option.value_exn (Scope.find_type_symbol (Env.root_scope env) "string")
 
         | Float _ ->
-          Type_env.new_id {
-            value = TypeValue.Ctor("f32", []);
-            loc;
-            deps = [];
-            check = none;
-          }
+          Option.value_exn (Scope.find_type_symbol (Env.root_scope env) "f32")
 
         | Boolean _ -> 
-          Type_env.new_id {
-            value = TypeValue.Ctor("boolean", []);
-            loc;
-            deps = [];
-            check = none;
-          }
+          Option.value_exn (Scope.find_type_symbol (Env.root_scope env) "boolean")
 
       in
 
@@ -199,7 +174,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let callee = cast_expressions_into_callee [] callee in
       let call_params = List.map ~f:(annotate_expression ~prev_deps env) call_params in
 
-      let ty_var = Type_env.new_id {
+      let ty_var = Type_context.new_id (Env.ctx env) {
         value = TypeValue.Unknown;
         loc;
         deps = [ T.Expression.(callee.callee_ty_var) ];
@@ -222,7 +197,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         loc;
         check = none;
       } in
-      let id = Type_env.new_id node in
+      let id = Type_context.new_id (Env.ctx env) node in
 
       id, (T.Expression.Binary(op, left, right))
     )
@@ -258,7 +233,7 @@ and annotate_block ~prev_deps env block : T.Block.t =
     loc;
     check = none;
   } in
-  let return_ty = Type_env.new_id node in
+  let return_ty = Type_context.new_id (Env.ctx env) node in
   { T.Block.
     body = body_stmts;
     loc;
@@ -282,16 +257,16 @@ and annotate_declaration env decl : T.Declaration.t =
       | DeclFunction declare_fun -> (
         let { Ast.Function. id; params; _ } = declare_fun in
 
-        let params, params_type = annoate_function_params env params in
+        let params, params_types = annoate_function_params env params in
 
         let node = {
           value = TypeValue.Unknown;
-          deps = [params_type];
+          deps = params_types;
           loc = decl_loc;
           check = none;
         } in
 
-        let ty_id = Type_env.new_id node in
+        let ty_id = Type_context.new_id (Env.ctx env) node in
 
         let header = {
           T.Function.
@@ -317,7 +292,7 @@ and annotate_declaration env decl : T.Declaration.t =
 and annotate_class _env _cls =
   failwith "not implement"
 
-and annotate_pattern _env pat =
+and annotate_pattern env pat =
   let open Ast.Pattern in
   let { spec; loc } = pat in
   let id, spec =
@@ -330,46 +305,44 @@ and annotate_pattern _env pat =
         check = none;
         deps = [];
       } in
-      let id = Type_env.new_id node in
+      let id = Type_context.new_id (Env.ctx env) node in
       id, (T.Pattern.Symbol (ident.pident_name, id))
     )
   in
   { T.Pattern. spec; loc }, id
 
-and annotate_type env ty =
+(* only collect deps, construct value in type check *)
+and annotate_type env ty : (TypeValue.t * int list) =
   let open Ast.Type in
-  let { spec; loc } = ty in
+  let { spec; _ } = ty in
   let deps = ref [] in
-  let value =
-    match spec with
-    | Ty_any -> TypeValue.Any
-    | Ty_ctor(ctor, params) -> (
-      let { Identifier. pident_name; _ } = ctor in
+  match spec with
+  | Ty_any -> TypeValue.Any, []
+  | Ty_ctor(ctor, params) -> (
+    let { Identifier. pident_name; pident_loc } = ctor in
+    let ty_var_opt = Scope.find_type_symbol (Env.peek_scope env) pident_name in
+    match ty_var_opt with
+    | Some ty_var -> (
       (* TODO: find ctor in the scope *)
-      let params = List.map ~f:(annotate_type env) params in
-      deps := List.concat [ !deps; params ];
-      TypeValue.Ctor (pident_name, params)
+      let params, params_deps = List.map ~f:(annotate_type env) params |> List.unzip in
+      deps := List.concat (!deps::params_deps);
+      TypeValue.Ctor (ty_var, params), [ty_var]
     )
-    | Ty_arrow (params, result) -> (
-      let params_types = List.map ~f:(annotate_type env) params in
-      let return_type = annotate_type env result in
-      deps := List.concat [ !deps; params_types; [ return_type ] ];
-      let ctor_type = Type_env.new_id {
-        deps = params_types;
-        value = TypeValue.Unknown;
-        loc;
-        check = none;
-      } in
-      TypeValue.Function(ctor_type, return_type)
+
+    | None -> (
+      let err_spec = Type_error.CannotFindName pident_name in
+      let err = Type_error.make_error pident_loc err_spec in
+      raise (Type_error.Error err)
     )
-  in
-  let node = {
-    loc;
-    value;
-    deps = !deps;
-    check = none;
-  } in
-  Type_env.new_id node
+
+  )
+  | Ty_arrow (params, result) -> (
+    let params, params_types_deps = List.map ~f:(annotate_type env) params |> List.unzip in
+    let return_type, return_type_deps = annotate_type env result in
+    deps := List.concat ((!deps)::return_type_deps::params_types_deps);
+    TypeValue.Function(params, return_type), !deps
+  )
+  (* !deps *)
 
 and annoate_function_params env params = 
   let open Ast.Function in
@@ -377,20 +350,22 @@ and annoate_function_params env params =
     let { param_pat; param_ty; param_init = _init; param_loc; param_rest } = param in
     let param_pat, param_ty_id = annotate_pattern env param_pat in
     let deps = ref [ param_ty_id ] in
+    let value = ref TypeValue.Unknown in
     Option.iter
       ~f:(fun ty ->
-        let param_ty = annotate_type env ty in
-        deps := param_ty::!deps
+        let param_ty, param_ty_deps = annotate_type env ty in
+        deps := List.append param_ty_deps !deps;
+        value := param_ty;
       )
       param_ty
     ;
     let node = {
       loc = param_loc;
-      value = TypeValue.Unknown;
+      value = !value;
       deps = !deps;
       check = none;  (* check init *)
     } in
-    let node_id = Type_env.new_id node in
+    let node_id = Type_context.new_id (Env.ctx env) node in
     { T.Function.
       param_pat;
       param_ty = param_ty_id;
@@ -402,13 +377,7 @@ and annoate_function_params env params =
 
   let { params_content; params_loc } = params in
   let params, params_types = List.map ~f:annoate_param params_content |> List.unzip in
-  let node = {
-    loc = params_loc;
-    value = TypeValue.Unknown;
-    deps = params_types;
-    check = none;  (* check init *)
-  } in
-  { T.Function. params_content = params; params_loc }, (Type_env.new_id node)
+  { T.Function. params_content = params; params_loc }, params_types
 
 and annotate_function env fun_ =
   let open Ast.Function in
@@ -421,18 +390,18 @@ and annotate_function env fun_ =
 
     let fun_id_opt = Scope.find_var_symbol prev_scope header.id.pident_name in
     if Option.is_none fun_id_opt then (
-      failwith "unexpected";
+      failwith (Format.sprintf "unexpected: function id %s is not added in parsing stage" header.id.pident_name)
     );
     let fun_id = Option.value_exn fun_id_opt in
-    let name_node = Type_env.get_node fun_id in
+    let name_node = Type_context.get_node (Env.ctx env) fun_id in
 
     let name_node = {
       name_node with
       loc;
     } in
-    Type_env.update_node fun_id name_node;
+    Type_context.update_node (Env.ctx env) fun_id name_node;
 
-    let params, params_type = annoate_function_params env header.params in
+    let params, params_types = annoate_function_params env header.params in
 
     (* add all params into scope *)
     List.iter
@@ -446,7 +415,7 @@ and annotate_function env fun_ =
       )
       params.params_content;
 
-    let body = annotate_block ~prev_deps:[params_type] env body in
+    let body = annotate_block ~prev_deps:params_types env body in
 
     let return_node = {
       loc;
@@ -454,17 +423,17 @@ and annotate_function env fun_ =
       deps = [body.return_ty];
       check = none;
     } in
-    let return_id = Type_env.new_id return_node in
+    let return_id = Type_context.new_id (Env.ctx env) return_node in
 
-    Type_env.update_node fun_id {
+    Type_context.update_node (Env.ctx env) fun_id {
       name_node with
-      value = TypeValue.Function (params_type, return_id);
-      deps = [ params_type; return_id ];
+      value = TypeValue.Unknown;  (* it's an typedef *)
+      deps = return_id::params_types;
       check = none;
     };
     { T.Function.
       header = {
-        id = params_type;
+        id = fun_id;
         name = header.id.pident_name;
         params;
       };
@@ -486,7 +455,7 @@ let annotate_program env (program: Ast.program) =
         deps = [];
         check = none;
       } in
-      let new_id = Type_env.new_id node in
+      let new_id = Type_context.new_id (Env.ctx env) node in
       Scope.insert_var_symbol (Env.peek_scope env) key new_id
     )
     pprogram_top_level.names
@@ -531,7 +500,7 @@ let annotate_program env (program: Ast.program) =
       check = (fun () -> ());
     }
   in
-  let ty_var = Type_env.new_id val_ in
+  let ty_var = Type_context.new_id (Env.ctx env) val_ in
   let tree = { T.
     tprogram_declarations;
     tprogram_scope = Env.root_scope env;

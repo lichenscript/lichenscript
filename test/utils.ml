@@ -6,7 +6,8 @@ exception ExpectedError of string
 
 let parse_string_to_program content =
   let result = Parser.parse_string None content in
-  let env = Waterlang_typing.Env.create () in
+  let ctx = Waterlang_typing.Type_context.create () in
+  let env = Waterlang_typing.Env.create ctx in
   let typed_tree =
     match result with
     | Result.Ok { tree = program; _ } ->
@@ -14,7 +15,7 @@ let parse_string_to_program content =
         (* Ast.pp_program Format.std_formatter program; *)
         try (
           let program = Waterlang_typing.Annotate.annotate_program env program in
-          let typecheck_errors = Waterlang_typing.Typecheck.type_check program in
+          let typecheck_errors = Waterlang_typing.Typecheck.type_check ctx program in
 
           if not (List.is_empty typecheck_errors) then (
             List.iter

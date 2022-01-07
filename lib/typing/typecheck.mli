@@ -4,4 +4,4 @@
 	?open_domains:(string array list) ->
 	Typedtree.program -> (Typedtree.program * Type_error.t list) *)
 
-val type_check: Typedtree.program -> Type_error.t list
+val type_check: Type_context.t -> Typedtree.program -> Type_error.t list

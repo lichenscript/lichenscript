@@ -4,45 +4,52 @@ open Core_kernel
  **)
 
 (* num -> [] *)
-let type_env: ResizableArray.t = ResizableArray.make 1024
+type t = ResizableArray.t
 
-let new_id ty =
-  let id = ResizableArray.size type_env in
-  ResizableArray.push type_env ty;
+let create () = ResizableArray.make 1024
+
+let new_id ctx ty =
+  let id = ResizableArray.size ctx in
+  ResizableArray.push ctx ty;
   id
 
-let update_node id node =
-  ResizableArray.set type_env id node
+let update_node ctx id node =
+  ResizableArray.set ctx id node
 
-let size () = ResizableArray.size type_env
+let size ctx = ResizableArray.size ctx
 
-let get_node id =
-  ResizableArray.get type_env id
+let get_node ctx id =
+  ResizableArray.get ctx id
 
-let print () =
-  let print_item_by_id id =
-    let item = get_node id in
+let print ctx =
+  let rec print_item_by_id id =
+    let item = get_node ctx id in
     let open Core_type.TypeValue in
     match item.value with
     | Unknown -> "unkonwn"
     | Any -> "any"
     | Unit -> "unit"
     | Ctor (name, []) -> (
-      name
+      print_item_by_id name
     )
+    | Ctor _ -> "ctor"
+    (*
     | Ctor (name, _list) -> (
       name ^ "<>"
-    )
+    ) *)
 
     | Class _ -> "class"
     | Function _ -> "function"
     | Module _ -> "module"
     | Array _ -> "array"
+    | TypeDef sym ->
+      (Core_type.TypeSym.name sym)
+
   in
 
-  let arr_size = size() in
+  let arr_size = size ctx in
   for i = 0 to (arr_size - 1) do
-    let item = get_node i in
+    let item = get_node ctx i in
     let deps = Buffer.create 64 in
     List.iter ~f:(fun item -> Buffer.add_string deps (Int.to_string item); Buffer.add_string deps " ") item.deps ;
     Format.printf "%d: %s\n" i (Buffer.contents deps);

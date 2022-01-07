@@ -7,11 +7,12 @@ module rec TypeValue : sig
     | Unknown
     | Any
     | Unit
-    | Ctor of string * (int list)
+    | Ctor of int * (t list)
     | Class of class_type
-    | Function of int * int
+    | Function of t list * t
     | Module of module_type
     | Array of t
+    | TypeDef of TypeSym.t
 
   and module_type = {
     export: t;
@@ -42,11 +43,12 @@ end = struct
     | Unknown
     | Any
     | Unit
-    | Ctor of string * (int list)
+    | Ctor of int * (t list)
     | Class of class_type
-    | Function of int * int
+    | Function of t list * t
     | Module of module_type
     | Array of t
+    | TypeDef of TypeSym.t
 
   and module_type = {
     export: t;
@@ -73,7 +75,7 @@ end = struct
     | Unknown -> Format.pp_print_string formatter "unknown"
     | Any -> Format.pp_print_string formatter "any"
     | Unit -> Format.pp_print_string formatter "unit"
-    | Ctor(sym, _) -> Format.fprintf formatter "%s<>" sym
+    | Ctor(sym, _) -> Format.fprintf formatter "%d<>" sym
     | Class _ -> Format.pp_print_string formatter "Class"
     | Function _ ->
       Format.pp_print_string formatter "function"
@@ -81,6 +83,8 @@ end = struct
     | Module _ -> Format.pp_print_string formatter "module"
 
     | Array _ -> Format.pp_print_string formatter "Array"
+
+    | TypeDef _ -> Format.pp_print_string formatter "TypeDef"
 
   and pp_function_type formatter fun_ =
     Format.pp_print_string formatter "(";

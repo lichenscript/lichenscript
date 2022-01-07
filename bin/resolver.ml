@@ -7,9 +7,9 @@ open Waterlang_parsing
 exception ParseError of Parse_error.t list
 exception TypeCheckError of Type_error.t list
 
-let parse_string_to_typed_tree ~file_key content =
+let parse_string_to_typed_tree ~file_key ~ctx content =
   let result = Parser.parse_string file_key content in
-  let env = Waterlang_typing.Env.create () in
+  let env = Waterlang_typing.Env.create ctx in
   let typed_tree =
     match result with
     | Result.Ok { tree; _ } ->
@@ -151,10 +151,10 @@ let create_or_insert_moudule_file env ~id ~id_str file =
     ModuleMap.set env.module_map ~key:id_str ~data:m
   )
 
-let compile_file_to_path env names path =
+let compile_file_to_path ~ctx env names path =
   let file_content = In_channel.read_all path in
   let file_key = File_key.LibFile path in
-  let typed_tree = parse_string_to_typed_tree ~file_key:(Some file_key) file_content in
+  let typed_tree = parse_string_to_typed_tree ~ctx ~file_key:(Some file_key) file_content in
   (* let filename = Filename.basename path in
   let test_regex = Re.exec allow_suffix filename in
   let mod_name =  *)
@@ -169,7 +169,7 @@ let compile_file_to_path env names path =
   create_or_insert_moudule_file env ~id ~id_str:module_id_str file
 
 (* recursive all files in the path *)
-let parse_and_annotate_path env path =
+let parse_and_annotate_path ~ctx env path =
   let rec iterate names path =
     let children = Sys.ls_dir path in
     List.iter
@@ -178,7 +178,7 @@ let parse_and_annotate_path env path =
         if Sys.is_file_exn child_path then (
           let test_result = Re.exec allow_suffix child_path |> Re.Group.all in
           if Array.length test_result > 1 then  (* is a .wt file *)
-            compile_file_to_path env names child_path
+            compile_file_to_path ~ctx env names child_path
           else ()
         ) else if Sys.is_directory_exn child_path then (
           let mod_name = last_piece_of_path child_path in
@@ -190,10 +190,10 @@ let parse_and_annotate_path env path =
   let mod_root_name = last_piece_of_path path in
   iterate [mod_root_name] path
 
-let parse_and_annotate_find_paths env =
-  List.iter ~f:(parse_and_annotate_path env) env.find_paths
+let parse_and_annotate_find_paths ~ctx env =
+  List.iter ~f:(parse_and_annotate_path ~ctx env) env.find_paths
 
-let typecheck_all_modules env =
+let typecheck_all_modules ~ctx env =
   (* let type_provider = create_type_provider env in *)
   ModuleMap.iter
     ~f:(fun m -> 
@@ -201,7 +201,7 @@ let typecheck_all_modules env =
       let files =
         List.map
           ~f:(fun file ->
-            let errors = Typecheck.type_check file.typed_tree in
+            let errors = Typecheck.type_check ctx file.typed_tree in
             if (List.length errors) > 0 then (
               raise (TypeCheckError errors)
             );
@@ -228,17 +228,19 @@ let rec compile_file_path ~std_dir ~build_dir entry_file_path =
     ignore (exit 1)
   );
   try
+    (* ctx is a typing context for all modules *)
+    let ctx = Waterlang_typing.Type_context.create () in
     let env = create ~find_paths:[ Option.value_exn std_dir ] () in
 
     (* load standard library *)
     (* parse_and_annotate_find_paths *)
-    parse_and_annotate_find_paths env;
+    parse_and_annotate_find_paths ~ctx env;
 
     (* parse the entry file *)
     let dir_of_entry = Filename.dirname entry_file_path in
-    parse_and_annotate_path env dir_of_entry;
+    parse_and_annotate_path ~ctx env dir_of_entry;
 
-    typecheck_all_modules env;
+    typecheck_all_modules ~ctx env;
 
     (* open std.preclude to module scope *)
     (* let content = In_channel.read_all entry_file_path in

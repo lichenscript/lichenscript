@@ -366,12 +366,12 @@ let type_check ?(type_provider=Type_provider.default_provider) ?(open_domains=[]
 
 module IntHash = Hashtbl.Make(Int)
 
-let type_check _program =
+let type_check ctx _program =
   let visited_set = Hash_set.create (module Int) in
   let reversed_map = IntHash.create () in
 
   let no_deps = ref [] in
-  let size = Type_env.size () in
+  let size = Type_context.size ctx in
 
   (**
    * iterate the array,
@@ -380,7 +380,7 @@ let type_check _program =
    * and get nodes depend nothing
    *)
   for i = 0 to (size - 1) do
-    let node = Type_env.get_node i in
+    let node = Type_context.get_node ctx i in
     let deps = node.deps in
     match deps with
     | [] -> (
@@ -400,7 +400,7 @@ let type_check _program =
 
   let rec iterate_node node_id =
     if not (Hash_set.mem visited_set node_id) then (
-      let node = Type_env.get_node node_id in
+      let node = Type_context.get_node ctx node_id in
       node.check();
       Hash_set.add visited_set node_id;
 
@@ -415,6 +415,6 @@ let type_check _program =
   List.iter ~f:iterate_node !no_deps;
 
   (* only for debug *)
-  Type_env.print ();
+  Type_context.print ctx;
 
   []
