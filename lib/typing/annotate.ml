@@ -50,6 +50,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       in
 
       let scope = Env.peek_scope env in
+      (* TODO: check redefinition? *)
       Scope.insert_var_symbol scope name sym_id;
 
       let binding_init = annotate_expression ~prev_deps env binding_init in
@@ -145,14 +146,14 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     )
 
     | Identifier id -> (
-      let name = id.pident_name in
-      let ty_var = Type_env.new_id {
-        value = TypeValue.Ctor(name, []);
-        loc;
-        deps = [];
-        check = none;
-      } in
-      ty_var, (T.Expression.Identifier ty_var)
+      let ty_var_opt = Scope.find_var_symbol (Env.peek_scope env) id.pident_name in
+      match ty_var_opt with
+      | Some ty_var ->
+        ty_var, (T.Expression.Identifier ty_var)
+      | _ ->
+        let err_spec = Type_error.CannotFindName id.pident_name in
+        let err = Type_error.make_error id.pident_loc err_spec in
+        raise (Type_error.Error err)
     )
 
     | Lambda _
@@ -166,21 +167,22 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         match spec with
         | Identifier id -> (
           let name = id.pident_name in
+          let var_opt = Scope.find_var_symbol (Env.peek_scope env) name in
+          match var_opt with
+          | Some id -> (
+            { T.Expression.
+              callee_spec = ((name, id), List.rev acc);
+              callee_loc = loc;
+              callee_ty_var = id;
+            }
+          )
 
-          let node = {
-            value = TypeValue.Unknown;
-            deps = prev_deps;
-            loc = id.pident_loc;
-            check = none;
-          } in
+          | None -> (
+            let err_spec = Type_error.CannotFindName id.pident_name in
+            let err = Type_error.make_error id.pident_loc err_spec in
+            raise (Type_error.Error err)
+          )
 
-          let id = Type_env.new_id node in
-
-          { T.Expression.
-            callee_spec = ((name, id), List.rev acc);
-            callee_loc = loc;
-            callee_ty_var = id;
-          }
         )
 
         | Member (expr, name) -> (
@@ -411,44 +413,61 @@ and annoate_function_params env params =
 and annotate_function env fun_ =
   let open Ast.Function in
 
-  let { visibility = _visibility; header; body; loc; comments; } = fun_ in
+  let fun_scope = Scope.create ~prev:(Env.peek_scope env) () in
 
-  let name_node = {
-    loc = header.id.pident_loc;
-    value = TypeValue.Unknown;
-    deps = [];
-    check = none;
-  } in
-  let name_id = Type_env.new_id name_node in
+  Env.with_new_scope env fun_scope (fun env ->
+    let { visibility = _visibility; header; body; loc; comments; } = fun_ in
 
-  let params, params_type = annoate_function_params env header.params in
+    let name_node = {
+      loc = header.id.pident_loc;
+      value = TypeValue.Unknown;
+      deps = [];
+      check = none;
+    } in
+    let name_id = Type_env.new_id name_node in
 
-  let body = annotate_block ~prev_deps:[params_type] env body in
+    let params, params_type = annoate_function_params env header.params in
 
-  let return_node = {
-    loc;
-    value = TypeValue.Unknown;
-    deps = [body.return_ty];
-    check = none;
-  } in
-  let return_id = Type_env.new_id return_node in
+    (* add all params into scope *)
+    List.iter
+      ~f:(fun param -> 
+        let pat = param.param_pat in
+        let name = 
+          match pat.spec with
+          | T.Pattern.Symbol (name, _) -> name
+        in
+        Scope.insert_var_symbol fun_scope name param.param_ty;
+      )
+      params.params_content;
 
-  Type_env.update_node name_id {
-    name_node with
-    value = TypeValue.Function (params_type, return_id);
-    deps = [ params_type; return_id ];
-    check = none;
-  };
-  { T.Function.
-    header = {
-      id = params_type;
-      name = header.id.pident_name;
-      params;
+    let body = annotate_block ~prev_deps:[params_type] env body in
+
+    let return_node = {
+      loc;
+      value = TypeValue.Unknown;
+      deps = [body.return_ty];
+      check = none;
+    } in
+    let return_id = Type_env.new_id return_node in
+
+    Type_env.update_node name_id {
+      name_node with
+      value = TypeValue.Function (params_type, return_id);
+      deps = [ params_type; return_id ];
+      check = none;
     };
-    body;
-    ty_var = name_id;
-    comments;
-  }
+    { T.Function.
+      header = {
+        id = params_type;
+        name = header.id.pident_name;
+        params;
+      };
+      scope = fun_scope;
+      body;
+      ty_var = name_id;
+      comments;
+    }
+  )
 
 let annotate_program env (program: Ast.program) =
   let { Ast. pprogram_declarations; pprogram_loc; _; } = program in

@@ -110,6 +110,7 @@ and Function : sig
     header: header;
     body: Block.t;
     comments: Loc.t Waterlang_lex.Comment.t list;
+    scope: Scope.t;
     ty_var: int;
   }
 

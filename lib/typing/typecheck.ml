@@ -373,6 +373,12 @@ let type_check _program =
   let no_deps = ref [] in
   let size = Type_env.size () in
 
+  (**
+   * iterate the array,
+   * get the reversed map,
+   *
+   * and get nodes depend nothing
+   *)
   for i = 0 to (size - 1) do
     let node = Type_env.get_node i in
     let deps = node.deps in
@@ -407,5 +413,8 @@ let type_check _program =
   in
 
   List.iter ~f:iterate_node !no_deps;
+
+  (* only for debug *)
+  Type_env.print ();
 
   []
