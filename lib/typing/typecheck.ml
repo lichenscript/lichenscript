@@ -392,10 +392,18 @@ let type_check _program =
         deps
   done;
 
-  let iterate_node node_id =
+  let rec iterate_node node_id =
+    if not (Hash_set.mem visited_set node_id) then (
       let node = Type_env.get_node node_id in
       node.check();
-      Hash_set.add visited_set node_id
+      Hash_set.add visited_set node_id;
+
+      match IntHash.find reversed_map node_id with
+      | None -> ()
+      | Some arr -> (
+        List.iter ~f:iterate_node arr
+      )
+    )
   in
 
   List.iter ~f:iterate_node !no_deps;

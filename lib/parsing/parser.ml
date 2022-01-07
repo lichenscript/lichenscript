@@ -170,6 +170,11 @@ and parse_declaration env : Declaration.t =
         Eat.token env;
         let function_header = parse_function_header env in
         let spec = Declaration.DeclFunction function_header in
+
+        if Peek.token env = Token.T_SEMICOLON then (
+          Eat.token env
+        );
+
         Declaration.Declare {
           decl_spec = spec;
           decl_loc = with_start_loc env start_loc;
@@ -201,9 +206,16 @@ and parse_declaration env : Declaration.t =
             Function_ fun_
           )
 
-          | _ ->
-            Parser_env.error_unexpected env;
-            failwith "unreachable"
+          | _ -> (
+            let lex_error = Waterlang_lex.Lex_error.Unexpected (Token.value_of_token (Peek.token env)) in
+            let parse_error = {
+              Parse_error.
+              perr_spec = Parse_error.LexError lex_error;
+              perr_loc = (Peek.loc env);
+            } in
+
+            Parse_error.error parse_error
+          )
         ) else (
           let err =
             {
@@ -217,8 +229,15 @@ and parse_declaration env : Declaration.t =
       end
 
     | _ ->
-      Parser_env.error_unexpected env;
-      failwith "unreachable"
+      Format.eprintf "false token %s\n" (Token.value_of_token (Peek.token env));
+      let lex_error = Waterlang_lex.Lex_error.Unexpected (Token.value_of_token (Peek.token env)) in
+      let parse_error = {
+        Parse_error.
+        perr_spec = Parse_error.LexError lex_error;
+        perr_loc = (Peek.loc env);
+      } in
+
+      Parse_error.error parse_error
 
   in
   {

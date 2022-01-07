@@ -9,7 +9,7 @@ module Pattern = struct
   }
 
   and spec =
-  | Symbol of int
+  | Symbol of (string * int)
   [@@deriving show]
 
 end
@@ -45,7 +45,7 @@ module%gen rec Expression : sig
     | Block of Block.t
 
   and callee = {
-    callee_spec: int * ([ `Property of string | `Expr of t ] list);
+    callee_spec: (string * int) * ([ `Property of string | `Expr of t ] list);
     callee_loc: Loc.t;
     callee_ty_var: int;
   }
@@ -120,6 +120,7 @@ and Function : sig
 
   and header = {
     id: int;
+    name: string;
     params: params;
   }
 
@@ -150,12 +151,12 @@ end
 and Declaration : sig
 
   type declare_spec =
-  | Function_ of Function.header
+  | DeclFunction of Function.header
 
   and declare = {
-    declare_spec: declare_spec;
-    declare_loc: Loc.t;
-    declare_ty_var: int;
+    decl_spec: declare_spec;
+    decl_loc: Loc.t;
+    decl_ty_var: int;
   }
 
   and _class = {
