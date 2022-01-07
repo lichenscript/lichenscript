@@ -3,9 +3,9 @@ type env
 
 val init_env: Waterlang_lex.File_key.t option -> string -> env
 
-val add_export: env -> Export.tuple -> unit
+val add_top_level: env -> name:string -> visibility:Asttypes.visibility -> unit
 
-val get_export: env -> Export.t
+val get_top_level: env -> Top_level.t
 
 val include_module_ids: env -> string list
 

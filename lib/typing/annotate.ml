@@ -413,18 +413,24 @@ and annoate_function_params env params =
 and annotate_function env fun_ =
   let open Ast.Function in
 
-  let fun_scope = Scope.create ~prev:(Env.peek_scope env) () in
+  let prev_scope = Env.peek_scope env in
+  let fun_scope = Scope.create ~prev:prev_scope () in
 
   Env.with_new_scope env fun_scope (fun env ->
     let { visibility = _visibility; header; body; loc; comments; } = fun_ in
 
+    let fun_id_opt = Scope.find_var_symbol prev_scope header.id.pident_name in
+    if Option.is_none fun_id_opt then (
+      failwith "unexpected";
+    );
+    let fun_id = Option.value_exn fun_id_opt in
+    let name_node = Type_env.get_node fun_id in
+
     let name_node = {
-      loc = header.id.pident_loc;
-      value = TypeValue.Unknown;
-      deps = [];
-      check = none;
+      name_node with
+      loc;
     } in
-    let name_id = Type_env.new_id name_node in
+    Type_env.update_node fun_id name_node;
 
     let params, params_type = annoate_function_params env header.params in
 
@@ -450,7 +456,7 @@ and annotate_function env fun_ =
     } in
     let return_id = Type_env.new_id return_node in
 
-    Type_env.update_node name_id {
+    Type_env.update_node fun_id {
       name_node with
       value = TypeValue.Function (params_type, return_id);
       deps = [ params_type; return_id ];
@@ -464,13 +470,28 @@ and annotate_function env fun_ =
       };
       scope = fun_scope;
       body;
-      ty_var = name_id;
+      ty_var = fun_id;
       comments;
     }
   )
 
 let annotate_program env (program: Ast.program) =
-  let { Ast. pprogram_declarations; pprogram_loc; _; } = program in
+  let { Ast. pprogram_declarations; pprogram_top_level; pprogram_loc; _; } = program in
+
+  Hashtbl.iter_keys
+    ~f:(fun key ->
+      let node = {
+        value = TypeValue.Unknown;
+        loc = Waterlang_lex.Loc.none;
+        deps = [];
+        check = none;
+      } in
+      let new_id = Type_env.new_id node in
+      Scope.insert_var_symbol (Env.peek_scope env) key new_id
+    )
+    pprogram_top_level.names
+    ;
+
   let tprogram_declarations = List.map ~f:(annotate_declaration env) pprogram_declarations in
 
   let deps =

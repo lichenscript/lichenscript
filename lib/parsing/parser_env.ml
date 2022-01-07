@@ -108,18 +108,16 @@ type env = {
   lookahead: Lookahead.t ref;
   token_sink: (token_sink_result -> unit) option ref;
   source: File_key.t option;
-  mutable export_names: Export.tuple list;
+  top_level: Top_level.t;
   mutable include_module_ids: string list;
   mutable scope: Parse_scope.t;
 }
 
-let add_export env export =
-  env.export_names <- export::env.export_names
+let add_top_level env ~name ~visibility =
+  Core_kernel.Hashtbl.set env.top_level.names ~key:name ~data:visibility
 
-let get_export env =
-  { Export.
-    names = List.rev env.export_names;
-  }
+let get_top_level env =
+  env.top_level
 
 let lookahead ~i env =
   assert (i < maximum_lookahead);
@@ -146,7 +144,7 @@ let init_env source content =
     token_sink = ref None;
     include_module_ids = [];
     scope = Parse_scope.create Parse_scope.PScope_Module;
-    export_names = [];
+    top_level = Top_level.create ();
   }
 
 let include_module_ids env = List.rev env.include_module_ids

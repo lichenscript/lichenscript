@@ -172,14 +172,14 @@ and Declaration : sig
   }
 
   and class_property = {
-    cls_property_visibility: Ast.visibility;
+    cls_property_visibility: Asttypes.visibility;
     cls_property_loc: Loc.t;
     cls_property_name: Identifier.t;
     cls_property_init: Expression.t option;
   }
 
   and class_method = {
-    cls_method_visibility: Ast.visibility;
+    cls_method_visibility: Asttypes.visibility;
     cls_method_loc: Loc.t;
   }
 

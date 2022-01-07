@@ -87,7 +87,7 @@ and parse_program env : program =
   done;
 
   {
-    pprogram_export = Parser_env.get_export env;
+    pprogram_top_level = Parser_env.get_top_level env;
     pprogram_declarations = List.rev !decls;
     pprogram_comments = [];
     pprogram_loc = with_start_loc env start_loc;
@@ -171,6 +171,9 @@ and parse_declaration env : Declaration.t =
         let function_header = parse_function_header env in
         let spec = Declaration.DeclFunction function_header in
 
+        let name = function_header.id.pident_name in
+        Parser_env.add_top_level env ~name ~visibility:Asttypes.Pvisibility_public;
+
         if Peek.token env = Token.T_SEMICOLON then (
           Eat.token env
         );
@@ -185,6 +188,7 @@ and parse_declaration env : Declaration.t =
     | Token.T_PROTECTED
     | Token.T_PRIVATE ->
       begin
+        let open Asttypes in
         let visibility =
           match next with
           | Token.T_PUBLIC -> Pvisibility_public
@@ -198,10 +202,10 @@ and parse_declaration env : Declaration.t =
           match next with
           | Token.T_FUNCTION -> (
             let fun_ = parse_function ~visibility env in
-            let { Function. header = { id; _ }; loc; _ } = fun_ in
+            let { Function. header = { id; _ }; _ } = fun_ in
             let name = id.pident_name in
 
-            Parser_env.add_export env (name, loc);
+            Parser_env.add_top_level env ~name ~visibility;
 
             Function_ fun_
           )
@@ -401,11 +405,16 @@ and parse_function_header env: Function.header =
 
 and parse_function ?visibility env: Function.t =
   let open Function in
-  let fun_scope = Parse_scope.create ~prev:(scope env) Parse_scope.PString_Function in
+  let prev_scope = scope env in
+  let fun_scope = Parse_scope.create ~prev:prev_scope Parse_scope.PString_Function in
   with_scope env fun_scope (fun () ->
     let start_loc = Peek.loc env in
     let header = parse_function_header env in
     let block = parse_block env in
+
+    let name = header.id.pident_name in
+    Parser_env.add_top_level env ~name ~visibility:(Option.value ~default:Asttypes.Pvisibility_private visibility);
+
     {
       visibility;
       header;
@@ -534,6 +543,7 @@ and parse_class env : Declaration._class =
   }
 
 and parse_visibility env =
+  let open Asttypes in
   let next = Peek.token env in
   match next with
   | Token.T_PUBLIC ->

@@ -3,12 +3,6 @@ module Loc = Waterlang_lex.Loc
 type location_stack = Loc.t list
 [@@deriving show]
 
-type visibility =
-  | Pvisibility_public
-  | Pvisibility_protected
-  | Pvisibility_private
-  [@@deriving show]
-
 type var_kind =
   | Pvar_let
   | Pvar_const
@@ -143,7 +137,7 @@ end
 and Function : sig
 
   type t = {
-    visibility: visibility option;
+    visibility: Asttypes.visibility option;
     header: header;
     body: Block.t;
     loc: Loc.t;
@@ -237,7 +231,7 @@ and Declaration : sig
 
   and class_property = {
     cls_property_attributes: attributes;
-    cls_property_visiblity: visibility option;
+    cls_property_visiblity: Asttypes.visibility option;
     cls_property_loc: Loc.t;
     cls_property_name: Identifier.t;
     cls_property_type: Type.t option;
@@ -247,7 +241,7 @@ and Declaration : sig
   and class_method = {
     cls_method_attributes: attributes;
     cls_method_static: bool;
-    cls_method_visiblity: visibility option;
+    cls_method_visiblity: Asttypes.visibility option;
     cls_method_name: Identifier.t;
     cls_method_params: Function.params;
     cls_method_body: Block.t option;
@@ -278,7 +272,7 @@ end
   = Declaration
 
 type program = {
-  pprogram_export: Export.t;
+  pprogram_top_level: Top_level.t;
   pprogram_declarations: Declaration.t list;
   pprogram_comments: Loc.t Waterlang_lex.Comment.t list;
   pprogram_loc: Loc.t;

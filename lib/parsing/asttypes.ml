@@ -97,3 +97,9 @@ module UpdateOp = struct
     [@@deriving show]
   
 end
+
+type visibility =
+  | Pvisibility_public
+  | Pvisibility_protected
+  | Pvisibility_private
+  [@@deriving show]
