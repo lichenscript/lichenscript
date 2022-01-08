@@ -367,11 +367,11 @@ let type_check ?(type_provider=Type_provider.default_provider) ?(open_domains=[]
 module IntHash = Hashtbl.Make(Int)
 
 let type_check ctx _program =
-  let visited_set = Hash_set.create (module Int) in
+  let size = Type_context.size ctx in
+  let visited_mark = Array.create ~len:size false in
   let reversed_map = IntHash.create () in
 
   let no_deps = ref [] in
-  let size = Type_context.size ctx in
 
   (**
    * iterate the array,
@@ -405,16 +405,16 @@ let type_check ctx _program =
         if not acc then
           acc
         else
-          Hash_set.mem visited_set id
+          Array.get visited_mark id
       )
       ids
   in
 
   let rec iterate_node node_id =
-    if not (Hash_set.mem visited_set node_id) then (
+    if not (Array.get visited_mark node_id) then (
       let node = Type_context.get_node ctx node_id in
       node.check node_id;
-      Hash_set.add visited_set node_id;
+      Array.set visited_mark node_id true;
 
       match IntHash.find reversed_map node_id with
       | None -> ()

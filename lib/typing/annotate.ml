@@ -284,7 +284,7 @@ and annotate_declaration env decl : T.Declaration.t =
   let spec =
     match spec with
     | Class _class -> (
-      T.Declaration.Class (annotate_class env decl)
+      T.Declaration.Class (annotate_class env _class)
     )
 
     | Function_ _fun -> T.Declaration.Function_ (annotate_function env _fun)
@@ -337,8 +337,46 @@ and annotate_declaration env decl : T.Declaration.t =
   in
   { T.Declaration. spec; loc; attributes }
 
-and annotate_class _env _cls =
-  failwith "not implement"
+and annotate_class env cls =
+  let open Ast.Declaration in
+  (* let annotate_body_element elem =
+    match elem with
+    | Cls_method _method ->
+      failwith "n"
+
+    | Cls_property _ -> failwith "n"
+
+  in *)
+  let annotate_class_body body =
+    let { cls_body_elements = _; cls_body_loc; } = body in
+    let cls_body_elements =
+      []
+      (* TODO *)
+      (* List.map ~f:annotate_body_element cls_body_elements *)
+    in
+    { T.Declaration. cls_body_elements; cls_body_loc}
+  in
+
+  let class_scope = Scope.create ~prev:(Env.peek_scope env) () in
+  Env.with_new_scope env class_scope (fun env ->
+    let { cls_id; cls_type_vars = _; cls_loc; cls_body; cls_comments } = cls in
+    let cls_id = annotate_identifer env cls_id in
+    let cls_body = annotate_class_body cls_body in
+    { T.Declaration. cls_id; cls_body; cls_loc; cls_comments; }
+  )
+
+and annotate_identifer env ident =
+  let open Identifier in
+  let { pident_name; pident_loc } = ident in
+  let node = {
+    Core_type.
+    loc = pident_loc;
+    value = TypeValue.Unknown;
+    check = none;
+    deps = [];
+  } in
+  let id = Type_context.new_id (Env.ctx env) node in
+  pident_name, id
 
 and annotate_pattern env pat =
   let open Ast.Pattern in
@@ -346,15 +384,8 @@ and annotate_pattern env pat =
   let id, spec =
     match spec with
     | Identifier ident -> (
-      let node = {
-        Core_type.
-        loc;
-        value = TypeValue.Unknown;
-        check = none;
-        deps = [];
-      } in
-      let id = Type_context.new_id (Env.ctx env) node in
-      id, (T.Pattern.Symbol (ident.pident_name, id))
+      let name, id = annotate_identifer env ident in
+      id, (T.Pattern.Symbol (name, id))
     )
   in
   { T.Pattern. spec; loc }, id
@@ -572,8 +603,8 @@ let annotate_program env (program: Ast.program) =
         let { spec; _ } = decl in
         match spec with
         | Class cls -> (
-          let { cls_id; _} = cls in
-          cls_id::acc
+          let { cls_id = (_, ty_var); _} = cls in
+          ty_var::acc
         )
 
         | Function_ _fun -> (

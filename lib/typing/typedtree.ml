@@ -161,9 +161,10 @@ and Declaration : sig
   }
 
   and _class = {
-    cls_id: int;
+    cls_id: (string * int);
     cls_loc: Loc.t;
     cls_body: class_body;
+    cls_comments:  Loc.t Waterlang_lex.Comment.t list;
   }
 
   and class_body = {

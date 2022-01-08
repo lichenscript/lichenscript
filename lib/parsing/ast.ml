@@ -217,7 +217,7 @@ and Declaration : sig
   }
 
   and _class = {
-    cls_id:        Identifier.t option;
+    cls_id:        Identifier.t;
     cls_type_vars: Identifier.t list;
     cls_loc:       Loc.t;
     cls_body:      class_body;

@@ -535,7 +535,7 @@ and parse_class env : Declaration._class =
   in
   let body = parse_class_body env in
   {
-    cls_id = Some id;
+    cls_id = id;
     cls_type_vars;
     cls_loc = with_start_loc env start_loc;
     cls_body = body;
