@@ -80,7 +80,7 @@ let test_type_checking _ =
     "
   in
   assert_raises
-    (Utils.ExpectedError "Error: 3:6 Type 'i32' can not be returned because 'f32' is expected\n")
+    (Utils.ExpectedError "Error: 3:17 Type 'i32' can not be returned because 'f32' is expected")
     (fun _ ->
       Utils.parse_string_and_codegen source
     )
@@ -155,8 +155,8 @@ let test_assignment _ =
 
 let suite =
   "TestParser" >::: [
-    (* "test_parser" >:: test_parser;
-    "test_codegen" >:: test_codegen;
+    "test_parser" >:: test_parser;
+    (* "test_codegen" >:: test_codegen;
     "test_codegen_binary" >:: test_codegen_binary; *)
     "test_type_checking" >:: test_type_checking;
     (* "test_function_call" >:: test_function_call;

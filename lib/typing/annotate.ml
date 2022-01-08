@@ -26,8 +26,11 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       let expr = annotate_expression ~prev_deps env expr in 
       let ty_var = T.Expression.(expr.ty_var) in
 
+      let root_scope = Type_context.root_scope (Env.ctx env) in
+      let _unit = Option.value_exn ~message:"unit type" (Scope.find_var_symbol root_scope "unit") in
+
       let node = {
-        value = TypeValue.Unit;
+        value = TypeValue.Ctor(_unit, []);
         loc;
         deps = [ty_var];
         check = none;  (* TODO: check expr is empty *)
@@ -79,6 +82,9 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       | Some expr -> (
         let expr = annotate_expression ~prev_deps env expr in
         let ty_var = expr.ty_var in
+
+        Env.add_return_type env ty_var;
+
         [ty_var], (T.Statement.Return (Some expr))
       )
 
@@ -128,7 +134,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         ty_var, (T.Expression.Identifier ty_var)
       | _ ->
         let err_spec = Type_error.CannotFindName id.pident_name in
-        let err = Type_error.make_error id.pident_loc err_spec in
+        let err = Type_error.make_error (Env.ctx env) id.pident_loc err_spec in
         raise (Type_error.Error err)
     )
 
@@ -154,8 +160,9 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           )
 
           | None -> (
+            let ctx = Env.ctx env in
             let err_spec = Type_error.CannotFindName id.pident_name in
-            let err = Type_error.make_error id.pident_loc err_spec in
+            let err = Type_error.make_error ctx id.pident_loc err_spec in
             raise (Type_error.Error err)
           )
 
@@ -204,13 +211,13 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           match (left_def_opt, right_def_opt) with
           | (Some (left_sym, left_id), Some (right_sym, _)) -> (
             if not (Check_helper.type_addable left_sym right_sym) then (
-              let err = Type_error.(make_error loc (NotAddable (left_sym, right_sym))) in
+              let err = Type_error.(make_error ctx loc (NotAddable (left_sym, right_sym))) in
               raise (Type_error.Error err)
             );
             Type_context.update_node_type ctx id (TypeValue.Ctor(left_id, []))
           )
           | _ -> (
-            let err = Type_error.(make_error loc CannotResolveTypeOfExpression) in
+            let err = Type_error.(make_error ctx loc CannotResolveTypeOfExpression) in
             raise (Type_error.Error err)
           )
         );
@@ -249,7 +256,20 @@ and annotate_block ~prev_deps env block : T.Block.t =
     value = TypeValue.Unknown;
     deps = body_dep;
     loc;
-    check = none;
+    check = (fun id ->
+      let ctx = Env.ctx env in
+      let last_opt = List.last body_stmts in
+      match last_opt with
+      | Some { Typedtree.Statement. spec = Expr expr ; _ } -> (
+        let ty_var = Typedtree.Expression.(expr.ty_var) in
+        Type_context.update_node_type ctx id (TypeValue.Ctor (ty_var, []))
+      )
+
+      | _ -> (
+        let none_type = Option.value_exn (Scope.find_type_symbol (Type_context.root_scope ctx) "unit") in
+        Type_context.update_node_type ctx id (TypeValue.Ctor (none_type, []))
+      )
+    );
   } in
   let return_ty = Type_context.new_id (Env.ctx env) node in
   { T.Block.
@@ -348,8 +368,9 @@ and annotate_type env ty : (TypeValue.t * int list) =
     )
 
     | None -> (
+      let ctx = Env.ctx env in
       let err_spec = Type_error.CannotFindName pident_name in
-      let err = Type_error.make_error pident_loc err_spec in
+      let err = Type_error.make_error ctx pident_loc err_spec in
       raise (Type_error.Error err)
     )
 
@@ -384,7 +405,6 @@ and annoate_function_params env params =
       check = none;  (* check init *)
     } in
     Type_context.update_node (Env.ctx env) param_id node;
-    Format.printf "param %d: %s\n" param_id (Format.asprintf "%a" TypeValue.pp !value);
     { T.Function.
       param_pat;
       param_ty = param_id;
@@ -413,12 +433,20 @@ and annotate_function env fun_ =
     );
     let fun_id = Option.value_exn fun_id_opt in
     let name_node = Type_context.get_node (Env.ctx env) fun_id in
+    let fun_deps = ref [] in
 
     let name_node = {
       name_node with
       loc;
     } in
     Type_context.update_node (Env.ctx env) fun_id name_node;
+
+    let def_return_ty = Option.map ~f:(annotate_type env) header.return_ty in
+    Option.iter
+      ~f:(fun (_, deps) ->
+        fun_deps := List.append !fun_deps deps
+      )
+      def_return_ty;
 
     let params, params_types = annoate_function_params env header.params in
 
@@ -435,12 +463,56 @@ and annotate_function env fun_ =
       params.params_content;
 
     let body = annotate_block ~prev_deps:params_types env body in
+    let collected_returns = Env.take_return_types env in
+
+    (* defined return *)
+    fun_deps := body.return_ty::(!fun_deps);
+    fun_deps := List.append !fun_deps collected_returns;
 
     let return_node = {
       loc;
       value = TypeValue.Unknown;
-      deps = [body.return_ty];
-      check = none;
+      deps = !fun_deps;
+      check = (fun id -> 
+        let ctx = Env.ctx env in
+        let block_node = Type_context.get_node ctx body.return_ty in
+        match def_return_ty with
+        (* the return type is defined
+         * check if assinable with block's return
+         *)
+        | Some (val_, _) -> (
+          (* if no return statements, use last statement of block *)
+          if List.is_empty collected_returns then (
+            if not (Check_helper.type_assinable ctx val_ block_node.value) then (
+              let open Type_error in
+              let spec = CannotReturn(val_, block_node.value) in
+              let err = make_error ctx block_node.loc spec in
+              raise (Error err)
+            );
+            Type_context.update_node_type ctx id val_
+          ) else (
+            (* there are return statements, check every statments *)
+            List.iter
+              ~f:(fun return_ty_var ->
+                let return_ty_node = Type_context.get_node ctx return_ty_var in
+                if not (Check_helper.type_assinable ctx val_ return_ty_node.value) then (
+                  let open Type_error in
+                  let spec = CannotReturn(val_, return_ty_node.value) in
+                  let err = make_error ctx return_ty_node.loc spec in
+                  raise (Error err)
+                )
+              )
+              collected_returns
+          )
+        )
+
+        (* if return type is not defined in header
+         * function return type is the same as block's return type
+         *)
+        | None -> (
+          Type_context.update_node_type ctx id block_node.value
+        )
+      );
     } in
     let return_id = Type_context.new_id (Env.ctx env) return_node in
 

@@ -18,6 +18,7 @@ let make_default_type_sym ctx scope =
   let open Core_type in
   let open Core_type.TypeSym in
   let names = [|
+    ("unit", Primitive);
     ("u32", Primitive);
     ("i32", Primitive);
     ("u64", Primitive);
@@ -64,31 +65,29 @@ let size ctx = ResizableArray.size ctx.ty_map
 let get_node ctx id =
   ResizableArray.get ctx.ty_map id
 
+let rec print_type_by_id ctx id =
+  let item = get_node ctx id in
+  let open Core_type.TypeValue in
+  match item.value with
+  | Unknown -> "unknown"
+  | Any -> "any"
+  | Ctor (name, []) -> (
+    print_type_by_id ctx name
+  )
+  | Ctor _ -> "ctor"
+  (*
+  | Ctor (name, _list) -> (
+    name ^ "<>"
+  ) *)
+
+  | Class _ -> "class"
+  | Function _ -> "function"
+  | Module _ -> "module"
+  | Array _ -> "array"
+  | TypeDef sym ->
+    (Core_type.TypeSym.name sym)
+
 let print ctx =
-  let rec print_item_by_id id =
-    let item = get_node ctx id in
-    let open Core_type.TypeValue in
-    match item.value with
-    | Unknown -> "unkonwn"
-    | Any -> "any"
-    | Unit -> "unit"
-    | Ctor (name, []) -> (
-      print_item_by_id name
-    )
-    | Ctor _ -> "ctor"
-    (*
-    | Ctor (name, _list) -> (
-      name ^ "<>"
-    ) *)
-
-    | Class _ -> "class"
-    | Function _ -> "function"
-    | Module _ -> "module"
-    | Array _ -> "array"
-    | TypeDef sym ->
-      (Core_type.TypeSym.name sym)
-
-  in
 
   let arr_size = size ctx in
   for i = 0 to (arr_size - 1) do
@@ -96,7 +95,7 @@ let print ctx =
     let deps = Buffer.create 64 in
     List.iter ~f:(fun item -> Buffer.add_string deps (Int.to_string item); Buffer.add_string deps " ") item.deps ;
     Format.printf "%d: %s\n" i (Buffer.contents deps);
-    Format.printf "\t%s\n\n" (print_item_by_id i);
+    Format.printf "\t%s\n\n" (print_type_by_id ctx i);
   done
 
 let root_scope ctx = ctx.root_scope

@@ -20,7 +20,7 @@ let parse_string_to_program content =
           if not (List.is_empty typecheck_errors) then (
             List.iter
               ~f:(fun e ->
-                Format.fprintf Format.str_formatter "%a\n" Waterlang_typing.Type_error.PP.error e
+                Format.fprintf Format.str_formatter "%a\n" (Waterlang_typing.Type_error.PP.error ~ctx) e
               )
               typecheck_errors
             ;
@@ -30,8 +30,7 @@ let parse_string_to_program content =
 
           program
         ) with Waterlang_typing.Type_error.Error e ->
-          Waterlang_typing.Type_error.PP.error Format.str_formatter e;
-          let err_str = Format.flush_str_formatter () in
+          let err_str = Format.asprintf "%a" (Waterlang_typing.Type_error.PP.error ~ctx) e in
           raise (ExpectedError err_str)
         
       end

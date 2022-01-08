@@ -17,9 +17,9 @@ val errors: t -> Type_error.t list
 
 val with_new_scope: t -> Scope.t -> (t -> 'a) -> 'a
 
-val set_return_type: t -> Core_type.TypeValue.t option -> unit
+val add_return_type: t -> int -> unit
 
-val return_type: t -> Core_type.TypeValue.t option
+val take_return_types: t -> int list
 
 val ty_u32: t -> int
 

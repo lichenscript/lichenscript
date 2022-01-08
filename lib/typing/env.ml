@@ -1,6 +1,5 @@
 open Base
 open Core_kernel
-open Core_type
 
 type t = {
   ctx: Type_context.t;
@@ -10,7 +9,12 @@ type t = {
   mutable current_scope: Scope.t;
   mutable errors: Type_error.t list;
   mutable scope_counter: int;
-  mutable return_type: TypeValue.t option;
+
+  (*
+   * collect all the return types
+   * a function can have multiple return
+   *)
+  mutable return_types: int list;
 }
 
 let create ?(open_domains=[]) ~type_provider ctx =
@@ -23,7 +27,7 @@ let create ?(open_domains=[]) ~type_provider ctx =
     current_scope = mod_scope;
     errors = [];
     scope_counter = 1;
-    return_type = None;
+    return_types = [];
   }
 
 let ctx env = env.ctx
@@ -47,10 +51,13 @@ let with_new_scope env scope callback =
   env.current_scope <- prev_scope;
   result
 
-let set_return_type env return_type =
-  env.return_type <- return_type
+let add_return_type env return_type =
+  env.return_types <- return_type::env.return_types
 
-let return_type env = env.return_type
+let take_return_types env = 
+  let result = env.return_types in
+  env.return_types <- [];
+  result
 
 let get_global_type_val env =
   Scope.find_type_symbol (Type_context.root_scope env.ctx)

@@ -6,7 +6,6 @@ module rec TypeValue : sig
   type t =
     | Unknown
     | Any
-    | Unit
     | Ctor of int * (t list)
     | Class of class_type
     | Function of t list * t
@@ -34,15 +33,14 @@ module rec TypeValue : sig
     tfun_ret: t;
   }
 
-  val pp: Format.formatter -> t -> unit
-  val pp_function_type: Format.formatter -> function_type -> unit
+  (* val pp: Format.formatter -> t -> unit
+  val pp_function_type: Format.formatter -> function_type -> unit *)
 
 end = struct
 
   type t =
     | Unknown
     | Any
-    | Unit
     | Ctor of int * (t list)
     | Class of class_type
     | Function of t list * t
@@ -70,11 +68,10 @@ end = struct
     tfun_ret: t;
   }
 
-  let rec pp formatter ty =
+  (* let rec pp formatter ty =
     match ty with
     | Unknown -> Format.pp_print_string formatter "unknown"
     | Any -> Format.pp_print_string formatter "any"
-    | Unit -> Format.pp_print_string formatter "unit"
     | Ctor(sym, _) -> Format.fprintf formatter "%d<>" sym
     | Class _ -> Format.pp_print_string formatter "Class"
     | Function _ ->
@@ -102,7 +99,7 @@ end = struct
       fun_.tfun_params;
 
     Format.pp_print_string formatter ") => ";
-    pp formatter fun_.tfun_ret
+    pp formatter fun_.tfun_ret *)
   
 end
 

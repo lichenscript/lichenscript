@@ -315,10 +315,10 @@ let rec compile_file_path ~std_dir ~build_dir entry_file_path =
     | TypeCheckError errors ->
       List.iter
         ~f:(fun err ->
-          let { Type_error. spec; loc } = err in
+          let { Type_error. spec; loc; ctx } = err in
           print_loc_title ~prefix:"type error" loc;
           let start = loc.start in
-          Format.printf "%d:%d %a\n" start.line start.column Type_error.PP.error_spec spec
+          Format.printf "%d:%d %a\n" start.line start.column (Type_error.PP.error_spec ~ctx) spec
         )
         errors
 
@@ -334,10 +334,10 @@ let rec compile_file_path ~std_dir ~build_dir entry_file_path =
         errors
 
     | Type_error.Error e ->
-      let { Type_error. spec; loc } = e in
+      let { Type_error. spec; loc; ctx } = e in
       print_loc_title ~prefix:"type error" loc;
       let start = loc.start in
-      Format.printf "%d:%d %a\n" start.line start.column Type_error.PP.error_spec spec
+      Format.printf "%d:%d %a\n" start.line start.column (Type_error.PP.error_spec ~ctx) spec
 
     (* | e ->
       let string = Exn.to_string e in
