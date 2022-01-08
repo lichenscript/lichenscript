@@ -24,7 +24,7 @@ module%gen rec Expression : sig
 
   and spec =
     | Constant of Ast.Literal.t
-    | Identifier of int
+    | Identifier of (string * int)
     | Lambda
     | If of if_desc
     | Array of t list

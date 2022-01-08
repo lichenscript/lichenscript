@@ -18,6 +18,7 @@ and spec =
   | CannotReadMember of string * TypeValue.t
   | NotAddable of TypeSym.t * TypeSym.t
   | CannotResolveTypeOfExpression
+  | DeclareFunctionShouldSpecificExternal
 
 let make_error ctx loc spec =
   { loc; spec; ctx }
@@ -78,6 +79,9 @@ module PP = struct
 
     | CannotResolveTypeOfExpression ->
       Format.fprintf formatter "Can not resolve type of expression"
+
+    | DeclareFunctionShouldSpecificExternal ->
+      Format.fprintf formatter "declare function should specify external symbol, use @external decorator"
 
   let error ~ctx formatter err =
     let { spec; loc; _ } = err in

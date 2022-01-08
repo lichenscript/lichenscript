@@ -46,11 +46,11 @@ let parse_string_to_program content =
           );
       assert false
   in
-  typed_tree
+  ctx, typed_tree
 
 let parse_string_and_codegen content =
-  let p = parse_string_to_program content in
-  Waterlang_c.codegen p
+  let ctx, p = parse_string_to_program content in
+  Waterlang_c.codegen ~ctx p
 
 (* let parse_string_and_codegen_to_path content path =
   let p = parse_string_to_program content in

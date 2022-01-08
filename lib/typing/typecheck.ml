@@ -414,7 +414,6 @@ let type_check ctx _program =
     if not (Hash_set.mem visited_set node_id) then (
       let node = Type_context.get_node ctx node_id in
       node.check node_id;
-      Format.eprintf "iterate id %d\n" node_id;
       Hash_set.add visited_set node_id;
 
       match IntHash.find reversed_map node_id with

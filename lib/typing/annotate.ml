@@ -131,7 +131,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let ty_var_opt = Scope.find_var_symbol (Env.peek_scope env) id.pident_name in
       match ty_var_opt with
       | Some ty_var ->
-        ty_var, (T.Expression.Identifier ty_var)
+        ty_var, (T.Expression.Identifier (id.pident_name, ty_var))
       | _ ->
         let err_spec = Type_error.CannotFindName id.pident_name in
         let err = Type_error.make_error (Env.ctx env) id.pident_loc err_spec in
@@ -305,6 +305,16 @@ and annotate_declaration env decl : T.Declaration.t =
         } in
 
         let ty_id = Type_context.new_id (Env.ctx env) node in
+
+        (match List.last attributes with
+        | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; _ } ->
+          Type_context.set_external_symbol (Env.ctx env) ty_id ext_name
+
+        | _ ->
+          let open Type_error in
+          let err = make_error (Env.ctx env) loc DeclareFunctionShouldSpecificExternal in
+          raise (Error err)
+        );
 
         let header = {
           T.Function.

@@ -156,8 +156,8 @@ let test_assignment _ =
 let suite =
   "TestParser" >::: [
     "test_parser" >:: test_parser;
-    (* "test_codegen" >:: test_codegen;
-    "test_codegen_binary" >:: test_codegen_binary; *)
+    "test_codegen" >:: test_codegen;
+    "test_codegen_binary" >:: test_codegen_binary;
     "test_type_checking" >:: test_type_checking;
     (* "test_function_call" >:: test_function_call;
     "test_string" >:: test_string; *)

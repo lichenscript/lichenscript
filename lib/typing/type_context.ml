@@ -6,6 +6,7 @@ open Core_kernel
 (* num -> [] *)
 type t = {
   ty_map: ResizableArray.t;
+  external_symbol: (int, string) Hashtbl.t;
   root_scope: Scope.t
 }
 
@@ -47,6 +48,7 @@ let create () =
   let root_scope = Scope.create () in
   let ctx = {
     ty_map = ResizableArray.make 1024;
+    external_symbol = Hashtbl.create (module Int);
     root_scope;
   } in
   make_default_type_sym ctx root_scope;
@@ -59,6 +61,12 @@ let update_node ctx id node =
 let update_node_type ctx id ty =
   let old_node = ResizableArray.get ctx.ty_map id in
   update_node ctx id { old_node with value = ty }
+
+let set_external_symbol ctx id symbol =
+  Hashtbl.set ctx.external_symbol ~key:id ~data:symbol
+
+let find_external_symbol ctx id =
+  Hashtbl.find ctx.external_symbol id
 
 let size ctx = ResizableArray.size ctx.ty_map
 

@@ -303,7 +303,7 @@ let rec compile_file_path ~std_dir ~build_dir entry_file_path =
     let typed_tree = Module.(file.typed_tree) in
 
     (* TODO: compile other modules *)
-    let output = Waterlang_c.codegen (Option.value_exn typed_tree) in
+    let output = Waterlang_c.codegen ~ctx (Option.value_exn typed_tree) in
     let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
     let output_path = write_to_file build_dir mod_name output in
     let build_dir = Option.value_exn build_dir in
