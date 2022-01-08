@@ -4,70 +4,36 @@ open Core_type
 
 type t = {
   ctx: Type_context.t;
-  root_scope: Scope.t;
+  module_scope: Scope.t;
   open_domains: string array list;
+  type_provider: Type_provider.provider;
   mutable current_scope: Scope.t;
   mutable errors: Type_error.t list;
   mutable scope_counter: int;
   mutable return_type: TypeValue.t option;
 }
 
-let make_default_type_sym ctx scope =
-  let open TypeSym in
-  let names = [|
-    ("u32", Primitive);
-    ("i32", Primitive);
-    ("u64", Primitive);
-    ("i64", Primitive);
-    ("f32", Primitive);
-    ("f64", Primitive);
-    ("char", Primitive);
-    ("string", Object);
-    ("boolean", Primitive);
-  |] in
-  Array.iter
-    ~f:(fun (name, spec) ->
-      let sym = TypeSym.create ~builtin:true  name spec in
-      let node = {
-        value = TypeValue.TypeDef sym;
-        loc = Waterlang_lex.Loc.none;
-        deps = [];
-        check = none;
-      } in
-      let id = Type_context.new_id ctx node in
-      Scope.insert_type_symbol scope name id;
-    )
-    names
-
-let has_make_default = ref false
-
-let create ?(open_domains=[]) ctx =
-  let mod_scope = Scope.create ~prev:(Scope.root_scope) () in
-  let env =
-    {
-      ctx;
-      root_scope = Scope.root_scope;
-      open_domains;
-      current_scope = mod_scope;
-      errors = [];
-      scope_counter = 1;
-      return_type = None;
-    }
-  in
-  if not !has_make_default then (
-    make_default_type_sym ctx Scope.root_scope;
-    has_make_default := true
-  );
-  env
+let create ?(open_domains=[]) ~type_provider ctx =
+  let mod_scope = Scope.create ~prev:(Type_context.root_scope ctx) () in
+  {
+    ctx;
+    open_domains;
+    type_provider;
+    module_scope = mod_scope;
+    current_scope = mod_scope;
+    errors = [];
+    scope_counter = 1;
+    return_type = None;
+  }
 
 let ctx env = env.ctx
-
-let root_scope env = env.root_scope
 
 let set_current_scope env scope =
   env.current_scope <- scope
 
 let peek_scope env = env.current_scope
+
+let module_scope env = env.module_scope
 
 let add_error env err =
   env.errors <- err::env.errors
@@ -87,7 +53,7 @@ let set_return_type env return_type =
 let return_type env = env.return_type
 
 let get_global_type_val env =
-  Scope.find_type_symbol env.root_scope
+  Scope.find_type_symbol (Type_context.root_scope env.ctx)
 
 let unwrap_global_type name env =
   Option.value_exn (get_global_type_val env name)

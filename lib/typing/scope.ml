@@ -47,5 +47,3 @@ let vars scope =
 
 let pp formatter _scope =
   Format.fprintf formatter "Scope"
-
-let root_scope = create ()

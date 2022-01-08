@@ -1,8 +1,11 @@
+open Waterlang_parsing
 open Waterlang_typing
 
 type file = {
 	path: string;
-  typed_tree: Typedtree.program;
+	ast: Ast.program option;  (* release later *)
+	typed_env: Env.t;
+  typed_tree: Typedtree.program option;
 }
 
 type t

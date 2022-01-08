@@ -93,6 +93,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
 and annotate_expression ~prev_deps env expr : T.Expression.t =
   let open Ast.Expression in
   let { spec; loc; attributes; } = expr in
+  let root_scope = Type_context.root_scope (Env.ctx env) in
   let ty_var, spec = 
     match spec with
     | Constant cnst -> (
@@ -100,20 +101,20 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let ty_var =
         match cnst with
         | Integer _ ->
-          Option.value_exn (Scope.find_type_symbol (Env.root_scope env) "i32")
+          Option.value_exn (Scope.find_type_symbol root_scope "i32")
 
         | Char _ ->
-          Option.value_exn (Scope.find_type_symbol (Env.root_scope env) "char")
+          Option.value_exn (Scope.find_type_symbol root_scope "char")
 
         (* 'c' *)
         | String _ ->
-          Option.value_exn (Scope.find_type_symbol (Env.root_scope env) "string")
+          Option.value_exn (Scope.find_type_symbol root_scope "string")
 
         | Float _ ->
-          Option.value_exn (Scope.find_type_symbol (Env.root_scope env) "f32")
+          Option.value_exn (Scope.find_type_symbol root_scope "f32")
 
         | Boolean _ -> 
-          Option.value_exn (Scope.find_type_symbol (Env.root_scope env) "boolean")
+          Option.value_exn (Scope.find_type_symbol root_scope "boolean")
 
       in
 
@@ -195,7 +196,24 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         value = TypeValue.Unknown;
         deps = [left.ty_var; right.ty_var];
         loc;
-        check = none;
+        check = (fun id ->
+          let ctx = Env.ctx env in
+          let left_def_opt = Check_helper.find_to_typedef ctx left.ty_var in
+          let right_def_opt = Check_helper.find_to_typedef ctx right.ty_var in
+          Format.printf "bin: %d, left: %d, right: %d\n" id left.ty_var right.ty_var;
+          match (left_def_opt, right_def_opt) with
+          | (Some (left_sym, left_id), Some (right_sym, _)) -> (
+            if not (Check_helper.type_addable left_sym right_sym) then (
+              let err = Type_error.(make_error loc (NotAddable (left_sym, right_sym))) in
+              raise (Type_error.Error err)
+            );
+            Type_context.update_node_type ctx id (TypeValue.Ctor(left_id, []))
+          )
+          | _ -> (
+            let err = Type_error.(make_error loc CannotResolveTypeOfExpression) in
+            raise (Type_error.Error err)
+          )
+        );
       } in
       let id = Type_context.new_id (Env.ctx env) node in
 
@@ -348,8 +366,8 @@ and annoate_function_params env params =
   let open Ast.Function in
   let annoate_param param =
     let { param_pat; param_ty; param_init = _init; param_loc; param_rest } = param in
-    let param_pat, param_ty_id = annotate_pattern env param_pat in
-    let deps = ref [ param_ty_id ] in
+    let param_pat, param_id = annotate_pattern env param_pat in
+    let deps = ref [] in
     let value = ref TypeValue.Unknown in
     Option.iter
       ~f:(fun ty ->
@@ -365,14 +383,15 @@ and annoate_function_params env params =
       deps = !deps;
       check = none;  (* check init *)
     } in
-    let node_id = Type_context.new_id (Env.ctx env) node in
+    Type_context.update_node (Env.ctx env) param_id node;
+    Format.printf "param %d: %s\n" param_id (Format.asprintf "%a" TypeValue.pp !value);
     { T.Function.
       param_pat;
-      param_ty = param_ty_id;
+      param_ty = param_id;
       param_init = None;  (* TODO *)
       param_loc;
       param_rest;
-    }, node_id
+    }, param_id
   in
 
   let { params_content; params_loc } = params in
@@ -497,13 +516,13 @@ let annotate_program env (program: Ast.program) =
       value = TypeValue.Unknown;
       loc = pprogram_loc;
       deps;
-      check = (fun () -> ());
+      check = none;
     }
   in
   let ty_var = Type_context.new_id (Env.ctx env) val_ in
   let tree = { T.
     tprogram_declarations;
-    tprogram_scope = Env.root_scope env;
+    tprogram_scope = Env.module_scope env;
     ty_var
   } in
   tree

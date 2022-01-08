@@ -203,13 +203,13 @@ end = struct
   
 end
 
-let none () = ()
+let none _ = ()
 
 type node = {
   loc: Waterlang_lex.Loc.t;
   value: TypeValue.t;
   deps: int list;
-  check: unit -> unit;
+  check: int -> unit;
 }
 
 let unknown = {

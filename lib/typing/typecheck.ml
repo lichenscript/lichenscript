@@ -398,16 +398,37 @@ let type_check ctx _program =
         deps
   done;
 
+  let is_all_id_satisfied ids =
+    List.fold
+      ~init:true
+      ~f:(fun acc id ->
+        if not acc then
+          acc
+        else
+          Hash_set.mem visited_set id
+      )
+      ids
+  in
+
   let rec iterate_node node_id =
     if not (Hash_set.mem visited_set node_id) then (
       let node = Type_context.get_node ctx node_id in
-      node.check();
+      node.check node_id;
+      Format.eprintf "iterate id %d\n" node_id;
       Hash_set.add visited_set node_id;
 
       match IntHash.find reversed_map node_id with
       | None -> ()
       | Some arr -> (
-        List.iter ~f:iterate_node arr
+        List.iter
+        ~f:(fun id ->
+          let node = Type_context.get_node ctx id in
+          let deps = node.deps in
+          if is_all_id_satisfied deps then (
+            iterate_node id
+          )
+        )
+        arr
       )
     )
   in

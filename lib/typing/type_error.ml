@@ -15,6 +15,8 @@ and spec =
   | ParamsMismatch of TypeValue.t
   | CannotPassParam of string * TypeValue.t * TypeValue.t
   | CannotReadMember of string * TypeValue.t
+  | NotAddable of TypeSym.t * TypeSym.t
+  | CannotResolveTypeOfExpression
 
 let make_error loc spec =
   { loc; spec }
@@ -50,6 +52,13 @@ module PP = struct
     | CannotReadMember(name, ty) ->
       Format.fprintf formatter "Can not read member '%s' of type '%a'"
         name TypeValue.pp ty
+
+    | NotAddable (left ,right) ->
+      Format.fprintf formatter "Type '%a' can not add '%a'"
+        TypeSym.pp left TypeSym.pp right
+
+    | CannotResolveTypeOfExpression ->
+      Format.fprintf formatter "Can not resolve type of expression"
 
   let error formatter err =
     let { spec; loc } = err in

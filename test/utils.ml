@@ -7,7 +7,7 @@ exception ExpectedError of string
 let parse_string_to_program content =
   let result = Parser.parse_string None content in
   let ctx = Waterlang_typing.Type_context.create () in
-  let env = Waterlang_typing.Env.create ctx in
+  let env = Waterlang_typing.Env.create ~type_provider:(Waterlang_typing.Type_provider.default_provider) ctx in
   let typed_tree =
     match result with
     | Result.Ok { tree = program; _ } ->
