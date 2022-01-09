@@ -264,7 +264,7 @@ and codegen_function env (_fun: Typedtree.Function.t) =
 
   with_indent env (fun () ->
     let { scope; body; _ } = _fun in
-    let vars = Scope.vars scope in
+    let vars = scope#vars in
     let vars_len_m1 = (List.length vars) - 1 in
 
     print_indents env;
@@ -349,7 +349,7 @@ let codegen_program env (program: Typedtree.program) =
   ps env main_snippet;
 
   (* if user has a main function *)
-  let test_main = Scope.find_var_symbol tprogram_scope "main" in
+  let test_main = tprogram_scope#find_var_symbol "main" in
   match test_main with
   | Some _main_sym -> (
     (* let open Core_type.VarSym in

@@ -7,50 +7,6 @@ open Waterlang_parsing
 exception ParseError of Parse_error.t list
 exception TypeCheckError of Type_error.t list
 
-(* let parse_string_to_typed_tree ~file_key ~ctx ~type_provider content =
-  let result = Parser.parse_string file_key content in
-  let env = Waterlang_typing.Env.create ~type_provider ctx in
-  let typed_tree =
-    match result with
-    | Result.Ok { tree; _ } ->
-      begin
-        (* Ast.pp_program Format.std_formatter program; *)
-        Waterlang_typing.Annotate.annotate_program env tree
-      end
-
-    | Result.Error errs ->
-      raise (ParseError errs)
-  in
-  typed_tree *)
-
-(* let parse_string_to_program ~file_key ~type_provider content =
-  let result = Parser.parse_string file_key content in
-  let open_domains = [
-    [| "std"; "preclude" |]
-  ] in
-  let env = Waterlang_typing.Env.create () ~open_domains ~type_provider in
-  let typed_tree, include_module_ids =
-    match result with
-    | Result.Ok { tree; include_module_ids } ->
-      begin
-        (* Ast.pp_program Format.std_formatter program; *)
-        let program = Waterlang_typing.Annotate.annotate env tree in
-        Typecheck.type_check env program;
-
-        let typecheck_errors = Waterlang_typing.Env.errors env in
-        if not (List.is_empty typecheck_errors) then (
-          raise (TypeCheckError typecheck_errors)
-        );
-
-        (program, include_module_ids)
-        
-      end
-
-    | Result.Error errs ->
-      raise (ParseError errs)
-  in
-  typed_tree, include_module_ids *)
-
 module ModuleMap = Hashtbl.Make(String)
 
 type t = {
@@ -64,30 +20,51 @@ let create ~find_paths () = {
   find_paths;
 }
 
-let _create_type_provider env : Type_provider.provider =
-  object
+class module_scope ~prev env extern_modules = object
+  inherit Scope.scope ~prev () as super
 
-    method resolve (mod_id, name) =
-      (* find module in find paths *)
-      match ModuleMap.find env.module_map mod_id with
-      | Some _mod -> (
-        let files = Module.files _mod in
-        List.fold_until
-          ~init:None
-          ~f:(fun _ file ->
-            let typed_tree = Option.value_exn (Module.(file.typed_tree)) in
-            let { Typedtree. tprogram_scope; _ } = typed_tree in
-            let first_name = name in
-            match Scope.find_var_symbol tprogram_scope first_name with
-            | Some sym -> Base.Continue_or_stop.Stop (Some sym)
-            | None -> Base.Continue_or_stop.Continue None
-          )
-          ~finish:(fun item -> item)
-          files
-      )
-      | None -> None
+  (* override *)
+  method! find_var_symbol (name: string): int option =
+    let module_result = super#find_var_symbol name in
+    match module_result with
+    | Some _ -> module_result
+    | None -> (
+      (* not in the local and prev, find the symbol in other modules *)
+      let tuples =
+        List.map
+        ~f:(fun extern_mod ->
+          try
+            let _mod = ModuleMap.find_exn env.module_map extern_mod in
+            let files = Module.files _mod in
+            let symbols = 
+              List.map
+              ~f:(fun file ->
+                let typed_env = file.typed_env in
+                let scope = Env.module_scope typed_env in
+                scope#vars
+              )
+              files
+            in
+            List.concat symbols
+          with
+          | _ ->
+            Format.eprintf "unexpected: find module failed: %s\n" extern_mod;
+            []
+        )
+        extern_modules
+        |> List.concat
+      in
+      List.find_map
+        tuples
+        ~f:(fun (sym_name, ty_var) ->
+          if (String.equal sym_name name) then
+            Some ty_var
+          else
+            None
+        )
+    )
 
-  end
+end
 
 let last_piece_of_path path =
   let parts = Filename.parts path in
@@ -177,6 +154,8 @@ let rec compile_file_to_path ~ctx ~mod_path env path =
     List.rev (preclude::collected_imports)
   ) in
 
+  let extern_modules = ref [] in
+
   List.iter
     ~f:(fun import ->
       let open Ast.Declaration in
@@ -196,17 +175,24 @@ let rec compile_file_to_path ~ctx ~mod_path env path =
           )
           find_paths in
       match result with
-      | Some path ->
-        parse_module_by_dir ~ctx env path
+      | Some path -> (
+        match parse_module_by_dir ~ctx env path with
+        | Some full_path ->
+          extern_modules := full_path::!extern_modules;
+        | None -> ()
+      )
       | None ->
         failwith (Format.sprintf "can not find module %s" source)
     )
     imports;
 
+  let extern_modules = List.rev !extern_modules in
+
+  let module_scope = new module_scope ~prev:(Type_context.root_scope ctx) env extern_modules in
   (* parse and create env, do annotation when all files are parsed
    * because annotation stage needs all exported symbols are resolved
    *)
-  let typed_env = Waterlang_typing.Env.create ~type_provider:(Type_provider.default_provider) ctx in
+  let typed_env = Waterlang_typing.Env.create ~module_scope ctx in
 
   (* add all top level symbols to typed_env *)
   let { Ast. pprogram_top_level; _ } = ast.tree in
@@ -220,7 +206,7 @@ let rec compile_file_to_path ~ctx ~mod_path env path =
         check = none;
       } in
       let new_id = Type_context.new_id (Env.ctx typed_env) node in
-      Scope.insert_var_symbol (Env.peek_scope typed_env) key new_id
+      (Env.peek_scope typed_env)#insert_var_symbol key new_id
     )
     pprogram_top_level.names
     ;
@@ -231,12 +217,13 @@ let rec compile_file_to_path ~ctx ~mod_path env path =
       ast = Some ast.tree;
       typed_env;
       typed_tree = None;
+      extern_modules;
     }
   in
   insert_moudule_file env ~mod_path file
 
 (* recursive all files in the path *)
-and parse_module_by_dir ~ctx env dir_path =
+and parse_module_by_dir ~ctx env dir_path : string option =
   let iterate_parse_file mod_path =
     ModuleMap.set env.module_map ~key:mod_path ~data:(Module.create ~full_path:mod_path ());
     let children = Sys.ls_dir mod_path in
@@ -255,8 +242,10 @@ and parse_module_by_dir ~ctx env dir_path =
   in
   let full_path = Filename.realpath dir_path in
   if not (ModuleMap.mem env.module_map full_path) then (
-    iterate_parse_file full_path
-  )
+    iterate_parse_file full_path;
+    Some full_path
+  ) else
+    None
 
 let annotate_all_modules env =
   ModuleMap.iter
@@ -323,7 +312,7 @@ let rec compile_file_path ~std_dir ~build_dir entry_file_path =
 
     (* parse the entry file *)
     let dir_of_entry = Filename.dirname entry_file_path in
-    parse_module_by_dir ~ctx env dir_of_entry;
+    let entry_full_path = parse_module_by_dir ~ctx env dir_of_entry in
 
     typecheck_all_modules ~ctx env;
 
@@ -331,7 +320,7 @@ let rec compile_file_path ~std_dir ~build_dir entry_file_path =
     (* let content = In_channel.read_all entry_file_path in
     let file_key = File_key.SourceFile entry_file_path in *)
 
-    let main_mod = ModuleMap.find_exn env.module_map "hello_world" in
+    let main_mod = ModuleMap.find_exn env.module_map (Option.value_exn entry_full_path) in
     let file = List.hd_exn (Module.files main_mod) in
     
     let typed_tree = Module.(file.typed_tree) in

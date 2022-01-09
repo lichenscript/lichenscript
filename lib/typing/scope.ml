@@ -2,48 +2,40 @@ open Core_kernel
 
 module SymbolTable = Hashtbl.Make_binable(String)
 
-type t = {
-  prev: t option;
-  var_symbols: int SymbolTable.t;
-  type_symbols: int SymbolTable.t;
-  mutable var_counter: int;
-}
+class scope ?prev () = object
+  val var_symbols = SymbolTable.create ()
+  val type_symbols = SymbolTable.create ()
+  val mutable var_counter = 0
 
-let create ?prev () =
-  {
-    prev;
-    var_symbols = SymbolTable.create ();
-    type_symbols = SymbolTable.create ();
-    var_counter = 0;
-  }
+  method find_var_symbol (name: string): int option =
+    let tmp = SymbolTable.find var_symbols name in
+    match tmp with
+    | Some _ -> tmp
+    | None ->
+      Option.(prev >>= (fun parent -> parent#find_var_symbol name))
 
-let rec find_var_symbol scope name =
-  let tmp = SymbolTable.find scope.var_symbols name in
-  match tmp with
-  | Some _ -> tmp
-  | None ->
-    Option.(scope.prev >>= (fun parent -> find_var_symbol parent name))
+  method find_type_symbol (name: string): int option =
+    let tmp = SymbolTable.find type_symbols name in
+    match tmp with
+    | Some _ -> tmp
+    | None ->
+      Option.(prev >>= (fun parent -> parent#find_type_symbol name))
 
-let rec find_type_symbol scope name =
-  let tmp = SymbolTable.find scope.type_symbols name in
-  match tmp with
-  | Some _ -> tmp
-  | None ->
-    Option.(scope.prev >>= (fun parent -> find_type_symbol parent name))
+  method insert_var_symbol name (sym: int) =
+    SymbolTable.set var_symbols ~key:name ~data:sym
 
-let insert_var_symbol (scope: t) name (sym: int) =
-  SymbolTable.set scope.var_symbols ~key:name ~data:sym
+  method insert_type_symbol name (sym: int) =
+    SymbolTable.set type_symbols ~key:name ~data:sym
 
-let insert_type_symbol (scope: t) name (sym: int) =
-  SymbolTable.set scope.type_symbols ~key:name ~data:sym
+  method next_var_id =
+    let id = var_counter in
+    var_counter <- var_counter + 1;
+    id
 
-let next_var_id scope =
-  let id = scope.var_counter in
-  scope.var_counter <- scope.var_counter + 1;
-  id
+  method vars =
+    SymbolTable.to_alist var_symbols
 
-let vars scope =
-  SymbolTable.to_alist scope.var_symbols
+end
 
-let pp formatter _scope =
+let pp_scope formatter _scope =
   Format.fprintf formatter "Scope"

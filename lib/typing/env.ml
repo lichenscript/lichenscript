@@ -1,12 +1,12 @@
 open Base
 open Core_kernel
+open Scope
 
 type t = {
   ctx: Type_context.t;
-  module_scope: Scope.t;
+  module_scope: scope;
   open_domains: string array list;
-  type_provider: Type_provider.provider;
-  mutable current_scope: Scope.t;
+  mutable current_scope: scope;
   mutable errors: Type_error.t list;
   mutable scope_counter: int;
 
@@ -17,14 +17,12 @@ type t = {
   mutable return_types: int list;
 }
 
-let create ?(open_domains=[]) ~type_provider ctx =
-  let mod_scope = Scope.create ~prev:(Type_context.root_scope ctx) () in
+let create ?(open_domains=[]) ~module_scope ctx =
   {
     ctx;
     open_domains;
-    type_provider;
-    module_scope = mod_scope;
-    current_scope = mod_scope;
+    module_scope;
+    current_scope = module_scope;
     errors = [];
     scope_counter = 1;
     return_types = [];
@@ -60,7 +58,8 @@ let take_return_types env =
   result
 
 let get_global_type_val env =
-  Scope.find_type_symbol (Type_context.root_scope env.ctx)
+  let root_scope = Type_context.root_scope env.ctx in
+  root_scope#find_type_symbol
 
 let unwrap_global_type name env =
   Option.value_exn (get_global_type_val env name)

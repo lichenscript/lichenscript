@@ -6,6 +6,7 @@
  *)
 open Core_kernel
 open Core_type
+open Scope
 open Waterlang_parsing
 
 module T = Typedtree
@@ -27,7 +28,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       let ty_var = T.Expression.(expr.ty_var) in
 
       let root_scope = Type_context.root_scope (Env.ctx env) in
-      let _unit = Option.value_exn ~message:"unit type" (Scope.find_var_symbol root_scope "unit") in
+      let _unit = Option.value_exn ~message:"unit type" (root_scope#find_var_symbol "unit") in
 
       let node = {
         value = TypeExpr.Ctor(_unit, []);
@@ -54,7 +55,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
 
       let scope = Env.peek_scope env in
       (* TODO: check redefinition? *)
-      Scope.insert_var_symbol scope name sym_id;
+      scope#insert_var_symbol name sym_id;
 
       let binding_init = annotate_expression ~prev_deps env binding_init in
 
@@ -107,20 +108,20 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let ty_var =
         match cnst with
         | Integer _ ->
-          Option.value_exn (Scope.find_type_symbol root_scope "i32")
+          Option.value_exn (root_scope#find_type_symbol "i32")
 
         | Char _ ->
-          Option.value_exn (Scope.find_type_symbol root_scope "char")
+          Option.value_exn (root_scope#find_type_symbol "char")
 
         (* 'c' *)
         | String _ ->
-          Option.value_exn (Scope.find_type_symbol root_scope "string")
+          Option.value_exn (root_scope#find_type_symbol "string")
 
         | Float _ ->
-          Option.value_exn (Scope.find_type_symbol root_scope "f32")
+          Option.value_exn (root_scope#find_type_symbol "f32")
 
         | Boolean _ -> 
-          Option.value_exn (Scope.find_type_symbol root_scope "boolean")
+          Option.value_exn (root_scope#find_type_symbol "boolean")
 
       in
 
@@ -128,7 +129,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     )
 
     | Identifier id -> (
-      let ty_var_opt = Scope.find_var_symbol (Env.peek_scope env) id.pident_name in
+      let ty_var_opt = (Env.peek_scope env)#find_var_symbol id.pident_name in
       match ty_var_opt with
       | Some ty_var ->
         ty_var, (T.Expression.Identifier (id.pident_name, ty_var))
@@ -149,7 +150,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         match spec with
         | Identifier id -> (
           let name = id.pident_name in
-          let var_opt = Scope.find_var_symbol (Env.peek_scope env) name in
+          let var_opt = (Env.peek_scope env)#find_var_symbol name in
           match var_opt with
           | Some id -> (
             { T.Expression.
@@ -266,7 +267,8 @@ and annotate_block ~prev_deps env block : T.Block.t =
       )
 
       | _ -> (
-        let none_type = Option.value_exn (Scope.find_type_symbol (Type_context.root_scope ctx) "unit") in
+        let root_scope = Type_context.root_scope ctx in
+        let none_type = Option.value_exn (root_scope#find_type_symbol "unit") in
         Type_context.update_node_type ctx id (TypeExpr.Ctor (none_type, []))
       )
     );
@@ -359,7 +361,7 @@ and annotate_class env cls =
     { T.Declaration. cls_body_elements; cls_body_loc}
   in
 
-  let class_scope = Scope.create ~prev:(Env.peek_scope env) () in
+  let class_scope = new scope ~prev:(Env.peek_scope env) () in
   Env.with_new_scope env class_scope (fun env ->
     let { cls_id; cls_type_vars = _; cls_loc; cls_body; cls_comments } = cls in
     let cls_id = annotate_identifer env cls_id in
@@ -401,7 +403,7 @@ and annotate_type env ty : (TypeExpr.t * int list) =
   | Ty_any -> TypeExpr.Any, []
   | Ty_ctor(ctor, params) -> (
     let { Identifier. pident_name; pident_loc } = ctor in
-    let ty_var_opt = Scope.find_type_symbol (Env.peek_scope env) pident_name in
+    let ty_var_opt = (Env.peek_scope env)#find_type_symbol pident_name in
     match ty_var_opt with
     | Some ty_var -> (
       (* TODO: find ctor in the scope *)
@@ -465,12 +467,12 @@ and annotate_function env fun_ =
   let open Ast.Function in
 
   let prev_scope = Env.peek_scope env in
-  let fun_scope = Scope.create ~prev:prev_scope () in
+  let fun_scope = new scope ~prev:prev_scope () in
 
   Env.with_new_scope env fun_scope (fun env ->
     let { visibility = _visibility; header; body; loc; comments; } = fun_ in
 
-    let fun_id_opt = Scope.find_var_symbol prev_scope header.id.pident_name in
+    let fun_id_opt = prev_scope#find_var_symbol header.id.pident_name in
     if Option.is_none fun_id_opt then (
       failwith (Format.sprintf "unexpected: function id %s is not added in parsing stage" header.id.pident_name)
     );
@@ -501,7 +503,7 @@ and annotate_function env fun_ =
           match pat.spec with
           | T.Pattern.Symbol (name, _) -> name
         in
-        Scope.insert_var_symbol fun_scope name param.param_ty;
+        fun_scope#insert_var_symbol name param.param_ty;
       )
       params.params_content;
 
@@ -590,7 +592,7 @@ let annotate_program env (program: Ast.program) =
         check = none;
       } in
       let new_id = Type_context.new_id (Env.ctx env) node in
-      Scope.insert_var_symbol (Env.peek_scope env) key new_id
+      (Env.peek_scope env)#insert_var_symbol key new_id
     )
     pprogram_top_level.names
     ;
@@ -620,7 +622,7 @@ let annotate_program env (program: Ast.program) =
           decl_ty_var::acc
         )
 
-        | Enum _ -> failwith "not implement"
+        | Enum _ -> acc
 
         | Import _ -> acc
         

@@ -1,4 +1,5 @@
 open Core_kernel
+open Scope
 (*
  * record the dependency of types
  **)
@@ -7,7 +8,7 @@ open Core_kernel
 type t = {
   ty_map: ResizableArray.t;
   external_symbol: (int, string) Hashtbl.t;
-  root_scope: Scope.t
+  root_scope: scope;
 }
 
 let new_id ctx ty =
@@ -40,12 +41,12 @@ let make_default_type_sym ctx scope =
         check = none;
       } in
       let id = new_id ctx node in
-      Scope.insert_type_symbol scope name id;
+      scope#insert_type_symbol name id;
     )
     names
 
 let create () =
-  let root_scope = Scope.create () in
+  let root_scope = new scope () in
   let ctx = {
     ty_map = ResizableArray.make 1024;
     external_symbol = Hashtbl.create (module Int);
@@ -53,7 +54,6 @@ let create () =
   } in
   make_default_type_sym ctx root_scope;
   ctx
-
 
 let update_node ctx id node =
   ResizableArray.set ctx.ty_map id node

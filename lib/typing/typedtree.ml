@@ -1,5 +1,6 @@
 open Waterlang_lex
 open Waterlang_parsing
+open Scope
 
 module Pattern = struct
 
@@ -110,7 +111,7 @@ and Function : sig
     header: header;
     body: Block.t;
     comments: Loc.t Waterlang_lex.Comment.t list;
-    scope: Scope.t;
+    scope: scope;
     ty_var: int;
   }
 
@@ -210,7 +211,7 @@ end
 
 type program = {
   tprogram_declarations: Declaration.t list;
-  tprogram_scope: Scope.t;
+  tprogram_scope: scope;
   ty_var: int;
 }
 [@@deriving show]

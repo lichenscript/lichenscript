@@ -7,6 +7,7 @@ type file = {
 	ast: Ast.program option;
 	typed_env: Env.t;
   typed_tree: Typedtree.program option;
+	extern_modules: string list;  (* full id *)
 }
 
 type t = {
