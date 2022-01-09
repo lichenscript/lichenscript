@@ -14,6 +14,9 @@ type t = {
 let new_id ctx ty =
   let id = ResizableArray.size ctx.ty_map in
   ResizableArray.push ctx.ty_map ty;
+  (* if phys_equal id 17 then (
+    failwith "fuckit";
+  ); *)
   id
 
 let make_default_type_sym ctx scope =
@@ -63,6 +66,7 @@ let update_node_type ctx id ty =
   update_node ctx id { old_node with value = ty }
 
 let set_external_symbol ctx id symbol =
+  Format.eprintf "external %d %s\n" id symbol;
   Hashtbl.set ctx.external_symbol ~key:id ~data:symbol
 
 let find_external_symbol ctx id =
@@ -102,7 +106,7 @@ let print ctx =
     let item = get_node ctx i in
     let deps = Buffer.create 64 in
     List.iter ~f:(fun item -> Buffer.add_string deps (Int.to_string item); Buffer.add_string deps " ") item.deps ;
-    Format.printf "%d: %s\n" i (Buffer.contents deps);
+    Format.printf "%d: %s \"%s\"\n" i (Buffer.contents deps) (Option.value ~default:"None" (Option.map ~f:(fun key -> Format.asprintf "%a" Waterlang_lex.File_key.pp key) item.loc.source));
     Format.printf "\t%s\n\n" (print_type_by_id ctx i);
   done
 

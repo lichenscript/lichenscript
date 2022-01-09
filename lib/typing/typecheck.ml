@@ -366,7 +366,7 @@ let type_check ?(type_provider=Type_provider.default_provider) ?(open_domains=[]
 
 module IntHash = Hashtbl.Make(Int)
 
-let type_check ctx _program =
+let type_check ctx =
   let size = Type_context.size ctx in
   let visited_mark = Array.create ~len:size false in
   let reversed_map = Array.create ~len:size [] in

@@ -183,7 +183,7 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
     let { callee; call_params; _ } = call in
     let { callee_spec; _ } = callee in
     match callee_spec with
-    | (_sym_name, sym_id), [] -> (
+    | (sym_name, sym_id), [] -> (
       let ext_name_opt = Type_context.find_external_symbol env.env.ctx sym_id in
       match ext_name_opt with
       | Some ext_method_name -> (
@@ -202,10 +202,10 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
         pss env "})"
       )
       | _ ->
-      failwith "not implemented"
+      failwith (Format.sprintf "can not find external %s %d\n" sym_name sym_id)
     )
     | _ ->
-      failwith "not implemented"
+      failwith "not implemented 3"
 
   )
 

@@ -195,21 +195,7 @@ let rec compile_file_to_path ~ctx ~mod_path env path =
   let typed_env = Waterlang_typing.Env.create ~module_scope ctx in
 
   (* add all top level symbols to typed_env *)
-  let { Ast. pprogram_top_level; _ } = ast.tree in
-  Hashtbl.iter_keys
-    ~f:(fun key ->
-      let open Core_type in
-      let node = {
-        value = TypeExpr.Unknown;
-        loc = Waterlang_lex.Loc.none;
-        deps = [];
-        check = none;
-      } in
-      let new_id = Type_context.new_id (Env.ctx typed_env) node in
-      (Env.peek_scope typed_env)#insert_var_symbol key new_id
-    )
-    pprogram_top_level.names
-    ;
+  Tree_helper.add_top_level_symbols_to_typed_env typed_env ast.tree;
 
   let file =
     { Module.
@@ -272,24 +258,10 @@ let annotate_all_modules env =
 
 let typecheck_all_modules ~ctx env =
   annotate_all_modules env;
-  (* let type_provider = create_type_provider env in *)
-  ModuleMap.iter
-    ~f:(fun m -> 
-      let files = Module.files m in
-      let files =
-        List.map
-          ~f:(fun file ->
-            let errors = Typecheck.type_check ctx (Option.value_exn file.typed_tree) in
-            if (List.length errors) > 0 then (
-              raise (TypeCheckError errors)
-            );
-            { file with typed_tree = file.typed_tree }
-          )
-          files
-      in
-      Module.set_files m files
-    )
-    env.module_map
+  let errors = Typecheck.type_check ctx in
+  if (List.length errors) > 0 then (
+    raise (TypeCheckError errors)
+  )
 
 (*
  * 1. parse all files with .wt of find path

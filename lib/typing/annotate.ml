@@ -299,14 +299,25 @@ and annotate_declaration env decl : T.Declaration.t =
 
         let params, params_types = annoate_function_params env params in
 
-        let node = {
+        let scope = Env.peek_scope env in
+        let ty_id =
+          match scope#find_var_symbol id.pident_name with
+          | Some v -> v
+          | None -> failwith (Format.sprintf "unexpected: %s is not added to scope\n" id.pident_name)
+        in
+
+        let node = Type_context.get_node (Env.ctx env) ty_id in
+        (* let node = {
           value = TypeExpr.Unknown;
+        } in *)
+
+        Format.eprintf "declare %s of %d\n" id.pident_name ty_id;
+        Type_context.update_node (Env.ctx env) ty_id {
+          node with
           deps = params_types;
           loc = decl_loc;
           check = none;
-        } in
-
-        let ty_id = Type_context.new_id (Env.ctx env) node in
+        };
 
         (match List.last attributes with
         | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; _ } ->
@@ -581,9 +592,9 @@ and annotate_function env fun_ =
   )
 
 let annotate_program env (program: Ast.program) =
-  let { Ast. pprogram_declarations; pprogram_top_level; pprogram_loc; _; } = program in
+  let { Ast. pprogram_declarations; pprogram_top_level = _; pprogram_loc; _; } = program in
 
-  Hashtbl.iter_keys
+  (* Hashtbl.iter_keys
     ~f:(fun key ->
       let node = {
         value = TypeExpr.Unknown;
@@ -595,7 +606,7 @@ let annotate_program env (program: Ast.program) =
       (Env.peek_scope env)#insert_var_symbol key new_id
     )
     pprogram_top_level.names
-    ;
+    ; *)
 
   let tprogram_declarations = List.map ~f:(annotate_declaration env) pprogram_declarations in
 
