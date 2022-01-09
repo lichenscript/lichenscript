@@ -1,4 +1,4 @@
 (library
- (name waterlang_parsing)
- (libraries waterlang_lex core_kernel)
+ (name lichenscript_parsing)
+ (libraries lichenscript_lex core_kernel)
  (preprocess (pps ppx_gen_rec ppx_deriving.std)))

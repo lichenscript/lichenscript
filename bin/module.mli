@@ -1,5 +1,5 @@
-open Waterlang_parsing
-open Waterlang_typing
+open Lichenscript_parsing
+open Lichenscript_typing
 
 type file = {
 	path: string;

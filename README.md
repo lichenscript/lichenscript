@@ -1,5 +1,5 @@
 
-# Waterlang
+# LichenScript
 
 A ligtweight language compiled to JavaScript/C.
 Easy to integrated with the Web Ecosystem.

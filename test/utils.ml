@@ -1,28 +1,29 @@
 open Core
-open Waterlang_lex
-open Waterlang_parsing
-open Waterlang_typing
+open Lichenscript_lex
+open Lichenscript_parsing
+open Lichenscript_typing
 
 exception ExpectedError of string
 
 let parse_string_to_program content =
   let result = Parser.parse_string None content in
-  let ctx = Waterlang_typing.Type_context.create () in
+  let ctx = Lichenscript_typing.Type_context.create () in
   let module_scope = new Scope.scope ~prev:(Type_context.root_scope ctx) () in
-  let env = Waterlang_typing.Env.create ~module_scope ctx in
+  let env = Lichenscript_typing.Env.create ~module_scope ctx in
   let typed_tree =
     match result with
     | Result.Ok { tree = program; _ } ->
         begin
         (* Ast.pp_program Format.std_formatter program; *)
         try (
-          let program = Waterlang_typing.Annotate.annotate_program env program in
-          let typecheck_errors = Waterlang_typing.Typecheck.type_check ctx in
+          Tree_helper.add_top_level_symbols_to_typed_env env program;
+          let program = Lichenscript_typing.Annotate.annotate_program env program in
+          let typecheck_errors = Lichenscript_typing.Typecheck.type_check ctx in
 
           if not (List.is_empty typecheck_errors) then (
             List.iter
               ~f:(fun e ->
-                Format.fprintf Format.str_formatter "%a\n" (Waterlang_typing.Type_error.PP.error ~ctx) e
+                Format.fprintf Format.str_formatter "%a\n" (Lichenscript_typing.Type_error.PP.error ~ctx) e
               )
               typecheck_errors
             ;
@@ -31,8 +32,8 @@ let parse_string_to_program content =
           );
 
           program
-        ) with Waterlang_typing.Type_error.Error e ->
-          let err_str = Format.asprintf "%a" (Waterlang_typing.Type_error.PP.error ~ctx) e in
+        ) with Lichenscript_typing.Type_error.Error e ->
+          let err_str = Format.asprintf "%a" (Lichenscript_typing.Type_error.PP.error ~ctx) e in
           raise (ExpectedError err_str)
         
       end
@@ -52,7 +53,7 @@ let parse_string_to_program content =
 
 let parse_string_and_codegen content =
   let ctx, p = parse_string_to_program content in
-  Waterlang_c.codegen ~ctx p
+  Lichenscript_c.codegen ~ctx p
 
 (* let parse_string_and_codegen_to_path content path =
   let p = parse_string_to_program content in

@@ -1,5 +1,5 @@
-open Waterlang_typing.Typedtree
-open Waterlang_typing
+open Lichenscript_typing.Typedtree
+open Lichenscript_typing
 open Core_kernel
 
 let main_snippet = {|
@@ -126,7 +126,7 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
   let { spec; _ } = expr in
   match spec with
   | Constant cnst -> (
-    let open Waterlang_parsing.Ast.Literal in
+    let open Lichenscript_parsing.Ast.Literal in
     match cnst with
     | Integer (raw, _) -> (
       pss env Primitives.Value.mk_i32;

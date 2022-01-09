@@ -1,5 +1,5 @@
-open Waterlang_lex
-open Waterlang_parsing
+open Lichenscript_lex
+open Lichenscript_parsing
 open Scope
 
 module Pattern = struct
@@ -110,7 +110,7 @@ and Function : sig
   type t = {
     header: header;
     body: Block.t;
-    comments: Loc.t Waterlang_lex.Comment.t list;
+    comments: Loc.t Lichenscript_lex.Comment.t list;
     scope: scope;
     ty_var: int;
   }
@@ -165,7 +165,7 @@ and Declaration : sig
     cls_id: (string * int);
     cls_loc: Loc.t;
     cls_body: class_body;
-    cls_comments:  Loc.t Waterlang_lex.Comment.t list;
+    cls_comments:  Loc.t Lichenscript_lex.Comment.t list;
   }
 
   and class_body = {

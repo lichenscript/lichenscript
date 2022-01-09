@@ -1,4 +1,4 @@
-open Waterlang_parsing
+open Lichenscript_parsing
 
 module Value = struct
 

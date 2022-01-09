@@ -1,7 +1,7 @@
 
 open Ast
 open Parser_env
-open Waterlang_lex
+open Lichenscript_lex
 
 type parse_result = {
   tree: Ast.program;
@@ -232,7 +232,7 @@ and parse_declaration env : Declaration.t =
           )
 
           | _ -> (
-            let lex_error = Waterlang_lex.Lex_error.Unexpected (Token.value_of_token (Peek.token env)) in
+            let lex_error = Lichenscript_lex.Lex_error.Unexpected (Token.value_of_token (Peek.token env)) in
             let parse_error = {
               Parse_error.
               perr_spec = Parse_error.LexError lex_error;
@@ -255,7 +255,7 @@ and parse_declaration env : Declaration.t =
 
     | _ ->
       Format.eprintf "false token %s\n" (Token.value_of_token (Peek.token env));
-      let lex_error = Waterlang_lex.Lex_error.Unexpected (Token.value_of_token (Peek.token env)) in
+      let lex_error = Lichenscript_lex.Lex_error.Unexpected (Token.value_of_token (Peek.token env)) in
       let parse_error = {
         Parse_error.
         perr_spec = Parse_error.LexError lex_error;
@@ -989,7 +989,7 @@ and parse_primary_expression env : Expression.t =
 
     | _ ->
       let tok = Token.token_to_string next in
-      let lex_error = Waterlang_lex.Lex_error.Unexpected tok in
+      let lex_error = Lichenscript_lex.Lex_error.Unexpected tok in
       let perr_spec = Parse_error.LexError lex_error in
       let err =
         { Parse_error.

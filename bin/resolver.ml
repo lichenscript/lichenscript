@@ -1,8 +1,8 @@
 open Cli_utils
 open Core
-open Waterlang_lex
-open Waterlang_typing
-open Waterlang_parsing
+open Lichenscript_lex
+open Lichenscript_typing
+open Lichenscript_parsing
 
 exception ParseError of Parse_error.t list
 exception TypeCheckError of Type_error.t list
@@ -107,13 +107,13 @@ let print_loc_title ~prefix loc_opt =
     match loc_opt.source with
     | Some source -> (
       print_error_prefix ();
-      let source_str = Format.asprintf "%a" Waterlang_lex.File_key.pp source in
+      let source_str = Format.asprintf "%a" Lichenscript_lex.File_key.pp source in
       Out_channel.printf "%s in %s\n" prefix (TermColor.bold ^ source_str ^ TermColor.reset)
     )
     | None -> ()
   )
 
-let allow_suffix = Re.Pcre.regexp "^(.+)\\.wt$"
+let allow_suffix = Re.Pcre.regexp "^(.+)\\.lc$"
 
 let insert_moudule_file env ~mod_path file =
   match ModuleMap.find env.module_map mod_path with
@@ -192,7 +192,7 @@ let rec compile_file_to_path ~ctx ~mod_path env path =
   (* parse and create env, do annotation when all files are parsed
    * because annotation stage needs all exported symbols are resolved
    *)
-  let typed_env = Waterlang_typing.Env.create ~module_scope ctx in
+  let typed_env = Lichenscript_typing.Env.create ~module_scope ctx in
 
   (* add all top level symbols to typed_env *)
   Tree_helper.add_top_level_symbols_to_typed_env typed_env ast.tree;
@@ -219,7 +219,7 @@ and parse_module_by_dir ~ctx env dir_path : string option =
         let child_path = Filename.concat mod_path item in
         if Sys.is_file_exn child_path then (
           let test_result = Re.exec allow_suffix child_path |> Re.Group.all in
-          if Array.length test_result > 1 then ((* is a .wt file *)
+          if Array.length test_result > 1 then ((* is a .bud file *)
             compile_file_to_path ~ctx ~mod_path env child_path
           )
         ) else ()
@@ -241,7 +241,7 @@ let annotate_all_modules env =
         List.map
           ~f:(fun file -> 
             let { Module. typed_env; ast; _ } = file in
-            let typed_tree = Waterlang_typing.Annotate.annotate_program typed_env (Option.value_exn ast) in
+            let typed_tree = Lichenscript_typing.Annotate.annotate_program typed_env (Option.value_exn ast) in
             { file with
               (* clear the ast to released memory,
                * but don't know if there are other references
@@ -279,7 +279,7 @@ let rec compile_file_path ~std_dir ~build_dir entry_file_path =
   );
   try
     (* ctx is a typing context for all modules *)
-    let ctx = Waterlang_typing.Type_context.create () in
+    let ctx = Lichenscript_typing.Type_context.create () in
     let env = create ~find_paths:[ Option.value_exn std_dir ] () in
 
     (* parse the entry file *)
@@ -298,7 +298,7 @@ let rec compile_file_path ~std_dir ~build_dir entry_file_path =
     let typed_tree = Module.(file.typed_tree) in
 
     (* TODO: compile other modules *)
-    let output = Waterlang_c.codegen ~ctx (Option.value_exn typed_tree) in
+    let output = Lichenscript_c.codegen ~ctx (Option.value_exn typed_tree) in
     let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
     let output_path = write_to_file build_dir mod_name output in
     let build_dir = Option.value_exn build_dir in

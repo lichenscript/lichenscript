@@ -1,0 +1,4 @@
+(library
+ (name lichenscript_codegen_utils)
+ (libraries core_kernel lichenscript_typing)
+)

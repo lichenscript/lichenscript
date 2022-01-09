@@ -1,9 +1,9 @@
 (test
- (name waterlang)
+ (name lichenscript_test)
  (libraries
-  waterlang_lex
-  waterlang_parsing
-  waterlang_typing
-  waterlang_c
+  lichenscript_lex
+  lichenscript_parsing
+  lichenscript_typing
+  lichenscript_c
   core
   ounit2))

@@ -1,5 +1,5 @@
 
-module Loc = Waterlang_lex.Loc
+module Loc = Lichenscript_lex.Loc
 
 type t = {
   pident_name: string;

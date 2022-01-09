@@ -1,7 +1,7 @@
 
 open OUnit2
-open Waterlang_lex
-open Waterlang_parsing
+open Lichenscript_lex
+open Lichenscript_parsing
 
 let temp_dir_name = "/tmp/test_waterlang/"
 
@@ -35,9 +35,9 @@ let test_parser _ =
   match result with
   | Result.Ok _program ->
     (* Ast.pp_program Format.std_formatter program; *)
-    (* let _env = Waterlang_typing.Env.create () in *)
-    (* let program = Waterlang_typing.Annotate.annotate env program in
-    Waterlang_typing.Typecheck.type_check env program; *)
+    (* let _env = Lichenscript_typing.Env.create () in *)
+    (* let program = Lichenscript_typing.Annotate.annotate env program in
+    Lichenscript_typing.Typecheck.type_check env program; *)
     assert true
 
   | Result.Error errs ->

@@ -1,5 +1,5 @@
 open Core_kernel
-open Waterlang_parsing
+open Lichenscript_parsing
 
 let add_top_level_symbols_to_typed_env typed_env tree =
   let { Ast. pprogram_top_level; _ } = tree in
@@ -8,7 +8,7 @@ let add_top_level_symbols_to_typed_env typed_env tree =
       let open Core_type in
       let node = {
         value = TypeExpr.Unknown;
-        loc = Waterlang_lex.Loc.none;
+        loc = Lichenscript_lex.Loc.none;
         deps = [];
         check = none;
       } in

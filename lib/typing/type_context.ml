@@ -39,7 +39,7 @@ let make_default_type_sym ctx scope =
       let sym = TypeDef.create ~builtin:true  name spec in
       let node = {
         value = TypeExpr.TypeDef sym;
-        loc = Waterlang_lex.Loc.none;
+        loc = Lichenscript_lex.Loc.none;
         deps = [];
         check = none;
       } in
@@ -106,7 +106,7 @@ let print ctx =
     let item = get_node ctx i in
     let deps = Buffer.create 64 in
     List.iter ~f:(fun item -> Buffer.add_string deps (Int.to_string item); Buffer.add_string deps " ") item.deps ;
-    Format.printf "%d: %s \"%s\"\n" i (Buffer.contents deps) (Option.value ~default:"None" (Option.map ~f:(fun key -> Format.asprintf "%a" Waterlang_lex.File_key.pp key) item.loc.source));
+    Format.printf "%d: %s \"%s\"\n" i (Buffer.contents deps) (Option.value ~default:"None" (Option.map ~f:(fun key -> Format.asprintf "%a" Lichenscript_lex.File_key.pp key) item.loc.source));
     Format.printf "\t%s\n\n" (print_type_by_id ctx i);
   done
 

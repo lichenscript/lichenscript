@@ -1,5 +1,5 @@
 
-module Loc = Waterlang_lex.Loc
+module Loc = Lichenscript_lex.Loc
 
 type constant =
   Const_int of int
@@ -27,7 +27,7 @@ module UnaryOp = struct
     [@@deriving show]
 
   let from_token =
-    let open Waterlang_lex in
+    let open Lichenscript_lex in
     function
     | Token.T_PLUS -> Plus
     | Token.T_MINUS -> Minus
@@ -63,7 +63,7 @@ module BinaryOp = struct
     [@@deriving show]
 
   let from_token =
-    let open Waterlang_lex in
+    let open Lichenscript_lex in
     function
     | Token.T_EQUAL -> Equal
     | Token.T_NOT_EQUAL -> NotEqual

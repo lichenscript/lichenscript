@@ -1,7 +1,7 @@
 
-open Waterlang_lex
+open Lichenscript_lex
 
-module Loc = Waterlang_lex.Loc
+module Loc = Lichenscript_lex.Loc
 
 module Lookahead : sig
   type t
@@ -168,7 +168,7 @@ let source env = env.source
 let errors env = !(env.errors)
 
 module Peek = struct
-  open Waterlang_lex
+  open Lichenscript_lex
 
   let ith_token ~i env = Lex_result.token (lookahead ~i env)
 

@@ -1,3 +1,3 @@
 
-val annotate_program: Env.t -> Waterlang_parsing.Ast.program
+val annotate_program: Env.t -> Lichenscript_parsing.Ast.program
 -> Typedtree.program

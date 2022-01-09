@@ -7,7 +7,7 @@
 open Core_kernel
 open Core_type
 open Scope
-open Waterlang_parsing
+open Lichenscript_parsing
 
 module T = Typedtree
 
@@ -598,7 +598,7 @@ let annotate_program env (program: Ast.program) =
     ~f:(fun key ->
       let node = {
         value = TypeExpr.Unknown;
-        loc = Waterlang_lex.Loc.none;
+        loc = Lichenscript_lex.Loc.none;
         deps = [];
         check = none;
       } in

@@ -24,7 +24,7 @@ module rec TypeExpr : sig
   }
 
   and class_property_type = {
-    tcls_property_name: Waterlang_parsing.Identifier.t;
+    tcls_property_name: Lichenscript_parsing.Identifier.t;
     tcls_property_type: t;
   }
 
@@ -59,7 +59,7 @@ end = struct
   }
 
   and class_property_type = {
-    tcls_property_name: Waterlang_parsing.Identifier.t;
+    tcls_property_name: Lichenscript_parsing.Identifier.t;
     tcls_property_type: t;
   }
 
@@ -225,14 +225,14 @@ end
 let none _ = ()
 
 type node = {
-  loc: Waterlang_lex.Loc.t;
+  loc: Lichenscript_lex.Loc.t;
   value: TypeExpr.t;
   deps: int list;
   check: int -> unit;
 }
 
 let unknown = {
-  loc = Waterlang_lex.Loc.none;
+  loc = Lichenscript_lex.Loc.none;
   value = TypeExpr.Unknown;
   deps = [];
   check = none;

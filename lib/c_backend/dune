@@ -1,10 +1,10 @@
 
 (library
- (name waterlang_c)
+ (name lichenscript_c)
  (libraries
-  waterlang_typing
-  waterlang_lex
-  waterlang_parsing
+  lichenscript_typing
+  lichenscript_lex
+  lichenscript_parsing
   core_kernel
  )
  (preprocess (pps ppx_deriving.show)))

@@ -1,4 +1,4 @@
 (library
- (name waterlang_lex)
+ (name lichenscript_lex)
  (libraries sedlex wtf8)
  (preprocess (pps ppx_deriving.show sedlex.ppx)))

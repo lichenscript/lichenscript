@@ -1,4 +1,4 @@
-open Waterlang_lex
+open Lichenscript_lex
 
 type t = {
   perr_loc: Loc.t;
@@ -6,7 +6,7 @@ type t = {
 }
 
 and spec =
-  | LexError of Waterlang_lex.Lex_error.t
+  | LexError of Lichenscript_lex.Lex_error.t
   | IsNotLeftValue
   | MalformedUnicode
   | VisibilityNoOnTopLevel

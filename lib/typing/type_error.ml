@@ -1,4 +1,4 @@
-open Waterlang_lex
+open Lichenscript_lex
 open Core_type
 
 type t = {

@@ -1,4 +1,4 @@
-module Loc = Waterlang_lex.Loc
+module Loc = Lichenscript_lex.Loc
 
 type location_stack = Loc.t list
 [@@deriving show]
@@ -141,7 +141,7 @@ and Function : sig
     header: header;
     body: Block.t;
     loc: Loc.t;
-    comments: Loc.t Waterlang_lex.Comment.t list;
+    comments: Loc.t Lichenscript_lex.Comment.t list;
   }
 
   and params = {
@@ -221,7 +221,7 @@ and Declaration : sig
     cls_type_vars: Identifier.t list;
     cls_loc:       Loc.t;
     cls_body:      class_body;
-    cls_comments:  Loc.t Waterlang_lex.Comment.t list;
+    cls_comments:  Loc.t Lichenscript_lex.Comment.t list;
   }
 
   and class_body = {
@@ -281,7 +281,7 @@ end
 type program = {
   pprogram_top_level: Top_level.t;
   pprogram_declarations: Declaration.t list;
-  pprogram_comments: Loc.t Waterlang_lex.Comment.t list;
+  pprogram_comments: Loc.t Lichenscript_lex.Comment.t list;
   pprogram_loc: Loc.t;
 }
 [@@deriving show]
