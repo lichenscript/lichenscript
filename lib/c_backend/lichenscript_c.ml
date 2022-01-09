@@ -1,6 +1,5 @@
 
 
 let codegen ~ctx tree =
-  let env = Codegen.create ~ctx () in
-  Codegen.codegen_program env tree;
+  let env = Codegen.codegen_program ~ctx tree in
   Codegen.contents env
