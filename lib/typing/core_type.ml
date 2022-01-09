@@ -2,7 +2,7 @@ open Core_kernel
 
 module PropsMap = Hashtbl.Make(String)
 
-module rec TypeValue : sig
+module rec TypeExpr : sig
   type t =
     | Unknown
     | Any
@@ -11,7 +11,7 @@ module rec TypeValue : sig
     | Function of t list * t
     | Module of module_type
     | Array of t
-    | TypeDef of TypeSym.t
+    | TypeDef of TypeDef.t
 
   and module_type = {
     export: t;
@@ -46,7 +46,7 @@ end = struct
     | Function of t list * t
     | Module of module_type
     | Array of t
-    | TypeDef of TypeSym.t
+    | TypeDef of TypeDef.t
 
   and module_type = {
     export: t;
@@ -103,9 +103,9 @@ end = struct
   
 end
 
-and TypeSym : sig
+and TypeDef : sig
   type module_type = {
-    props: TypeValue.t PropsMap.t;
+    props: TypeExpr.t PropsMap.t;
   }
 
   and enum_member = {
@@ -120,7 +120,7 @@ and TypeSym : sig
   and spec =
     | Primitive
     | Object 
-    | Alias of TypeValue.t
+    | Alias of TypeExpr.t
     | Module_ of module_type
     | Enum of enum_type
 
@@ -144,7 +144,7 @@ and TypeSym : sig
 
 end = struct
   type module_type = {
-    props: TypeValue.t PropsMap.t;
+    props: TypeExpr.t PropsMap.t;
   }
 
   and enum_member = {
@@ -159,7 +159,7 @@ end = struct
   and spec =
     | Primitive
     | Object
-    | Alias of TypeValue.t
+    | Alias of TypeExpr.t
     | Module_ of module_type
     | Enum of enum_type
 
@@ -204,14 +204,14 @@ let none _ = ()
 
 type node = {
   loc: Waterlang_lex.Loc.t;
-  value: TypeValue.t;
+  value: TypeExpr.t;
   deps: int list;
   check: int -> unit;
 }
 
 let unknown = {
   loc = Waterlang_lex.Loc.none;
-  value = TypeValue.Unknown;
+  value = TypeExpr.Unknown;
   deps = [];
   check = none;
 }

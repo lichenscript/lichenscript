@@ -3,7 +3,7 @@ open Core_type
 
 (* recursive find type *)
 let rec find_to_typedef ctx c1 =
-  let open TypeValue in
+  let open TypeExpr in
   let node = Type_context.get_node ctx c1 in 
   match node.value with
   | TypeDef sym -> Some (sym, c1)
@@ -13,7 +13,7 @@ let rec find_to_typedef ctx c1 =
   | _ -> None
 
 let type_assinable ctx left right =
-  let open TypeValue in
+  let open TypeExpr in
   match (left, right) with
   | (Any, _)
   | (_, Any) -> false
@@ -22,7 +22,7 @@ let type_assinable ctx left right =
     let c2_def = find_to_typedef ctx c2 in
     match (c1_def, c2_def) with
     | (Some (left_sym, _), Some (right_sym, _)) ->
-      if TypeSym.(left_sym == right_sym) then
+      if TypeDef.(left_sym == right_sym) then
         true
       else
         false
@@ -34,6 +34,6 @@ let type_assinable ctx left right =
     false
 
 let type_addable left right =
-  let open TypeSym in
+  let open TypeDef in
   left.builtin && right.builtin && (String.equal left.name right.name) &&
   (Array.mem [| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "string" |] ~equal:String.equal left.name)

@@ -30,7 +30,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       let _unit = Option.value_exn ~message:"unit type" (Scope.find_var_symbol root_scope "unit") in
 
       let node = {
-        value = TypeValue.Ctor(_unit, []);
+        value = TypeExpr.Ctor(_unit, []);
         loc;
         deps = [ty_var];
         check = none;  (* TODO: check expr is empty *)
@@ -183,7 +183,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let call_params = List.map ~f:(annotate_expression ~prev_deps env) call_params in
 
       let ty_var = Type_context.new_id (Env.ctx env) {
-        value = TypeValue.Unknown;
+        value = TypeExpr.Unknown;
         loc;
         deps = [ T.Expression.(callee.callee_ty_var) ];
         check = none;
@@ -200,7 +200,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let right = annotate_expression ~prev_deps env right in
       let open T.Expression in
       let node = {
-        value = TypeValue.Unknown;
+        value = TypeExpr.Unknown;
         deps = [left.ty_var; right.ty_var];
         loc;
         check = (fun id ->
@@ -214,7 +214,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
               let err = Type_error.(make_error ctx loc (NotAddable (left_sym, right_sym))) in
               raise (Type_error.Error err)
             );
-            Type_context.update_node_type ctx id (TypeValue.Ctor(left_id, []))
+            Type_context.update_node_type ctx id (TypeExpr.Ctor(left_id, []))
           )
           | _ -> (
             let err = Type_error.(make_error ctx loc CannotResolveTypeOfExpression) in
@@ -253,7 +253,7 @@ and annotate_block ~prev_deps env block : T.Block.t =
       body
   in
   let node = {
-    value = TypeValue.Unknown;
+    value = TypeExpr.Unknown;
     deps = body_dep;
     loc;
     check = (fun id ->
@@ -262,12 +262,12 @@ and annotate_block ~prev_deps env block : T.Block.t =
       match last_opt with
       | Some { Typedtree.Statement. spec = Expr expr ; _ } -> (
         let ty_var = Typedtree.Expression.(expr.ty_var) in
-        Type_context.update_node_type ctx id (TypeValue.Ctor (ty_var, []))
+        Type_context.update_node_type ctx id (TypeExpr.Ctor (ty_var, []))
       )
 
       | _ -> (
         let none_type = Option.value_exn (Scope.find_type_symbol (Type_context.root_scope ctx) "unit") in
-        Type_context.update_node_type ctx id (TypeValue.Ctor (none_type, []))
+        Type_context.update_node_type ctx id (TypeExpr.Ctor (none_type, []))
       )
     );
   } in
@@ -298,7 +298,7 @@ and annotate_declaration env decl : T.Declaration.t =
         let params, params_types = annoate_function_params env params in
 
         let node = {
-          value = TypeValue.Unknown;
+          value = TypeExpr.Unknown;
           deps = params_types;
           loc = decl_loc;
           check = none;
@@ -371,7 +371,7 @@ and annotate_identifer env ident =
   let node = {
     Core_type.
     loc = pident_loc;
-    value = TypeValue.Unknown;
+    value = TypeExpr.Unknown;
     check = none;
     deps = [];
   } in
@@ -391,12 +391,12 @@ and annotate_pattern env pat =
   { T.Pattern. spec; loc }, id
 
 (* only collect deps, construct value in type check *)
-and annotate_type env ty : (TypeValue.t * int list) =
+and annotate_type env ty : (TypeExpr.t * int list) =
   let open Ast.Type in
   let { spec; _ } = ty in
   let deps = ref [] in
   match spec with
-  | Ty_any -> TypeValue.Any, []
+  | Ty_any -> TypeExpr.Any, []
   | Ty_ctor(ctor, params) -> (
     let { Identifier. pident_name; pident_loc } = ctor in
     let ty_var_opt = Scope.find_type_symbol (Env.peek_scope env) pident_name in
@@ -405,7 +405,7 @@ and annotate_type env ty : (TypeValue.t * int list) =
       (* TODO: find ctor in the scope *)
       let params, params_deps = List.map ~f:(annotate_type env) params |> List.unzip in
       deps := List.concat (!deps::params_deps);
-      TypeValue.Ctor (ty_var, params), [ty_var]
+      TypeExpr.Ctor (ty_var, params), [ty_var]
     )
 
     | None -> (
@@ -420,7 +420,7 @@ and annotate_type env ty : (TypeValue.t * int list) =
     let params, params_types_deps = List.map ~f:(annotate_type env) params |> List.unzip in
     let return_type, return_type_deps = annotate_type env result in
     deps := List.concat ((!deps)::return_type_deps::params_types_deps);
-    TypeValue.Function(params, return_type), !deps
+    TypeExpr.Function(params, return_type), !deps
   )
   (* !deps *)
 
@@ -430,7 +430,7 @@ and annoate_function_params env params =
     let { param_pat; param_ty; param_init = _init; param_loc; param_rest } = param in
     let param_pat, param_id = annotate_pattern env param_pat in
     let deps = ref [] in
-    let value = ref TypeValue.Unknown in
+    let value = ref TypeExpr.Unknown in
     Option.iter
       ~f:(fun ty ->
         let param_ty, param_ty_deps = annotate_type env ty in
@@ -512,7 +512,7 @@ and annotate_function env fun_ =
 
     let return_node = {
       loc;
-      value = TypeValue.Unknown;
+      value = TypeExpr.Unknown;
       deps = !fun_deps;
       check = (fun id -> 
         let ctx = Env.ctx env in
@@ -559,7 +559,7 @@ and annotate_function env fun_ =
 
     Type_context.update_node (Env.ctx env) fun_id {
       name_node with
-      value = TypeValue.Unknown;  (* it's an typedef *)
+      value = TypeExpr.Unknown;  (* it's an typedef *)
       deps = return_id::params_types;
       check = none;
     };
@@ -582,7 +582,7 @@ let annotate_program env (program: Ast.program) =
   Hashtbl.iter_keys
     ~f:(fun key ->
       let node = {
-        value = TypeValue.Unknown;
+        value = TypeExpr.Unknown;
         loc = Waterlang_lex.Loc.none;
         deps = [];
         check = none;
@@ -626,7 +626,7 @@ let annotate_program env (program: Ast.program) =
 
   let val_ =
     {
-      value = TypeValue.Unknown;
+      value = TypeExpr.Unknown;
       loc = pprogram_loc;
       deps;
       check = none;

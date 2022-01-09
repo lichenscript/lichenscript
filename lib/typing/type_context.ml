@@ -17,7 +17,7 @@ let new_id ctx ty =
 
 let make_default_type_sym ctx scope =
   let open Core_type in
-  let open Core_type.TypeSym in
+  let open Core_type.TypeDef in
   let names = [|
     ("unit", Primitive);
     ("u32", Primitive);
@@ -32,9 +32,9 @@ let make_default_type_sym ctx scope =
   |] in
   Array.iter
     ~f:(fun (name, spec) ->
-      let sym = TypeSym.create ~builtin:true  name spec in
+      let sym = TypeDef.create ~builtin:true  name spec in
       let node = {
-        value = TypeValue.TypeDef sym;
+        value = TypeExpr.TypeDef sym;
         loc = Waterlang_lex.Loc.none;
         deps = [];
         check = none;
@@ -75,7 +75,7 @@ let get_node ctx id =
 
 let rec print_type_by_id ctx id =
   let item = get_node ctx id in
-  let open Core_type.TypeValue in
+  let open Core_type.TypeExpr in
   match item.value with
   | Unknown -> "unknown"
   | Any -> "any"
@@ -93,7 +93,7 @@ let rec print_type_by_id ctx id =
   | Module _ -> "module"
   | Array _ -> "array"
   | TypeDef sym ->
-    (Core_type.TypeSym.name sym)
+    (Core_type.TypeDef.name sym)
 
 let print ctx =
 

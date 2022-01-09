@@ -172,7 +172,7 @@ let compile_file_to_path ~ctx env names path =
     ~f:(fun key ->
       let open Core_type in
       let node = {
-        value = TypeValue.Unknown;
+        value = TypeExpr.Unknown;
         loc = Waterlang_lex.Loc.none;
         deps = [];
         check = none;

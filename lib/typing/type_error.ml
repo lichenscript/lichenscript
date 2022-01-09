@@ -8,15 +8,15 @@ type t = {
 }
 
 and spec =
-  | NotAssignable of TypeValue.t * TypeValue.t
-  | CannotReturn of TypeValue.t * TypeValue.t
+  | NotAssignable of TypeExpr.t * TypeExpr.t
+  | CannotReturn of TypeExpr.t * TypeExpr.t
   | CannotFindName of string
   | Redefinition of string
-  | NotCallable of TypeValue.t
-  | ParamsMismatch of TypeValue.t
-  | CannotPassParam of string * TypeValue.t * TypeValue.t
-  | CannotReadMember of string * TypeValue.t
-  | NotAddable of TypeSym.t * TypeSym.t
+  | NotCallable of TypeExpr.t
+  | ParamsMismatch of TypeExpr.t
+  | CannotPassParam of string * TypeExpr.t * TypeExpr.t
+  | CannotReadMember of string * TypeExpr.t
+  | NotAddable of TypeDef.t * TypeDef.t
   | CannotResolveTypeOfExpression
   | DeclareFunctionShouldSpecificExternal
 
@@ -28,7 +28,7 @@ exception Error of t
 module PP = struct
 
   let rec type_value ~ctx formatter ty_value =
-    let open TypeValue in
+    let open TypeExpr in
     match ty_value with
     | Unknown -> Format.pp_print_string formatter "unknown"
     | Any -> Format.pp_print_string formatter "any"
@@ -42,7 +42,7 @@ module PP = struct
     | Module _ -> Format.pp_print_string formatter "module"
     | Array _ -> Format.pp_print_string formatter "array"
     | TypeDef type_sym ->
-      TypeSym.pp formatter type_sym
+      TypeDef.pp formatter type_sym
 
   let error_spec formatter ~ctx spec =
     let pp_ty = type_value ~ctx in
@@ -75,7 +75,7 @@ module PP = struct
 
     | NotAddable (left ,right) ->
       Format.fprintf formatter "Type '%a' can not add '%a'"
-        TypeSym.pp left TypeSym.pp right
+        TypeDef.pp left TypeDef.pp right
 
     | CannotResolveTypeOfExpression ->
       Format.fprintf formatter "Can not resolve type of expression"
