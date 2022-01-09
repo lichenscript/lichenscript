@@ -1,6 +1,6 @@
 
 type provider = <
-  resolve: (string array * string array) -> int option
+  resolve: (string * string) -> int option
 >
 
 let default_provider: provider = object

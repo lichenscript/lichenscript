@@ -54,6 +54,7 @@ exception TypeCheckError of Type_error.t list
 module ModuleMap = Hashtbl.Make(String)
 
 type t = {
+  (* absolute path => module *)
   module_map: Module.t ModuleMap.t;
   find_paths: string list;
 }
@@ -66,8 +67,8 @@ let create ~find_paths () = {
 let _create_type_provider env : Type_provider.provider =
   object
 
-    method resolve (mod_arr, local_arr) =
-      let mod_id = Module.get_id_str mod_arr in
+    method resolve (mod_id, name) =
+      (* find module in find paths *)
       match ModuleMap.find env.module_map mod_id with
       | Some _mod -> (
         let files = Module.files _mod in
@@ -76,13 +77,10 @@ let _create_type_provider env : Type_provider.provider =
           ~f:(fun _ file ->
             let typed_tree = Option.value_exn (Module.(file.typed_tree)) in
             let { Typedtree. tprogram_scope; _ } = typed_tree in
-            if Array.length local_arr = 1 then (
-              let first_name = Array.get local_arr 0 in
-              match Scope.find_var_symbol tprogram_scope first_name with
-              | Some sym -> Base.Continue_or_stop.Stop (Some sym)
-              | None -> Base.Continue_or_stop.Continue None
-            ) else
-              Base.Continue_or_stop.Continue None
+            let first_name = name in
+            match Scope.find_var_symbol tprogram_scope first_name with
+            | Some sym -> Base.Continue_or_stop.Stop (Some sym)
+            | None -> Base.Continue_or_stop.Continue None
           )
           ~finish:(fun item -> item)
           files
@@ -140,18 +138,16 @@ let print_loc_title ~prefix loc_opt =
 
 let allow_suffix = Re.Pcre.regexp "^(.+)\\.wt$"
 
-let create_or_insert_moudule_file env ~id ~id_str file =
-  match ModuleMap.find env.module_map id_str with
+let insert_moudule_file env ~mod_path file =
+  match ModuleMap.find env.module_map mod_path with
   | Some m ->
     Module.add_file m file
 
   | None -> (
-    let m = Module.create ~id ~id_str () in
-    Module.add_file m file;
-    ModuleMap.set env.module_map ~key:id_str ~data:m
+    failwith (Format.sprintf "unexpected: can not find mod %s" mod_path)
   )
 
-let compile_file_to_path ~ctx env names path =
+let rec compile_file_to_path ~ctx ~mod_path env path =
   let file_content = In_channel.read_all path in
   let file_key = File_key.LibFile path in
   let ast =
@@ -160,6 +156,52 @@ let compile_file_to_path ~ctx env names path =
     | Result.Error err ->
       raise (ParseError err)
   in
+
+  let imports = Ast.(
+    let collected_imports =
+    List.fold
+      ~init:[]
+      ~f:(fun acc item ->
+        let open Ast.Declaration in
+        match item.spec with
+        | Import import -> import::acc
+        | _ -> acc
+      )
+      ast.tree.pprogram_declarations
+    in
+    let preclude = {
+      Ast.Declaration.
+      source = "std/preclude";
+      source_loc = Loc.none;
+    } in
+    List.rev (preclude::collected_imports)
+  ) in
+
+  List.iter
+    ~f:(fun import ->
+      let open Ast.Declaration in
+      let { source; _ } = import in
+      let find_paths = env.find_paths in
+      let result =
+        List.fold
+          ~init:None
+          ~f:(fun acc path ->
+            match acc with
+            | Some _ -> acc
+            | None ->
+              let path = Filename.concat path source in
+              if Sys.is_directory_exn path then (
+                Some path
+              ) else None
+          )
+          find_paths in
+      match result with
+      | Some path ->
+        parse_module_by_dir ~ctx env path
+      | None ->
+        failwith (Format.sprintf "can not find module %s" source)
+    )
+    imports;
 
   (* parse and create env, do annotation when all files are parsed
    * because annotation stage needs all exported symbols are resolved
@@ -183,8 +225,6 @@ let compile_file_to_path ~ctx env names path =
     pprogram_top_level.names
     ;
 
-  let id = names |> List.rev |> List.to_array in
-  let module_id_str = Module.get_id_str id in
   let file =
     { Module.
       path;
@@ -193,32 +233,30 @@ let compile_file_to_path ~ctx env names path =
       typed_tree = None;
     }
   in
-  create_or_insert_moudule_file env ~id ~id_str:module_id_str file
+  insert_moudule_file env ~mod_path file
 
 (* recursive all files in the path *)
-let parse_module_path ~ctx env path =
-  let rec iterate names path =
-    let children = Sys.ls_dir path in
+and parse_module_by_dir ~ctx env dir_path =
+  let iterate_parse_file mod_path =
+    ModuleMap.set env.module_map ~key:mod_path ~data:(Module.create ~full_path:mod_path ());
+    let children = Sys.ls_dir mod_path in
+    (* only compile files in this level *)
     List.iter
       ~f:(fun item ->
-        let child_path = Filename.concat path item in
+        let child_path = Filename.concat mod_path item in
         if Sys.is_file_exn child_path then (
           let test_result = Re.exec allow_suffix child_path |> Re.Group.all in
-          if Array.length test_result > 1 then  (* is a .wt file *)
-            compile_file_to_path ~ctx env names child_path
-          else ()
-        ) else if Sys.is_directory_exn child_path then (
-          let mod_name = last_piece_of_path child_path in
-          iterate (mod_name::names) child_path
-        )
+          if Array.length test_result > 1 then ((* is a .wt file *)
+            compile_file_to_path ~ctx ~mod_path env child_path
+          )
+        ) else ()
       )
       children
   in
-  let mod_root_name = last_piece_of_path path in
-  iterate [mod_root_name] path
-
-let parse_files_in_find_paths ~ctx env =
-  List.iter ~f:(parse_module_path ~ctx env) env.find_paths
+  let full_path = Filename.realpath dir_path in
+  if not (ModuleMap.mem env.module_map full_path) then (
+    iterate_parse_file full_path
+  )
 
 let annotate_all_modules env =
   ModuleMap.iter
@@ -283,13 +321,9 @@ let rec compile_file_path ~std_dir ~build_dir entry_file_path =
     let ctx = Waterlang_typing.Type_context.create () in
     let env = create ~find_paths:[ Option.value_exn std_dir ] () in
 
-    (* load standard library *)
-    (* parse_and_annotate_find_paths *)
-    parse_files_in_find_paths ~ctx env;
-
     (* parse the entry file *)
     let dir_of_entry = Filename.dirname entry_file_path in
-    parse_module_path ~ctx env dir_of_entry;
+    parse_module_by_dir ~ctx env dir_of_entry;
 
     typecheck_all_modules ~ctx env;
 

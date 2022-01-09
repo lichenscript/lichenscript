@@ -10,9 +10,7 @@ type file = {
 
 type t
 
-val get_id_str: string array -> string
-
-val create: id:string array -> id_str: string -> unit -> t
+val create: full_path: string -> unit -> t
 
 val add_file: t -> file -> unit
 

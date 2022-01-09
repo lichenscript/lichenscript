@@ -119,6 +119,7 @@ and codegen_declaration env decl =
   | Function_ _fun -> codegen_function env _fun
   | Declare _ -> ()
   | Enum _ -> ()
+  | Import _ -> ()
 
 and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
   let open Expression in

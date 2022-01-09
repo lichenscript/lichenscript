@@ -23,6 +23,8 @@ val errors: env -> Parse_error.t list
 
 val error : env -> Parse_error.spec -> unit
 
+val get_unexpected_error : ?expected:string -> Waterlang_lex.Token.t -> Parse_error.spec
+
 val error_unexpected : ?expected:string -> env -> unit
 
 val last_loc : env -> Waterlang_lex.Loc.t option

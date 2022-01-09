@@ -106,6 +106,27 @@ and parse_declaration env : Declaration.t =
     | Token.T_FUNCTION ->
       Function_ (parse_function env)
 
+    | Token.T_IMPORT -> (
+      Eat.token env;
+      let perr_loc = Peek.loc env in
+      let next = Peek.token env in
+      match next with
+      | Token.T_STRING (loc, content, _, _) -> (
+        Import {
+          source = content;
+          source_loc = loc;
+        }
+      )
+
+      | _ -> (
+        let perr_spec = Parser_env.get_unexpected_error next in
+        Parse_error.error {
+          perr_spec;
+          perr_loc;
+        }
+      )
+    )
+
     | Token.T_ENUM ->
       let parse_member env =
         let member_name = parse_identifier env in

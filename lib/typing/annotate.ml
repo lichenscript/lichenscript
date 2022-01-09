@@ -334,6 +334,8 @@ and annotate_declaration env decl : T.Declaration.t =
 
     | Enum enum -> T.Declaration.Enum enum
 
+    | Import import -> T.Declaration.Import import
+
   in
   { T.Declaration. spec; loc; attributes }
 
@@ -619,6 +621,8 @@ let annotate_program env (program: Ast.program) =
         )
 
         | Enum _ -> failwith "not implement"
+
+        | Import _ -> acc
         
       )
       tprogram_declarations

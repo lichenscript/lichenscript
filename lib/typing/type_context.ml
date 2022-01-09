@@ -27,7 +27,7 @@ let make_default_type_sym ctx scope =
     ("f32", Primitive);
     ("f64", Primitive);
     ("char", Primitive);
-    ("string", Object);
+    ("string", Primitive);  (* alias for String *)
     ("boolean", Primitive);
   |] in
   Array.iter

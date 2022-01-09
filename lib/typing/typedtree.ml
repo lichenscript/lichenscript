@@ -194,6 +194,7 @@ and Declaration : sig
     | Function_ of Function.t
     | Declare of declare
     | Enum of Ast.Enum.t
+    | Import of Ast.Declaration.import
     [@@deriving show]
 
   type t =

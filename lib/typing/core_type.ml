@@ -117,11 +117,22 @@ and TypeDef : sig
     enum_members: enum_member list;
   }
 
+  and _function = {
+    fun_params: TypeExpr.t list;
+    fun_return: TypeExpr.t;
+  }
+
+  and cls = {
+    properties: (string * t) list;
+    methods: (string * _function) list;
+  }
+
   and spec =
     | Primitive
-    | Object 
+    | Class of cls 
     | Alias of TypeExpr.t
     | Module_ of module_type
+    | Function of _function
     | Enum of enum_type
 
   and t = {
@@ -156,11 +167,22 @@ end = struct
     enum_members: enum_member list;
   }
 
+  and _function = {
+    fun_params: TypeExpr.t list;
+    fun_return: TypeExpr.t;
+  }
+
+  and cls = {
+    properties: (string * t) list;
+    methods: (string * _function) list;
+  }
+
   and spec =
     | Primitive
-    | Object
+    | Class of cls 
     | Alias of TypeExpr.t
     | Module_ of module_type
+    | Function of _function
     | Enum of enum_type
 
   and t = {

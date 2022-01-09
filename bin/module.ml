@@ -10,28 +10,13 @@ type file = {
 }
 
 type t = {
-  id: string array;
-  id_str: string;
+  mod_full_path: string;
   mutable files: file list;
 }
 
-let get_id_str id =
-  let buf = Buffer.create 64 in
-  let len = Array.length id in
-  let index = ref 0 in
-  while !index < len do
-    Buffer.add_string buf (Array.get id !index);
-    if !index < (len - 1) then (
-      Buffer.add_string buf "."
-    );
-    index := !index + 1;
-  done;
-  Buffer.contents buf
-
-let create ~id ~id_str () =
+let create ~full_path () =
   {
-    id;
-    id_str;
+    mod_full_path = full_path;
     files = [];
   }
 

@@ -254,11 +254,18 @@ and Declaration : sig
     | Cls_property of class_property
   [@@deriving show]
 
+  type import = {
+    source: string;
+    source_loc: Loc.t;
+  }
+  [@@deriving show]
+
   type spec =
     | Class of _class
     | Function_ of Function.t
     | Declare of declare
     | Enum of Enum.t
+    | Import of import
     [@@deriving show]
 
   type t = {
