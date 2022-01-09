@@ -369,7 +369,7 @@ module IntHash = Hashtbl.Make(Int)
 let type_check ctx _program =
   let size = Type_context.size ctx in
   let visited_mark = Array.create ~len:size false in
-  let reversed_map = IntHash.create () in
+  let reversed_map = Array.create ~len:size [] in
 
   let no_deps = ref [] in
 
@@ -389,11 +389,8 @@ let type_check ctx _program =
     | _ ->
       List.iter
         ~f:(fun dep ->
-          match IntHash.find reversed_map dep with
-          | Some exist ->
-            IntHash.set reversed_map ~key:dep ~data:(i::exist)
-          | None ->
-            IntHash.set reversed_map ~key:dep ~data:[i]
+          let exist = Array.get reversed_map dep in
+          Array.set reversed_map dep (i::exist)
         )
         deps
   done;
@@ -416,19 +413,16 @@ let type_check ctx _program =
       node.check node_id;
       Array.set visited_mark node_id true;
 
-      match IntHash.find reversed_map node_id with
-      | None -> ()
-      | Some arr -> (
-        List.iter
-        ~f:(fun id ->
-          let node = Type_context.get_node ctx id in
-          let deps = node.deps in
-          if is_all_id_satisfied deps then (
-            iterate_node id
-          )
+      let arr = Array.get reversed_map node_id in
+      List.iter
+      ~f:(fun id ->
+        let node = Type_context.get_node ctx id in
+        let deps = node.deps in
+        if is_all_id_satisfied deps then (
+          iterate_node id
         )
-        arr
       )
+      arr
     )
   in
 
