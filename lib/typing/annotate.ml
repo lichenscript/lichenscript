@@ -58,7 +58,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
 
       let scope = Env.peek_scope env in
       (* TODO: check redefinition? *)
-      scope#insert_var_symbol name sym_id;
+      scope#insert_var_symbol name { var_id = sym_id; var_kind = binding_kind };
 
       let binding_init = annotate_expression ~prev_deps env binding_init in
 
@@ -145,8 +145,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     | Identifier id -> (
       let ty_var_opt = (Env.peek_scope env)#find_var_symbol id.pident_name in
       match ty_var_opt with
-      | Some ty_var ->
-        ty_var, (T.Expression.Identifier (id.pident_name, ty_var))
+      | Some variable ->
+        variable.var_id, (T.Expression.Identifier (id.pident_name, variable.var_id))
       | _ ->
         let err_spec = Type_error.CannotFindName id.pident_name in
         let err = Type_error.make_error (Env.ctx env) id.pident_loc err_spec in
@@ -166,11 +166,11 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           let name = id.pident_name in
           let var_opt = (Env.peek_scope env)#find_var_symbol name in
           match var_opt with
-          | Some id -> (
+          | Some variable -> (
             { T.Expression.
-              callee_spec = ((name, id), List.rev acc);
+              callee_spec = ((name, variable.var_id), List.rev acc);
               callee_loc = loc;
-              callee_ty_var = id;
+              callee_ty_var = variable.var_id;
             }
           )
 
@@ -249,11 +249,29 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let pat, ty_int = annotate_pattern env pat in
       let ctx = Env.ctx env in
       let value = (TypeExpr.Ctor ((Env.ty_unit env), [])) in
+      let scope = Env.peek_scope env in
       let next_id = Type_context.new_id ctx {
         value;
         deps = [ expr.ty_var; ty_int ];
         loc;
-        check = none;
+        check = (fun _ ->
+          (match pat.spec with
+          | T.Pattern.Symbol (name, _) ->
+            let variable = Option.value_exn (scope#find_var_symbol name) in
+            match variable.var_kind with
+            | Ast.Pvar_const -> (
+              let err = Type_error.(make_error ctx loc CannotAssignToConstVar) in
+              raise (Type_error.Error err)
+            )
+            | _ -> ()
+          );
+          let sym_node = Type_context.get_node ctx ty_int in
+          let expr_node = Type_context.get_node ctx expr.ty_var in
+          if not (Check_helper.type_assinable ctx sym_node.value expr_node.value) then (
+            let err = Type_error.(make_error ctx loc (NotAssignable(sym_node.value, expr_node.value))) in
+            raise (Type_error.Error err)
+          )
+        );
       } in
       next_id, Assign(pat, expr)
     )
@@ -334,7 +352,7 @@ and annotate_declaration env decl : T.Declaration.t =
         let scope = Env.peek_scope env in
         let ty_id =
           match scope#find_var_symbol id.pident_name with
-          | Some v -> v
+          | Some v -> v.var_id
           | None -> failwith (Format.sprintf "unexpected: %s is not added to scope\n" id.pident_name)
         in
 
@@ -385,6 +403,11 @@ and annotate_declaration env decl : T.Declaration.t =
   in
   { T.Declaration. spec; loc; attributes }
 
+(*
+ * class annotation is done in two phase
+ * 1. scan all methods and properties, infer `this`
+ * 2. annotate all methods and collect dependencies
+ *)
 and annotate_class env cls =
   let open Ast.Declaration in
   (* let annotate_body_element elem =
@@ -520,7 +543,7 @@ and annotate_function env fun_ =
     if Option.is_none fun_id_opt then (
       failwith (Format.sprintf "unexpected: function id %s is not added in parsing stage" header.id.pident_name)
     );
-    let fun_id = Option.value_exn fun_id_opt in
+    let fun_id = (Option.value_exn fun_id_opt).var_id in
     let name_node = Type_context.get_node (Env.ctx env) fun_id in
     let fun_deps = ref [] in
 
@@ -547,7 +570,10 @@ and annotate_function env fun_ =
           match pat.spec with
           | T.Pattern.Symbol (name, _) -> name
         in
-        fun_scope#insert_var_symbol name param.param_ty;
+        fun_scope#insert_var_symbol name {
+          var_id = param.param_ty;
+          var_kind = Ast.Pvar_let;
+        };
       )
       params.params_content;
 

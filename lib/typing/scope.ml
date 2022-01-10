@@ -4,13 +4,18 @@ open Lichenscript_parsing
 module SymbolTable = Hashtbl.Make_binable(String)
 module ExportTable = Map.Make(String)
 
+type variable = {
+  var_id: int;
+  var_kind: Ast.var_kind;
+}
+
 class scope ?prev () = object
   val var_symbols = SymbolTable.create ()
   val type_symbols = SymbolTable.create ()
   val mutable export_map: Asttypes.visibility option ExportTable.t = ExportTable.empty;
   val mutable var_counter = 0
 
-  method find_var_symbol (name: string): int option =
+  method find_var_symbol (name: string): variable option =
     let tmp = SymbolTable.find var_symbols name in
     match tmp with
     | Some _ -> tmp
@@ -24,8 +29,8 @@ class scope ?prev () = object
     | None ->
       Option.(prev >>= (fun parent -> parent#find_type_symbol name))
 
-  method insert_var_symbol name (sym: int) =
-    SymbolTable.set var_symbols ~key:name ~data:sym
+  method insert_var_symbol name (var: variable) =
+    SymbolTable.set var_symbols ~key:name ~data:var
 
   method insert_type_symbol name (sym: int) =
     SymbolTable.set type_symbols ~key:name ~data:sym

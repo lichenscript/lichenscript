@@ -12,7 +12,7 @@ type file = {
 
 type export = {
   export_name: string;
-  export_ty_var: int;
+  export_var: Scope.variable;
 }
 
 (* prev export * new export *)
@@ -52,7 +52,7 @@ let finalize_module_exports env =
           | Some Asttypes.Pvisibility_public -> (
             let export = {
               export_name = name;
-              export_ty_var = ty_var;
+              export_var = ty_var;
             } in
             (match Hashtbl.find env.exports name with
             | Some old_export -> (

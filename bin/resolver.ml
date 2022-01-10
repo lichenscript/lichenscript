@@ -24,7 +24,7 @@ class module_scope ~prev env extern_modules = object
   inherit Scope.scope ~prev () as super
 
   (* override *)
-  method! find_var_symbol (name: string): int option =
+  method! find_var_symbol (name: string): Scope.variable option =
     let module_result = super#find_var_symbol name in
     match module_result with
     | Some _ -> module_result
@@ -42,7 +42,7 @@ class module_scope ~prev env extern_modules = object
               let open Module in
               match export with
               | Some export ->
-                Base.Continue_or_stop.Stop (Some export.export_ty_var)
+                Base.Continue_or_stop.Stop (Some export.export_var)
               | None ->
                 Base.Continue_or_stop.Continue None
             with

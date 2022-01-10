@@ -9,6 +9,7 @@ type t = {
 
 and spec =
   | NotAssignable of TypeExpr.t * TypeExpr.t
+  | CannotAssignToConstVar
   | CannotReturn of TypeExpr.t * TypeExpr.t
   | CannotFindName of string
   | Redefinition of string
@@ -49,6 +50,9 @@ module PP = struct
     match spec with
     | NotAssignable (be_assigned, assign) ->
       Format.fprintf formatter "Type '%a' is not assignable to type '%a'" pp_ty assign pp_ty be_assigned
+
+    | CannotAssignToConstVar ->
+      Format.fprintf formatter "Can not assign value to a const variable"
 
     | CannotReturn (expected, actual) ->
       Format.fprintf formatter "Type '%a' can not be returned because '%a' is expected" pp_ty actual pp_ty expected

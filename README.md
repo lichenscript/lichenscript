@@ -26,11 +26,29 @@ Webassembly(AKA WASM) provides excellent performance approching native speed, bu
 
 ## What's the different with Rust? Why not Rust?
 
-Waterlang is high level language.
+### LS do NOT use lifetime
+
+LS is high level language.
 I don't want the programmer to care about the detail
 of the memory such as liftime/smart pointer.
 
-Waterlang is designed to use the ecosystem of C++ in
+LS is designed to use the ecosystem of C++ in
 Computer Graphic. So comping to C is reasonable.
 
 It't not hard to support Rust in the future.
+
+### LS is more dynamic than Rust
+
+dynamic dispatch
+
+## What's different from JavaScript/TypeScript?
+
+### class private field are guaranteed by the type system
+
+Unlike JavaScript/TypeScipt, which is 'fake' private,
+LS's private is guaranteed, so you don't need a `#` syntax
+to implement real private field.
+
+### No exceptions and try/catch
+
+### More static

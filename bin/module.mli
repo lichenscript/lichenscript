@@ -12,7 +12,7 @@ type file = {
 
 type export = {
   export_name: string;
-  export_ty_var: int;
+  export_var: Scope.variable;
 }
 
 (* prev export * new export *)
