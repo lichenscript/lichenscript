@@ -1,10 +1,13 @@
 open Core_kernel
+open Lichenscript_parsing
 
 module SymbolTable = Hashtbl.Make_binable(String)
+module ExportTable = Map.Make(String)
 
 class scope ?prev () = object
   val var_symbols = SymbolTable.create ()
   val type_symbols = SymbolTable.create ()
+  val mutable export_map: Asttypes.visibility option ExportTable.t = ExportTable.empty;
   val mutable var_counter = 0
 
   method find_var_symbol (name: string): int option =
@@ -34,6 +37,12 @@ class scope ?prev () = object
 
   method vars =
     SymbolTable.to_alist var_symbols
+
+  method set_visibility name (visibility: Lichenscript_parsing.Asttypes.visibility option): unit =
+    export_map <- ExportTable.set export_map ~key:name ~data:visibility
+
+  method get_visibility name: Lichenscript_parsing.Asttypes.visibility option =
+    Option.join (ExportTable.find export_map name)
 
 end
 

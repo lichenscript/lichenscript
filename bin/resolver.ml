@@ -30,38 +30,28 @@ class module_scope ~prev env extern_modules = object
     | Some _ -> module_result
     | None -> (
       (* not in the local and prev, find the symbol in other modules *)
-      let tuples =
-        List.map
-        ~f:(fun extern_mod ->
-          try
-            let _mod = ModuleMap.find_exn env.module_map extern_mod in
-            let files = Module.files _mod in
-            let symbols = 
-              List.map
-              ~f:(fun file ->
-                let typed_env = file.typed_env in
-                let scope = Env.module_scope typed_env in
-                scope#vars
-              )
-              files
-            in
-            List.concat symbols
-          with
-          | _ ->
-            Format.eprintf "unexpected: find module failed: %s\n" extern_mod;
-            []
-        )
-        extern_modules
-        |> List.concat
-      in
-      List.find_map
-        tuples
-        ~f:(fun (sym_name, ty_var) ->
-          if (String.equal sym_name name) then
-            Some ty_var
+      List.fold_until
+        ~init:None
+        ~f:(fun acc extern_mod ->
+          if Option.is_some acc then
+            Base.Continue_or_stop.Stop acc
           else
-            None
+            try
+              let _mod = ModuleMap.find_exn env.module_map extern_mod in
+              let export = Module.find_export _mod ~name in
+              let open Module in
+              match export with
+              | Some export ->
+                Base.Continue_or_stop.Stop (Some export.export_ty_var)
+              | None ->
+                Base.Continue_or_stop.Continue None
+            with
+            | _ ->
+              Format.eprintf "unexpected: find module failed: %s\n" extern_mod;
+              Base.Continue_or_stop.Continue None
         )
+        ~finish:(fun item -> item)
+        extern_modules
     )
 
 end
@@ -211,7 +201,8 @@ let rec compile_file_to_path ~ctx ~mod_path env path =
 (* recursive all files in the path *)
 and parse_module_by_dir ~ctx env dir_path : string option =
   let iterate_parse_file mod_path =
-    ModuleMap.set env.module_map ~key:mod_path ~data:(Module.create ~full_path:mod_path ());
+    let _mod = Module.create ~full_path:mod_path () in
+    ModuleMap.set env.module_map ~key:mod_path ~data:_mod;
     let children = Sys.ls_dir mod_path in
     (* only compile files in this level *)
     List.iter
@@ -219,12 +210,13 @@ and parse_module_by_dir ~ctx env dir_path : string option =
         let child_path = Filename.concat mod_path item in
         if Sys.is_file_exn child_path then (
           let test_result = Re.exec allow_suffix child_path |> Re.Group.all in
-          if Array.length test_result > 1 then ((* is a .bud file *)
+          if Array.length test_result > 1 then ((* is a .lc file *)
             compile_file_to_path ~ctx ~mod_path env child_path
           )
         ) else ()
       )
-      children
+      children;
+    Module.finalize_module_exports _mod;
   in
   let full_path = Filename.realpath dir_path in
   if not (ModuleMap.mem env.module_map full_path) then (

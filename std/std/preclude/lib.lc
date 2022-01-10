@@ -1,6 +1,6 @@
 
 @external("wt_std_print")
-declare function print(content: string);
+public declare function print(content: string);
 
 enum Option<A> {
     Some(A),
