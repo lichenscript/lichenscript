@@ -69,25 +69,25 @@ typedef struct WTValue {
 static WTValue WTTrue = { { .int_val = 1 }, WT_TY_BOOL };
 static WTValue WTFalse = { { .int_val = 0 }, WT_TY_BOOL };
 
-#define MK_NULL() (WTValue) { { .int_val = 0 }, WT_TY_NULL }
-#define MK_I32(v) (WTValue) { { .int_val = v }, WT_TY_I32 }
-#define MK_F32(v) (WTValue) { { .float_val = v }, WT_TY_F32 }
-#define MK_BOOL(v) (WTValue) { { .int_val = v }, WT_TY_BOOL }
+#define MK_NULL() ((WTValue) { { .int_val = 0 }, WT_TY_NULL })
+#define MK_I32(v) ((WTValue) { { .int_val = v }, WT_TY_I32 })
+#define MK_F32(v) ((WTValue) { { .float_val = v }, WT_TY_F32 })
+#define MK_BOOL(v) ((WTValue) { { .int_val = v }, WT_TY_BOOL })
 #define MK_VARIANT_CLOSED(v) (WTValue) { { .int_val = v }, (WT_TY_MAX + (v << 6)) }
-#define WT_I32_EQ(l, r) MK_BOOL(l.int_val == r.int_val)
-#define WT_I32_NOT_EQ(l, r) MK_BOOL(l.int_val != r.int_val)
-#define WT_I32_LT(l, r) MK_BOOL(l.int_val < r.int_val)
-#define WT_I32_LTEQ(l, r) MK_BOOL(l.int_val <= r.int_val)
-#define WT_I32_GT(l, r) MK_BOOL(l.int_val > r.int_val)
-#define WT_I32_GTEQ(l, r) MK_BOOL(l.int_val >= r.int_val)
-#define WT_I32_PLUS(l, r) MK_I32(l.int_val + r.int_val)
-#define WT_I32_MINUS(l, r) MK_I32(l.int_val - r.int_val)
-#define WT_I32_MULT(l, r) MK_I32(l.int_val * r.int_val)
-#define WT_I32_DIV(l, r) MK_I32(l.int_val / r.int_val)
-#define WT_I32_LEFT_SHIFT(l, r) MK_I32(l.int_val << r.int_val)
-#define WT_I32_RIGHT_SHIFT(l, r) MK_I32(l.int_val >> r.int_val)
-#define WT_I32_BIT_OR(l, r) MK_I32(l.int_val | r.int_val)
-#define WT_I32_BIT_AND(l, r) MK_I32(l.int_val & r.int_val)
+#define WT_I32_EQ(l, r) MK_BOOL((l).int_val == (r).int_val)
+#define WT_I32_NOT_EQ(l, r) MK_BOOL((l).int_val != (r).int_val)
+#define WT_I32_LT(l, r) MK_BOOL((l).int_val < (r).int_val)
+#define WT_I32_LTEQ(l, r) MK_BOOL((l).int_val <= (r).int_val)
+#define WT_I32_GT(l, r) MK_BOOL((l).int_val > (r).int_val)
+#define WT_I32_GTEQ(l, r) MK_BOOL((l).int_val >= (r).int_val)
+#define WT_I32_PLUS(l, r) MK_I32((l).int_val + (r).int_val)
+#define WT_I32_MINUS(l, r) MK_I32((l).int_val - (r).int_val)
+#define WT_I32_MULT(l, r) MK_I32((l).int_val * (r).int_val)
+#define WT_I32_DIV(l, r) MK_I32((l).int_val / (r).int_val)
+#define WT_I32_LEFT_SHIFT(l, r) MK_I32((l).int_val << (r).int_val)
+#define WT_I32_RIGHT_SHIFT(l, r) MK_I32((l).int_val >> (r).int_val)
+#define WT_I32_BIT_OR(l, r) MK_I32((l).int_val | (r).int_val)
+#define WT_I32_BIT_AND(l, r) MK_I32((l).int_val & (r).int_val)
 
 #endif
 

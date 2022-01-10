@@ -59,10 +59,19 @@ let pss env content = Buffer.add_string env.stmt_buffer content
 
 let endl env = ps env "\n"
 
+let endl_s env = pss env "\n"
+
 let print_indents env =
   let count = ref 0 in
   while !count < env.indent_level do
     ps env env.indent;
+    count := !count + 1
+  done
+
+let print_indents_s env =
+  let count = ref 0 in
+  while !count < env.env.indent_level do
+    pss env env.env.indent;
     count := !count + 1
   done
 
@@ -86,7 +95,21 @@ let rec codegen_statement (env: stmt_env) stmt =
     codegen_expression env expr;
     pss env ";"
   )
-  | While _ -> ()
+
+  | While { while_test; while_block; _ } -> (
+    pss env "while (";
+    codegen_expression env while_test;
+    pss env ".int_val";
+    pss env ") {";
+    endl_s env;
+    with_indent env.env (fun () ->
+      List.iter ~f:(codegen_statement env) while_block.body
+    );
+    endl_s env;
+    print_indents_s env;
+    pss env "}";
+    endl_s env
+  )
 
   | Binding binding -> (
     let { binding_pat; binding_init; _ } = binding in
