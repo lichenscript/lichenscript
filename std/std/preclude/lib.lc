@@ -1,5 +1,5 @@
 
-@external("wt_std_print")
+@external("lc_std_print")
 public declare function print(content: string);
 
 enum Option<A> {

@@ -2,186 +2,186 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-typedef void*(*WTMalloc)(size_t);
-typedef void(*WTFree)(void*);
+typedef void*(*LCMalloc)(size_t);
+typedef void(*LCFree)(void*);
 
-#define WT_NO_GC 0xFFFFFFFF
+#define LC_NO_GC 0xFFFFFFFF
 
-typedef enum WTObjectType {
-    WT_TY_BOOL = -3,
-    WT_TY_F32 = -2,
-    WT_TY_I32 = -1,
-    WT_TY_NULL = 0,
-    WT_TY_STRING = 1,
-    WT_TY_SYMBOL,
-    WT_TY_LAMBDA,
-    WT_TY_CLASS_OBJECT_META,
-    WT_TY_ARRAY = 16,
-    WT_TY_CLASS_OBJECT,
-    WT_TY_BOXED_I64 = 24,
-    WT_TY_BOXED_U64,
-    WT_TY_BOXED_F64,
-    WT_TY_MAX = 63,
-} WTObjectType;
+typedef enum LCObjectType {
+    LC_TY_BOOL = -3,
+    LC_TY_F32 = -2,
+    LC_TY_I32 = -1,
+    LC_TY_NULL = 0,
+    LC_TY_STRING = 1,
+    LC_TY_SYMBOL,
+    LC_TY_LAMBDA,
+    LC_TY_CLASS_OBJECT_META,
+    LC_TY_ARRAY = 16,
+    LC_TY_CLASS_OBJECT,
+    LC_TY_BOXED_I64 = 24,
+    LC_TY_BOXED_U64,
+    LC_TY_BOXED_F64,
+    LC_TY_MAX = 63,
+} LCObjectType;
 
-#define WT_OBJ_HEADER WTObjectHeader header;
+#define LC_OBJ_HEADER LCObjectHeader header;
 
-typedef struct WTObjectHeader {
+typedef struct LCObjectHeader {
     uint32_t     count;
-} WTObjectHeader;
+} LCObjectHeader;
 
-typedef struct WTObject {
-    WT_OBJ_HEADER
-} WTObject;
+typedef struct LCObject {
+    LC_OBJ_HEADER
+} LCObject;
 
 // #if INTPTR_MAX >= INT64_MAX
-// #define WT_PTR64
+// #define LC_PTR64
 // #endif
 
-#ifdef WT_PTR64
+#ifdef LC_PTR64
 
-// in 64bit mode, WTValue is 128bit
+// in 64bit mode, LCValue is 128bit
 // int64_t and double are encoded in the value
-typedef struct WTValue {
-    WTObjectType type;
+typedef struct LCValue {
+    LCObjectType type;
     union {
         int32_t   i32_val;  // bool
         float     f32_val;
-        WTObject* ptr_val;
+        LCObject* ptr_val;
         double    f64_val;
         int64_t   i64_val;
     };
-} WTValue;
+} LCValue;
 
 #else
 
-// in 64bit mode, WTValue is 128bit
+// in 64bit mode, LCValue is 128bit
 // int64_t and double are encoded in the value
-typedef struct WTValue {
+typedef struct LCValue {
     union {
         int       int_val;  // bool
         float     float_val;
-        WTObject* ptr_val;
+        LCObject* ptr_val;
     };
-    WTObjectType type;
-} WTValue;
+    LCObjectType type;
+} LCValue;
 
-static WTValue WTTrue = { { .int_val = 1 }, WT_TY_BOOL };
-static WTValue WTFalse = { { .int_val = 0 }, WT_TY_BOOL };
+static LCValue LCTrue = { { .int_val = 1 }, LC_TY_BOOL };
+static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 
-#define MK_NULL() ((WTValue) { { .int_val = 0 }, WT_TY_NULL })
-#define MK_I32(v) ((WTValue) { { .int_val = v }, WT_TY_I32 })
-#define MK_F32(v) ((WTValue) { { .float_val = v }, WT_TY_F32 })
-#define MK_BOOL(v) ((WTValue) { { .int_val = v }, WT_TY_BOOL })
-#define MK_VARIANT_CLOSED(v) (WTValue) { { .int_val = v }, (WT_TY_MAX + (v << 6)) }
-#define WT_I32_EQ(l, r) MK_BOOL((l).int_val == (r).int_val)
-#define WT_I32_NOT_EQ(l, r) MK_BOOL((l).int_val != (r).int_val)
-#define WT_I32_LT(l, r) MK_BOOL((l).int_val < (r).int_val)
-#define WT_I32_LTEQ(l, r) MK_BOOL((l).int_val <= (r).int_val)
-#define WT_I32_GT(l, r) MK_BOOL((l).int_val > (r).int_val)
-#define WT_I32_GTEQ(l, r) MK_BOOL((l).int_val >= (r).int_val)
-#define WT_I32_PLUS(l, r) MK_I32((l).int_val + (r).int_val)
-#define WT_I32_MINUS(l, r) MK_I32((l).int_val - (r).int_val)
-#define WT_I32_MULT(l, r) MK_I32((l).int_val * (r).int_val)
-#define WT_I32_DIV(l, r) MK_I32((l).int_val / (r).int_val)
-#define WT_I32_LEFT_SHIFT(l, r) MK_I32((l).int_val << (r).int_val)
-#define WT_I32_RIGHT_SHIFT(l, r) MK_I32((l).int_val >> (r).int_val)
-#define WT_I32_BIT_OR(l, r) MK_I32((l).int_val | (r).int_val)
-#define WT_I32_BIT_AND(l, r) MK_I32((l).int_val & (r).int_val)
+#define MK_NULL() ((LCValue) { { .int_val = 0 }, LC_TY_NULL })
+#define MK_I32(v) ((LCValue) { { .int_val = v }, LC_TY_I32 })
+#define MK_F32(v) ((LCValue) { { .float_val = v }, LC_TY_F32 })
+#define MK_BOOL(v) ((LCValue) { { .int_val = v }, LC_TY_BOOL })
+#define MK_VARIANT_CLOSED(v) (LCValue) { { .int_val = v }, (LC_TY_MAX + (v << 6)) }
+#define LC_I32_EQ(l, r) MK_BOOL((l).int_val == (r).int_val)
+#define LC_I32_NOT_EQ(l, r) MK_BOOL((l).int_val != (r).int_val)
+#define LC_I32_LT(l, r) MK_BOOL((l).int_val < (r).int_val)
+#define LC_I32_LTEQ(l, r) MK_BOOL((l).int_val <= (r).int_val)
+#define LC_I32_GT(l, r) MK_BOOL((l).int_val > (r).int_val)
+#define LC_I32_GTEQ(l, r) MK_BOOL((l).int_val >= (r).int_val)
+#define LC_I32_PLUS(l, r) MK_I32((l).int_val + (r).int_val)
+#define LC_I32_MINUS(l, r) MK_I32((l).int_val - (r).int_val)
+#define LC_I32_MULT(l, r) MK_I32((l).int_val * (r).int_val)
+#define LC_I32_DIV(l, r) MK_I32((l).int_val / (r).int_val)
+#define LC_I32_LEFT_SHIFT(l, r) MK_I32((l).int_val << (r).int_val)
+#define LC_I32_RIGHT_SHIFT(l, r) MK_I32((l).int_val >> (r).int_val)
+#define LC_I32_BIT_OR(l, r) MK_I32((l).int_val | (r).int_val)
+#define LC_I32_BIT_AND(l, r) MK_I32((l).int_val & (r).int_val)
 
 #endif
 
-typedef struct WTString {
-    WT_OBJ_HEADER
+typedef struct LCString {
+    LC_OBJ_HEADER
     uint32_t length;
     uint32_t hash;
     unsigned char content[];
-} WTString;
+} LCString;
 
-typedef struct WTSymbolBucket {
-    WTValue content;
-    struct WTSymbolBucket* next;
-} WTSymbolBucket;
+typedef struct LCSymbolBucket {
+    LCValue content;
+    struct LCSymbolBucket* next;
+} LCSymbolBucket;
 
-typedef struct WTBox64 {
-    WT_OBJ_HEADER
+typedef struct LCBox64 {
+    LC_OBJ_HEADER
     union {
         int64_t  i64;
         uint64_t u64;
         double   f64;
     };
-} WTBox64;
+} LCBox64;
 
-typedef struct WTRuntime {
-    WTMalloc malloc_method;
-    WTFree free_method;
+typedef struct LCRuntime {
+    LCMalloc malloc_method;
+    LCFree free_method;
     uint32_t seed;
-    WTSymbolBucket* symbol_buckets;
+    LCSymbolBucket* symbol_buckets;
     uint32_t symbol_bucket_size;
     uint32_t symbol_len;
-    WTValue* i64_pool;
-} WTRuntime;
+    LCValue* i64_pool;
+} LCRuntime;
 
-typedef WTValue (*WTCFunction)(WTRuntime* rt, WTValue this, int32_t arg_len, WTValue* args);
+typedef LCValue (*LCCFunction)(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args);
 
-typedef struct WTProgram {
-    WTRuntime* runtime;
-    WTCFunction main_fun;
-} WTProgram;
+typedef struct LCProgram {
+    LCRuntime* runtime;
+    LCCFunction main_fun;
+} LCProgram;
 
-WTValue WTRunMain(WTProgram* program);
+LCValue LCRunMain(LCProgram* program);
 
-WTRuntime* WTNewRuntime();
-void WTFreeRuntime(WTRuntime* rt);
+LCRuntime* LCNewRuntime();
+void LCFreeRuntime(LCRuntime* rt);
 
-void WTRetain(WTValue obj);
-void WTRelease(WTRuntime* rt, WTValue obj);
+void LCRetain(LCValue obj);
+void LCRelease(LCRuntime* rt, LCValue obj);
 
-typedef struct WTLambda {
-    WT_OBJ_HEADER
+typedef struct LCLambda {
+    LC_OBJ_HEADER
     void*   c_fun;
     size_t  captured_values_size;
-    WTValue captured_values[];
-} WTLambda;
+    LCValue captured_values[];
+} LCLambda;
 
-WTValue WTNewStringFromCStringLen(WTRuntime* rt, const unsigned char* content, uint32_t len);
-WTValue WTNewStringFromCString(WTRuntime* rt, const unsigned char* content);
+LCValue LCNewStringFromCStringLen(LCRuntime* rt, const unsigned char* content, uint32_t len);
+LCValue LCNewStringFromCString(LCRuntime* rt, const unsigned char* content);
 
-WTValue WTNewSymbolLen(WTRuntime* rt, const char* content, uint32_t len);
-WTValue WTNewSymbol(WTRuntime* rt, const char* content);
+LCValue LCNewSymbolLen(LCRuntime* rt, const char* content, uint32_t len);
+LCValue LCNewSymbol(LCRuntime* rt, const char* content);
 
-typedef struct WTArray {
-    WT_OBJ_HEADER
+typedef struct LCArray {
+    LC_OBJ_HEADER
     uint32_t len;
     uint32_t capacity;
-    WTValue* data;
-} WTArray;
+    LCValue* data;
+} LCArray;
 
 // A global unique ID for class method
-typedef uint64_t WTClassObjectMethodID;
+typedef uint64_t LCClassObjectMethodID;
 
-typedef struct WTClassObjectMethod {
-    WTClassObjectMethodID id;
+typedef struct LCClassObjectMethod {
+    LCClassObjectMethodID id;
     const char* name;
     void* fun_ptr;
-    struct WTClassObjectMethod* next;
-} WTClassObjectMethod;
+    struct LCClassObjectMethod* next;
+} LCClassObjectMethod;
 
-typedef struct WTClassObjectMeta {
-    WT_OBJ_HEADER
+typedef struct LCClassObjectMeta {
+    LC_OBJ_HEADER
     const char* name;  // class name
-    WTClassObjectMethod* methods;
-} WTClassObjectMeta;
+    LCClassObjectMethod* methods;
+} LCClassObjectMeta;
 
 // ClassClassObjectMethodString("hello")  // slow
 // ClassClassObjectMethodID(123)  // quick
-typedef struct WTClassObject {
-    WT_OBJ_HEADER
-    WTClassObjectMeta* meta;
+typedef struct LCClassObject {
+    LC_OBJ_HEADER
+    LCClassObjectMeta* meta;
     size_t    properties_size;
-    WTValue   properties[];
-} WTClassObject;
+    LCValue   properties[];
+} LCClassObject;
 
-WTClassObject* WTNewClassObject(WTRuntime* rt, WTClassObjectMeta* meta, uint32_t slot_count);
+LCClassObject* LCNewClassObject(LCRuntime* rt, LCClassObjectMeta* meta, uint32_t slot_count);
 
-WTValue wt_std_print(WTRuntime* rt, WTValue this, int arg_len, WTValue* args);
+LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
