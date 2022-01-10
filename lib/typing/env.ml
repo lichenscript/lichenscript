@@ -75,3 +75,5 @@ let ty_char = unwrap_global_type "char"
 let ty_string = unwrap_global_type "string"
 
 let ty_boolean = unwrap_global_type "boolean"
+
+let ty_unit = unwrap_global_type "unit"

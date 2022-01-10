@@ -27,11 +27,8 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       let expr = annotate_expression ~prev_deps env expr in 
       let ty_var = T.Expression.(expr.ty_var) in
 
-      let root_scope = Type_context.root_scope (Env.ctx env) in
-      let _unit = Option.value_exn ~message:"unit type" (root_scope#find_var_symbol "unit") in
-
       let node = {
-        value = TypeExpr.Ctor(_unit, []);
+        value = TypeExpr.Ctor((Env.ty_unit env), []);
         loc;
         deps = [ty_var];
         check = none;  (* TODO: check expr is empty *)
@@ -41,7 +38,13 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       [id], (T.Statement.Semi expr)
     )
 
-    | While _ -> prev_deps, failwith "not implment"
+    | While _while -> (
+      let { while_test; while_block; while_loc } = _while in
+      let while_test = annotate_expression ~prev_deps env while_test in
+      let while_block = annotate_block ~prev_deps:[while_test.ty_var] env while_block in
+      let next_desp = [ while_block.return_ty ] in
+      next_desp, T.Statement.While { while_test; while_block; while_loc }
+    )
 
     | Binding binding -> (
       let { binding_kind; binding_pat; binding_init; binding_loc; _ } = binding in
@@ -58,6 +61,17 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       scope#insert_var_symbol name sym_id;
 
       let binding_init = annotate_expression ~prev_deps env binding_init in
+
+      let ctx = Env.ctx env in
+      let node = Type_context.get_node ctx sym_id in
+      Type_context.update_node ctx sym_id {
+        node with
+        deps = List.append node.deps [binding_init.ty_var];
+        check = (fun id ->
+          let expr_node = Type_context.get_node ctx binding_init.ty_var in
+          Type_context.update_node_type ctx id expr_node.value
+        )
+      };
 
       [sym_id], T.Statement.Binding { T.Statement.
         binding_kind;
@@ -228,8 +242,22 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       id, (T.Expression.Binary(op, left, right))
     )
 
-    | Update _
-    | Assign _ -> -1, failwith "not implemented"
+    | Update _ -> -1, failwith "not implemented"
+
+    | Assign (pat, expr) -> (
+      let expr = annotate_expression ~prev_deps env expr in
+      let pat, ty_int = annotate_pattern env pat in
+      let ctx = Env.ctx env in
+      let value = (TypeExpr.Ctor ((Env.ty_unit env), [])) in
+      let next_id = Type_context.new_id ctx {
+        value;
+        deps = [ expr.ty_var; ty_int ];
+        loc;
+        check = none;
+      } in
+      next_id, Assign(pat, expr)
+    )
+
     | Block block -> (
       let block = annotate_block ~prev_deps env block in
       T.Block.(block.return_ty), (T.Expression.Block block)
@@ -267,9 +295,8 @@ and annotate_block ~prev_deps env block : T.Block.t =
       )
 
       | _ -> (
-        let root_scope = Type_context.root_scope ctx in
-        let none_type = Option.value_exn (root_scope#find_type_symbol "unit") in
-        Type_context.update_node_type ctx id (TypeExpr.Ctor (none_type, []))
+        let unit_type = Env.ty_unit env in
+        Type_context.update_node_type ctx id (TypeExpr.Ctor (unit_type, []))
       )
     );
   } in
