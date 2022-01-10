@@ -407,7 +407,7 @@ and annotate_class env cls =
 
   let class_scope = new scope ~prev:(Env.peek_scope env) () in
   Env.with_new_scope env class_scope (fun env ->
-    let { cls_id; cls_visibility; cls_type_vars = _; cls_loc; cls_body; cls_comments } = cls in
+    let { cls_id; cls_visibility; cls_type_vars = _; cls_loc; cls_body; cls_comments; _ } = cls in
     let cls_id = annotate_identifer env cls_id in
     let cls_body = annotate_class_body cls_body in
     { T.Declaration. cls_id; cls_visibility; cls_body; cls_loc; cls_comments; }

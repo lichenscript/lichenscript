@@ -590,9 +590,20 @@ and parse_class ~visibility env : Declaration._class =
       parse_type_vars env
     else []
   in
+
+  let cls_extends =
+    if Peek.token env = Token.T_EXTENDS then (
+      Eat.token env;
+      let ext_id = parse_identifier env in
+      Some ext_id
+    ) else
+      None
+  in
+
   let body = parse_class_body env in
   {
     cls_visibility = visibility;
+    cls_extends;
     cls_id = id;
     cls_type_vars;
     cls_loc = with_start_loc env start_loc;
