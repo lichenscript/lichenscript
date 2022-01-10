@@ -5,7 +5,7 @@ open Core_kernel
  * to avoid scan again in annotation stage.
  *)
 type t = {
-  names: (string, Asttypes.visibility) Hashtbl.t;
+  names: (string, Asttypes.visibility option) Hashtbl.t;
 }
 
 let create () = {

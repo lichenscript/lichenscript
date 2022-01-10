@@ -156,6 +156,7 @@ and Declaration : sig
   | DeclFunction of Function.header
 
   and declare = {
+    decl_visibility: Asttypes.visibility option;
     decl_spec: declare_spec;
     decl_loc: Loc.t;
     decl_ty_var: int;
@@ -163,6 +164,7 @@ and Declaration : sig
 
   and _class = {
     cls_id: (string * int);
+    cls_visibility: Asttypes.visibility option;
     cls_loc: Loc.t;
     cls_body: class_body;
     cls_comments:  Loc.t Lichenscript_lex.Comment.t list;

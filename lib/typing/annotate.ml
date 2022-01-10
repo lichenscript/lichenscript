@@ -292,7 +292,7 @@ and annotate_declaration env decl : T.Declaration.t =
     | Function_ _fun -> T.Declaration.Function_ (annotate_function env _fun)
 
     | Declare declare -> (
-      let { decl_spec; decl_loc } = declare in
+      let { decl_spec; decl_visibility; decl_loc } = declare in
       match decl_spec with
       | DeclFunction declare_fun -> (
         let { Ast.Function. id; params; _ } = declare_fun in
@@ -338,6 +338,7 @@ and annotate_declaration env decl : T.Declaration.t =
 
         T.Declaration.Declare {
           T.Declaration.
+          decl_visibility;
           decl_ty_var = ty_id;
           decl_spec = T.Declaration.DeclFunction header;
           decl_loc;
@@ -374,10 +375,10 @@ and annotate_class env cls =
 
   let class_scope = new scope ~prev:(Env.peek_scope env) () in
   Env.with_new_scope env class_scope (fun env ->
-    let { cls_id; cls_type_vars = _; cls_loc; cls_body; cls_comments } = cls in
+    let { cls_id; cls_visibility; cls_type_vars = _; cls_loc; cls_body; cls_comments } = cls in
     let cls_id = annotate_identifer env cls_id in
     let cls_body = annotate_class_body cls_body in
-    { T.Declaration. cls_id; cls_body; cls_loc; cls_comments; }
+    { T.Declaration. cls_id; cls_visibility; cls_body; cls_loc; cls_comments; }
   )
 
 and annotate_identifer env ident =

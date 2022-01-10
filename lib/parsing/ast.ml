@@ -195,6 +195,7 @@ and Enum : sig
   [@@deriving show]
 
   type t = {
+    visibility: Asttypes.visibility option;
     name: Identifier.t;
     type_vars: Identifier.t list;
     members: member list;
@@ -212,16 +213,18 @@ and Declaration : sig
   | DeclFunction of Function.header
 
   and declare = {
+    decl_visibility: Asttypes.visibility option;
     decl_spec: declare_spec;
     decl_loc: Loc.t;
   }
 
   and _class = {
-    cls_id:        Identifier.t;
-    cls_type_vars: Identifier.t list;
-    cls_loc:       Loc.t;
-    cls_body:      class_body;
-    cls_comments:  Loc.t Lichenscript_lex.Comment.t list;
+    cls_id:         Identifier.t;
+    cls_visibility: Asttypes.visibility option;
+    cls_type_vars:  Identifier.t list;
+    cls_loc:        Loc.t;
+    cls_body:       class_body;
+    cls_comments:   Loc.t Lichenscript_lex.Comment.t list;
   }
 
   and class_body = {

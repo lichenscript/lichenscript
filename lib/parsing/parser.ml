@@ -100,12 +100,6 @@ and parse_declaration env : Declaration.t =
   let next = Peek.token env in
   let spec: Declaration.spec =
     match next with
-    | Token.T_CLASS ->
-      Class (parse_class env)
-
-    | Token.T_FUNCTION ->
-      Function_ (parse_function env)
-
     | Token.T_IMPORT -> (
       Eat.token env;
       let perr_loc = Peek.loc env in
@@ -127,85 +121,7 @@ and parse_declaration env : Declaration.t =
       )
     )
 
-    | Token.T_ENUM ->
-      let parse_member env =
-        let member_name = parse_identifier env in
-        let fields =
-          if (Peek.token env) == Token.T_LPAREN then (
-            let result = ref [] in
-            Eat.token env;
-
-            while (Peek.token env) <> Token.T_RPAREN do
-              let ty = parse_type env in
-              result := ty::(!result);
-              if (Peek.token env) <> Token.T_RPAREN then (
-                Expect.token env Token.T_COMMA
-              )
-            done;
-
-            Expect.token env Token.T_RPAREN;
-            List.rev !result
-          ) else
-            []
-        in
-
-        { Enum.
-          member_name;
-          fields;
-        }
-      in
-      let start_loc = Peek.loc env in
-      Eat.token env;
-      let name = parse_identifier env in
-
-      let type_vars =
-        if Peek.token env = Token.T_LESS_THAN then
-          parse_type_vars env
-        else
-          []
-      in
-
-      let members = ref [] in
-      Expect.token env Token.T_LCURLY;
-
-      while (Peek.token env) <> Token.T_RCURLY && (Peek.token env) <> Token.T_EOF do
-        let member = parse_member env in
-        members := member::(!members);
-
-        if (Peek.token env) <> Token.T_RCURLY then (
-          Expect.token env Token.T_COMMA
-        );
-
-      done;
-
-      Expect.token env Token.T_RCURLY;
-      Enum { Enum.
-        name;
-        type_vars;
-        members = List.rev !members;
-        loc = with_start_loc env start_loc;
-      }
-
-    | Token.T_DECLARE ->
-      begin
-        Eat.token env;
-        let function_header = parse_function_header env in
-        let spec = Declaration.DeclFunction function_header in
-
-        let name = function_header.id.pident_name in
-        Parser_env.add_top_level env ~name ~visibility:Asttypes.Pvisibility_public;
-
-        if Peek.token env = Token.T_SEMICOLON then (
-          Eat.token env
-        );
-
-        Declaration.Declare {
-          decl_spec = spec;
-          decl_loc = with_start_loc env start_loc;
-        }
-      end
-
-    | Token.T_PUBLIC
+    (* | Token.T_PUBLIC
     | Token.T_PROTECTED
     | Token.T_PRIVATE ->
       begin
@@ -251,18 +167,133 @@ and parse_declaration env : Declaration.t =
           in
           Parse_error.error err
         )
-      end
+      end *)
 
-    | _ ->
-      Format.eprintf "false token %s\n" (Token.value_of_token (Peek.token env));
-      let lex_error = Lichenscript_lex.Lex_error.Unexpected (Token.value_of_token (Peek.token env)) in
-      let parse_error = {
-        Parse_error.
-        perr_spec = Parse_error.LexError lex_error;
-        perr_loc = (Peek.loc env);
-      } in
+    | _ -> (
+      let open Asttypes in
+      let visibility =
+        match next with
+        | Token.T_PUBLIC ->
+          Eat.token env;
+          Some Pvisibility_public
 
-      Parse_error.error parse_error
+        | Token.T_PROTECTED ->
+          Eat.token env;
+          Some Pvisibility_protected
+
+        | Token.T_PRIVATE ->
+          Eat.token env;
+          Some Pvisibility_private
+
+        | _ -> None
+      in
+      let next = Peek.token env in
+      match next with
+      | Token.T_CLASS ->
+        Class (parse_class ~visibility env)
+
+      | Token.T_FUNCTION -> (
+        let _fun = parse_function ~visibility env in
+
+        let { Function. header = { id; _ }; _ } = _fun in
+        let name = id.pident_name in
+
+        Parser_env.add_top_level env ~name ~visibility;
+
+        Function_ _fun
+      )
+
+      | Token.T_DECLARE ->
+        begin
+          Eat.token env;
+          let function_header = parse_function_header env in
+          let spec = Declaration.DeclFunction function_header in
+
+          let name = function_header.id.pident_name in
+          Parser_env.add_top_level env ~name ~visibility;
+
+          if Peek.token env = Token.T_SEMICOLON then (
+            Eat.token env
+          );
+
+          Declaration.Declare {
+            decl_visibility = visibility;
+            decl_spec = spec;
+            decl_loc = with_start_loc env start_loc;
+          }
+        end
+
+      | Token.T_ENUM ->
+        let parse_member env =
+          let member_name = parse_identifier env in
+          let fields =
+            if (Peek.token env) == Token.T_LPAREN then (
+              let result = ref [] in
+              Eat.token env;
+
+              while (Peek.token env) <> Token.T_RPAREN do
+                let ty = parse_type env in
+                result := ty::(!result);
+                if (Peek.token env) <> Token.T_RPAREN then (
+                  Expect.token env Token.T_COMMA
+                )
+              done;
+
+              Expect.token env Token.T_RPAREN;
+              List.rev !result
+            ) else
+              []
+          in
+
+          { Enum.
+            member_name;
+            fields;
+          }
+        in
+        let start_loc = Peek.loc env in
+        Eat.token env;
+        let name = parse_identifier env in
+
+        let type_vars =
+          if Peek.token env = Token.T_LESS_THAN then
+            parse_type_vars env
+          else
+            []
+        in
+
+        let members = ref [] in
+        Expect.token env Token.T_LCURLY;
+
+        while (Peek.token env) <> Token.T_RCURLY && (Peek.token env) <> Token.T_EOF do
+          let member = parse_member env in
+          members := member::(!members);
+
+          if (Peek.token env) <> Token.T_RCURLY then (
+            Expect.token env Token.T_COMMA
+          );
+
+        done;
+
+        Expect.token env Token.T_RCURLY;
+        Enum { Enum.
+          visibility;
+          name;
+          type_vars;
+          members = List.rev !members;
+          loc = with_start_loc env start_loc;
+        }
+
+      | _ ->
+        Format.eprintf "false token %s\n" (Token.value_of_token (Peek.token env));
+        let lex_error = Lichenscript_lex.Lex_error.Unexpected (Token.value_of_token (Peek.token env)) in
+        let parse_error = {
+          Parse_error.
+          perr_spec = Parse_error.LexError lex_error;
+          perr_loc = (Peek.loc env);
+        } in
+
+        Parse_error.error parse_error
+    )
 
   in
   {
@@ -424,7 +455,7 @@ and parse_function_header env: Function.header =
     header_loc = with_start_loc env start_loc;
   }
 
-and parse_function ?visibility env: Function.t =
+and parse_function ~visibility env: Function.t =
   let open Function in
   let prev_scope = scope env in
   let fun_scope = Parse_scope.create ~prev:prev_scope Parse_scope.PString_Function in
@@ -433,8 +464,8 @@ and parse_function ?visibility env: Function.t =
     let header = parse_function_header env in
     let block = parse_block env in
 
-    let name = header.id.pident_name in
-    Parser_env.add_top_level env ~name ~visibility:(Option.value ~default:Asttypes.Pvisibility_private visibility);
+    (* let name = header.id.pident_name in *)
+    (* Parser_env.add_top_level env ~name ~visibility:(Option.value ~default:Asttypes.Pvisibility_private visibility); *)
 
     {
       visibility;
@@ -545,7 +576,7 @@ and parse_identifier_with_keywords env : Identifier.t =
   else
     parse_identifier env
 
-and parse_class env : Declaration._class =
+and parse_class ~visibility env : Declaration._class =
   let start_loc = Peek.loc env in
   Eat.token env;  (* class *)
   let id = parse_identifier env in
@@ -556,6 +587,7 @@ and parse_class env : Declaration._class =
   in
   let body = parse_class_body env in
   {
+    cls_visibility = visibility;
     cls_id = id;
     cls_type_vars;
     cls_loc = with_start_loc env start_loc;
