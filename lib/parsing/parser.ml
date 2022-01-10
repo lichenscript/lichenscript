@@ -975,9 +975,20 @@ and parse_primary_expression env : Expression.t =
 
   let spec : Expression.spec =
     match next with 
-    | Token.T_IDENTIFIER _ ->
+    | Token.T_IDENTIFIER _ -> (
       let ident = parse_identifier env in
-      Identifier ident
+      match Peek.token env with
+      | Token.T_LCURLY -> (
+        Eat.token env;
+        Expect.token env Token.T_RCURLY;
+        Init {
+          init_entries = [];
+          init_loc = with_start_loc env start_loc;
+        }
+      )
+      | _ ->
+        Identifier ident
+    )
 
     | Token.T_NUMBER { raw; _ } ->
       Eat.token env;
