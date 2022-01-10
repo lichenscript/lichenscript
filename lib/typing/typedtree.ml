@@ -45,6 +45,8 @@ module%gen rec Expression : sig
 
     | Block of Block.t
 
+    | Init of Ast.Expression.init
+
   and callee = {
     callee_spec: (string * int) * ([ `Property of string | `Expr of t ] list);
     callee_loc: Loc.t;
@@ -184,6 +186,7 @@ and Declaration : sig
 
   and class_method = {
     cls_method_visibility: Asttypes.visibility;
+    cls_method_modifier: Ast.Declaration.class_modifier option;
     cls_method_loc: Loc.t;
   }
 

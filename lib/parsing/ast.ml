@@ -48,6 +48,17 @@ and Expression : sig
     call_loc: Loc.t;
   }
 
+  and init_entry = {
+    init_entry_loc: Loc.t;
+    init_entry_key: Identifier.t;
+    init_entry_value: t option;
+  }
+
+  and init = {
+    init_loc: Loc.t;
+    init_entries: init_entry list;
+  }
+
   and spec =
     | Constant of Literal.t
     | Identifier of Identifier.t
@@ -61,6 +72,7 @@ and Expression : sig
     | Update of Asttypes.UpdateOp.t * t * bool (* prefix *)
     | Assign of Pattern.t * t
     | Block of Block.t
+    | Init of init
 
   and t = {
     spec: spec;
@@ -243,7 +255,7 @@ and Declaration : sig
 
   and class_method = {
     cls_method_attributes: attributes;
-    cls_method_static: bool;
+    cls_method_modifier: class_modifier option;
     cls_method_visiblity: Asttypes.visibility option;
     cls_method_name: Identifier.t;
     cls_method_params: Function.params;
@@ -251,6 +263,11 @@ and Declaration : sig
     cls_method_loc: Loc.t;
     cls_method_return_ty: Type.t option;
   }
+
+  and class_modifier =
+    | Cls_modifier_static
+    | Cls_modifier_virtual
+    | Cls_modifier_override
 
   and class_body_element =
     | Cls_method of class_method

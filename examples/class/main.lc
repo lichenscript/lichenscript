@@ -1,0 +1,29 @@
+
+class Base {
+
+    static new(): Base {
+        return Base {};
+    }
+
+    virtual printName() {
+        print("name")
+    }
+
+}
+
+class Child extends Base {
+
+    static new(): Child {
+        return Child {};
+    }
+
+    override printName() {
+        print("name")
+    }
+
+}
+
+function main() {
+    const child = Child.new();
+    child.printName();
+}

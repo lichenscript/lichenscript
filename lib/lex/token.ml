@@ -62,7 +62,8 @@ type t =
   | T_EXTENDS
   | T_STATIC
   | T_ELSE
-  | T_NEW
+  | T_VIRTUAL
+  | T_OVERRIDE
   | T_DELETE
   | T_TYPEOF
   | T_VOID
@@ -225,7 +226,8 @@ let token_to_string = function
   | T_EXTENDS -> "T_EXTENDS"
   | T_STATIC -> "T_STATIC"
   | T_ELSE -> "T_ELSE"
-  | T_NEW -> "T_NEW"
+  | T_VIRTUAL -> "T_VIRTUAL"
+  | T_OVERRIDE -> "T_OVERRIDE"
   | T_DELETE -> "T_DELETE"
   | T_TYPEOF -> "T_TYPEOF"
   | T_VOID -> "T_VOID"
@@ -376,7 +378,8 @@ let value_of_token = function
   | T_EXTENDS -> "extends"
   | T_STATIC -> "static"
   | T_ELSE -> "else"
-  | T_NEW -> "new"
+  | T_VIRTUAL -> "virtual"
+  | T_OVERRIDE -> "override"
   | T_DELETE -> "delete"
   | T_TYPEOF -> "typeof"
   | T_VOID -> "void"
@@ -523,7 +526,6 @@ let is_keyword = function
   | T_EXTENDS
   | T_STATIC
   | T_ELSE
-  | T_NEW
   | T_DELETE
   | T_TYPEOF
   | T_VOID

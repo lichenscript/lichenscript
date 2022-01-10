@@ -259,6 +259,8 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
     pss env ";"
   )
 
+  | Init _ -> ()
+
   | Block  _ -> ()
 
 (* return the number of temp values *)

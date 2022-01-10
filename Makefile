@@ -11,5 +11,11 @@ fibonacci: compiler
 	./_build/default/bin/main.exe build ./examples/fibonacci/main.wt \
 		--std ./std --base ./examples -D ./_build_wt/fibonacci
 
+class: compiler
+	rm -rf ./_build_wt/class
+	mkdir -p ./_build_wt/class
+	./_build/default/bin/main.exe build ./examples/class/main.wt \
+		--std ./std --base ./examples -D ./_build_wt/class
+
 compiler:
 	dune build

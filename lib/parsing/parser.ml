@@ -408,7 +408,12 @@ and parse_type_vars env =
 
 and parse_var_binding env kind: Statement.var_binding =
   let start_loc = Peek.loc env in
-  Expect.token env Token.T_LET;
+  (match kind with
+  | Pvar_const ->
+    Expect.token env Token.T_CONST
+  | Pvar_let ->
+    Expect.token env Token.T_LET
+  );
   let binding_pat = parse_pattern env in
 
   let binding_ty =
@@ -619,11 +624,21 @@ and parse_class_body env: Declaration.class_body =
     let start_pos = Peek.loc env in
     let v = parse_visibility env in
 
-    let cls_method_static =
-      if Peek.token env == Token.T_STATIC then (
+    let cls_method_modifier =
+      match Peek.token env with
+      | Token.T_STATIC ->
         Eat.token env;
-        true
-      ) else false
+        Some Ast.Declaration.Cls_modifier_static
+
+      | Token.T_VIRTUAL ->
+        Eat.token env;
+        Some Ast.Declaration.Cls_modifier_virtual
+
+      | Token.T_OVERRIDE ->
+        Eat.token env;
+        Some Ast.Declaration.Cls_modifier_override
+
+      | _ -> None
     in
 
     let attributes =
@@ -654,7 +669,7 @@ and parse_class_body env: Declaration.class_body =
         in
         Cls_method {
           cls_method_attributes = attributes;
-          cls_method_static;
+          cls_method_modifier;
           cls_method_visiblity = v;
           cls_method_name = id;
           cls_method_params = params;

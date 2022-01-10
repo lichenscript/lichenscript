@@ -262,6 +262,11 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let block = annotate_block ~prev_deps env block in
       T.Block.(block.return_ty), (T.Expression.Block block)
     )
+
+    | Init _init ->
+      failwith "not implemented"
+      (* T.Expression.Init init *)
+
   in
   { T.Expression.
     spec;
