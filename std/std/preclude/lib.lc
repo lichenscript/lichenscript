@@ -2,6 +2,14 @@
 @external("lc_std_print")
 public declare function print(content: string);
 
+class Object {
+
+    virtual toString(): string {
+        return "Object";
+    }
+
+}
+
 enum Option<A> {
     Some(A),
     None,

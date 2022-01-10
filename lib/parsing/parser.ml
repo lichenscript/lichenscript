@@ -585,6 +585,10 @@ and parse_class ~visibility env : Declaration._class =
   let start_loc = Peek.loc env in
   Eat.token env;  (* class *)
   let id = parse_identifier env in
+
+  let name = id.pident_name in
+  Parser_env.add_top_level env ~name ~visibility;
+
   let cls_type_vars =
     if (Peek.token env) = Token.T_LESS_THAN then
       parse_type_vars env
