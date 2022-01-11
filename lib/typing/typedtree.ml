@@ -41,20 +41,14 @@ module%gen rec Expression : sig
     | Update of
       Asttypes.UpdateOp.t * t * bool
 
-    | Assign of Pattern.t * t
+    | Assign of (string * int) * t
 
     | Block of Block.t
 
     | Init of Ast.Expression.init
 
-  and callee = {
-    callee_spec: (string * int) * ([ `Property of string | `Expr of t ] list);
-    callee_loc: Loc.t;
-    callee_ty_var: int;
-  }
-
   and call = {
-    callee: callee;
+    callee: t;
     call_params: t list;
     call_loc: Loc.t;
   }

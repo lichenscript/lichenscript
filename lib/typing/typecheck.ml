@@ -426,8 +426,13 @@ let type_check ctx =
     )
   in
 
-  List.iter ~f:iterate_node !no_deps;
-
+  (try
+    List.iter ~f:iterate_node !no_deps;
+  with
+  | e -> 
+    Type_context.print ctx;
+    raise e
+  );
   (* only for debug *)
   Type_context.print ctx;
 

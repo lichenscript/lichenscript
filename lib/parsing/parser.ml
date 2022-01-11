@@ -729,15 +729,11 @@ and parse_class_body env: Declaration.class_body =
 and parse_expression env : Expression.t =
   parse_assigment_expression env
 
-and reinterpret_expression_as_pattern _env (expr: Expression.t) : Pattern.t =
+and reinterpret_expression_as_id _env (expr: Expression.t) : Identifier.t =
   let { Expression. spec; loc; _; } = expr in
   match spec with
-  | Identifier  id ->
-    let pat = Pattern.Identifier id in
-    { Pattern.
-      spec = pat;
-      loc;
-    }
+  | Identifier id ->
+    id
 
   | _ ->
     let err =
@@ -755,7 +751,7 @@ and parse_assigment_expression env : Expression.t =
   match next with
   | Token.T_ASSIGN ->
     Eat.token env;
-    let left = reinterpret_expression_as_pattern env expr in
+    let left = reinterpret_expression_as_id env expr in
     let right = parse_assigment_expression env in
     let spec = Expression.Assign(left, right) in
     {

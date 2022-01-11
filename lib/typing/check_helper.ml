@@ -26,7 +26,9 @@ let type_assinable ctx left right =
         true
       else
         false
-    | _ ->false
+    | _ ->
+      false
+
   )
 
   (* | (Unknown, Unknown) *)

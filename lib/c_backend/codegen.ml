@@ -250,9 +250,8 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
 
   | Call call -> (
     let { callee; call_params; _ } = call in
-    let { callee_spec; _ } = callee in
-    match callee_spec with
-    | (sym_name, sym_id), [] -> (
+    match callee.spec with
+    | Expression.Identifier (sym_name, sym_id) -> (
       let ext_name_opt = Type_context.find_external_symbol env.env.ctx sym_id in
       match ext_name_opt with
       | Some ext_method_name -> (
@@ -294,8 +293,8 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
 
   | Update _ -> ()
 
-  | Assign(left, right) -> (
-    codegen_pattern env left;
+  | Assign((name, _), right) -> (
+    pss env name;
     pss env " = ";
     codegen_expression env right;
     pss env ";"
@@ -345,7 +344,7 @@ and codegen_function env (_fun: Typedtree.Function.t) =
     let vars_len_m1 = (List.length vars) - 1 in
 
     print_indents env;
-    ps env "LCValue ret;";
+    ps env "LCValue ret = MK_NULL();";
     endl env;
 
     if vars_len_m1 >= 0 then (

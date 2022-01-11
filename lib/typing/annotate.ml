@@ -20,7 +20,10 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       let expr = annotate_expression ~prev_deps env expr in 
       let ty_var = T.Expression.(expr.ty_var) in
 
-      [ty_var], (T.Statement.Expr expr)
+      (* the expression may not depends on prev_deps, so next
+       * statement should continue to depends on prev deps
+       *)
+      (List.append prev_deps [ty_var]), (T.Statement.Expr expr)
     )
 
     | Semi expr -> (
@@ -30,7 +33,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       let node = {
         value = TypeExpr.Ctor((Env.ty_unit env), []);
         loc;
-        deps = [ty_var];
+        deps = List.append prev_deps [ty_var];
         check = none;  (* TODO: check expr is empty *)
       } in
 
@@ -66,7 +69,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       let node = Type_context.get_node ctx sym_id in
       Type_context.update_node ctx sym_id {
         node with
-        deps = List.append node.deps [binding_init.ty_var];
+        deps = List.concat [node.deps; [binding_init.ty_var]; prev_deps ];
         check = (fun id ->
           let expr_node = Type_context.get_node ctx binding_init.ty_var in
           Type_context.update_node_type ctx id expr_node.value
@@ -139,7 +142,16 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
       in
 
-      ty_var, (T.Expression.Constant cnst)
+      let node = {
+        value = TypeExpr.Ctor(ty_var, []);
+        loc = loc;
+        check = none;
+        deps = [ty_var];
+      } in
+
+      let node_id = Type_context.new_id (Env.ctx env) node in
+
+      node_id, (T.Expression.Constant cnst)
     )
 
     | Identifier id -> (
@@ -159,7 +171,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       -1, failwith "not implemented"
 
     | Call call -> (
-      let rec cast_expressions_into_callee acc expr : T.Expression.callee =
+      (* let rec cast_expressions_into_callee acc expr : T.Expression.callee =
         let { Ast.Expression. spec; loc; _ } = expr in
         match spec with
         | Identifier id -> (
@@ -190,34 +202,31 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
         | _ -> failwith "unrechable"
 
-      in
+      in *)
 
       let { callee; call_params; call_loc } = call in
 
-      let callee = cast_expressions_into_callee [] callee in
+      let callee = annotate_expression ~prev_deps env callee in
       let call_params = List.map ~f:(annotate_expression ~prev_deps env) call_params in
 
       let ty_var = Type_context.new_id (Env.ctx env) {
         value = TypeExpr.Unknown;
         loc;
-        deps = [ T.Expression.(callee.callee_ty_var) ];
+        deps = [ T.Expression.(callee.ty_var) ];
         check = (fun id ->
           let ctx = Env.ctx env in
-          match callee.callee_spec with
-          | ((_name, ty_int), []) -> (
-            let ty_def = Check_helper.find_to_typedef ctx ty_int in
-            match ty_def with
-            | Some ({ TypeDef. spec = Function _fun; _ }, _) ->
-              (* TODO: check call params *)
-              Type_context.update_node_type ctx id _fun.fun_return
+          let ty_int = callee.ty_var in
+          let ty_def = Check_helper.find_to_typedef ctx ty_int in
+          match ty_def with
+          | Some ({ TypeDef. spec = Function _fun; _ }, _) ->
+            (* TODO: check call params *)
+            Type_context.update_node_type ctx id _fun.fun_return
 
-            | _ -> (
-              let _val = Type_context.get_node ctx ty_int in
-              let err = Type_error.(make_error ctx call_loc (NotCallable _val.value)) in
-              raise (Type_error.Error err)
-            )
+          | _ -> (
+            let _val = Type_context.get_node ctx ty_int in
+            let err = Type_error.(make_error ctx call_loc (NotCallable _val.value)) in
+            raise (Type_error.Error err)
           )
-          | _ -> failwith "not implement: callee"
         );
       } in
 
@@ -225,10 +234,23 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     )
 
     (*
-     * namespace property
-     * 
+     * TODO: namespace
+     * class/enum static function
+     * object's property/method
      *)
-    | Member _
+    | Member (expr, name) -> (
+      let expr = annotate_expression ~prev_deps env expr in
+      let node = {
+        value = TypeExpr.Unknown;
+        loc;
+        deps = List.append prev_deps [expr.ty_var];
+        check = none;
+      } in
+      let ctx = Env.ctx env in
+      let id = Type_context.new_id ctx node in
+      id, T.Expression.Member(expr, name)
+    )
+
     | Unary _ -> -1, failwith "not implemented"
 
     | Binary (op, left, right) -> (
@@ -265,27 +287,32 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
     | Update _ -> -1, failwith "not implemented"
 
-    | Assign (pat, expr) -> (
+    | Assign (id, expr) -> (
       let expr = annotate_expression ~prev_deps env expr in
-      let pat, ty_int = annotate_pattern env pat in
-      let ctx = Env.ctx env in
-      let value = (TypeExpr.Ctor ((Env.ty_unit env), [])) in
       let scope = Env.peek_scope env in
+      let ctx = Env.ctx env in
+      let name, ty_int =
+        match scope#find_var_symbol id.pident_name with
+        | Some var -> (id.pident_name, var.var_id)
+        | None -> (
+          let err = Type_error.(make_error ctx loc (CannotFindName id.pident_name)) in
+          raise (Type_error.Error err)
+        )
+      in
+      let value = (TypeExpr.Ctor ((Env.ty_unit env), [])) in
+      Format.printf "assign var to: %d\n" ty_int;
       let next_id = Type_context.new_id ctx {
         value;
         deps = [ expr.ty_var; ty_int ];
         loc;
         check = (fun _ ->
-          (match pat.spec with
-          | T.Pattern.Symbol (name, _) ->
-            let variable = Option.value_exn (scope#find_var_symbol name) in
-            match variable.var_kind with
-            | Ast.Pvar_const -> (
-              let err = Type_error.(make_error ctx loc CannotAssignToConstVar) in
-              raise (Type_error.Error err)
-            )
-            | _ -> ()
-          );
+          let variable = Option.value_exn (scope#find_var_symbol name) in
+          (match variable.var_kind with
+          | Ast.Pvar_const -> (
+            let err = Type_error.(make_error ctx loc CannotAssignToConstVar) in
+            raise (Type_error.Error err)
+          )
+          | _ -> ());
           let sym_node = Type_context.get_node ctx ty_int in
           let expr_node = Type_context.get_node ctx expr.ty_var in
           if not (Check_helper.type_assinable ctx sym_node.value expr_node.value) then (
@@ -294,7 +321,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           )
         );
       } in
-      next_id, Assign(pat, expr)
+      next_id, Assign((name, ty_int), expr)
     )
 
     | Block block -> (
