@@ -240,13 +240,30 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
      *)
     | Member (expr, name) -> (
       let expr = annotate_expression ~prev_deps env expr in
+      let ctx = Env.ctx env in
       let node = {
         value = TypeExpr.Unknown;
         loc;
         deps = List.append prev_deps [expr.ty_var];
-        check = none;
+        check = (fun _id ->
+          let expr_node = Type_context.get_node ctx expr.ty_var in
+          let open TypeExpr in
+          match expr_node.value with
+          (* instance of type *)
+          | Ctor(_ty_id, []) ->
+            failwith "in"
+
+          (* type def itself *)
+          | TypeDef { spec = Class _cls_def; _ } -> (
+            
+            failwith "class def in"
+          )
+
+          | _ ->
+            let err = Type_error.(make_error ctx loc (CannotReadMember(name.pident_name, expr_node.value))) in
+            raise (Type_error.Error err)
+        );
       } in
-      let ctx = Env.ctx env in
       let id = Type_context.new_id ctx node in
       id, T.Expression.Member(expr, name)
     )
@@ -524,13 +541,19 @@ and annotate_class env cls =
     )
     cls.cls_body.cls_body_elements;
 
-  Type_context.update_node_type ctx cls_var.var_id (TypeExpr.TypeDef (
-    { TypeDef.
-      builtin = false;
-      name = cls.cls_id.pident_name;
-      spec = Class { tcls_extends = None; tcls_elements = List.rev !tcls_elements };
-    }
-  ));
+  Type_context.map_node ctx 
+    ~f:(fun node -> {
+      node with
+      value = TypeExpr.TypeDef (
+        { TypeDef.
+          builtin = false;
+          name = cls.cls_id.pident_name;
+          spec = Class { tcls_extends = None; tcls_elements = List.rev !tcls_elements };
+        }
+      );
+      loc = cls.cls_loc;
+    })
+    cls_var.var_id;
 
   let annotate_class_body body =
     let { cls_body_elements; cls_body_loc; } = body in

@@ -61,6 +61,11 @@ let create () =
 let update_node ctx id node =
   ResizableArray.set ctx.ty_map id node
 
+let map_node ctx ~f id =
+  let node = ResizableArray.get ctx.ty_map id in
+  let new_node = f node in
+  update_node ctx id new_node
+
 let update_node_type ctx id ty =
   let old_node = ResizableArray.get ctx.ty_map id in
   update_node ctx id { old_node with value = ty }
