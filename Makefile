@@ -8,7 +8,7 @@ hello_world: compiler
 fibonacci: compiler
 	rm -rf ./_build_wt/fibonacci
 	mkdir -p ./_build_wt/fibonacci
-	./_build/default/bin/main.exe build ./examples/fibonacci/main.wt \
+	./_build/default/bin/main.exe run ./examples/fibonacci/main.wt \
 		--std ./std --base ./examples -D ./_build_wt/fibonacci
 
 class: compiler
