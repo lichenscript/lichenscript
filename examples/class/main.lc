@@ -17,6 +17,7 @@ class Child extends Base {
 
     static new(): Child {
         return Child {
+            ...Base.new(),
             name: "Hello World",
         };
     }

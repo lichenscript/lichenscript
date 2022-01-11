@@ -180,6 +180,14 @@ and codegen_class env _class =
 
   ps env (Format.sprintf "} %s;" name);
   endl env;
+
+  ps env (Format.sprintf "LCValue %s_init(LCRuntime* rt, LCValue ancester) {\n" name);
+  with_indent env (fun () ->
+    print_indents env;
+    ps env "return MK_NULL();\n";
+  );
+  ps env "}\n";
+
   ()
 
 and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =

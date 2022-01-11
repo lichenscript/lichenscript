@@ -54,10 +54,14 @@ and Expression : sig
     init_entry_value: t option;
   }
 
+  and init_element =
+  | InitSpread of Expression.t
+  | InitEntry of init_entry
+
   and init = {
     init_loc: Loc.t;
     init_name: Identifier.t;
-    init_entries: init_entry list;
+    init_elements: init_element list;
   }
 
   and spec =

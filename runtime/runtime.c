@@ -7,6 +7,20 @@
 #define LC_INIT_SYMBOL_BUCKET_SIZE 128
 #define I64_POOL_SIZE 1024
 
+#define lc_raw_malloc malloc
+#define lc_raw_realloc realloc
+#define lc_raw_free free
+
+typedef struct LCRuntime {
+    LCMallocState malloc_state;
+    uint32_t seed;
+    LCSymbolBucket* symbol_buckets;
+    uint32_t symbol_bucket_size;
+    uint32_t symbol_len;
+    LCValue* i64_pool;
+    LCBox64* i64_pool_space;
+} LCRuntime;
+
 static inline uint32_t hash_string8(const uint8_t *str, size_t len, uint32_t h)
 {
     size_t i;
@@ -27,13 +41,15 @@ static inline uint32_t hash_string16(const uint16_t *str,
 }
 
 // -511 - 512 is the range in the pool
-static LCValue* InitI64Pool(LCMalloc malloc_method) {
-    LCValue* result = malloc_method(sizeof(LCBox64) * I64_POOL_SIZE);
+static LCValue* init_i64_pool(LCRuntime* rt) {
+    LCValue* result = (LCValue*)lc_malloc(rt, sizeof(LCValue) * I64_POOL_SIZE);
+
+    rt->i64_pool_space = (LCBox64*)lc_malloc(rt, sizeof (LCBox64) * I64_POOL_SIZE);
 
     int i;
     for (i = 0; i < I64_POOL_SIZE; i++) {
         int val = I64_POOL_SIZE / 2 - i;
-        LCBox64* ptr = malloc_method(sizeof(LCBox64));
+        LCBox64* ptr = rt->i64_pool_space + i;
         ptr->i64 = val;
         ptr->header.count = LC_NO_GC;
         result[i].type = LC_TY_BOXED_I64;
@@ -41,6 +57,11 @@ static LCValue* InitI64Pool(LCMalloc malloc_method) {
     }
 
     return result;
+}
+
+static void free_i64_pool(LCRuntime* rt) {
+    lc_free(rt, rt->i64_pool_space);
+    lc_free(rt, rt->i64_pool);
 }
 
 static void FreeObject(LCRuntime* rt, LCValue val);
@@ -51,7 +72,7 @@ static void FreeLambda(LCRuntime* rt, LCLambda* obj) {
         LCRelease(rt, obj->captured_values[i]);
     }
 
-    rt->free_method(obj);
+    lc_free(rt, obj);
 }
 
 static void FreeClassObject(LCRuntime* rt, LCClassObject* clsObj) {
@@ -60,12 +81,12 @@ static void FreeClassObject(LCRuntime* rt, LCClassObject* clsObj) {
         LCRelease(rt, clsObj->properties[i]);
     }
 
-    rt->free_method(clsObj);
+    lc_free(rt, clsObj);
 }
 
 static void FreeClassObjectMeta(LCRuntime* rt, LCClassObjectMeta* meta) {
 
-    rt->free_method(meta);
+    lc_free(rt, meta);
 }
 
 static void FreeArray(LCRuntime* rt, LCArray* arr) {
@@ -95,7 +116,7 @@ static void FreeObject(LCRuntime* rt, LCValue val) {
     case LC_TY_BOXED_I64:
     case LC_TY_BOXED_U64:
     case LC_TY_BOXED_F64:
-        rt->free_method(val.ptr_val);
+        lc_free(rt, val.ptr_val);
         break;
     
     default:
@@ -109,22 +130,44 @@ static void FreeObject(LCRuntime* rt, LCValue val) {
     }
 }
 
+void* lc_malloc(LCRuntime* rt, size_t size) {
+    void* ptr = lc_raw_malloc(size);
+    if (ptr == NULL) {
+        return NULL;
+    }
+    rt->malloc_state.malloc_count++;
+    return ptr;
+}
+
+void* lc_mallocz(LCRuntime* rt, size_t size) {
+    void* ptr = lc_malloc(rt, size);
+    if (ptr == NULL) {
+        return NULL;
+    }
+    memset(ptr, 0, size);
+    return ptr;
+}
+
+void lc_free(LCRuntime* rt, void* ptr) {
+    rt->malloc_state.malloc_count--;
+    lc_raw_free(ptr);
+}
+
 LCRuntime* LCNewRuntime() {
-    LCRuntime* runtime = (LCRuntime*)malloc(sizeof(LCRuntime));
-    runtime->malloc_method = malloc;
-    runtime->free_method = free;
+    LCRuntime* runtime = (LCRuntime*)lc_raw_malloc(sizeof(LCRuntime));
+    memset(runtime, 0, sizeof(LCRuntime));
+    runtime->malloc_state.malloc_count = 1;
 
     runtime->seed = time(NULL);
 
     size_t bucket_size = sizeof(LCSymbolBucket) * LC_INIT_SYMBOL_BUCKET_SIZE;
-    LCSymbolBucket* buckets = runtime->malloc_method(bucket_size);
-    memset(buckets, 0, bucket_size);
+    LCSymbolBucket* buckets = lc_mallocz(runtime, bucket_size);
 
     runtime->symbol_buckets = buckets;
     runtime->symbol_bucket_size = LC_INIT_SYMBOL_BUCKET_SIZE;
     runtime->symbol_len = 0;
 
-    runtime->i64_pool = InitI64Pool(runtime->malloc_method);
+    runtime->i64_pool = init_i64_pool(runtime);
 
     return runtime;
 }
@@ -142,11 +185,17 @@ void LCFreeRuntime(LCRuntime* rt) {
         }
     }
 
-    free(rt->symbol_buckets);
+    lc_free(rt, rt->symbol_buckets);
 
-    free(rt->i64_pool);
+    free_i64_pool(rt);
 
-    free(rt);
+    if (rt->malloc_state.malloc_count != 1) {
+        fprintf(stderr, "LichenScript: memory leaks %zu\n", rt->malloc_state.malloc_count);
+        lc_raw_free(rt);
+        exit(1);
+    }
+
+    lc_raw_free(rt);
 }
 
 void LCRetain(LCValue val) {
@@ -177,7 +226,7 @@ void LCInitObject(LCObjectHeader* header, LCObjectType obj_type) {
 
 LCValue LCNewStringFromCStringLen(LCRuntime* rt, const unsigned char* content, uint32_t len) {
     uint32_t acquire_len = sizeof(LCString) + len + 1;
-    LCString* result = rt->malloc_method(acquire_len);
+    LCString* result = lc_mallocz(rt, acquire_len);
     memset(result, 0, acquire_len);
 
     LCInitObject(&result->header, LC_TY_STRING);
@@ -249,7 +298,7 @@ LCValue LCNewSymbol(LCRuntime* rt, const char* content) {
 
 LCClassObject* LCNewClassObject(LCRuntime* rt, LCClassObjectMeta* meta, uint32_t slot_count) {
     uint32_t acquire_len = sizeof(LCClassObject) + sizeof(uint64_t) * slot_count;
-    LCClassObject* result = rt->malloc_method(sizeof(LCClassObject));
+    LCClassObject* result = lc_mallocz(rt, sizeof(LCClassObject));
     memset(result, 0, acquire_len);
 
     LCInitObject(&result->header, LC_TY_CLASS_OBJECT);

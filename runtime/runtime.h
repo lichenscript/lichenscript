@@ -2,9 +2,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 
-typedef void*(*LCMalloc)(size_t);
-typedef void(*LCFree)(void*);
-
 #define LC_NO_GC 0xFFFFFFFF
 
 typedef enum LCObjectType {
@@ -112,15 +109,13 @@ typedef struct LCBox64 {
     };
 } LCBox64;
 
-typedef struct LCRuntime {
-    LCMalloc malloc_method;
-    LCFree free_method;
-    uint32_t seed;
-    LCSymbolBucket* symbol_buckets;
-    uint32_t symbol_bucket_size;
-    uint32_t symbol_len;
-    LCValue* i64_pool;
-} LCRuntime;
+typedef struct LCMallocState {
+    size_t malloc_count;
+    size_t malloc_size;
+    size_t malloc_limit;
+} LCMallocState;
+
+typedef struct LCRuntime LCRuntime;
 
 typedef LCValue (*LCCFunction)(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args);
 
@@ -133,6 +128,10 @@ LCValue LCRunMain(LCProgram* program);
 
 LCRuntime* LCNewRuntime();
 void LCFreeRuntime(LCRuntime* rt);
+
+void* lc_malloc(LCRuntime* rt, size_t size);
+void* lc_mallocz(LCRuntime* rt, size_t size);
+void lc_free(LCRuntime* rt, void *);
 
 void LCRetain(LCValue obj);
 void LCRelease(LCRuntime* rt, LCValue obj);

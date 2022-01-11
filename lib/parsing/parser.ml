@@ -979,25 +979,35 @@ and parse_primary_expression env : Expression.t =
       match Peek.token env with
       | Token.T_LCURLY -> (
         Eat.token env;
-        let init_entries = ref [] in
+        let init_elements = ref [] in
 
         while (Peek.token env) <> Token.T_RCURLY do
           let start_loc = Peek.loc env in
-          let init_entry_key = parse_identifier env in
-          let init_entry_value =
-            if (Peek.token env) = Token.T_COLON then (
+          let element =
+            match (Peek.token env) with
+            | Token.T_ELLIPSIS -> (
               Eat.token env;
-              Some (parse_expression env)
-            ) else
-              None
+              let expr = parse_expression env in
+              Expression.InitSpread expr
+            )
+            | _ ->  (
+              let init_entry_key = parse_identifier env in
+              let init_entry_value =
+                if (Peek.token env) = Token.T_COLON then (
+                  Eat.token env;
+                  Some (parse_expression env)
+                ) else
+                  None
+              in
+              Expression.InitEntry {
+                Expression.
+                init_entry_key;
+                init_entry_value;
+                init_entry_loc = with_start_loc env start_loc;
+              }
+            )
           in
-          let entry = {
-            Expression.
-            init_entry_key;
-            init_entry_value;
-            init_entry_loc = with_start_loc env start_loc;
-          } in
-          init_entries := entry::(!init_entries);
+          init_elements := element::(!init_elements);
           if (Peek.token env) <> Token.T_RCURLY then (
             Expect.token env T_COMMA
           )
@@ -1006,7 +1016,7 @@ and parse_primary_expression env : Expression.t =
         Expect.token env Token.T_RCURLY;
         Init {
           init_name = ident;
-          init_entries = List.rev !init_entries;
+          init_elements = List.rev !init_elements;
           init_loc = with_start_loc env start_loc;
         }
       )
