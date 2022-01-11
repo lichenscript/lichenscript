@@ -83,24 +83,33 @@ let get_node ctx id =
 
 let rec print_type_by_id ctx id =
   let item = get_node ctx id in
+  print_type_value ctx item.value
+
+(* first level *)
+and print_type_value ctx ty_value =
   let open Core_type.TypeExpr in
-  match item.value with
+  match ty_value with
   | Unknown -> "unknown"
   | Any -> "any"
-  | Ctor (name, []) -> (
-    print_type_by_id ctx name
+  | Ctor (var, []) -> (
+    let node = get_node ctx var in
+    match node.value with
+    | TypeDef type_sym ->
+      (Format.asprintf "%a" Core_type.TypeDef.pp type_sym)
+
+    | _ ->
+      print_type_value ctx node.value
+
   )
   | Ctor _ -> "ctor"
-  (*
-  | Ctor (name, _list) -> (
-    name ^ "<>"
-  ) *)
-
+  | Ref id -> (
+    let node = get_node ctx id in
+    print_type_value ctx node.value
+  )
   | Function _ -> "function"
-  | Module _ -> "module"
   | Array _ -> "array"
-  | TypeDef sym ->
-    (Core_type.TypeDef.name sym)
+  | TypeDef type_sym ->
+    (Format.asprintf "(typeof %a)" Core_type.TypeDef.pp type_sym)
 
 let print ctx =
 

@@ -2,19 +2,51 @@ open Core_kernel
 
 module PropsMap = Hashtbl.Make(String)
 
+(*
+ * Type expression is expressing something behind an expression
+ * 
+ * For example:
+ * let string_to_int: (a: string) => i32
+ * the expression after the semicolon is called `TypeExpr`
+ *
+ * Every expression has a TypeExpr
+ *)
 module rec TypeExpr : sig
   type t =
     | Unknown
     | Any
-    | Ctor of int * (t list)
-    | Function of t list * t
-    | Module of module_type
-    | Array of t
-    | TypeDef of TypeDef.t
 
-  and module_type = {
-    export: t;
-  }
+    (*
+     * Ctor represents `instance`, does not represent the type itself
+     *
+     * For example:
+     * let a : Person => Ctor(Person, [])
+     *
+     * saying `a` is an instance of Person
+     *
+     * One thing to notice, contants are also instances:
+     * 1,2,3 are instance of i32
+     * "string" is instance of String
+     *)
+    | Ctor of int * (t list)
+
+    (*
+     * On the contract of Ctor, `Ref` represents the original type itself.
+     * I guess this is used internally, such as referring a method of a class.
+     *)
+    | Ref of int
+
+    (*
+     * (a: string) => i32
+     *)
+    | Function of t list * t
+
+    (*
+     * Alias of Array<T>
+     *)
+    | Array of t
+
+    | TypeDef of TypeDef.t
 
   and function_type = {
     tfun_params: (string * t) list;
@@ -27,14 +59,10 @@ end = struct
     | Unknown
     | Any
     | Ctor of int * (t list)
+    | Ref of int
     | Function of t list * t
-    | Module of module_type
     | Array of t
     | TypeDef of TypeDef.t
-
-  and module_type = {
-    export: t;
-  }
 
   and function_type = {
     tfun_params: (string * t) list;
@@ -65,6 +93,7 @@ and TypeDef : sig
   and class_type = {
     tcls_extends:    t option;
     tcls_elements: (string * int) list;
+    tcls_static_elements: (string * int) list;
   }
 
   and spec =
@@ -113,8 +142,9 @@ end = struct
   }
 
   and class_type = {
-    tcls_extends:    t option;
+    tcls_extends: t option;
     tcls_elements: (string * int) list;
+    tcls_static_elements: (string * int) list;
   }
 
   and spec =

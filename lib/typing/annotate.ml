@@ -171,39 +171,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       -1, failwith "not implemented"
 
     | Call call -> (
-      (* let rec cast_expressions_into_callee acc expr : T.Expression.callee =
-        let { Ast.Expression. spec; loc; _ } = expr in
-        match spec with
-        | Identifier id -> (
-          let name = id.pident_name in
-          let var_opt = (Env.peek_scope env)#find_var_symbol name in
-          match var_opt with
-          | Some variable -> (
-            { T.Expression.
-              callee_spec = ((name, variable.var_id), List.rev acc);
-              callee_loc = loc;
-              callee_ty_var = variable.var_id;
-            }
-          )
-
-          | None -> (
-            let ctx = Env.ctx env in
-            let err_spec = Type_error.CannotFindName id.pident_name in
-            let err = Type_error.make_error ctx id.pident_loc err_spec in
-            raise (Type_error.Error err)
-          )
-
-        )
-
-        | Member (expr, name) -> (
-          let name = name.pident_name in
-          cast_expressions_into_callee ((`Property name)::acc) expr
-        )
-
-        | _ -> failwith "unrechable"
-
-      in *)
-
       let { callee; call_params; call_loc } = call in
 
       let callee = annotate_expression ~prev_deps env callee in
@@ -245,23 +212,34 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         value = TypeExpr.Unknown;
         loc;
         deps = List.append prev_deps [expr.ty_var];
-        check = (fun _id ->
+        check = (fun id ->
           let expr_node = Type_context.get_node ctx expr.ty_var in
           let open TypeExpr in
+          let raise_error () =
+            let err = Type_error.(make_error ctx loc (CannotReadMember(name.pident_name, expr_node.value))) in
+            raise (Type_error.Error err)
+          in
           match expr_node.value with
           (* instance of type *)
           | Ctor(_ty_id, []) ->
             failwith "in"
 
           (* type def itself *)
-          | TypeDef { spec = Class _cls_def; _ } -> (
-            
-            failwith "class def in"
+          | TypeDef { spec = Class { tcls_static_elements; _ }; _ } -> (
+            let result =
+              List.find ~f:(fun (static_memeber_name, _) -> String.equal static_memeber_name name.pident_name)
+              tcls_static_elements
+            in
+
+            match result with
+            | Some (_, memeber_id) ->
+              Type_context.update_node_type ctx id (TypeExpr.Ref memeber_id)
+
+            | _ -> raise_error ()
           )
 
-          | _ ->
-            let err = Type_error.(make_error ctx loc (CannotReadMember(name.pident_name, expr_node.value))) in
-            raise (Type_error.Error err)
+          | _ -> raise_error ()
+
         );
       } in
       let id = Type_context.new_id ctx node in
@@ -496,6 +474,7 @@ and annotate_class env cls =
 
   let class_scope = new class_scope ~prev:(Env.peek_scope env) () in
 
+  let tcls_static_elements = ref [] in
   let tcls_elements = ref [] in
 
   let ctx = Env.ctx env in
@@ -504,7 +483,7 @@ and annotate_class env cls =
     ~f:(fun item ->
       match item with
       | Cls_method _method -> (
-        let { cls_method_name; cls_method_visibility; cls_method_loc; _ } = _method in
+        let { cls_method_name; cls_method_visibility; cls_method_loc; cls_method_modifier; _ } = _method in
         let node = {
           value = TypeExpr.Unknown;
           deps = [];
@@ -512,16 +491,23 @@ and annotate_class env cls =
           check = none;
         } in
         let node_id = Type_context.new_id ctx node in
-        tcls_elements := ((cls_method_name.pident_name, node_id)::!tcls_elements);
-        class_scope#insert_cls_element
-          cls_method_name.pident_name
-          (Scope.Cls_method {
-            method_id = node_id;
-            method_visibility = cls_method_visibility;
-          })
+        match cls_method_modifier with
+        | (Some Cls_modifier_static) -> (
+          tcls_static_elements := (cls_method_name.pident_name, node_id)::!tcls_static_elements;
+        )
+
+        | _ -> (
+          tcls_elements := ((cls_method_name.pident_name, node_id)::!tcls_elements);
+          class_scope#insert_cls_element
+            cls_method_name.pident_name
+            (Scope.Cls_method {
+              method_id = node_id;
+              method_visibility = cls_method_visibility;
+            })
+        )
       )
       | Cls_property property -> (
-        let { cls_property_name; cls_property_type; cls_property_loc; cls_property_visibility; _ } = property in
+        let { cls_property_name; cls_property_type; cls_property_loc; cls_property_visibility; _  } = property in
         let property_ty, deps = annotate_type env cls_property_type in
         let node = {
           value = property_ty;
@@ -548,7 +534,11 @@ and annotate_class env cls =
         { TypeDef.
           builtin = false;
           name = cls.cls_id.pident_name;
-          spec = Class { tcls_extends = None; tcls_elements = List.rev !tcls_elements };
+          spec = Class {
+            tcls_extends = None;
+            tcls_elements = List.rev !tcls_elements;
+            tcls_static_elements = List.rev !tcls_static_elements;
+          };
         }
       );
       loc = cls.cls_loc;
