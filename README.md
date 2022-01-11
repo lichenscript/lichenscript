@@ -39,9 +39,17 @@ It't not hard to support Rust in the future.
 
 ### LS is more dynamic than Rust
 
-dynamic dispatch
+No a bunch of pointer types.
+Dynamic dispatch, supports any.
+Support inheritance.
 
 ## What's different from JavaScript/TypeScript?
+
+More lightweight, don't depends on a heavy runtime.
+The C runtime is very small, LS's object uses reference
+counting to free memory.
+
+More static features.
 
 ### class private field are guaranteed by the type system
 
@@ -50,5 +58,7 @@ LS's private is guaranteed, so you don't need a `#` syntax
 to implement real private field.
 
 ### No exceptions and try/catch
+
+Exception mechanism depends on a heavy runtime.
 
 ### More static

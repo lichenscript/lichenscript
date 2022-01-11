@@ -9,6 +9,15 @@ type variable = {
   var_kind: Ast.var_kind;
 }
 
+type class_element =
+| Cls_property of { prop_id: int; prop_visibility: Asttypes.visibility option; }
+| Cls_method of { method_id: int; method_visibility: Asttypes.visibility option; }
+
+type property = {
+  prop_id: int;
+  prop_visibility: Asttypes.visibility option;
+}
+
 class scope ?prev () = object
   val var_symbols = SymbolTable.create ()
   val type_symbols = SymbolTable.create ()
@@ -48,6 +57,25 @@ class scope ?prev () = object
 
   method get_visibility name: Lichenscript_parsing.Asttypes.visibility option =
     Option.join (ExportTable.find export_map name)
+
+  method find_cls_element (_name: string): class_element option =
+    failwith "only allowed in class scope"
+
+  method insert_cls_element (_name: string) (_var: class_element) : unit =
+    failwith "only allowed in class scope"
+
+end
+
+class class_scope ?prev () = object
+  inherit scope ?prev ()
+
+  val properties = SymbolTable.create ()
+
+  method! find_cls_element name : class_element option =
+    SymbolTable.find properties name
+
+  method! insert_cls_element name var =
+    SymbolTable.set properties ~key:name ~data:var
 
 end
 

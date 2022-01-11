@@ -56,6 +56,7 @@ and Expression : sig
 
   and init = {
     init_loc: Loc.t;
+    init_name: Identifier.t;
     init_entries: init_entry list;
   }
 
@@ -247,17 +248,16 @@ and Declaration : sig
 
   and class_property = {
     cls_property_attributes: attributes;
-    cls_property_visiblity: Asttypes.visibility option;
+    cls_property_visibility: Asttypes.visibility option;
     cls_property_loc: Loc.t;
     cls_property_name: Identifier.t;
-    cls_property_type: Type.t option;
-    cls_property_init: Expression.t option;
+    cls_property_type: Type.t;
   }
 
   and class_method = {
     cls_method_attributes: attributes;
     cls_method_modifier: class_modifier option;
-    cls_method_visiblity: Asttypes.visibility option;
+    cls_method_visibility: Asttypes.visibility option;
     cls_method_name: Identifier.t;
     cls_method_params: Function.params;
     cls_method_body: Block.t option;

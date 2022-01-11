@@ -7,7 +7,6 @@ module rec TypeExpr : sig
     | Unknown
     | Any
     | Ctor of int * (t list)
-    | Class of class_type
     | Function of t list * t
     | Module of module_type
     | Array of t
@@ -17,24 +16,10 @@ module rec TypeExpr : sig
     export: t;
   }
 
-  and class_type = {
-    tcls_extends:    t option;
-    tcls_properties: class_property_type list;
-    tcls_methods:    function_type list;
-  }
-
-  and class_property_type = {
-    tcls_property_name: Lichenscript_parsing.Identifier.t;
-    tcls_property_type: t;
-  }
-
   and function_type = {
     tfun_params: (string * t) list;
     tfun_ret: t;
   }
-
-  (* val pp: Format.formatter -> t -> unit
-  val pp_function_type: Format.formatter -> function_type -> unit *)
 
 end = struct
 
@@ -42,7 +27,6 @@ end = struct
     | Unknown
     | Any
     | Ctor of int * (t list)
-    | Class of class_type
     | Function of t list * t
     | Module of module_type
     | Array of t
@@ -52,55 +36,11 @@ end = struct
     export: t;
   }
 
-  and class_type = {
-    tcls_extends:    t option;
-    tcls_properties: class_property_type list;
-    tcls_methods:    function_type list;
-  }
-
-  and class_property_type = {
-    tcls_property_name: Lichenscript_parsing.Identifier.t;
-    tcls_property_type: t;
-  }
-
   and function_type = {
     tfun_params: (string * t) list;
     tfun_ret: t;
   }
 
-  (* let rec pp formatter ty =
-    match ty with
-    | Unknown -> Format.pp_print_string formatter "unknown"
-    | Any -> Format.pp_print_string formatter "any"
-    | Ctor(sym, _) -> Format.fprintf formatter "%d<>" sym
-    | Class _ -> Format.pp_print_string formatter "Class"
-    | Function _ ->
-      Format.pp_print_string formatter "function"
-
-    | Module _ -> Format.pp_print_string formatter "module"
-
-    | Array _ -> Format.pp_print_string formatter "Array"
-
-    | TypeDef _ -> Format.pp_print_string formatter "TypeDef"
-
-  and pp_function_type formatter fun_ =
-    Format.pp_print_string formatter "(";
-
-    List.iteri
-      ~f:(fun index param ->
-        let (name, ty) = param in
-        Format.pp_print_string formatter name;
-        Format.pp_print_string formatter ": ";
-        pp formatter ty;
-        if index <> (List.length fun_.tfun_params) - 1 then (
-          Format.pp_print_string formatter ", "
-        )
-      )
-      fun_.tfun_params;
-
-    Format.pp_print_string formatter ") => ";
-    pp formatter fun_.tfun_ret *)
-  
 end
 
 and TypeDef : sig
@@ -122,14 +62,14 @@ and TypeDef : sig
     fun_return: TypeExpr.t;
   }
 
-  and cls = {
-    properties: (string * t) list;
-    methods: (string * _function) list;
+  and class_type = {
+    tcls_extends:    t option;
+    tcls_elements: (string * int) list;
   }
 
   and spec =
     | Primitive
-    | Class of cls 
+    | Class of class_type 
     | Alias of TypeExpr.t
     | Module_ of module_type
     | Function of _function
@@ -172,14 +112,14 @@ end = struct
     fun_return: TypeExpr.t;
   }
 
-  and cls = {
-    properties: (string * t) list;
-    methods: (string * _function) list;
+  and class_type = {
+    tcls_extends:    t option;
+    tcls_elements: (string * int) list;
   }
 
   and spec =
     | Primitive
-    | Class of cls 
+    | Class of class_type 
     | Alias of TypeExpr.t
     | Module_ of module_type
     | Function of _function

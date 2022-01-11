@@ -207,6 +207,10 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       ty_var, (T.Expression.Call { callee; call_params; call_loc })
     )
 
+    (*
+     * namespace property
+     * 
+     *)
     | Member _
     | Unary _ -> -1, failwith "not implemented"
 
@@ -407,28 +411,97 @@ and annotate_declaration env decl : T.Declaration.t =
  * class annotation is done in two phase
  * 1. scan all methods and properties, infer `this`
  * 2. annotate all methods and collect dependencies
+ *
  *)
 and annotate_class env cls =
   let open Ast.Declaration in
-  (* let annotate_body_element elem =
-    match elem with
-    | Cls_method _method ->
-      failwith "n"
 
-    | Cls_property _ -> failwith "n"
+  let cls_var = Option.value_exn ((Env.peek_scope env)#find_var_symbol cls.cls_id.pident_name) in
 
-  in *)
+  let class_scope = new class_scope ~prev:(Env.peek_scope env) () in
+
+  let tcls_elements = ref [] in
+
+  let ctx = Env.ctx env in
+  (* prescan class property and method *)
+  List.iter
+    ~f:(fun item ->
+      match item with
+      | Cls_method _method -> (
+        let { cls_method_name; cls_method_visibility; cls_method_loc; _ } = _method in
+        let node = {
+          value = TypeExpr.Unknown;
+          deps = [];
+          loc = cls_method_loc;
+          check = none;
+        } in
+        let node_id = Type_context.new_id ctx node in
+        tcls_elements := ((cls_method_name.pident_name, node_id)::!tcls_elements);
+        class_scope#insert_cls_element
+          cls_method_name.pident_name
+          (Scope.Cls_method {
+            method_id = node_id;
+            method_visibility = cls_method_visibility;
+          })
+      )
+      | Cls_property property -> (
+        let { cls_property_name; cls_property_type; cls_property_loc; cls_property_visibility; _ } = property in
+        let property_ty, deps = annotate_type env cls_property_type in
+        let node = {
+          value = property_ty;
+          deps;
+          loc = cls_property_loc;
+          check = none;
+        } in
+        let node_id = Type_context.new_id ctx node in
+        tcls_elements := ((cls_property_name.pident_name, node_id)::!tcls_elements);
+        class_scope#insert_cls_element
+          cls_property_name.pident_name
+          (Scope.Cls_property {
+            prop_id = node_id;
+            prop_visibility = cls_property_visibility;
+          })
+      )
+    )
+    cls.cls_body.cls_body_elements;
+
+  Type_context.update_node_type ctx cls_var.var_id (TypeExpr.TypeDef (
+    { TypeDef.
+      builtin = false;
+      name = cls.cls_id.pident_name;
+      spec = Class { tcls_extends = None; tcls_elements = List.rev !tcls_elements };
+    }
+  ));
+
   let annotate_class_body body =
-    let { cls_body_elements = _; cls_body_loc; } = body in
+    let { cls_body_elements; cls_body_loc; } = body in
     let cls_body_elements =
-      []
-      (* TODO *)
-      (* List.map ~f:annotate_body_element cls_body_elements *)
+      List.map ~f:(fun elm ->
+        match elm with
+        | Cls_method _method -> (
+          let { cls_method_visibility; cls_method_modifier; cls_method_loc; _ } = _method in
+          T.Declaration.Cls_method {
+            T.Declaration.
+            cls_method_visibility;
+            cls_method_modifier;
+            cls_method_loc;
+          }
+        )
+        | Cls_property prop -> (
+          let { cls_property_visibility; cls_property_loc; cls_property_name; _ } = prop in
+          T.Declaration.Cls_property {
+            T.Declaration.
+            cls_property_loc;
+            cls_property_visibility;
+            cls_property_name;
+          }
+        )
+      )
+      cls_body_elements
     in
     { T.Declaration. cls_body_elements; cls_body_loc}
   in
 
-  let class_scope = new scope ~prev:(Env.peek_scope env) () in
   Env.with_new_scope env class_scope (fun env ->
     let { cls_id; cls_visibility; cls_type_vars = _; cls_loc; cls_body; cls_comments; _ } = cls in
     let cls_id = annotate_identifer env cls_id in

@@ -1,6 +1,7 @@
 open Lichenscript_typing.Typedtree
 open Lichenscript_codegen_utils
 open Lichenscript_typing
+open Lichenscript_parsing
 open Core_kernel
 
 let main_snippet main_name = {|
@@ -143,11 +144,43 @@ and codegen_declaration env decl =
   let open Declaration in
   let { spec; _ } = decl in
   match spec with
-  | Class _ -> ()
+  | Class cls -> codegen_class env cls
   | Function_ _fun -> codegen_function env _fun
   | Declare _ -> ()
   | Enum _ -> ()
   | Import _ -> ()
+
+and codegen_class env _class =
+  let open Declaration in
+  let { cls_id; cls_body; _ } = _class in
+  let name = (match cls_id with
+  | (name, _) -> name
+  ) in
+  ps env (Format.sprintf "typedef struct %s {" name);
+  endl env;
+
+  with_indent env (fun () -> 
+    print_indents env;
+    ps env "LC_OBJ_HEADER";
+    endl env;
+
+    List.iter
+      ~f:(fun elm ->
+        match elm with
+        | Cls_method _ -> ()
+        | Cls_property prop -> (
+          let { cls_property_name; _ } = prop in
+          print_indents env;
+          ps env (Format.sprintf "LCValue %s;" cls_property_name.pident_name);
+          endl env;
+        )
+      )
+      cls_body.cls_body_elements;
+  );
+
+  ps env (Format.sprintf "} %s;" name);
+  endl env;
+  ()
 
 and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
   let open Expression in
@@ -233,7 +266,8 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
       failwith (Format.sprintf "can not find external %s %d\n" sym_name sym_id)
     )
     | _ ->
-      failwith "not implemented 3"
+      pss env "MK_NULL()"
+      (* failwith "not implemented 3" *)
 
   )
 
@@ -259,7 +293,10 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
     pss env ";"
   )
 
-  | Init _ -> ()
+  | Init init -> (
+    let { Ast.Expression. init_name; _ } = init in
+    pss env (Format.sprintf "%s_init()" init_name.pident_name);
+  )
 
   | Block  _ -> ()
 

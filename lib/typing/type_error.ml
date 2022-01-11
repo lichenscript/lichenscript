@@ -38,7 +38,6 @@ module PP = struct
       type_value ~ctx formatter node.value
     )
     | Ctor _ -> Format.pp_print_string formatter "ctor"
-    | Class _ -> Format.pp_print_string formatter "class"
     | Function _ -> Format.pp_print_string formatter "function"
     | Module _ -> Format.pp_print_string formatter "module"
     | Array _ -> Format.pp_print_string formatter "array"

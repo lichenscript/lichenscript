@@ -92,7 +92,6 @@ let rec print_type_by_id ctx id =
     name ^ "<>"
   ) *)
 
-  | Class _ -> "class"
   | Function _ -> "function"
   | Module _ -> "module"
   | Array _ -> "array"

@@ -13,8 +13,12 @@ class Base {
 
 class Child extends Base {
 
+    name: string
+
     static new(): Child {
-        return Child {};
+        return Child {
+            name: "Hello World",
+        };
     }
 
     override printName() {

@@ -685,7 +685,7 @@ and parse_class_body env: Declaration.class_body =
         Cls_method {
           cls_method_attributes = attributes;
           cls_method_modifier;
-          cls_method_visiblity = v;
+          cls_method_visibility = v;
           cls_method_name = id;
           cls_method_params = params;
           cls_method_body;
@@ -695,34 +695,18 @@ and parse_class_body env: Declaration.class_body =
       end
     else
       begin
-        let cls_property_type = 
-          if Peek.token env == Token.T_COLON then
-            begin
-              Eat.token env;
-              Some (parse_type env)
-            end
-          else
-            None
-        in
+        Expect.token env Token.T_COLON;
+        let cls_property_type = parse_type env in
 
-        let cls_property_init =
-          if Peek.token env == Token.T_ASSIGN then
-            begin
-              Eat.token env;
-              Some (parse_expression env)
-            end
-          else
-            None
-        in
-
-        Expect.token env Token.T_SEMICOLON;
+        if (Peek.token env) = Token.T_SEMICOLON then (
+          Eat.token env;
+        );
         Cls_property {
           cls_property_attributes = attributes;
-          cls_property_visiblity = v;
+          cls_property_visibility = v;
           cls_property_loc = with_start_loc env start_pos;
           cls_property_name = id;
           cls_property_type;
-          cls_property_init;
         }
     end
   in
@@ -995,9 +979,34 @@ and parse_primary_expression env : Expression.t =
       match Peek.token env with
       | Token.T_LCURLY -> (
         Eat.token env;
+        let init_entries = ref [] in
+
+        while (Peek.token env) <> Token.T_RCURLY do
+          let start_loc = Peek.loc env in
+          let init_entry_key = parse_identifier env in
+          let init_entry_value =
+            if (Peek.token env) = Token.T_COLON then (
+              Eat.token env;
+              Some (parse_expression env)
+            ) else
+              None
+          in
+          let entry = {
+            Expression.
+            init_entry_key;
+            init_entry_value;
+            init_entry_loc = with_start_loc env start_loc;
+          } in
+          init_entries := entry::(!init_entries);
+          if (Peek.token env) <> Token.T_RCURLY then (
+            Expect.token env T_COMMA
+          )
+        done;
+
         Expect.token env Token.T_RCURLY;
         Init {
-          init_entries = [];
+          init_name = ident;
+          init_entries = List.rev !init_entries;
           init_loc = with_start_loc env start_loc;
         }
       )
