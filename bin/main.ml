@@ -38,78 +38,98 @@ let rec main () =
   let command = Array.get args !index in
   index := !index + 1;
   match command with
-  | "build" -> build_command args index
+  | "build" -> ignore (build_command args index)
+  | "run" -> build_and_run args index
   | _ -> (
     Format.printf "unkown command %s\n" command;
     ignore (exit 1)
   )
 
-and build_command args index =
+and build_and_run args index =
+  let build_result = build_command args index in
+  match build_result with
+  | Some path ->
+    run_bin_path path
+
+  | None -> ()
+
+and build_command args index : string option =
   if !index >= (Array.length args) then (
     Format.printf "%s" build_help_message;
-    ignore (exit 1)
-  );
-  let entry = ref None in
-  let std = ref None in
-  let buildDir = ref None in
-  let platform = ref "native" in
-  let baseDir = ref Filename.current_dir_name in
-  while !index < (Array.length args) do
-    let item = Array.get args !index in
-    index := !index + 1;
-    match item with
-    | "-h" | "--help" ->
-      Format.printf "%s" build_help_message;
-      ignore (exit 0)
-
-    | "--std" -> (
-      if !index >= (Array.length args) then (
-        Format.printf "not enough args for --std\n";
-        ignore (exit 1)
-      );
-      std := Some (Array.get args !index);
-      index := !index + 1;
-    )
-
-    | "--build-dir" | "-D" -> (
-      if !index >= (Array.length args) then (
-        Format.printf "not enough args for --build-dir\n";
-        ignore (exit 1)
-      );
-      buildDir := Some (Array.get args !index);
-      index := !index + 1;
-    )
-
-    | "--platform" -> (
-      if !index >= (Array.length args) then (
-        Format.printf "not enough args for --platform\n";
-        ignore (exit 1)
-      );
-      platform := (Array.get args !index);
-      index := !index + 1;
-    )
-
-    | "--base" -> (
-      if !index >= (Array.length args) then (
-        Format.printf "not enough args for --base\n";
-        ignore (exit 1)
-      );
-      baseDir := (Array.get args !index) |> Filename.realpath;
-      index := !index + 1;
-    )
-
-    | _ ->
-      entry := Some item
-
-  done;
-  if Option.is_none !entry then (
-    Format.printf "Error: no input files\n";
-    ignore (exit 1)
+    ignore (exit 1);
+    None
   ) else 
-    build_entry (Option.value_exn !entry) !std !buildDir
+    let entry = ref None in
+    let std = ref None in
+    let buildDir = ref None in
+    let platform = ref "native" in
+    let baseDir = ref Filename.current_dir_name in
+    while !index < (Array.length args) do
+      let item = Array.get args !index in
+      index := !index + 1;
+      match item with
+      | "-h" | "--help" ->
+        Format.printf "%s" build_help_message;
+        ignore (exit 0)
 
-and build_entry (entry: string) std_dir build_dir =
+      | "--std" -> (
+        if !index >= (Array.length args) then (
+          Format.printf "not enough args for --std\n";
+          ignore (exit 1)
+        );
+        std := Some (Array.get args !index);
+        index := !index + 1;
+      )
+
+      | "--build-dir" | "-D" -> (
+        if !index >= (Array.length args) then (
+          Format.printf "not enough args for --build-dir\n";
+          ignore (exit 1)
+        );
+        buildDir := Some (Array.get args !index);
+        index := !index + 1;
+      )
+
+      | "--platform" -> (
+        if !index >= (Array.length args) then (
+          Format.printf "not enough args for --platform\n";
+          ignore (exit 1)
+        );
+        platform := (Array.get args !index);
+        index := !index + 1;
+      )
+
+      | "--base" -> (
+        if !index >= (Array.length args) then (
+          Format.printf "not enough args for --base\n";
+          ignore (exit 1)
+        );
+        baseDir := (Array.get args !index) |> Filename.realpath;
+        index := !index + 1;
+      )
+
+      | _ ->
+        entry := Some item
+
+    done;
+    if Option.is_none !entry then (
+      Format.printf "Error: no input files\n";
+      ignore (exit 1);
+      None
+    ) else 
+      build_entry (Option.value_exn !entry) !std !buildDir
+
+and build_entry (entry: string) std_dir build_dir: string option =
   Resolver.compile_file_path ~std_dir ~build_dir entry
+
+and run_bin_path path =
+  match Unix.fork () with
+  | `In_the_child -> (
+    ignore (Unix.exec ~prog:path ~argv:[path] ())
+  )
+  | `In_the_parent pid -> (
+    Unix.waitpid_exn pid
+  )
 
 ;;
 

@@ -298,6 +298,7 @@ let rec compile_file_path ~std_dir ~build_dir entry_file_path =
     let bin_name = entry_file_path |> last_piece_of_path |> (Filename.chop_extension) in
     write_makefiles ~bin_name build_dir [ (mod_name, output_path) ];
     run_make_in_dir build_dir;
+    Some (Filename.concat build_dir bin_name)
   with
     | TypeCheckError errors ->
       List.iter
@@ -307,7 +308,8 @@ let rec compile_file_path ~std_dir ~build_dir entry_file_path =
           let start = loc.start in
           Format.printf "%d:%d %a\n" start.line start.column (Type_error.PP.error_spec ~ctx) spec
         )
-        errors
+        errors;
+      None
 
     | Parse_error.Error errors
     | ParseError errors ->
@@ -318,23 +320,15 @@ let rec compile_file_path ~std_dir ~build_dir entry_file_path =
           let start = perr_loc.start in
           Format.printf "%d:%d %a\n" start.line start.column Parse_error.PP.error err
         )
-        errors
+        errors;
+      None
 
     | Type_error.Error e ->
       let { Type_error. spec; loc; ctx } = e in
       print_loc_title ~prefix:"type error" loc;
       let start = loc.start in
-      Format.printf "%d:%d %a\n" start.line start.column (Type_error.PP.error_spec ~ctx) spec
-
-    (* | e ->
-      let string = Exn.to_string e in
-      print_error_prefix ();
-      Out_channel.printf "%s\n" string;
-      let stack = Printexc.get_backtrace () in
-      Out_channel.print_string TermColor.grey;
-      Out_channel.print_string stack;
-      Out_channel.print_string TermColor.reset;
-      Out_channel.print_endline "" *)
+      Format.printf "%d:%d %a\n" start.line start.column (Type_error.PP.error_spec ~ctx) spec;
+      None
 
 and write_to_file build_dir mod_name content: string =
   let build_dir =

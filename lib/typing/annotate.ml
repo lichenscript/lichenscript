@@ -365,7 +365,6 @@ and annotate_declaration env decl : T.Declaration.t =
           value = TypeExpr.Unknown;
         } in *)
 
-        Format.eprintf "declare %s of %d\n" id.pident_name ty_id;
         Type_context.update_node (Env.ctx env) ty_id {
           node with
           deps = params_types;

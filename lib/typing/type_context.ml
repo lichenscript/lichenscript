@@ -66,7 +66,6 @@ let update_node_type ctx id ty =
   update_node ctx id { old_node with value = ty }
 
 let set_external_symbol ctx id symbol =
-  Format.eprintf "external %d %s\n" id symbol;
   Hashtbl.set ctx.external_symbol ~key:id ~data:symbol
 
 let find_external_symbol ctx id =
