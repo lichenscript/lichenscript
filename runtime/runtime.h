@@ -25,6 +25,7 @@ typedef enum LCObjectType {
 
 typedef struct LCObjectHeader {
     uint32_t     count;
+    uint32_t     class_id;
 } LCObjectHeader;
 
 typedef struct LCObject {
@@ -70,7 +71,8 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 #define MK_I32(v) ((LCValue) { { .int_val = v }, LC_TY_I32 })
 #define MK_F32(v) ((LCValue) { { .float_val = v }, LC_TY_F32 })
 #define MK_BOOL(v) ((LCValue) { { .int_val = v }, LC_TY_BOOL })
-#define MK_VARIANT_CLOSED(v) (LCValue) { { .int_val = v }, (LC_TY_MAX + (v << 6)) }
+#define MK_VARIANT_CLOSED(v) ((LCValue) { { .int_val = v }, (LC_TY_MAX + (v << 6)) })
+#define MK_CLASS_OBJ(obj) ((LCValue){ { .ptr_val = (LCObject*)obj }, LC_TY_CLASS_OBJECT })
 #define LC_I32_EQ(l, r) MK_BOOL((l).int_val == (r).int_val)
 #define LC_I32_NOT_EQ(l, r) MK_BOOL((l).int_val != (r).int_val)
 #define LC_I32_LT(l, r) MK_BOOL((l).int_val < (r).int_val)
@@ -118,6 +120,7 @@ typedef struct LCMallocState {
 typedef struct LCRuntime LCRuntime;
 
 typedef LCValue (*LCCFunction)(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args);
+typedef void (*LCFinalizer)(LCRuntime* rt, LCValue obj);
 
 typedef struct LCProgram {
     LCRuntime* runtime;
@@ -131,11 +134,11 @@ void LCFreeRuntime(LCRuntime* rt);
 
 void* lc_malloc(LCRuntime* rt, size_t size);
 void* lc_mallocz(LCRuntime* rt, size_t size);
+void* lc_realloc(LCRuntime* rt, void*, size_t size);
 void lc_free(LCRuntime* rt, void *);
 
 void LCRetain(LCValue obj);
 void LCRelease(LCRuntime* rt, LCValue obj);
-
 typedef struct LCLambda {
     LC_OBJ_HEADER
     void*   c_fun;
@@ -156,31 +159,30 @@ typedef struct LCArray {
     LCValue* data;
 } LCArray;
 
-// A global unique ID for class method
-typedef uint64_t LCClassObjectMethodID;
-
-typedef struct LCClassObjectMethod {
-    LCClassObjectMethodID id;
+typedef struct LCClassMethodDef {
     const char* name;
     void* fun_ptr;
     struct LCClassObjectMethod* next;
-} LCClassObjectMethod;
+} LCClassMethodDef;
 
-typedef struct LCClassObjectMeta {
-    LC_OBJ_HEADER
+typedef struct LCClassDef {
     const char* name;  // class name
-    LCClassObjectMethod* methods;
-} LCClassObjectMeta;
+    LCClassMethodDef* methods;
+    LCFinalizer finalizer;
+} LCClassDef;
+
+typedef uint32_t LCClassID;
 
 // ClassClassObjectMethodString("hello")  // slow
 // ClassClassObjectMethodID(123)  // quick
 typedef struct LCClassObject {
     LC_OBJ_HEADER
-    LCClassObjectMeta* meta;
     size_t    properties_size;
     LCValue   properties[];
 } LCClassObject;
 
-LCClassObject* LCNewClassObject(LCRuntime* rt, LCClassObjectMeta* meta, uint32_t slot_count);
+LCClassObject* LCNewClassObject(LCRuntime* rt, uint32_t slot_count);
+LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def);
 
 LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
+void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCObject* obj);

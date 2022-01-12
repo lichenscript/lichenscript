@@ -5,11 +5,16 @@
 #include "stdio.h"
 
 #define LC_INIT_SYMBOL_BUCKET_SIZE 128
+#define LC_INIT_CLASS_META_CAP 8
 #define I64_POOL_SIZE 1024
 
 #define lc_raw_malloc malloc
 #define lc_raw_realloc realloc
 #define lc_raw_free free
+
+typedef struct LCClassMeta {
+    LCClassDef* cls_def;
+} LCClassMeta;
 
 typedef struct LCRuntime {
     LCMallocState malloc_state;
@@ -19,6 +24,9 @@ typedef struct LCRuntime {
     uint32_t symbol_len;
     LCValue* i64_pool;
     LCBox64* i64_pool_space;
+    uint32_t cls_meta_cap;
+    uint32_t cls_meta_size;
+    LCClassMeta* cls_meta_data;
 } LCRuntime;
 
 static inline uint32_t hash_string8(const uint8_t *str, size_t len, uint32_t h)
@@ -84,11 +92,6 @@ static void FreeClassObject(LCRuntime* rt, LCClassObject* clsObj) {
     lc_free(rt, clsObj);
 }
 
-static void FreeClassObjectMeta(LCRuntime* rt, LCClassObjectMeta* meta) {
-
-    lc_free(rt, meta);
-}
-
 static void FreeArray(LCRuntime* rt, LCArray* arr) {
     uint32_t i;
     for (i = 0; i < arr->len; i++) {
@@ -148,6 +151,10 @@ void* lc_mallocz(LCRuntime* rt, size_t size) {
     return ptr;
 }
 
+void* lc_realloc(LCRuntime* rt, void* ptr, size_t size) {
+    return lc_raw_realloc(ptr, size);
+}
+
 void lc_free(LCRuntime* rt, void* ptr) {
     rt->malloc_state.malloc_count--;
     lc_raw_free(ptr);
@@ -169,6 +176,10 @@ LCRuntime* LCNewRuntime() {
 
     runtime->i64_pool = init_i64_pool(runtime);
 
+    runtime->cls_meta_cap = LC_INIT_CLASS_META_CAP;
+    runtime->cls_meta_size = 0;
+    runtime->cls_meta_data = lc_malloc(runtime, sizeof(LCClassMeta) * runtime->cls_meta_cap);
+
     return runtime;
 }
 
@@ -188,6 +199,8 @@ void LCFreeRuntime(LCRuntime* rt) {
     lc_free(rt, rt->symbol_buckets);
 
     free_i64_pool(rt);
+
+    lc_free(rt, rt->cls_meta_data);
 
     if (rt->malloc_state.malloc_count != 1) {
         fprintf(stderr, "LichenScript: memory leaks %zu\n", rt->malloc_state.malloc_count);
@@ -296,7 +309,7 @@ LCValue LCNewSymbol(LCRuntime* rt, const char* content) {
     return LCNewSymbolLen(rt, content, strlen(content));
 }
 
-LCClassObject* LCNewClassObject(LCRuntime* rt, LCClassObjectMeta* meta, uint32_t slot_count) {
+LCClassObject* LCNewClassObject(LCRuntime* rt, uint32_t slot_count) {
     uint32_t acquire_len = sizeof(LCClassObject) + sizeof(uint64_t) * slot_count;
     LCClassObject* result = lc_mallocz(rt, sizeof(LCClassObject));
     memset(result, 0, acquire_len);
@@ -348,6 +361,24 @@ static void std_print_val(LCRuntime* rt, LCValue val) {
         break;
     }
 
+}
+
+LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def) {
+    LCClassID id = rt->cls_meta_size++;
+
+    if (rt->cls_meta_size >= rt->cls_meta_cap) {
+        rt->cls_meta_cap *= 2;
+        rt->cls_meta_data = lc_realloc(rt, rt->cls_meta_data, sizeof(LCClassMeta) * rt->cls_meta_cap);
+    }
+
+    rt->cls_meta_data[id].cls_def = cls_def;
+
+    return id;
+}
+
+void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCObject* obj) {
+    obj->header.count = 1;
+    obj->header.class_id = cls_id;
 }
 
 LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
