@@ -25,14 +25,21 @@ module rec TypeExpr : sig
      * saying `a` is an instance of Person
      *
      * One thing to notice, contants are also instances:
-     * 1,2,3 are instance of i32
-     * "string" is instance of String
+     * 1,2,3 are instances of i32
+     * "string" is instances of String
      *)
     | Ctor of int * (t list)
 
     (*
-     * On the contract of Ctor, `Ref` represents the original type itself.
-     * I guess this is used internally, such as referring a method of a class.
+     * 1. On the contract of Ctor, `Ref` represents the original type itself.
+     *    I guess this is used internally, such as referring a method of a class.
+     *
+     * 2. Ref also represents reference to another TypeExpr, for example:
+     *
+     *    let a: '1 = "hello" '2;
+     *
+     *    Node '1 is referring Node '2
+     *
      *)
     | Ref of int
 

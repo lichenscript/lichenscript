@@ -183,7 +183,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         check = (fun id ->
           let ctx = Env.ctx env in
           let ty_int = callee.ty_var in
-          let ty_def = Check_helper.find_to_typedef ctx ty_int in
+          let ty_def = Check_helper.find_construct_of ctx ty_int in
           match ty_def with
           | Some ({ TypeDef. spec = Function _fun; _ }, _) ->
             (* TODO: check call params *)
@@ -232,8 +232,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
             in
 
             match result with
-            | Some (_, memeber_id) ->
-              Type_context.update_node_type ctx id (TypeExpr.Ref memeber_id)
+            | Some (_, member_id) ->
+              Type_context.update_node_type ctx id (TypeExpr.Ref member_id)
 
             | _ -> raise_error ()
           )
@@ -258,9 +258,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         loc;
         check = (fun id ->
           let ctx = Env.ctx env in
-          let left_def_opt = Check_helper.find_to_typedef ctx left.ty_var in
-          let right_def_opt = Check_helper.find_to_typedef ctx right.ty_var in
-          Format.printf "bin: %d, left: %d, right: %d\n" id left.ty_var right.ty_var;
+          let left_def_opt = Check_helper.find_construct_of ctx left.ty_var in
+          let right_def_opt = Check_helper.find_construct_of ctx right.ty_var in
           match (left_def_opt, right_def_opt) with
           | (Some (left_sym, left_id), Some (right_sym, _)) -> (
             if not (Check_helper.type_addable left_sym right_sym) then (
@@ -295,7 +294,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         )
       in
       let value = (TypeExpr.Ctor ((Env.ty_unit env), [])) in
-      Format.printf "assign var to: %d\n" ty_int;
       let next_id = Type_context.new_id ctx {
         value;
         deps = [ expr.ty_var; ty_int ];
@@ -324,9 +322,28 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       T.Block.(block.return_ty), (T.Expression.Block block)
     )
 
-    | Init _init ->
-      failwith "not implemented"
-      (* T.Expression.Init init *)
+    | Init init -> (
+      let { init_loc; init_name; _ } = init in
+      let ctx = Env.ctx env in
+      let type_int = (Env.peek_scope env)#find_type_symbol init_name.pident_name in
+      match type_int with
+      | Some v -> (
+        let node = {
+          value = TypeExpr.Ctor(v, []);
+          loc = init_loc;
+          deps = [];
+          (* TODO: check props and expressions *)
+          check = none;
+        } in
+        let node_id = Type_context.new_id ctx node in
+        node_id, T.Expression.Init init
+      )
+      | None -> (
+        let err = Type_error.(make_error ctx init_loc (CannotFindName init_name.pident_name)) in
+        raise (Type_error.Error err)
+      )
+
+    )
 
   in
   { T.Expression.
@@ -357,12 +374,12 @@ and annotate_block ~prev_deps env block : T.Block.t =
       match last_opt with
       | Some { Typedtree.Statement. spec = Expr expr ; _ } -> (
         let ty_var = Typedtree.Expression.(expr.ty_var) in
-        Type_context.update_node_type ctx id (TypeExpr.Ctor (ty_var, []))
+        Type_context.update_node_type ctx id (TypeExpr.Ref ty_var)
       )
 
       | _ -> (
         let unit_type = Env.ty_unit env in
-        Type_context.update_node_type ctx id (TypeExpr.Ctor (unit_type, []))
+        Type_context.update_node_type ctx id (TypeExpr.Ctor(unit_type, []))
       )
     );
   } in
@@ -476,7 +493,8 @@ and annotate_class env cls =
 
   let tcls_static_elements = ref [] in
   let tcls_elements = ref [] in
-  let cls_deps = ref [] in
+  let props_deps = ref [] in
+  let method_deps = ref [] in
 
   let ctx = Env.ctx env in
   (* prescan class property and method *)
@@ -523,7 +541,7 @@ and annotate_class env cls =
          * the class itself depends on all the properties
          * all the method depends on the class
          *)
-        cls_deps := node_id::(!cls_deps);
+         props_deps := node_id::(!props_deps);
 
         class_scope#insert_cls_element
           cls_property_name.pident_name
@@ -541,7 +559,7 @@ and annotate_class env cls =
       let var = (Env.peek_scope env)#find_var_symbol extend.pident_name in
       match var with
       | Some var ->
-        cls_deps := (var.var_id)::!cls_deps;
+        props_deps := (var.var_id)::!props_deps;
 
       | None -> (
         let err = Type_error.(make_error (Env.ctx env) extend.pident_loc (CannotFindName extend.pident_name)) in
@@ -550,39 +568,62 @@ and annotate_class env cls =
     )
     cls.cls_extends;
 
-  Type_context.map_node ctx 
-    ~f:(fun node -> {
-      node with
-      value = TypeExpr.TypeDef (
-        { TypeDef.
-          builtin = false;
-          name = cls.cls_id.pident_name;
-          spec = Class {
-            tcls_extends = None;
-            tcls_elements = List.rev !tcls_elements;
-            tcls_static_elements = List.rev !tcls_static_elements;
-          };
-        }
-      );
-      loc = cls.cls_loc;
-      deps = List.rev !cls_deps;
-    })
-    cls_var.var_id;
-
   let annotate_class_body body =
     let { cls_body_elements; cls_body_loc; } = body in
     let cls_body_elements =
       List.map ~f:(fun elm ->
         match elm with
         | Cls_method _method -> (
-          let { cls_method_attributes; cls_method_visibility; cls_method_modifier; cls_method_name; cls_method_params; cls_method_loc; _ } = _method in
+          let { cls_method_attributes; cls_method_visibility; cls_method_modifier; cls_method_name; cls_method_params; cls_method_loc; cls_method_body; cls_method_return_ty; _ } = _method in
           let method_id =
-            match (class_scope#find_cls_element cls_method_name.pident_name) with
-            | Some (Scope.Cls_method { method_id; _ }) -> method_id
-            | Some _ -> failwith "unexpected: expect class method, but got property"
-            | None -> failwith (Format.sprintf "unexpected: can not find class method %s" cls_method_name.pident_name)
+            match cls_method_modifier with
+            | Some Ast.Declaration.Cls_modifier_static -> (
+              let result = List.find ~f:(fun (name, _) -> String.equal name cls_method_name.pident_name) !tcls_static_elements in
+              match result with
+              | Some (_, id) -> id
+              | None ->
+                failwith (Format.sprintf "unexpected: can not find static class method %s" cls_method_name.pident_name)
+            )
+
+            | _ -> (
+              match (class_scope#find_cls_element cls_method_name.pident_name) with
+              | Some (Scope.Cls_method { method_id; _ }) -> method_id
+              | Some _ -> failwith "unexpected: expect class method, but got property"
+              | None -> failwith (Format.sprintf "unexpected: can not find class method %s" cls_method_name.pident_name)
+            )
           in
-          let cls_method_params, _cls_method_params = annotate_function_params env cls_method_params in
+          let cls_method_params, cls_method_params_deps = annotate_function_params env cls_method_params in
+          let cls_method_body = Option.map ~f:(annotate_block ~prev_deps:cls_method_params_deps env) cls_method_body in
+
+          let fun_return, return_ty_deps =
+            match cls_method_return_ty with
+            | Some ty -> annotate_type env ty
+            | None -> (
+              let unit_type = Env.ty_unit env in
+              TypeExpr.(Ctor (unit_type, [])), [unit_type]
+            )
+          in
+
+          let new_type = {
+            TypeDef.
+            builtin = false;
+            name = cls_method_name.pident_name;
+            spec = Function {
+              fun_params = [];
+              fun_return;
+            };
+          } in
+
+          method_deps := List.concat [ [method_id]; !method_deps; return_ty_deps];
+
+          Type_context.map_node ctx
+            ~f:(fun node -> {
+              node with
+              deps = List.rev !props_deps;
+              value = (TypeExpr.TypeDef new_type);
+            })
+            method_id
+            ;
           T.Declaration.Cls_method {
             T.Declaration.
             cls_method_attributes;
@@ -590,7 +631,7 @@ and annotate_class env cls =
             cls_method_modifier;
             cls_method_params;
             cls_method_name = (cls_method_name.pident_name, method_id);
-            cls_method_body = None;
+            cls_method_body;
             cls_method_loc;
           }
         )
@@ -613,6 +654,26 @@ and annotate_class env cls =
     let { cls_id; cls_visibility; cls_type_vars = _; cls_loc; cls_body; cls_comments; _ } = cls in
     let cls_id = annotate_identifer env cls_id in
     let cls_body = annotate_class_body cls_body in
+
+    Type_context.map_node ctx 
+      ~f:(fun node -> {
+        node with
+        value = TypeExpr.TypeDef (
+          { TypeDef.
+            builtin = false;
+            name = cls.cls_id.pident_name;
+            spec = Class {
+              tcls_extends = None;
+              tcls_elements = List.rev !tcls_elements;
+              tcls_static_elements = List.rev !tcls_static_elements;
+            };
+          }
+        );
+        loc = cls.cls_loc;
+        deps = if List.is_empty !method_deps then List.rev !props_deps else List.rev !method_deps;
+      })
+      cls_var.var_id;
+
     { T.Declaration. cls_id; cls_visibility; cls_body; cls_loc; cls_comments; }
   )
 

@@ -23,6 +23,11 @@ module%gen rec Expression : sig
     attributes: Ast.attributes;
   }
 
+  and init = {
+    init_loc: Loc.t;
+    init_name: (string * int);
+  }
+
   and spec =
     | Constant of Ast.Literal.t
     | Identifier of (string * int)
