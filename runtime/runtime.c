@@ -376,6 +376,10 @@ LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def) {
     return id;
 }
 
+void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_method, size_t size) {
+
+}
+
 void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCObject* obj) {
     obj->header.count = 1;
     obj->header.class_id = cls_id;

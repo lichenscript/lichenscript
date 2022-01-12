@@ -19,9 +19,13 @@ int main() {
 }
 |}
 
-type cls_init_tuple = {
-  cls_id_name: string;
-  cls_init_method_name: string;
+type cls_init =
+  | InitClass of (string * string)
+  | InitMethods of (string * string)
+
+type cls_method_entry = {
+  cls_method_origin_name: string;
+  cls_method_gen_name: string;
 }
 
 type t = {
@@ -31,7 +35,7 @@ type t = {
   mutable buffer: Buffer.t;
   mutable statements: string list;
   mutable scope: Codegen_scope.scope;
-  mutable cls_inits: cls_init_tuple list;
+  mutable cls_inits: cls_init list;
 }
 
 type stmt_env = {
@@ -168,6 +172,7 @@ and codegen_class env _class =
   let class_id_var_name = name ^ "_class_id" in
   ps env (Format.sprintf "static LCClassID %s;\n" class_id_var_name);
 
+  (* gen properties *)
   ps env (Format.sprintf "typedef struct %s {" name);
   endl env;
 
@@ -192,6 +197,25 @@ and codegen_class env _class =
 
   ps env (Format.sprintf "} %s;" name);
   endl env;
+
+  let methods = ref [] in
+
+  (* gen methods *)
+  List.iter
+    ~f:(fun elm ->
+      match elm with
+      | Cls_property _ -> ()
+      | Cls_method _method -> (
+        let method_name, _ = _method.cls_method_name in
+        let gen_name = Format.sprintf "%s__%s" name method_name in
+        ps env (Format.sprintf "LCValue %s(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {\n" gen_name);
+        ps env "    return MK_NULL();\n";
+        ps env "}\n";
+
+        methods := { cls_method_origin_name = method_name; cls_method_gen_name = gen_name }::(!methods)
+      )
+    )
+    cls_body.cls_body_elements;
 
   ps env (Format.sprintf "LCValue %s_init(LCRuntime* rt, LCValue ancester) {\n" name);
   with_indent env (fun () ->
@@ -227,7 +251,23 @@ and codegen_class env _class =
   );
   ps env "};\n";
 
-  env.cls_inits <- { cls_id_name = class_id_var_name; cls_init_method_name = class_def_name }::env.cls_inits;
+  env.cls_inits <- (InitClass (class_id_var_name, class_def_name))::env.cls_inits;
+
+  if not (List.is_empty !methods) then (
+    let method_def_name = name ^ "_methods" in
+    ps env (Format.sprintf "static LCClassMethodDef %s[] = {\n" method_def_name);
+
+    (!methods
+    |> List.rev
+    |> List.iter
+    ~f:(fun entry ->
+      ps env (Format.sprintf "    {\"%s\", 0, %s},\n" entry.cls_method_origin_name entry.cls_method_gen_name)
+    ));
+
+    ps env "};\n";
+
+    env.cls_inits <- (InitMethods (class_id_var_name, method_def_name))::env.cls_inits;
+  );
 
   ()
 
@@ -470,10 +510,14 @@ let codegen_program ?indent ~ctx (program: Typedtree.program) =
     ps env "void init_class_meta(LCRuntime* rt) {\n";
 
     List.iter
-      ~f:(fun tuple ->
-        ps env (Format.sprintf "    %s = LCDefineClass(rt, &%s);\n" tuple.cls_id_name tuple.cls_init_method_name)
+      ~f:(fun entry ->
+        match entry with
+        | InitClass (id_name, gen_name) ->
+          ps env (Format.sprintf "    %s = LCDefineClass(rt, &%s);\n" id_name gen_name)
+        | InitMethods (id_name, cls_def_name) ->
+          ps env (Format.sprintf "    LCDefineClassMethod(rt, %s, %s, countof(%s));\n" id_name cls_def_name cls_def_name)
       )
-      env.cls_inits;
+      (List.rev env.cls_inits);
 
     ps env "}\n";
     Some "init_class_meta"

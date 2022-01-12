@@ -3,6 +3,9 @@
 #include <stdlib.h>
 
 #define LC_NO_GC 0xFFFFFFFF
+#ifndef countof
+#define countof(x) (sizeof(x) / sizeof((x)[0]))
+#endif
 
 typedef enum LCObjectType {
     LC_TY_BOOL = -3,
@@ -161,8 +164,8 @@ typedef struct LCArray {
 
 typedef struct LCClassMethodDef {
     const char* name;
-    void* fun_ptr;
-    struct LCClassObjectMethod* next;
+    int flag;
+    LCCFunction fun_ptr;
 } LCClassMethodDef;
 
 typedef struct LCClassDef {
@@ -183,6 +186,7 @@ typedef struct LCClassObject {
 
 LCClassObject* LCNewClassObject(LCRuntime* rt, uint32_t slot_count);
 LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def);
+void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_method, size_t size);
 
 LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCObject* obj);
