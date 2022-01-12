@@ -14,6 +14,8 @@
 
 typedef struct LCClassMeta {
     LCClassDef* cls_def;
+    LCClassMethodDef* cls_method;
+    size_t cls_method_size;
 } LCClassMeta;
 
 typedef struct LCRuntime {
@@ -83,13 +85,17 @@ static void FreeLambda(LCRuntime* rt, LCLambda* obj) {
     lc_free(rt, obj);
 }
 
-static void FreeClassObject(LCRuntime* rt, LCClassObject* clsObj) {
-    size_t i;
-    for (i = 0; i < clsObj->properties_size; i++) {
-        LCRelease(rt, clsObj->properties[i]);
+/**
+ * extract the finalizer from the class definition
+ */
+static void FreeClassObject(LCRuntime* rt, LCValue val) {
+    LCObject* clsObj = (LCObject*)val.ptr_val;
+    LCClassID cls_id = clsObj->header.class_id;
+    LCClassMeta* meta = &rt->cls_meta_data[cls_id];
+    LCFinalizer finalizer = meta->cls_def->finalizer;
+    if (finalizer) {
+        finalizer(rt, val);
     }
-
-    lc_free(rt, clsObj);
 }
 
 static void FreeArray(LCRuntime* rt, LCArray* arr) {
@@ -106,7 +112,7 @@ static void FreeObject(LCRuntime* rt, LCValue val) {
         break;
 
     case LC_TY_CLASS_OBJECT:
-        FreeClassObject(rt, (LCClassObject*)val.ptr_val);
+        FreeClassObject(rt, val);
         break;
 
     case LC_TY_ARRAY:
@@ -309,16 +315,6 @@ LCValue LCNewSymbol(LCRuntime* rt, const char* content) {
     return LCNewSymbolLen(rt, content, strlen(content));
 }
 
-LCClassObject* LCNewClassObject(LCRuntime* rt, uint32_t slot_count) {
-    uint32_t acquire_len = sizeof(LCClassObject) + sizeof(uint64_t) * slot_count;
-    LCClassObject* result = lc_mallocz(rt, sizeof(LCClassObject));
-    memset(result, 0, acquire_len);
-
-    LCInitObject(&result->header, LC_TY_CLASS_OBJECT);
-    
-    return result;
-}
-
 LCValue LCRunMain(LCProgram* program) {
     if (program->main_fun == NULL) {
         return MK_NULL();
@@ -377,7 +373,31 @@ LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def) {
 }
 
 void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_method, size_t size) {
+    LCClassMeta* meta = rt->cls_meta_data + cls_id;
+    meta->cls_method = cls_method;
+    meta->cls_method_size = size;
+}
 
+LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_len, LCValue* args) {
+    if (this.type <= 0) {
+        fprintf(stderr, "try to invoke on primitive type");
+        exit(1);
+    }
+
+    LCObject* obj = (LCObject*)this.ptr_val;
+    LCClassID class_id = obj->header.class_id;
+    LCClassMeta* meta = rt->cls_meta_data + class_id;
+
+    size_t i;
+    LCClassMethodDef* method_def;
+    for (i = 0; i < meta->cls_method_size; i++) {
+        method_def = &meta->cls_method[i];
+        if (strcmp(method_def->name, content) == 0) {  // this is it
+            return method_def->fun_ptr(rt, this, arg_len, args);
+        }
+    }
+
+    return MK_NULL();
 }
 
 void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCObject* obj) {

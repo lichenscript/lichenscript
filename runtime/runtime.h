@@ -176,17 +176,12 @@ typedef struct LCClassDef {
 
 typedef uint32_t LCClassID;
 
-// ClassClassObjectMethodString("hello")  // slow
-// ClassClassObjectMethodID(123)  // quick
-typedef struct LCClassObject {
-    LC_OBJ_HEADER
-    size_t    properties_size;
-    LCValue   properties[];
-} LCClassObject;
-
-LCClassObject* LCNewClassObject(LCRuntime* rt, uint32_t slot_count);
 LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def);
 void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_method, size_t size);
+
+// dynamic dispatch by str
+LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_len, LCValue* args);
+// TODO: dynamic dispatch by ATOM
 
 LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCObject* obj);
