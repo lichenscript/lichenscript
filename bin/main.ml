@@ -21,6 +21,7 @@ wtc build <entry> [<args>]
                         default: current directory
   --build-dir, -D <dir> Specify a directory to build,
                         a temp directory will be used if this is not specified.
+  --runtime, -R <dir>   The directory of runtime.
   --std <dir>           Specify the directorey of std library.
                         If this is not passed, use the builtin version.
   --platform <platform> native/wasm/js, default: native
@@ -62,6 +63,7 @@ and build_command args index : string option =
     let entry = ref None in
     let std = ref None in
     let buildDir = ref None in
+    let runtimeDir = ref None in
     let platform = ref "native" in
     let baseDir = ref Filename.current_dir_name in
     while !index < (Array.length args) do
@@ -83,11 +85,20 @@ and build_command args index : string option =
 
       | "--build-dir" | "-D" -> (
         if !index >= (Array.length args) then (
-          Format.printf "not enough args for --build-dir\n";
+          Format.printf "not enough args for %s\n" item;
           ignore (exit 1)
         );
         buildDir := Some (Array.get args !index);
         index := !index + 1;
+      )
+
+      | "--runtime" | "-R" -> (
+        if !index >= (Array.length args) then (
+          Format.printf "not enough args for %s\n" item;
+          ignore (exit 1)
+        );
+        runtimeDir := Some (Array.get args !index);
+        index := !index + 1
       )
 
       | "--platform" -> (
@@ -117,10 +128,10 @@ and build_command args index : string option =
       ignore (exit 1);
       None
     ) else 
-      build_entry (Option.value_exn !entry) !std !buildDir
+      build_entry (Option.value_exn !entry) !std !buildDir !runtimeDir
 
-and build_entry (entry: string) std_dir build_dir: string option =
-  Resolver.compile_file_path ~std_dir ~build_dir entry
+and build_entry (entry: string) std_dir build_dir runtime_dir: string option =
+  Resolver.compile_file_path ~std_dir ~build_dir ~runtime_dir entry
 
 and run_bin_path path =
   match Unix.fork () with

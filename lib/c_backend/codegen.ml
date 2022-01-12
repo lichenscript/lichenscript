@@ -4,19 +4,25 @@ open Lichenscript_typing
 open Lichenscript_parsing
 open Core_kernel
 
-let main_snippet main_name = {|
+let main_snippet ?init_name main_name = {|
 int main() {
   int ec = 0;
   LCValue ev;
   LCRuntime*rt = LCNewRuntime();
   LCProgram program = { rt, |} ^ main_name ^ {| };
   ev = LCRunMain(&program);
+  |} ^ Option.value ~default:"" (Option.map ~f:(Format.sprintf "%s(rt);") init_name) ^ {|
   ec = ev.int_val;
   LCFreeRuntime(rt);
   
   return ec;
 }
 |}
+
+type cls_init_tuple = {
+  cls_id_name: string;
+  cls_init_method_name: string;
+}
 
 type t = {
   indent: string;
@@ -25,6 +31,7 @@ type t = {
   mutable buffer: Buffer.t;
   mutable statements: string list;
   mutable scope: Codegen_scope.scope;
+  mutable cls_inits: cls_init_tuple list;
 }
 
 type stmt_env = {
@@ -53,6 +60,7 @@ let create ?(indent="    ") ~ctx ~scope () =
     buffer = Buffer.create 1024;
     statements = [];
     scope;
+    cls_inits = [];
   }
 
 let ps env content = Buffer.add_string env.buffer content
@@ -157,7 +165,8 @@ and codegen_class env _class =
   | (name, _) -> name
   ) in
 
-  ps env (Format.sprintf "static LCClassID %s_class_id;\n" name);
+  let class_id_var_name = name ^ "_class_id" in
+  ps env (Format.sprintf "static LCClassID %s;\n" class_id_var_name);
 
   ps env (Format.sprintf "typedef struct %s {" name);
   endl env;
@@ -205,7 +214,8 @@ and codegen_class env _class =
   ); *)
   ps env "}\n";
 
-  ps env (Format.sprintf "static LCClassDef %s_def = {\n" name);
+  let class_def_name = name ^ "_def" in
+  ps env (Format.sprintf "static LCClassDef %s = {\n" class_def_name);
   with_indent env (fun () ->
     print_indents env;
     ps env (Format.sprintf "\"%s\",\n" name);
@@ -216,6 +226,8 @@ and codegen_class env _class =
     ps env (Format.sprintf "%s_finalizer,\n" name);
   );
   ps env "};\n";
+
+  env.cls_inits <- { cls_id_name = class_id_var_name; cls_init_method_name = class_def_name }::env.cls_inits;
 
   ()
 
@@ -453,6 +465,20 @@ let codegen_program ?indent ~ctx (program: Typedtree.program) =
 |};
   List.iter ~f:(codegen_declaration env) tprogram_declarations;
 
+  let init_name = if not (List.is_empty env.cls_inits) then (
+    endl env;
+    ps env "void init_class_meta(LCRuntime* rt) {\n";
+
+    List.iter
+      ~f:(fun tuple ->
+        ps env (Format.sprintf "    %s = LCDefineClass(rt, &%s);\n" tuple.cls_id_name tuple.cls_init_method_name)
+      )
+      env.cls_inits;
+
+    ps env "}\n";
+    Some "init_class_meta"
+  ) else None in
+
   (* if user has a main function *)
   let test_main = tprogram_scope#find_var_symbol "main" in
   (match test_main with
@@ -461,7 +487,7 @@ let codegen_program ?indent ~ctx (program: Typedtree.program) =
     match main_sym.def_type with
     | Core_type.TypeValue.Function _ -> *)
     let main_name = env.scope#codegen_name "main" in
-      ps env (main_snippet main_name)
+      ps env (main_snippet ?init_name main_name)
     (* | _ -> () *)
   )
 

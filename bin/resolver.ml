@@ -264,9 +264,13 @@ let typecheck_all_modules ~ctx env =
  * because cyclic dependencies is allowed.
  * Annotated parsed tree remain the "holes" to type check
  *)
-let rec compile_file_path ~std_dir ~build_dir entry_file_path =
+let rec compile_file_path ~std_dir ~build_dir ~runtime_dir entry_file_path =
   if Option.is_none std_dir then (
     Format.printf "std library is not found\n";
+    ignore (exit 1)
+  );
+  if Option.is_none runtime_dir then (
+    Format.printf "runtime library is not found\n";
     ignore (exit 1)
   );
   try
@@ -294,9 +298,8 @@ let rec compile_file_path ~std_dir ~build_dir entry_file_path =
     let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
     let output_path = write_to_file build_dir mod_name output in
     let build_dir = Option.value_exn build_dir in
-    write_runtime_files build_dir;
     let bin_name = entry_file_path |> last_piece_of_path |> (Filename.chop_extension) in
-    write_makefiles ~bin_name build_dir [ (mod_name, output_path) ];
+    write_makefiles ~bin_name ~runtime_dir:(Option.value_exn runtime_dir) build_dir [ (mod_name, output_path) ];
     run_make_in_dir build_dir;
     Some (Filename.concat build_dir bin_name)
   with
@@ -346,18 +349,10 @@ and write_to_file build_dir mod_name content: string =
   Out_channel.write_all output_file_path ~data:content;
   output_file_path
 
-and write_runtime_files build_dir =
-  List.iter
-    ~f:(fun (name, content) ->
-      let output_path = Filename.concat build_dir name in
-      Out_channel.write_all output_path ~data:content
-    )
-    Embed.contents
-
-and write_makefiles ~bin_name build_dir mods =
+and write_makefiles ~bin_name ~runtime_dir build_dir mods =
   let output_path = Filename.concat build_dir "Makefile" in
   let open Makefile in
-  let c_srcs = List.fold ~init:"runtime.c" ~f:(fun acc (m, _) -> (acc ^ " " ^ m ^ ".c")) mods in
+  let c_srcs = List.fold ~init:"runtime.o" ~f:(fun acc (m, _) -> (acc ^ " " ^ m ^ ".o")) mods in
   let entries = List.concat [
     [
       {
@@ -367,15 +362,21 @@ and write_makefiles ~bin_name build_dir mods =
       };
       {
         entry_name = "runtime";
-        deps = ["runtime.c"; "runtime.h"];
-        content = "cc -c runtime.c";
+        deps =
+          List.map
+          ~f:(fun name ->
+            (Filename.concat runtime_dir name)
+            |> Filename.realpath
+          )
+          ["runtime.c"; "runtime.h"];
+        content = "cc -c " ^ Filename.(concat runtime_dir "runtime.c"|> realpath);
       }
     ];
     List.map
       ~f:(fun (m, output) -> {
         entry_name = m;
         deps = [];
-        content = "cc -c " ^ (Filename.basename output)
+        content = Format.sprintf "cc -I%s -c %s" (Filename.realpath runtime_dir) (Filename.basename output);
       })
       mods;
   ] in
