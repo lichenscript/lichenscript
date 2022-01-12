@@ -476,6 +476,7 @@ and annotate_class env cls =
 
   let tcls_static_elements = ref [] in
   let tcls_elements = ref [] in
+  let cls_deps = ref [] in
 
   let ctx = Env.ctx env in
   (* prescan class property and method *)
@@ -486,7 +487,7 @@ and annotate_class env cls =
         let { cls_method_name; cls_method_visibility; cls_method_loc; cls_method_modifier; _ } = _method in
         let node = {
           value = TypeExpr.Unknown;
-          deps = [];
+          deps = [cls_var.var_id];
           loc = cls_method_loc;
           check = none;
         } in
@@ -517,6 +518,13 @@ and annotate_class env cls =
         } in
         let node_id = Type_context.new_id ctx node in
         tcls_elements := ((cls_property_name.pident_name, node_id)::!tcls_elements);
+
+        (*
+         * the class itself depends on all the properties
+         * all the method depends on the class
+         *)
+        cls_deps := node_id::(!cls_deps);
+
         class_scope#insert_cls_element
           cls_property_name.pident_name
           (Scope.Cls_property {
@@ -526,6 +534,21 @@ and annotate_class env cls =
       )
     )
     cls.cls_body.cls_body_elements;
+
+  (* depend on the base class *)
+  Option.iter
+    ~f:(fun extend ->
+      let var = (Env.peek_scope env)#find_var_symbol extend.pident_name in
+      match var with
+      | Some var ->
+        cls_deps := (var.var_id)::!cls_deps;
+
+      | None -> (
+        let err = Type_error.(make_error (Env.ctx env) extend.pident_loc (CannotFindName extend.pident_name)) in
+        raise (Type_error.Error err)
+      )
+    )
+    cls.cls_extends;
 
   Type_context.map_node ctx 
     ~f:(fun node -> {
@@ -542,6 +565,7 @@ and annotate_class env cls =
         }
       );
       loc = cls.cls_loc;
+      deps = List.rev !cls_deps;
     })
     cls_var.var_id;
 
@@ -551,11 +575,22 @@ and annotate_class env cls =
       List.map ~f:(fun elm ->
         match elm with
         | Cls_method _method -> (
-          let { cls_method_visibility; cls_method_modifier; cls_method_loc; _ } = _method in
+          let { cls_method_attributes; cls_method_visibility; cls_method_modifier; cls_method_name; cls_method_params; cls_method_loc; _ } = _method in
+          let method_id =
+            match (class_scope#find_cls_element cls_method_name.pident_name) with
+            | Some (Scope.Cls_method { method_id; _ }) -> method_id
+            | Some _ -> failwith "unexpected: expect class method, but got property"
+            | None -> failwith (Format.sprintf "unexpected: can not find class method %s" cls_method_name.pident_name)
+          in
+          let cls_method_params, _cls_method_params = annotate_function_params env cls_method_params in
           T.Declaration.Cls_method {
             T.Declaration.
+            cls_method_attributes;
             cls_method_visibility;
             cls_method_modifier;
+            cls_method_params;
+            cls_method_name = (cls_method_name.pident_name, method_id);
+            cls_method_body = None;
             cls_method_loc;
           }
         )

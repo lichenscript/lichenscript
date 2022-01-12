@@ -260,8 +260,8 @@ and Declaration : sig
 
   and class_method = {
     cls_method_attributes: attributes;
-    cls_method_modifier: class_modifier option;
     cls_method_visibility: Asttypes.visibility option;
+    cls_method_modifier: class_modifier option;
     cls_method_name: Identifier.t;
     cls_method_params: Function.params;
     cls_method_body: Block.t option;
