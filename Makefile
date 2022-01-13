@@ -16,7 +16,7 @@ fibonacci: compiler
 class: compiler
 	rm -rf ./_build_wt/class
 	mkdir -p ./_build_wt/class
-	./_build/default/bin/main.exe build ./examples/class/main.wt \
+	./_build/default/bin/main.exe run ./examples/class/main.wt \
 		$(FLAGS) -D ./_build_wt/class
 
 compiler:

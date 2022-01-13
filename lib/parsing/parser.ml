@@ -498,7 +498,6 @@ and parse_params env: Function.params =
     {
       param_pat;
       param_ty;
-      param_init = None;
       param_loc = with_start_loc env start_loc;
       param_rest;
     }

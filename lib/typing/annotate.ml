@@ -652,6 +652,7 @@ and annotate_class env cls =
 
   Env.with_new_scope env class_scope (fun env ->
     let { cls_id; cls_visibility; cls_type_vars = _; cls_loc; cls_body; cls_comments; _ } = cls in
+    let tcls_name = cls_id.pident_name in
     let cls_id = annotate_identifer env cls_id in
     let cls_body = annotate_class_body cls_body in
 
@@ -663,6 +664,7 @@ and annotate_class env cls =
             builtin = false;
             name = cls.cls_id.pident_name;
             spec = Class {
+              tcls_name;
               tcls_extends = None;
               tcls_elements = List.rev !tcls_elements;
               tcls_static_elements = List.rev !tcls_static_elements;
@@ -739,7 +741,7 @@ and annotate_type env ty : (TypeExpr.t * int list) =
 and annotate_function_params env params = 
   let open Ast.Function in
   let annoate_param param =
-    let { param_pat; param_ty; param_init = _init; param_loc; param_rest } = param in
+    let { param_pat; param_ty; param_loc; param_rest } = param in
     let param_pat, param_id = annotate_pattern env param_pat in
     let deps = ref [] in
     let value = ref TypeExpr.Unknown in
@@ -761,7 +763,6 @@ and annotate_function_params env params =
     { T.Function.
       param_pat;
       param_ty = param_id;
-      param_init = None;  (* TODO *)
       param_loc;
       param_rest;
     }, param_id

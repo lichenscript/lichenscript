@@ -9,9 +9,9 @@ int main() {
   int ec = 0;
   LCValue ev;
   LCRuntime*rt = LCNewRuntime();
+  |} ^ Option.value ~default:"" (Option.map ~f:(Format.sprintf "%s(rt);") init_name) ^ {|
   LCProgram program = { rt, |} ^ main_name ^ {| };
   ev = LCRunMain(&program);
-  |} ^ Option.value ~default:"" (Option.map ~f:(Format.sprintf "%s(rt);") init_name) ^ {|
   ec = ev.int_val;
   LCFreeRuntime(rt);
   
@@ -198,6 +198,17 @@ and codegen_class env _class =
   ps env (Format.sprintf "} %s;" name);
   endl env;
 
+  ps env (Format.sprintf "LCValue %s_init(LCRuntime* rt, LCValue ancester) {\n" name);
+  with_indent env (fun () ->
+    print_indents env;
+    ps env (Format.sprintf "%s* obj = lc_mallocz(rt, sizeof(%s));\n" name name);
+    print_indents env;
+    ps env (Format.sprintf "lc_init_object(rt, %s_class_id, (LCObject*)obj);\n" name);
+    print_indents env;
+    ps env "return MK_CLASS_OBJ(obj);\n";
+  );
+  ps env "}\n";
+
   let methods = ref [] in
 
   (* gen methods *)
@@ -209,7 +220,44 @@ and codegen_class env _class =
         let method_name, _ = _method.cls_method_name in
         let gen_name = Format.sprintf "%s__%s" name method_name in
         ps env (Format.sprintf "LCValue %s(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {\n" gen_name);
-        ps env "    return MK_NULL();\n";
+        ps env "    LCValue ret = MK_NULL();\n";
+        let stmts = codegen_function_block env (Option.value_exn _method.cls_method_body) in
+        let max_tmp_value = List.fold ~init:0
+          ~f:(fun acc item -> if item.tmp_vars_counter > acc then item.tmp_vars_counter else acc)
+          stmts
+        in
+
+        if max_tmp_value > 0 then (
+          print_indents env;
+          ps env "LCValue t[";
+          ps env (Int.to_string max_tmp_value);
+          ps env "];";
+          endl env;
+        );
+
+        List.iter
+          ~f:(fun stmt_env ->
+            List.iter
+              ~f:(fun line ->
+                print_indents env;
+                ps env line;
+                endl env
+              )
+              stmt_env.stmt_prepend_lines;
+            let content = Buffer.contents stmt_env.stmt_buffer in
+            print_indents env;
+            ps env content;
+            endl env;
+            List.iter
+              ~f:(fun line ->
+                print_indents env;
+                ps env line;
+                endl env
+              )
+              stmt_env.stmt_append_lines;
+          )
+          stmts;
+        ps env "    return ret;\n";
         ps env "}\n";
 
         methods := { cls_method_origin_name = method_name; cls_method_gen_name = gen_name }::(!methods)
@@ -217,16 +265,6 @@ and codegen_class env _class =
     )
     cls_body.cls_body_elements;
 
-  ps env (Format.sprintf "LCValue %s_init(LCRuntime* rt, LCValue ancester) {\n" name);
-  with_indent env (fun () ->
-    print_indents env;
-    ps env (Format.sprintf "%s* obj = lc_mallocz(rt, sizeof(%s));\n" name name);
-    print_indents env;
-    ps env (Format.sprintf "lc_init_object(rt, %s_class_id, (LCObject*)obj);\n" name);
-    print_indents env;
-    ps env "return MK_CLASS_OBJ(obj);\n";
-  );
-  ps env "}\n";
   ps env (Format.sprintf "void %s_finalizer(LCRuntime* rt, LCValue value) {\n" name);
   (* with_indent env (fun () ->
     print_indents env;
@@ -353,9 +391,38 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
       | _ ->
       failwith (Format.sprintf "can not find external %s %d\n" sym_name sym_id)
     )
+    | Expression.Member (expr, name) -> (
+      (* let ty_node = Type_context.get_node env.env.ctx expr.ty_var in *)
+      let ctor = Check_helper.find_construct_of env.env.ctx expr.ty_var in
+      match ctor with
+      | Some (def, _) -> (
+        (* let open Core_type.TypeExpr in *)
+        match def.spec with
+        | Class cls -> (
+          let cls_name = cls.tcls_name in
+          let static_method =
+            List.find ~f:(fun (m_name, _) -> String.equal m_name name.pident_name) cls.tcls_static_elements
+          in
+          match static_method with
+          (* static method *)
+          | Some _ -> (
+            let method_name = cls_name ^ "__" ^ name.pident_name in
+            pss env (Format.sprintf "%s(rt, MK_NULL(), 0, NULL);" method_name)
+          )
+          | None -> (
+            pss env (Format.sprintf "LCInvokeStr(rt, child, \"%s\", 0, NULL);\n" name.pident_name)
+          )
+        )
+        
+        | _ ->
+          pss env "MK_NULL()"
+      )
+      | _ ->
+        pss env (Format.sprintf "LCInvokeStr(rt, child, \"%s\", 0, NULL);\n" name.pident_name)
+    )
+
     | _ ->
       pss env "MK_NULL()"
-      (* failwith "not implemented 3" *)
 
   )
 
@@ -383,7 +450,7 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
 
   | Init init -> (
     let { Ast.Expression. init_name; _ } = init in
-    pss env (Format.sprintf "%s_init()" init_name.pident_name);
+    pss env (Format.sprintf "%s_init(rt, MK_NULL())" init_name.pident_name);
   )
 
   | Block  _ -> ()

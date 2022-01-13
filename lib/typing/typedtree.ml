@@ -130,7 +130,6 @@ and Function : sig
   and param = {
     param_pat: Pattern.t;
     param_ty: int;
-    param_init: Expression.t option;
     param_loc: Loc.t;
     param_rest: bool;
   }

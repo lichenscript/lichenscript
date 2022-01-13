@@ -98,8 +98,9 @@ and TypeDef : sig
   }
 
   and class_type = {
-    tcls_extends:    t option;
-    tcls_elements: (string * int) list;
+    tcls_name:            string;
+    tcls_extends:         t option;
+    tcls_elements:        (string * int) list;
     tcls_static_elements: (string * int) list;
   }
 
@@ -149,8 +150,9 @@ end = struct
   }
 
   and class_type = {
-    tcls_extends: t option;
-    tcls_elements: (string * int) list;
+    tcls_name:            string;
+    tcls_extends:         t option;
+    tcls_elements:        (string * int) list;
     tcls_static_elements: (string * int) list;
   }
 

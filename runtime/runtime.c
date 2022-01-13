@@ -380,8 +380,8 @@ void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_
 
 LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_len, LCValue* args) {
     if (this.type <= 0) {
-        fprintf(stderr, "try to invoke on primitive type");
-        exit(1);
+        fprintf(stderr, "[LichenScript] try to invoke on primitive type");
+        abort();
     }
 
     LCObject* obj = (LCObject*)this.ptr_val;
@@ -397,6 +397,8 @@ LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_le
         }
     }
 
+    fprintf(stderr, "[LichenScript] Can not find method \"%s\" of class, id: %u\n", content, class_id);
+    abort();
     return MK_NULL();
 }
 
