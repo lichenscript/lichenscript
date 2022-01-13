@@ -1,4 +1,4 @@
 (library
  (name lichenscript_typing)
- (libraries lichenscript_lex lichenscript_parsing core_kernel)
+ (libraries lichenscript_lex lichenscript_parsing core_kernel core)
  (preprocess (pps ppx_gen_rec ppx_deriving.show)))

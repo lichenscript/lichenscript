@@ -6,5 +6,5 @@
   lichenscript_parsing
   lichenscript_typing
   lichenscript_c
-  core
-  re))
+  lichenscript_resolver
+  core))

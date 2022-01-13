@@ -1,4 +1,3 @@
-open Cli_utils
 open Core
 open Lichenscript_lex
 open Lichenscript_typing
@@ -91,17 +90,6 @@ let last_piece_of_path path =
       )
       child_modules
   ) *)
-
-let print_loc_title ~prefix loc_opt =
-  Loc. (
-    match loc_opt.source with
-    | Some source -> (
-      print_error_prefix ();
-      let source_str = Format.asprintf "%a" Lichenscript_lex.File_key.pp source in
-      Out_channel.printf "%s in %s\n" prefix (TermColor.bold ^ source_str ^ TermColor.reset)
-    )
-    | None -> ()
-  )
 
 let allow_suffix = Re.Pcre.regexp "^(.+)\\.lc$"
 
@@ -300,38 +288,13 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir entry_file_path =
     let build_dir = Option.value_exn build_dir in
     let bin_name = entry_file_path |> last_piece_of_path |> (Filename.chop_extension) in
     write_makefiles ~bin_name ~runtime_dir:(Option.value_exn runtime_dir) build_dir [ (mod_name, output_path) ];
-    run_make_in_dir build_dir;
-    Some (Filename.concat build_dir bin_name)
+    build_dir, (Some (Filename.concat build_dir bin_name))
   with
-    | TypeCheckError errors ->
-      List.iter
-        ~f:(fun err ->
-          let { Type_error. spec; loc; ctx } = err in
-          print_loc_title ~prefix:"type error" loc;
-          let start = loc.start in
-          Format.printf "%d:%d %a\n" start.line start.column (Type_error.PP.error_spec ~ctx) spec
-        )
-        errors;
-      None
-
-    | Parse_error.Error errors
-    | ParseError errors ->
-      List.iter
-        ~f:(fun err ->
-          let { Parse_error. perr_loc; _ } = err in
-          print_loc_title ~prefix:"parse error" perr_loc;
-          let start = perr_loc.start in
-          Format.printf "%d:%d %a\n" start.line start.column Parse_error.PP.error err
-        )
-        errors;
-      None
-
     | Type_error.Error e ->
-      let { Type_error. spec; loc; ctx } = e in
-      print_loc_title ~prefix:"type error" loc;
-      let start = loc.start in
-      Format.printf "%d:%d %a\n" start.line start.column (Type_error.PP.error_spec ~ctx) spec;
-      None
+      raise (TypeCheckError [e])
+
+    | Parse_error.Error errors ->
+      raise (ParseError errors)
 
 and write_to_file build_dir mod_name content: string =
   let build_dir =
@@ -382,15 +345,3 @@ and write_makefiles ~bin_name ~runtime_dir build_dir mods =
   ] in
   let data = to_string entries in
   Out_channel.write_all output_path ~data
-
-and run_make_in_dir build_dir =
-  Out_channel.printf "Spawn to build in %s\n" (TermColor.bold ^ build_dir ^ TermColor.reset);
-  Out_channel.flush Out_channel.stdout;
-  Out_channel.flush Out_channel.stderr;
-  match Unix.fork () with
-  | `In_the_child -> 
-    Unix.chdir build_dir;
-    Unix.exec ~prog:"make" ~argv:["make";] () |> ignore
-
-  | `In_the_parent pid ->
-    ignore (Unix.waitpid pid)

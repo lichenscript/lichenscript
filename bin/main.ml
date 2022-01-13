@@ -1,3 +1,7 @@
+open Lichenscript_lex
+open Lichenscript_parsing
+open Lichenscript_typing
+open Lichenscript_resolver
 open Cli_utils
 open Core
 
@@ -131,7 +135,64 @@ and build_command args index : string option =
       build_entry (Option.value_exn !entry) !std !buildDir !runtimeDir
 
 and build_entry (entry: string) std_dir build_dir runtime_dir: string option =
-  Resolver.compile_file_path ~std_dir ~build_dir ~runtime_dir entry
+  let open Resolver in
+  if Option.is_none std_dir then (
+    Format.printf "std library is not found\n";
+    ignore (exit 1)
+  );
+  if Option.is_none runtime_dir then (
+    Format.printf "runtime library is not found\n";
+    ignore (exit 1)
+  );
+  try
+    let build_dir, result = Resolver.compile_file_path ~std_dir ~build_dir ~runtime_dir entry in
+    run_make_in_dir build_dir;
+    result
+  with
+    | TypeCheckError errors ->
+      List.iter
+        ~f:(fun err ->
+          let { Type_error. spec; loc; ctx } = err in
+          print_loc_title ~prefix:"type error" loc;
+          let start = loc.start in
+          Format.printf "%d:%d %a\n" start.line start.column (Type_error.PP.error_spec ~ctx) spec
+        )
+        errors;
+      None
+
+    | ParseError errors ->
+      List.iter
+        ~f:(fun err ->
+          let { Parse_error. perr_loc; _ } = err in
+          print_loc_title ~prefix:"parse error" perr_loc;
+          let start = perr_loc.start in
+          Format.printf "%d:%d %a\n" start.line start.column Parse_error.PP.error err
+        )
+        errors;
+      None
+
+and run_make_in_dir build_dir =
+  Out_channel.printf "Spawn to build in %s\n" (TermColor.bold ^ build_dir ^ TermColor.reset);
+  Out_channel.flush Out_channel.stdout;
+  Out_channel.flush Out_channel.stderr;
+  match Unix.fork () with
+  | `In_the_child -> 
+    Unix.chdir build_dir;
+    Unix.exec ~prog:"make" ~argv:["make";] () |> ignore
+
+  | `In_the_parent pid ->
+    ignore (Unix.waitpid pid)
+
+and print_loc_title ~prefix loc_opt =
+  Loc. (
+    match loc_opt.source with
+    | Some source -> (
+      print_error_prefix ();
+      let source_str = Format.asprintf "%a" Lichenscript_lex.File_key.pp source in
+      Out_channel.printf "%s in %s\n" prefix (TermColor.bold ^ source_str ^ TermColor.reset)
+    )
+    | None -> ()
+  )
 
 and run_bin_path path =
   match Unix.fork () with

@@ -1,0 +1,11 @@
+(library
+ (name lichenscript_resolver)
+ (libraries
+  lichenscript_lex
+  lichenscript_parsing
+  lichenscript_typing
+  lichenscript_c
+  core_kernel
+  re
+  )
+ (preprocess (pps ppx_gen_rec ppx_deriving.show)))
