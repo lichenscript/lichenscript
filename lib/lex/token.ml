@@ -68,6 +68,7 @@ type t =
   | T_TYPEOF
   | T_VOID
   | T_ENUM
+  | T_MATCH
   | T_EXPORT
   | T_IMPORT
   | T_SUPER
@@ -232,6 +233,7 @@ let token_to_string = function
   | T_TYPEOF -> "T_TYPEOF"
   | T_VOID -> "T_VOID"
   | T_ENUM -> "T_ENUM"
+  | T_MATCH -> "T_MATCH"
   | T_EXPORT -> "T_EXPORT"
   | T_IMPORT -> "T_IMPORT"
   | T_SUPER -> "T_SUPER"
@@ -384,6 +386,7 @@ let value_of_token = function
   | T_TYPEOF -> "typeof"
   | T_VOID -> "void"
   | T_ENUM -> "enum"
+  | T_MATCH -> "match"
   | T_EXPORT -> "export"
   | T_IMPORT -> "import"
   | T_SUPER -> "super"

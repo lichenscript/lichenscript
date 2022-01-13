@@ -1074,6 +1074,39 @@ and parse_primary_expression env : Expression.t =
       let blk = parse_block env in
       Block blk
 
+    | Token.T_MATCH -> (
+      Eat.token env;
+      let match_expr = parse_expression env in
+      let match_clauses = ref [] in
+      Expect.token env Token.T_LCURLY;
+
+      while (Peek.token env) <> Token.T_RCURLY do
+        let pat = parse_pattern env in
+        Expect.token env Token.T_ARROW;
+        let clause_consequent = parse_expression env in
+
+        if (Peek.token env) <> Token.T_RCURLY then (
+          Expect.token env Token.T_COMMA;
+        );
+
+        let clause = {
+          Expression.
+          clause_pat = pat;
+          clause_consequent;
+          clause_loc = with_start_loc env start_loc;
+        } in
+        match_clauses := clause::(!match_clauses);
+      done;
+
+      Expect.token env Token.T_RCURLY;
+
+      Match {
+        match_expr;
+        match_clauses = List.rev !match_clauses;
+        match_loc = with_start_loc env start_loc;
+      }
+    )
+
     | _ ->
       let tok = Token.token_to_string next in
       let lex_error = Lichenscript_lex.Lex_error.Unexpected tok in
@@ -1100,11 +1133,25 @@ and parse_pattern env : Pattern.t =
   let next = Peek.token env in
   let spec =
     match next with
-    | Token.T_IDENTIFIER _ ->
+    | Token.T_IDENTIFIER _ -> (
       let ident = parse_identifier env in
-      Identifier ident
+      if (Peek.token env) = Token.T_LPAREN then (
+        Eat.token env;
+        let content = parse_pattern env in
+        Expect.token env Token.T_RPAREN;
+        EnumConstruct content
+      ) else
+        Identifier ident
+    )
 
-    | _ -> failwith "not implemented"
+    | _ -> (
+      let perr_spec = Parser_env.get_unexpected_error next in
+      let err = Parse_error.error {
+        perr_spec;
+        perr_loc = with_start_loc env start_loc;
+      } in
+      Parse_error.error err
+    )
   in
 
   {

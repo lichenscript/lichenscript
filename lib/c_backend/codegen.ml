@@ -454,6 +454,7 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
   )
 
   | Block  _ -> ()
+  | Match _ -> ()
 
 (* return the number of temp values *)
 and codegen_function_block (env: t) block =

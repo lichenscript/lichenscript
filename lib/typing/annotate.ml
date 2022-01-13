@@ -345,6 +345,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
     )
 
+    | Match _ -> failwith "not implement"
+
   in
   { T.Expression.
     spec;
@@ -701,6 +703,8 @@ and annotate_pattern env pat =
       let name, id = annotate_identifer env ident in
       id, (T.Pattern.Symbol (name, id))
     )
+
+    | _ -> failwith "unimplemented pattern"
   in
   { T.Pattern. spec; loc }, id
 

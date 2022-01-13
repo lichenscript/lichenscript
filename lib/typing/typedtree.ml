@@ -28,6 +28,18 @@ module%gen rec Expression : sig
     init_name: (string * int);
   }
 
+  and _match = {
+    match_expr: t;
+    match_clauses: match_clause list;
+    match_loc: Loc.t;
+  }
+
+  and match_clause = {
+    clause_pat: Pattern.t;
+    clause_consequent: t;
+    clause_loc: Loc.t;
+  }
+
   and spec =
     | Constant of Ast.Literal.t
     | Identifier of (string * int)
@@ -47,10 +59,9 @@ module%gen rec Expression : sig
       Asttypes.UpdateOp.t * t * bool
 
     | Assign of (string * int) * t
-
     | Block of Block.t
-
     | Init of Ast.Expression.init
+    | Match of _match
 
   and call = {
     callee: t;

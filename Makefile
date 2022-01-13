@@ -19,5 +19,11 @@ class: compiler
 	./_build/default/bin/main.exe run ./examples/class/main.wt \
 		$(FLAGS) -D ./_build_wt/class
 
+enum: compiler
+	rm -rf ./_build_wt/enum
+	mkdir -p ./_build_wt/enum
+	./_build/default/bin/main.exe run ./examples/enum/main.wt \
+		$(FLAGS) -D ./_build_wt/enum
+
 compiler:
 	dune build

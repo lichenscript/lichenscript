@@ -64,6 +64,18 @@ and Expression : sig
     init_elements: init_element list;
   }
 
+  and _match = {
+    match_expr: t;
+    match_clauses: match_clause list;
+    match_loc: Loc.t;
+  }
+
+  and match_clause = {
+    clause_pat: Pattern.t;
+    clause_consequent: t;
+    clause_loc: Loc.t;
+  }
+
   and spec =
     | Constant of Literal.t
     | Identifier of Identifier.t
@@ -78,6 +90,7 @@ and Expression : sig
     | Assign of Identifier.t * t
     | Block of Block.t
     | Init of init
+    | Match of _match
 
   and t = {
     spec: spec;
@@ -141,6 +154,7 @@ and Pattern : sig
 
   type spec =
     | Identifier of Identifier.t
+    | EnumConstruct of t
 
   and t = {
     spec: spec;

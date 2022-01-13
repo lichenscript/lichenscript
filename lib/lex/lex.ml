@@ -808,6 +808,7 @@ let token (env : Lex_env.t) lexbuf : result =
   | "do" -> Token (env, T_DO)
   | "else" -> Token (env, T_ELSE)
   | "enum" -> Token (env, T_ENUM)
+  | "match" -> Token (env, T_MATCH)
   | "export" -> Token (env, T_EXPORT)
   | "extends" -> Token (env, T_EXTENDS)
   | "false" -> Token (env, T_FALSE)
