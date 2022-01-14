@@ -6,10 +6,12 @@
  *)
 open Core_kernel
 open Lichenscript_typing
-open Lichenscript_typing.Typedtree
 
-type env = {
+module ModuleMap = Hashtbl.Make(String)
+
+type t = {
   ctx: Type_context.t;
+  module_map: Module.t ModuleMap.t;
   top_level_deps: (int list) Array.t;
 }
 
@@ -18,10 +20,56 @@ let create ~ctx () =
   let top_level_deps = Array.create ~len:(ResizableArray.size ctx.ty_map) [] in
   {
     ctx;
+    module_map = ModuleMap.create ();
     top_level_deps;
   }
 
-let rec collect_deps env =
+let link_from_entry env entry =
+  let reach_nodes = Array.create ~len:(ResizableArray.size env.ctx.ty_map) false in
+
+  let orders = ref [] in
+
+  let rec iterate_node id =
+    if Array.get reach_nodes id then ()
+    else (
+      let open Type_context in
+      Array.set reach_nodes id true;
+      let node = ResizableArray.get env.ctx.ty_map id in
+
+      let open Core_type.TypeExpr in
+      (match node.value with
+      | TypeDef _ -> orders := id::!orders;
+      | _ -> ()
+      );
+
+      let deps = node.deps in
+      List.iter ~f:iterate_node deps
+    )
+  in
+
+  iterate_node entry;
+
+  Format.printf "- entry %d\n" entry;
+  List.iteri
+    ~f:(fun index id ->
+      Format.printf "- %d: %d\n" index id
+    )
+    (!orders)
+
+let set_module env key _mod =
+  ModuleMap.set env.module_map ~key ~data:_mod
+
+let get_module env key =
+  ModuleMap.find env.module_map key
+
+let has_module env key =
+  ModuleMap.mem env.module_map key
+
+let iter_modules env ~f =
+  ModuleMap.iter
+    ~f env.module_map
+
+(* let rec collect_deps env =
   Hashtbl.iteri
     ~f:(collect_declaration env)
     env.ctx.declarations
@@ -78,4 +126,4 @@ let assemble_optimize_tree env (entry: int) =
 
   iterate_node entry;
 
-  reach_node
+  reach_node *)

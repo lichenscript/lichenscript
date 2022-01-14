@@ -6,18 +6,18 @@ open Lichenscript_parsing
 exception ParseError of Parse_error.t list
 exception TypeCheckError of Type_error.t list
 
-module ModuleMap = Hashtbl.Make(String)
-
 type t = {
   (* absolute path => module *)
-  module_map: Module.t ModuleMap.t;
+  linker: Linker.t;
   find_paths: string list;
 }
 
-let create ~find_paths () = {
-  module_map = ModuleMap.create ();
-  find_paths;
-}
+let create ~find_paths ~ctx () =
+  let linker = Linker.create ~ctx () in
+  {
+    linker;
+    find_paths;
+  }
 
 class module_scope ~prev env extern_modules = object
   inherit Scope.scope ~prev () as super
@@ -36,7 +36,7 @@ class module_scope ~prev env extern_modules = object
             Base.Continue_or_stop.Stop acc
           else
             try
-              let _mod = ModuleMap.find_exn env.module_map extern_mod in
+              let _mod = Option.value_exn (Linker.get_module env.linker extern_mod) in
               let export = Module.find_export _mod ~name in
               let open Module in
               match export with
@@ -62,7 +62,7 @@ let last_piece_of_path path =
 let allow_suffix = Re.Pcre.regexp "^(.+)\\.lc$"
 
 let insert_moudule_file env ~mod_path file =
-  match ModuleMap.find env.module_map mod_path with
+  match Linker.get_module env.linker mod_path with
   | Some m ->
     Module.add_file m file
 
@@ -158,7 +158,7 @@ let rec compile_file_to_path ~ctx ~mod_path env path =
 and parse_module_by_dir ~ctx env dir_path : string option =
   let iterate_parse_file mod_path =
     let _mod = Module.create ~full_path:mod_path () in
-    ModuleMap.set env.module_map ~key:mod_path ~data:_mod;
+    Linker.set_module env.linker mod_path _mod;
     let children = Sys.ls_dir mod_path in
     (* only compile files in this level *)
     List.iter
@@ -175,14 +175,14 @@ and parse_module_by_dir ~ctx env dir_path : string option =
     Module.finalize_module_exports _mod;
   in
   let full_path = Filename.realpath dir_path in
-  if not (ModuleMap.mem env.module_map full_path) then (
+  if not (Linker.has_module env.linker full_path) then (
     iterate_parse_file full_path;
     Some full_path
   ) else
     None
 
 let annotate_all_modules env =
-  ModuleMap.iter
+  Linker.iter_modules
     ~f:(fun m ->
       let files = Module.files m in
       let files =
@@ -202,7 +202,7 @@ let annotate_all_modules env =
       in
       Module.set_files m files
     )
-    env.module_map
+    env.linker
 
 let typecheck_all_modules ~ctx env =
   annotate_all_modules env;
@@ -232,7 +232,7 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir entry_file_path =
   try
     (* ctx is a typing context for all modules *)
     let ctx = Lichenscript_typing.Type_context.create () in
-    let env = create ~find_paths:[ Option.value_exn std_dir ] () in
+    let env = create ~find_paths:[ Option.value_exn std_dir ] ~ctx () in
 
     (* parse the entry file *)
     let dir_of_entry = Filename.dirname entry_file_path in
@@ -244,15 +244,21 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir entry_file_path =
     (* let content = In_channel.read_all entry_file_path in
     let file_key = File_key.SourceFile entry_file_path in *)
 
-    let main_mod = ModuleMap.find_exn env.module_map (Option.value_exn entry_full_path) in
+    let main_mod = Option.value_exn (Linker.get_module env.linker (Option.value_exn entry_full_path)) in
     let file = List.hd_exn (Module.files main_mod) in
     
-    let typed_tree = Module.(file.typed_tree) in
+    let typed_tree: Typedtree.program = Option.value_exn Module.(file.typed_tree) in
 
-    let _ = Linker.create ~ctx () in
+    let main_fun_id = typed_tree.tprogram_scope#find_type_symbol "main" in
+    if Option.is_none main_fun_id then (
+      Format.printf "main function is not found, nothing to output";
+      ignore (exit 0)
+    );
+    (* TODO: check type is a function *)
 
-    (* TODO: compile other modules *)
-    let output = Lichenscript_c.codegen ~ctx (Option.value_exn typed_tree) in
+    Linker.link_from_entry env.linker (Option.value_exn main_fun_id);
+
+    let output = Lichenscript_c.codegen ~ctx typed_tree in
     let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
     let output_path = write_to_file build_dir mod_name output in
     let build_dir = Option.value_exn build_dir in

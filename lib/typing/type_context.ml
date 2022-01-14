@@ -110,8 +110,21 @@ and print_type_value ctx ty_value =
   )
   | Function _ -> "function"
   | Array _ -> "array"
-  | TypeDef type_sym ->
-    (Format.asprintf "(typeof %a)" Core_type.TypeDef.pp type_sym)
+  | TypeDef type_sym -> (
+    let open Core_type.TypeDef in
+    match type_sym.spec with
+    | Function _fun -> (
+      let return = print_type_value ctx _fun.fun_return in
+      Format.asprintf "function %s(): %s" type_sym.name return
+    )
+
+    | Class _ -> (
+      Format.asprintf "class %s { ... }" type_sym.name
+    )
+
+    | _ ->
+      (Format.asprintf "(typeof %a)" Core_type.TypeDef.pp type_sym)
+  )
 
 let print ctx =
 

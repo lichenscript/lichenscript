@@ -507,7 +507,8 @@ and annotate_class env cls =
 
   let cls_var = Option.value_exn ((Env.peek_scope env)#find_var_symbol cls.cls_id.pident_name) in
 
-  let class_scope = new class_scope ~prev:(Env.peek_scope env) () in
+  let prev_scope = Env.peek_scope env in
+  let class_scope = new class_scope ~prev:prev_scope () in
 
   let tcls_static_elements = ref [] in
   let tcls_elements = ref [] in
@@ -523,7 +524,7 @@ and annotate_class env cls =
         let { cls_method_name; cls_method_visibility; cls_method_loc; cls_method_modifier; _ } = _method in
         let node = {
           value = TypeExpr.Unknown;
-          deps = [cls_var.var_id];
+          deps = [];
           loc = cls_method_loc;
           check = none;
         } in
@@ -668,10 +669,10 @@ and annotate_class env cls =
     { T.Declaration. cls_body_elements; cls_body_loc}
   in
 
-  Env.with_new_scope env class_scope (fun env ->
+  Env.with_new_scope env class_scope (fun _env ->
     let { cls_id; cls_visibility; cls_type_vars = _; cls_loc; cls_body; cls_comments; _ } = cls in
     let tcls_name = cls_id.pident_name in
-    let cls_id = annotate_identifer env cls_id in
+    let cls_id = tcls_name, cls_var.var_id in
     let cls_body = annotate_class_body cls_body in
 
     Type_context.map_node ctx 
@@ -690,14 +691,18 @@ and annotate_class env cls =
           }
         );
         loc = cls.cls_loc;
-        deps = if List.is_empty !method_deps then List.rev !props_deps else List.rev !method_deps;
+        deps = 
+          (* remove self-reference *)
+          List.filter
+          ~f:(fun id -> id <> cls_var.var_id)
+          (if List.is_empty !method_deps then List.rev !props_deps else List.rev !method_deps);
       })
       cls_var.var_id;
 
     { T.Declaration. cls_id; cls_visibility; cls_body; cls_loc; cls_comments; }
   )
 
-and annotate_identifer env ident =
+and annotate_an_def_identifer env ident =
   let open Identifier in
   let { pident_name; pident_loc } = ident in
   let node = {
@@ -716,7 +721,7 @@ and annotate_pattern env pat =
   let id, spec =
     match spec with
     | Identifier ident -> (
-      let name, id = annotate_identifer env ident in
+      let name, id = annotate_an_def_identifer env ident in
       id, (T.Pattern.Symbol (name, id))
     )
 
@@ -855,11 +860,12 @@ and annotate_function env fun_ =
     fun_deps := body.return_ty::(!fun_deps);
     fun_deps := List.append !fun_deps collected_returns;
 
-    let return_node = {
-      loc;
-      value = TypeExpr.Unknown;
+    Type_context.update_node (Env.ctx env) fun_id {
+      name_node with
+      value = TypeExpr.Unknown;  (* it's an typedef *)
+      (* deps = return_id::params_types; *)
       deps = !fun_deps;
-      check = (fun id -> 
+      check = (fun id ->
         let ctx = Env.ctx env in
         let block_node = Type_context.get_node ctx body.return_ty in
         (* if no return statements, use last statement of block *)
@@ -870,7 +876,7 @@ and annotate_function env fun_ =
             let err = make_error ctx block_node.loc spec in
             raise (Error err)
           );
-          Type_context.update_node_type ctx id return_ty
+          (* Type_context.update_node_type ctx id return_ty *)
         ) else (
           (* there are return statements, check every statments *)
           List.iter
@@ -884,16 +890,17 @@ and annotate_function env fun_ =
               )
             )
             collected_returns
-        )
+        );
+        let type_def = { TypeDef.
+          builtin = false;
+          name = fun_.header.id.pident_name;
+          spec = Function {
+            fun_params = [];
+            fun_return = return_ty;
+          };
+        } in
+        Type_context.update_node_type ctx id (TypeExpr.TypeDef type_def)
       );
-    } in
-    let return_id = Type_context.new_id (Env.ctx env) return_node in
-
-    Type_context.update_node (Env.ctx env) fun_id {
-      name_node with
-      value = TypeExpr.Unknown;  (* it's an typedef *)
-      deps = return_id::params_types;
-      check = none;
     };
     { T.Function.
       header = {
