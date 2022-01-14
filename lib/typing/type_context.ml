@@ -9,6 +9,7 @@ type t = {
   ty_map: ResizableArray.t;
   external_symbol: (int, string) Hashtbl.t;
   root_scope: scope;
+  declarations: (int, Typedtree.Declaration.t) Hashtbl.t;
 }
 
 let new_id ctx ty =
@@ -54,6 +55,7 @@ let create () =
     ty_map = ResizableArray.make 1024;
     external_symbol = Hashtbl.create (module Int);
     root_scope;
+    declarations = Hashtbl.create (module Int);
   } in
   make_default_type_sym ctx root_scope;
   ctx

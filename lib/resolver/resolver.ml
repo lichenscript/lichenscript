@@ -59,38 +59,6 @@ let last_piece_of_path path =
   let parts = Filename.parts path in
   List.last_exn parts
 
-(* let rec load_library_by_dir id_list env std_dir =
-  let abs_path = Filename.realpath std_dir in
-
-  let lib_name = last_piece_of_path abs_path in
-
-  let module_id = lib_name::id_list in
-  let module_id_str = get_mod_id module_id in
-  match ModuleMap.find env.module_map module_id_str with
-  | Some _ -> ()
-  | None -> (
-    let lib_entry_file = Filename.concat abs_path "lib.wt" in
-    (match (Sys.file_exists lib_entry_file) with
-    | `No -> raise (FileNotFound lib_entry_file)
-    | _ -> ()
-    );
-
-    let entry_file_content = In_channel.read_all lib_entry_file in
-    let file_key = File_key.LibFile lib_entry_file in
-    let type_provider = create_type_provider env in
-    let typed_tree, child_modules =
-      parse_string_to_program ~file_key:(Some file_key) ~type_provider entry_file_content
-    in
-    let id = List.rev (lib_name::id_list) |> List.to_array in
-    let _mod = Module.create ~path:abs_path ~id ~id_str:module_id_str typed_tree in
-    ModuleMap.set env.module_map ~key:module_id_str ~data:_mod;
-    List.iter
-      ~f:(fun item ->
-        load_library_by_dir module_id env (Filename.concat std_dir item)
-      )
-      child_modules
-  ) *)
-
 let allow_suffix = Re.Pcre.regexp "^(.+)\\.lc$"
 
 let insert_moudule_file env ~mod_path file =
@@ -280,6 +248,8 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir entry_file_path =
     let file = List.hd_exn (Module.files main_mod) in
     
     let typed_tree = Module.(file.typed_tree) in
+
+    let _ = Linker.create ~ctx () in
 
     (* TODO: compile other modules *)
     let output = Lichenscript_c.codegen ~ctx (Option.value_exn typed_tree) in

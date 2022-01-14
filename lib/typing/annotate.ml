@@ -395,13 +395,20 @@ and annotate_block ~prev_deps env block : T.Block.t =
 and annotate_declaration env decl : T.Declaration.t =
   let open Ast.Declaration in
   let { spec; loc; attributes } = decl in
-  let spec =
+  let ty_var, spec =
     match spec with
     | Class _class -> (
-      T.Declaration.Class (annotate_class env _class)
+      let open Typedtree.Declaration in
+      let _class = annotate_class env _class in
+      let _, ty_int = _class.cls_id in
+      ty_int, T.Declaration.Class _class
     )
 
-    | Function_ _fun -> T.Declaration.Function_ (annotate_function env _fun)
+    | Function_ _fun -> (
+      let open Typedtree.Function in
+      let _fun = annotate_function env _fun in
+      _fun.ty_var, T.Declaration.Function_ _fun
+    )
 
     | Declare declare -> (
       let { decl_spec; decl_visibility; decl_loc } = declare in
@@ -463,22 +470,31 @@ and annotate_declaration env decl : T.Declaration.t =
           params;
         } in
 
-        T.Declaration.Declare {
+        ty_id, (T.Declaration.Declare {
           T.Declaration.
           decl_visibility;
           decl_ty_var = ty_id;
           decl_spec = T.Declaration.DeclFunction header;
           decl_loc;
-        }
+        })
       )
     )
 
-    | Enum enum -> T.Declaration.Enum enum
+    | Enum enum -> -1, T.Declaration.Enum enum
 
-    | Import import -> T.Declaration.Import import
+    | Import import -> -1, T.Declaration.Import import
 
   in
-  { T.Declaration. spec; loc; attributes }
+  let result = { T.Declaration. spec; loc; attributes } in
+
+  (* record the declaration for linking stage *)
+  if ty_var >= 0 then (
+    let open Type_context in
+    let ctx = Env.ctx env in
+    Hashtbl.set ctx.declarations ~key:ty_var ~data:result
+  );
+
+  result
 
 (*
  * class annotation is done in two phase
