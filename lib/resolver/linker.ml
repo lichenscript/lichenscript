@@ -26,11 +26,17 @@ let rec collect_deps env =
     ~f:(collect_declaration env)
     env.ctx.declarations
 
-and collect_declaration _env ~key:_ ~data:decl =
+and collect_declaration env ~key:_ ~data:decl =
   let open Declaration in
   match decl.spec with
   | Class _ -> ()
-  | Function_ _ -> ()
+
+  | Function_ _fun -> (
+    let id = _fun.header.id in
+    let header_refs = collect_function_header _fun.header in
+
+    Array.set env.top_level_deps id header_refs
+  )
 
   | Declare _decare -> ()
 
@@ -39,6 +45,20 @@ and collect_declaration _env ~key:_ ~data:decl =
   )
 
   | Import _ -> ()
+
+and collect_function_header header =
+  let open Function in
+  let refs = ref [] in
+  let { params; _ } = header in
+
+  List.iter
+    ~f:(fun param ->
+      refs := param.param_ty::(!refs)
+    )
+    params.params_content;
+
+  List.rev !refs
+
 
 (*
  * Figure out all reached nodes

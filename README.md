@@ -62,3 +62,12 @@ to implement real private field.
 Exception mechanism depends on a heavy runtime.
 
 ### More static
+
+# License
+
+Two cases:
+
+1. The compiler of LichenScript(written in OCaml)
+   is under GPL license.
+2. The standard library(written in LichenScript)
+   is under MIT license.

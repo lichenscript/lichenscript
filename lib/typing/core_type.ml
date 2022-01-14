@@ -60,6 +60,8 @@ module rec TypeExpr : sig
     tfun_ret: t;
   }
 
+  val pp: Format.formatter -> t -> unit
+
 end = struct
 
   type t =
@@ -75,6 +77,17 @@ end = struct
     tfun_params: (string * t) list;
     tfun_ret: t;
   }
+
+  (* only used internally *)
+  let pp formatter t =
+    match t with
+    | Unknown -> Format.fprintf formatter "unkown"
+    | Any -> Format.fprintf formatter "any"
+    | Ctor(i, _) -> Format.fprintf formatter "'%d" i
+    | Ref i -> Format.fprintf formatter "ref '%d" i
+    | Function _ -> Format.fprintf formatter "function"
+    | Array _ -> Format.fprintf formatter "array"
+    | TypeDef _ -> Format.fprintf formatter "typedef"
 
 end
 
