@@ -55,7 +55,21 @@ let link_from_entry env entry =
     ~f:(fun index id ->
       Format.printf "- %d: %d\n" index id
     )
-    (List.rev !orders)
+    (List.rev !orders);
+
+  let declarations =
+    List.fold
+    ~init:[]
+    ~f:(fun acc id->
+      let open Type_context in
+      match Hashtbl.find env.ctx.declarations id with
+      | None -> acc
+      | Some decl ->
+        decl::acc
+    )
+    (!orders)
+  in
+  declarations
 
 let set_module env key _mod =
   ModuleMap.set env.module_map ~key ~data:_mod
@@ -69,62 +83,3 @@ let has_module env key =
 let iter_modules env ~f =
   ModuleMap.iter
     ~f env.module_map
-
-(* let rec collect_deps env =
-  Hashtbl.iteri
-    ~f:(collect_declaration env)
-    env.ctx.declarations
-
-and collect_declaration env ~key:_ ~data:decl =
-  let open Declaration in
-  match decl.spec with
-  | Class _ -> ()
-
-  | Function_ _fun -> (
-    let id = _fun.header.id in
-    let header_refs = collect_function_header _fun.header in
-
-    Array.set env.top_level_deps id header_refs
-  )
-
-  | Declare _decare -> ()
-
-  | Enum _ -> (
-    failwith "enum"
-  )
-
-  | Import _ -> ()
-
-and collect_function_header header =
-  let open Function in
-  let refs = ref [] in
-  let { params; _ } = header in
-
-  List.iter
-    ~f:(fun param ->
-      refs := param.param_ty::(!refs)
-    )
-    params.params_content;
-
-  List.rev !refs
-
-
-(*
- * Figure out all reached nodes
- *)
-let assemble_optimize_tree env (entry: int) =
-  let reach_node = Array.create ~len:(ResizableArray.size env.ctx.ty_map) false in
-
-  let rec iterate_node id = 
-    if Array.get reach_node id then
-      ()
-    else (
-      Array.set reach_node id true;
-      let deps = Array.get env.top_level_deps id in
-      List.iter ~f:iterate_node deps
-    )
-  in
-
-  iterate_node entry;
-
-  reach_node *)

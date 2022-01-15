@@ -256,9 +256,9 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir entry_file_path =
     );
     (* TODO: check type is a function *)
 
-    Linker.link_from_entry env.linker (Option.value_exn main_fun_id);
+    let declarations = Linker.link_from_entry env.linker (Option.value_exn main_fun_id) in
 
-    let output = Lichenscript_c.codegen ~ctx typed_tree in
+    let output = Lichenscript_c.codegen ~ctx declarations in
     let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
     let output_path = write_to_file build_dir mod_name output in
     let build_dir = Option.value_exn build_dir in

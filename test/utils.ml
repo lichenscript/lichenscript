@@ -53,7 +53,7 @@ let parse_string_to_program content =
 
 let parse_string_and_codegen content =
   let ctx, p = parse_string_to_program content in
-  Lichenscript_c.codegen ~ctx p
+  Lichenscript_c.codegen ~ctx p.tprogram_declarations
 
 (* let parse_string_and_codegen_to_path content path =
   let p = parse_string_to_program content in
