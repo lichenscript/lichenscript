@@ -525,6 +525,7 @@ and codegen_function env (_fun: Typedtree.Function.t) =
       endl env;
     );
 
+    (* print all stmts with indents *)
     List.iter
       ~f:(fun stmt_env ->
         List.iter

@@ -96,6 +96,7 @@ static void FreeClassObject(LCRuntime* rt, LCValue val) {
     if (finalizer) {
         finalizer(rt, val);
     }
+    lc_free(rt, val.ptr_val);
 }
 
 static void FreeArray(LCRuntime* rt, LCArray* arr) {
