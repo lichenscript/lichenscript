@@ -610,6 +610,7 @@ and annotate_class env cls =
       List.map ~f:(fun elm ->
         match elm with
         | Cls_method _method -> (
+          let method_scope = new scope ~prev:(Env.peek_scope env) () in
           let { cls_method_attributes; cls_method_visibility; cls_method_modifier; cls_method_name; cls_method_params; cls_method_loc; cls_method_body; cls_method_return_ty; _ } = _method in
           let method_id =
             match cls_method_modifier with
@@ -628,66 +629,69 @@ and annotate_class env cls =
               | None -> failwith (Format.sprintf "unexpected: can not find class method %s" cls_method_name.pident_name)
             )
           in
-          let cls_method_params, cls_method_params_deps = annotate_function_params env cls_method_params in
-          let cls_method_body = Option.map ~f:(annotate_block ~prev_deps:cls_method_params_deps env) cls_method_body in
+          Env.with_new_scope env method_scope (fun env ->
+            let cls_method_params, cls_method_params_deps = annotate_function_params env cls_method_params in
+            let cls_method_body = Option.map ~f:(annotate_block ~prev_deps:cls_method_params_deps env) cls_method_body in
 
-          let this_deps = ref !props_deps in
+            let this_deps = ref !props_deps in
 
-          Option.iter
-            ~f:(fun body_block ->
-              let t = Typedtree.Block.(body_block.return_ty) in
-              this_deps := t::(!this_deps);
-            )
-            cls_method_body;
+            Option.iter
+              ~f:(fun body_block ->
+                let t = Typedtree.Block.(body_block.return_ty) in
+                this_deps := t::(!this_deps);
+              )
+              cls_method_body;
 
-          (* check return *)
-          let _collected_returns = Env.take_return_types env in
+            (* check return *)
+            let _collected_returns = Env.take_return_types env in
 
-          let fun_return, return_ty_deps =
-            match cls_method_return_ty with
-            | Some ty -> annotate_type env ty
-            | None -> (
-              let unit_type = Env.ty_unit env in
-              TypeExpr.(Ctor (unit_type, [])), [unit_type]
-            )
-          in
+            let fun_return, return_ty_deps =
+              match cls_method_return_ty with
+              | Some ty -> annotate_type env ty
+              | None -> (
+                let unit_type = Env.ty_unit env in
+                TypeExpr.(Ctor (unit_type, [])), [unit_type]
+              )
+            in
 
-          let new_type = {
-            TypeDef.
-            builtin = false;
-            name = cls_method_name.pident_name;
-            spec = Function {
-              fun_params = [];
-              fun_return;
-            };
-          } in
+            let new_type = {
+              TypeDef.
+              builtin = false;
+              name = cls_method_name.pident_name;
+              spec = Function {
+                fun_params = [];
+                fun_return;
+              };
+            } in
 
-          (* class method deps *)
-          method_deps := List.append !method_deps [method_id];
+            (* class method deps *)
+            method_deps := List.append !method_deps [method_id];
 
-          this_deps := List.append !this_deps return_ty_deps;
+            this_deps := List.append !this_deps return_ty_deps;
 
-          Type_context.map_node ctx
-            ~f:(fun node -> {
-              node with
-              deps = List.rev !this_deps
-              |> List.filter
-                ~f:(fun id -> id <> cls_var.var_id)
+            Type_context.map_node ctx
+              ~f:(fun node -> {
+                node with
+                deps = List.rev !this_deps
+                |> List.filter
+                  ~f:(fun id -> id <> cls_var.var_id)
+                ;
+                value = (TypeExpr.TypeDef new_type);
+              })
+              method_id
               ;
-              value = (TypeExpr.TypeDef new_type);
-            })
-            method_id
-            ;
-          T.Declaration.Cls_method {
-            T.Declaration.
-            cls_method_attributes;
-            cls_method_visibility;
-            cls_method_modifier;
-            cls_method_params;
-            cls_method_name = (cls_method_name.pident_name, method_id);
-            cls_method_body;
-            cls_method_loc;
-          }
+            T.Declaration.Cls_method {
+              T.Declaration.
+              cls_method_attributes;
+              cls_method_visibility;
+              cls_method_modifier;
+              cls_method_params;
+              cls_method_name = (cls_method_name.pident_name, method_id);
+              cls_method_scope = Some method_scope;
+              cls_method_body;
+              cls_method_loc;
+            }
+          )
         )
         | Cls_property prop -> (
           let { cls_property_visibility; cls_property_loc; cls_property_name; _ } = prop in

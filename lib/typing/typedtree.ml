@@ -199,6 +199,7 @@ and Declaration : sig
     cls_method_name: (string * int);
     cls_method_params: Function.params;
     cls_method_body: Block.t option;
+    cls_method_scope: scope option;
     cls_method_loc: Loc.t;
   }
 

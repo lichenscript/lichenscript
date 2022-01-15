@@ -217,6 +217,17 @@ and codegen_class env _class =
       match elm with
       | Cls_property _ -> ()
       | Cls_method _method -> (
+        let method_name, method_id = _method.cls_method_name in
+        codegen_function_impl env
+          ~header:({
+            Typedtree.Function.
+            id = method_id;
+            name = method_name;
+            params = _method.cls_method_params;
+          })
+          ~scope:(Option.value_exn _method.cls_method_scope)
+          ~body:(Option.value_exn _method.cls_method_body);
+
         let method_name, _ = _method.cls_method_name in
         let gen_name = Format.sprintf "%s__%s" name method_name in
         ps env (Format.sprintf "LCValue %s(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {\n" gen_name);
@@ -477,18 +488,16 @@ and codegen_function_block (env: t) block =
 and codegen_identifier env id =
   ps env (env.scope#codegen_id id)
 
-and codegen_function env (_fun: Typedtree.Function.t) =
+and codegen_function_impl env ~header ~scope ~body =
   let open Function in
-  (* let fun_node = Type_context.get_node env.ctx _fun.header.id in *)
-  let fun_name = _fun.header.name in
+  let fun_name = header.name in
   ps env "LCValue ";
-  codegen_identifier env (fun_name, _fun.header.id);
+  codegen_identifier env (fun_name, header.id);
   ps env "(LCRuntime* rt, LCValue this, int arg_len, LCValue* args)";
   ps env " {";
   endl env;
 
   with_indent env (fun () ->
-    let { scope; body; _ } = _fun in
     let vars = scope#vars in
     let vars_len_m1 = (List.length vars) - 1 in
 
@@ -554,7 +563,13 @@ and codegen_function env (_fun: Typedtree.Function.t) =
     endl env;
   );
 
-  ps env "}"
+  ps env "}\n"
+
+and codegen_function env (_fun: Typedtree.Function.t) =
+  let open Function in
+  (* let fun_node = Type_context.get_node env.ctx _fun.header.id in *)
+
+  codegen_function_impl env ~header:_fun.header ~scope:_fun.scope ~body:_fun.body;
 
 and codegen_pattern env pat =
   let open Pattern in
