@@ -170,7 +170,6 @@ typedef struct LCClassMethodDef {
 
 typedef struct LCClassDef {
     const char* name;  // class name
-    LCClassMethodDef* methods;
     LCFinalizer finalizer;
 } LCClassDef;
 

@@ -11,6 +11,8 @@ module Value = struct
   let new_string_len = "LCNewStringFromCStringLen"
 
   let release = "LCRelease"
+
+  let init_class_meta = "LC_init_class_meta"
   
 end
 

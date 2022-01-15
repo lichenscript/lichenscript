@@ -271,7 +271,11 @@ and codegen_class env _class =
         ps env "    return ret;\n";
         ps env "}\n";
 
-        methods := { cls_method_origin_name = method_name; cls_method_gen_name = gen_name }::(!methods)
+        let open Declaration in
+        match _method.cls_method_modifier with
+        | Some Cls_modifier_static -> ()
+        | _ ->
+          methods := { cls_method_origin_name = method_name; cls_method_gen_name = gen_name }::(!methods)
       )
     )
     cls_body.cls_body_elements;
@@ -292,9 +296,6 @@ and codegen_class env _class =
   with_indent env (fun () ->
     print_indents env;
     ps env (Format.sprintf "\"%s\",\n" name);
-    print_indents env;
-    ps env "NULL,";
-    endl env;
     print_indents env;
     ps env (Format.sprintf "%s_finalizer,\n" name);
   );
@@ -453,6 +454,7 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
   | Update _ -> ()
 
   | Assign((name, _), right) -> (
+    (* TODO: release the left, retain the right *)
     pss env name;
     pss env " = ";
     codegen_expression env right;
@@ -558,6 +560,23 @@ and codegen_function_impl env ~header ~scope ~body =
       )
       stmts;
 
+    (* release all local vars *)
+    if vars_len_m1 >= 0 then (
+      print_indents env;
+      List.iter
+        ~f:(fun (name, _item) ->
+          print_indents env;
+          (* TODO: only release GC object *)
+          ps env "LCRelease(rt, ";
+          ps env name;
+          ps env ");";
+          endl env;
+        )
+        vars;
+      ps env ";";
+      endl env;
+    );
+
     print_indents env;
     ps env "return ret;";
     endl env;
@@ -590,7 +609,7 @@ let codegen_program ?indent ~ctx (declarations: Typedtree.Declaration.t list) =
 
   let init_name = if not (List.is_empty env.cls_inits) then (
     endl env;
-    ps env "void init_class_meta(LCRuntime* rt) {\n";
+    ps env (Format.sprintf "void %s(LCRuntime* rt) {\n" Primitives.Value.init_class_meta);
 
     List.iter
       ~f:(fun entry ->
@@ -603,7 +622,7 @@ let codegen_program ?indent ~ctx (declarations: Typedtree.Declaration.t list) =
       (List.rev env.cls_inits);
 
     ps env "}\n";
-    Some "init_class_meta"
+    Some (Primitives.Value.init_class_meta)
   ) else None in
 
   (* if user has a main function *)
