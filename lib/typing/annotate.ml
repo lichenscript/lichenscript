@@ -208,6 +208,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     | Member (expr, name) -> (
       let expr = annotate_expression ~prev_deps env expr in
       let ctx = Env.ctx env in
+      let member_name = name.pident_name in
       let node = {
         value = TypeExpr.Unknown;
         loc;
@@ -216,18 +217,34 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           let expr_node = Type_context.get_node ctx expr.ty_var in
           let open TypeExpr in
           let raise_error () =
-            let err = Type_error.(make_error ctx loc (CannotReadMember(name.pident_name, expr_node.value))) in
+            let err = Type_error.(make_error ctx loc (CannotReadMember(member_name, expr_node.value))) in
             raise (Type_error.Error err)
           in
           match expr_node.value with
           (* instance of type *)
-          | Ctor(_ty_id, []) ->
-            failwith "in"
+          | Ctor(ty_id, []) -> (
+            let ctor_node = Type_context.get_node ctx ty_id in
+            let open TypeDef in
+            match ctor_node.value with
+            | TypeDef { spec = Class cls; _ } -> (
+              let result =
+                List.find ~f:(fun (elm_name, _) -> String.equal elm_name member_name)
+                cls.tcls_elements
+              in
+              match result with
+              | Some (_, member_id) ->
+                Type_context.update_node_type ctx id (TypeExpr.Ref member_id)
+
+              | _ -> raise_error ()
+            )
+            | _ ->
+              raise_error ()
+          )
 
           (* type def itself *)
           | TypeDef { spec = Class { tcls_static_elements; _ }; _ } -> (
             let result =
-              List.find ~f:(fun (static_memeber_name, _) -> String.equal static_memeber_name name.pident_name)
+              List.find ~f:(fun (static_memeber_name, _) -> String.equal static_memeber_name member_name)
               tcls_static_elements
             in
 
@@ -614,6 +631,18 @@ and annotate_class env cls =
           let cls_method_params, cls_method_params_deps = annotate_function_params env cls_method_params in
           let cls_method_body = Option.map ~f:(annotate_block ~prev_deps:cls_method_params_deps env) cls_method_body in
 
+          let this_deps = ref !props_deps in
+
+          Option.iter
+            ~f:(fun body_block ->
+              let t = Typedtree.Block.(body_block.return_ty) in
+              this_deps := t::(!this_deps);
+            )
+            cls_method_body;
+
+          (* check return *)
+          let _collected_returns = Env.take_return_types env in
+
           let fun_return, return_ty_deps =
             match cls_method_return_ty with
             | Some ty -> annotate_type env ty
@@ -633,12 +662,18 @@ and annotate_class env cls =
             };
           } in
 
-          method_deps := List.concat [ [method_id]; !method_deps; return_ty_deps];
+          (* class method deps *)
+          method_deps := List.append !method_deps [method_id];
+
+          this_deps := List.append !this_deps return_ty_deps;
 
           Type_context.map_node ctx
             ~f:(fun node -> {
               node with
-              deps = List.rev !props_deps;
+              deps = List.rev !this_deps
+              |> List.filter
+                ~f:(fun id -> id <> cls_var.var_id)
+              ;
               value = (TypeExpr.TypeDef new_type);
             })
             method_id

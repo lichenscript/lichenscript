@@ -36,14 +36,15 @@ let link_from_entry env entry =
       Array.set reach_nodes id true;
       let node = ResizableArray.get env.ctx.ty_map id in
 
+      let deps = node.deps in
+      List.iter ~f:iterate_node deps;
+
+      (* after children *)
       let open Core_type.TypeExpr in
       (match node.value with
       | TypeDef _ -> orders := id::!orders;
       | _ -> ()
-      );
-
-      let deps = node.deps in
-      List.iter ~f:iterate_node deps
+      )
     )
   in
 
@@ -54,7 +55,7 @@ let link_from_entry env entry =
     ~f:(fun index id ->
       Format.printf "- %d: %d\n" index id
     )
-    (!orders)
+    (List.rev !orders)
 
 let set_module env key _mod =
   ModuleMap.set env.module_map ~key ~data:_mod
