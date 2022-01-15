@@ -221,6 +221,7 @@ and Enum : sig
   type member = {
     member_name: Identifier.t;
     fields: Type.t list;
+    member_loc: Loc.t;
   }
   [@@deriving show]
 

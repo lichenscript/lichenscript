@@ -44,7 +44,6 @@ typedef struct LCObject {
 // in 64bit mode, LCValue is 128bit
 // int64_t and double are encoded in the value
 typedef struct LCValue {
-    LCObjectType type;
     union {
         int32_t   i32_val;  // bool
         float     f32_val;
@@ -52,6 +51,7 @@ typedef struct LCValue {
         double    f64_val;
         int64_t   i64_val;
     };
+    int32_t tag;
 } LCValue;
 
 #else
@@ -64,7 +64,7 @@ typedef struct LCValue {
         float     float_val;
         LCObject* ptr_val;
     };
-    LCObjectType type;
+    int64_t tag;
 } LCValue;
 
 static LCValue LCTrue = { { .int_val = 1 }, LC_TY_BOOL };

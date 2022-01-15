@@ -10,12 +10,12 @@ class Object {
 
 }
 
-enum Option<A> {
+public enum Option<A> {
     Some(A),
     None,
 }
 
-enum Result<A, B> {
+public enum Result<A, B> {
     Ok(A),
     Error(B),
 }

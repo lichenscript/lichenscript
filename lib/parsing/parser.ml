@@ -225,7 +225,9 @@ and parse_declaration env : Declaration.t =
 
       | Token.T_ENUM ->
         let parse_member env =
+          let start_loc = Peek.loc env in
           let member_name = parse_identifier env in
+          Parser_env.add_top_level env ~name:(member_name.pident_name) ~visibility;
           let fields =
             if (Peek.token env) == Token.T_LPAREN then (
               let result = ref [] in
@@ -248,6 +250,7 @@ and parse_declaration env : Declaration.t =
           { Enum.
             member_name;
             fields;
+            member_loc = with_start_loc env start_loc;
           }
         in
         let start_loc = Peek.loc env in
@@ -275,6 +278,9 @@ and parse_declaration env : Declaration.t =
         done;
 
         Expect.token env Token.T_RCURLY;
+
+        Parser_env.add_top_level env ~name:(name.pident_name) ~visibility;
+
         Enum { Enum.
           visibility;
           name;

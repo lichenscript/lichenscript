@@ -62,7 +62,7 @@ static LCValue* init_i64_pool(LCRuntime* rt) {
         LCBox64* ptr = rt->i64_pool_space + i;
         ptr->i64 = val;
         ptr->header.count = LC_NO_GC;
-        result[i].type = LC_TY_BOXED_I64;
+        result[i].tag = LC_TY_BOXED_I64;
         result[i].ptr_val = (LCObject*)ptr;
     }
 
@@ -107,7 +107,7 @@ static void FreeArray(LCRuntime* rt, LCArray* arr) {
 }
 
 static void FreeObject(LCRuntime* rt, LCValue val) {
-    switch (val.type) {
+    switch (val.tag) {
     case LC_TY_LAMBDA:
         FreeLambda(rt, (LCLambda*)val.ptr_val);
         break;
@@ -130,10 +130,12 @@ static void FreeObject(LCRuntime* rt, LCValue val) {
         break;
     
     default:
-        if (val.type >= LC_TY_MAX) {
+        if (val.tag >= LC_TY_MAX) {
             // variant
+            val.tag = (val.tag & LC_TY_MAX ) - 8;  // 8 for negative type
+            FreeObject(rt, val);
         } else {
-            printf("[waterlang] internal error, unkown type: %d\n", val.type);
+            fprintf(stderr, "[LichenScript] internal error, unkown tag: %lld\n", val.tag);
             abort();
         }
         break;
@@ -210,7 +212,7 @@ void LCFreeRuntime(LCRuntime* rt) {
     lc_free(rt, rt->cls_meta_data);
 
     if (rt->malloc_state.malloc_count != 1) {
-        fprintf(stderr, "LichenScript: memory leaks %zu\n", rt->malloc_state.malloc_count);
+        fprintf(stderr, "[LichenScript] memory leaks %zu\n", rt->malloc_state.malloc_count);
         lc_raw_free(rt);
         exit(1);
     }
@@ -219,7 +221,7 @@ void LCFreeRuntime(LCRuntime* rt) {
 }
 
 void LCRetain(LCValue val) {
-    if (val.type >= 0) {
+    if (val.tag >= 0) {
         return;
     }
     if (val.ptr_val->header.count == LC_NO_GC) {
@@ -229,7 +231,7 @@ void LCRetain(LCValue val) {
 }
 
 void LCRelease(LCRuntime* rt, LCValue val) {
-    if (val.type <= 0) {
+    if (val.tag <= 0) {
         return;
     }
     if (val.ptr_val->header.count == LC_NO_GC) {
@@ -271,7 +273,7 @@ LCValue LCNewSymbolLen(LCRuntime* rt, const char* content, uint32_t len) {
     LCString* str_ptr = NULL;
 
     while (1) {
-        if (bucket_at_index->content.type == LC_TY_NULL) {
+        if (bucket_at_index->content.tag == LC_TY_NULL) {
             break;
         }
 
@@ -288,14 +290,14 @@ LCValue LCNewSymbolLen(LCRuntime* rt, const char* content, uint32_t len) {
     }
 
     // symbol not found
-    if (result.type == LC_TY_NULL) {
+    if (result.tag == LC_TY_NULL) {
         result = LCNewStringFromCStringLen(rt, (const unsigned char*)content, len);
-        result.type = LC_TY_SYMBOL;
+        result.tag = LC_TY_SYMBOL;
         str_ptr = (LCString*)result.ptr_val;
         str_ptr->header.count = LC_NO_GC;
         str_ptr->hash = hash_string8((const unsigned char*)content, len, rt->seed);
 
-        if (bucket_at_index->content.type == LC_TY_NULL) {
+        if (bucket_at_index->content.tag == LC_TY_NULL) {
             bucket_at_index->content = result;
         } else {
             new_bucket = malloc(sizeof(LCSymbolBucket));
@@ -328,7 +330,7 @@ static void std_print_string(LCString* str) {
 }
 
 static void std_print_val(LCRuntime* rt, LCValue val) {
-    switch (val.type)
+    switch (val.tag)
     {
     case LC_TY_BOOL:
         if (val.int_val) {
@@ -380,7 +382,7 @@ void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_
 }
 
 LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_len, LCValue* args) {
-    if (this.type <= 0) {
+    if (this.tag <= 0) {
         fprintf(stderr, "[LichenScript] try to invoke on primitive type");
         abort();
     }

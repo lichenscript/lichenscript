@@ -362,7 +362,16 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
     )
 
-    | Match _ -> failwith "not implement"
+    | Match _match -> (
+      let { match_expr; match_clauses = _; match_loc } = _match in
+      let match_expr = annotate_expression ~prev_deps env match_expr in
+
+      match_expr.ty_var, (T.Expression.Match { T.Expression.
+        match_expr;
+        match_clauses = [];
+        match_loc;
+      })
+    )
 
   in
   { T.Expression.
@@ -497,7 +506,9 @@ and annotate_declaration env decl : T.Declaration.t =
       )
     )
 
-    | Enum enum -> -1, T.Declaration.Enum enum
+    | Enum enum ->
+      let enum = annotate_enum env enum in
+      -1, T.Declaration.Enum enum
 
     | Import import -> -1, T.Declaration.Import import
 
@@ -954,6 +965,75 @@ and annotate_function env fun_ =
     }
   )
 
+and annotate_enum env enum =
+  let open Ast.Enum in
+  let { visibility; name; loc; members; type_vars } = enum in
+  let ctx = Env.ctx env in
+  let scope = Env.peek_scope env in
+  let variable = Option.value_exn (scope#find_var_symbol name.pident_name) in
+
+  let scope = new scope ~prev:scope () in
+
+  let type_vars =
+    List.map
+      ~f:(fun ident ->
+        let node = {
+          Core_type.
+          value = Unknown;
+          check = none;
+          loc = ident.pident_loc;
+          deps = [];
+        } in
+        let id = Type_context.new_id (Env.ctx env) node in
+        scope#insert_type_symbol ident.pident_name id;
+        id
+      )
+      type_vars
+  in
+
+  Env.with_new_scope env scope (fun env ->
+    let annotate_member member =
+      let { member_name; fields; member_loc } = member in
+      let member_var = Option.value_exn (scope#find_var_symbol member_name.pident_name) in
+
+      let fields_types, deps = List.map ~f:(annotate_type env) fields |> List.unzip in
+
+      Type_context.map_node
+        ctx
+        ~f:(fun node -> {
+          node with
+          deps = List.concat deps;
+          loc = member_loc;
+        })
+        member_var.var_id
+      ;
+
+      { T.Enum.
+        member_name = (member_name.pident_name, member_var.var_id);
+        fields = fields_types;
+      }, member_var.var_id 
+    in
+
+    let members, members_deps = List.map ~f:annotate_member members |> List.unzip in
+
+    Type_context.map_node
+      ctx
+      ~f:(fun node -> {
+        node with
+        deps = members_deps;
+        loc;
+      })
+      variable.var_id;
+
+    { T.Enum.
+      visibility;
+      name = (name.pident_name, variable.var_id);
+      type_vars;
+      members;
+      loc;
+    }
+  )
+
 let annotate_program env (program: Ast.program) =
   let { Ast. pprogram_declarations; pprogram_top_level = _; pprogram_loc; _; } = program in
 
@@ -996,7 +1076,11 @@ let annotate_program env (program: Ast.program) =
           decl_ty_var::acc
         )
 
-        | Enum _ -> acc
+        | Enum enum -> (
+          let open T.Enum in
+          let { name = (_, ty_var); _ } = enum in
+          ty_var::acc
+        )
 
         | Import _ -> acc
         

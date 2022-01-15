@@ -161,6 +161,26 @@ and Block : sig
 end
   = Block
 
+and Enum : sig
+
+  type member  = {
+    member_name: (string * int);
+    fields: Core_type.TypeExpr.t list;
+  }
+  [@@deriving show]
+
+  type t = {
+    visibility: Asttypes.visibility option;
+    name: (string * int);
+    type_vars: int list;
+    members: member list;
+    loc: Loc.t;
+  }
+  [@@deriving show]
+
+end
+  = Enum
+
 and Declaration : sig
 
   type declare_spec =
@@ -212,7 +232,7 @@ and Declaration : sig
     | Class of _class
     | Function_ of Function.t
     | Declare of declare
-    | Enum of Ast.Enum.t
+    | Enum of Enum.t
     | Import of Ast.Declaration.import
     [@@deriving show]
 
