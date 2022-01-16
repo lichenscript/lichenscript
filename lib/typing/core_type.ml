@@ -117,6 +117,11 @@ and TypeDef : sig
     tcls_static_elements: (string * int) list;
   }
 
+  and enum_contruct = {
+    enum_ctor_super_id: int;
+    enum_ctor_params: int list;
+  }
+
   and spec =
     | Primitive
     | Class of class_type 
@@ -124,6 +129,7 @@ and TypeDef : sig
     | Module_ of module_type
     | Function of _function
     | Enum of enum_type
+    | EnumCtor of enum_contruct
 
   and t = {
     builtin: bool;
@@ -169,6 +175,11 @@ end = struct
     tcls_static_elements: (string * int) list;
   }
 
+  and enum_contruct = {
+    enum_ctor_super_id: int;
+    enum_ctor_params: int list;
+  }
+
   and spec =
     | Primitive
     | Class of class_type 
@@ -176,6 +187,7 @@ end = struct
     | Module_ of module_type
     | Function of _function
     | Enum of enum_type
+    | EnumCtor of enum_contruct
 
   and t = {
     builtin: bool;

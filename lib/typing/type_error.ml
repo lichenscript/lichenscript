@@ -20,6 +20,7 @@ and spec =
   | NotAddable of TypeDef.t * TypeDef.t
   | CannotResolveTypeOfExpression
   | DeclareFunctionShouldSpecificExternal
+  | NotAllTheCasesReturnSameType
 
 let make_error ctx loc spec =
   { loc; spec; ctx }
@@ -90,6 +91,9 @@ module PP = struct
 
     | DeclareFunctionShouldSpecificExternal ->
       Format.fprintf formatter "Declare function should specify external symbol, use @external decorator"
+
+    | NotAllTheCasesReturnSameType ->
+      Format.fprintf formatter "All the cases of match expression should return the same type"
 
   let error ~ctx formatter err =
     let { spec; loc; _ } = err in

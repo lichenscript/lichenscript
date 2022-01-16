@@ -2,11 +2,11 @@
 function main() {
     let a = Some(1);
     match a {
-        Some(i) => {
+        case Some(i) => {
             print("Some")
-        },
-        None => {
+        }
+        case None => {
             print("None")
-        },
+        }
     }
 }

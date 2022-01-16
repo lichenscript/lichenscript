@@ -11,11 +11,11 @@ class Object {
 }
 
 public enum Option<A> {
-    Some(A),
-    None,
+    case Some(A)
+    case None
 }
 
 public enum Result<A, B> {
-    Ok(A),
-    Error(B),
+    case Ok(A)
+    case Error(B)
 }

@@ -121,6 +121,7 @@ typedef struct LCMallocState {
 } LCMallocState;
 
 typedef struct LCRuntime LCRuntime;
+typedef struct LCArray LCArray;
 
 typedef LCValue (*LCCFunction)(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args);
 typedef void (*LCFinalizer)(LCRuntime* rt, LCValue obj);
@@ -152,15 +153,11 @@ typedef struct LCLambda {
 LCValue LCNewStringFromCStringLen(LCRuntime* rt, const unsigned char* content, uint32_t len);
 LCValue LCNewStringFromCString(LCRuntime* rt, const unsigned char* content);
 
+LCValue LCNewArray(LCRuntime* rt);
+LCValue LCNewArrayLen(LCRuntime* rt, size_t size);
+
 LCValue LCNewSymbolLen(LCRuntime* rt, const char* content, uint32_t len);
 LCValue LCNewSymbol(LCRuntime* rt, const char* content);
-
-typedef struct LCArray {
-    LC_OBJ_HEADER
-    uint32_t len;
-    uint32_t capacity;
-    LCValue* data;
-} LCArray;
 
 typedef struct LCClassMethodDef {
     const char* name;

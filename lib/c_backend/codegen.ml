@@ -596,6 +596,7 @@ and codegen_pattern env pat =
   match spec with
   | Symbol (name, _) ->
     pss env name
+  | _ -> failwith "not implemented"
 
 let contents env = Buffer.contents env.buffer
 

@@ -224,10 +224,11 @@ and parse_declaration env : Declaration.t =
         end
 
       | Token.T_ENUM ->
-        let parse_member env =
+        let parse_case env =
           let start_loc = Peek.loc env in
-          let member_name = parse_identifier env in
-          Parser_env.add_top_level env ~name:(member_name.pident_name) ~visibility;
+          Expect.token env Token.T_CASE;
+          let case_name = parse_identifier env in
+          Parser_env.add_top_level env ~name:(case_name.pident_name) ~visibility;
           let fields =
             if (Peek.token env) == Token.T_LPAREN then (
               let result = ref [] in
@@ -248,9 +249,9 @@ and parse_declaration env : Declaration.t =
           in
 
           { Enum.
-            member_name;
-            fields;
-            member_loc = with_start_loc env start_loc;
+            case_name;
+            case_fields = fields;
+            case_loc = with_start_loc env start_loc;
           }
         in
         let start_loc = Peek.loc env in
@@ -264,17 +265,12 @@ and parse_declaration env : Declaration.t =
             []
         in
 
-        let members = ref [] in
+        let cases = ref [] in
         Expect.token env Token.T_LCURLY;
 
         while (Peek.token env) <> Token.T_RCURLY && (Peek.token env) <> Token.T_EOF do
-          let member = parse_member env in
-          members := member::(!members);
-
-          if (Peek.token env) <> Token.T_RCURLY then (
-            Expect.token env Token.T_COMMA
-          );
-
+          let _case = parse_case env in
+          cases := _case::(!cases);
         done;
 
         Expect.token env Token.T_RCURLY;
@@ -285,7 +281,7 @@ and parse_declaration env : Declaration.t =
           visibility;
           name;
           type_vars;
-          members = List.rev !members;
+          cases = List.rev !cases;
           loc = with_start_loc env start_loc;
         }
 
@@ -1130,6 +1126,7 @@ and parse_primary_expression env : Expression.t =
   }
 
 and parse_relaxed_kv_block env = 
+  let has_case = ref false in
   let parse_releaxed_kv env =
     let start_loc = Peek.loc env in
     let open Parser_helper in
@@ -1140,6 +1137,14 @@ and parse_relaxed_kv_block env =
       Relaxed_spread(start_loc, expr)
     )
     | _ -> (
+      let relaxed_case_prefix =
+        match (Peek.token env) with
+        | Token.T_CASE ->
+          Eat.token env;
+          has_case := true;
+          true;
+        | _ -> false
+      in
       let relaxed_key = parse_pattern env in
       let relaxed_op = Peek.token env in
       (match relaxed_op with
@@ -1156,6 +1161,7 @@ and parse_relaxed_kv_block env =
       Eat.token env;
       let relaxed_value = parse_expression env in
       Relaxed_node {
+        relaxed_case_prefix;
         relaxed_key;
         relaxed_op;
         relaxed_value;
@@ -1170,7 +1176,7 @@ and parse_relaxed_kv_block env =
   while (Peek.token env) <> Token.T_RCURLY do
     let kv = parse_releaxed_kv env in
     entries := kv::!entries;
-    if (Peek.token env) <> Token.T_RCURLY && (Peek.token env) = Token.T_COMMA then (
+    if not (!has_case) && (Peek.token env) = Token.T_COMMA then (
       Eat.token env
     )
   done;
@@ -1193,7 +1199,7 @@ and parse_pattern env : Pattern.t =
         Eat.token env;
         let content = parse_pattern env in
         Expect.token env Token.T_RPAREN;
-        EnumConstruct content
+        EnumCtor(ident, content)
       ) else
         Identifier ident
     )

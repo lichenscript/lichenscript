@@ -154,7 +154,7 @@ and Pattern : sig
 
   type spec =
     | Identifier of Identifier.t
-    | EnumConstruct of t
+    | EnumCtor of (Identifier.t * t)
 
   and t = {
     spec: spec;
@@ -218,10 +218,10 @@ end
   = Type
 
 and Enum : sig
-  type member = {
-    member_name: Identifier.t;
-    fields: Type.t list;
-    member_loc: Loc.t;
+  type case = {
+    case_name: Identifier.t;
+    case_fields: Type.t list;
+    case_loc: Loc.t;
   }
   [@@deriving show]
 
@@ -229,7 +229,7 @@ and Enum : sig
     visibility: Asttypes.visibility option;
     name: Identifier.t;
     type_vars: Identifier.t list;
-    members: member list;
+    cases: case list;
     loc: Loc.t
   }
   [@@deriving show]

@@ -14,6 +14,7 @@ open Lichenscript_lex
  *)
 
 type relaxed_kv_node = {
+  relaxed_case_prefix: bool;
   relaxed_key: Ast.Pattern.t;
   relaxed_op: Token.t;
   relaxed_value: Ast.Expression.t;
@@ -36,6 +37,10 @@ let cast_relaxed_block_into_match ~start_loc expr (block: relaxed_kv_block) =
     (fun entry ->
       match entry with
       | Relaxed_node node -> (
+        if not node.relaxed_case_prefix then (
+          let err = { Parse_error. perr_spec = MatchClauseNotPrefixCase; perr_loc = node.relaxed_kv_loc } in
+          raise (Parse_error.Error [err])
+        );
         let clause_pat = node.relaxed_key in
         if node.relaxed_op <> Token.T_ARROW then (
           let spec = Parser_env.get_unexpected_error ~expected:"=>" node.relaxed_op in

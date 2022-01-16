@@ -11,6 +11,7 @@ module Pattern = struct
 
   and spec =
   | Symbol of (string * int)
+  | EnumCtor of ((string * int) * t)
   [@@deriving show]
 
 end
@@ -163,9 +164,10 @@ end
 
 and Enum : sig
 
-  type member  = {
-    member_name: (string * int);
-    fields: Core_type.TypeExpr.t list;
+  type case  = {
+    case_name: (string * int);
+    case_fields: Core_type.TypeExpr.t list;
+    case_loc: Loc.t;
   }
   [@@deriving show]
 
@@ -173,7 +175,7 @@ and Enum : sig
     visibility: Asttypes.visibility option;
     name: (string * int);
     type_vars: int list;
-    members: member list;
+    cases: case list;
     loc: Loc.t;
   }
   [@@deriving show]

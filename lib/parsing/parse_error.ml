@@ -10,6 +10,7 @@ and spec =
   | IsNotLeftValue
   | MalformedUnicode
   | VisibilityNoOnTopLevel
+  | MatchClauseNotPrefixCase
 
 exception Error of t list
 
@@ -24,5 +25,6 @@ module PP = struct
     | IsNotLeftValue -> Format.fprintf formatter "Element is not a left value"
     | MalformedUnicode -> Format.fprintf formatter "Malformed unicode"
     | VisibilityNoOnTopLevel -> Format.fprintf formatter "Visibility modifiers are only allowed on top-leveled scope"
+    | MatchClauseNotPrefixCase -> Format.fprintf formatter "Match clause should start with 'case' keyword"
 
 end

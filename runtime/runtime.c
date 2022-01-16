@@ -31,6 +31,13 @@ typedef struct LCRuntime {
     LCClassMeta* cls_meta_data;
 } LCRuntime;
 
+typedef struct LCArray {
+    LC_OBJ_HEADER
+    uint32_t len;
+    uint32_t capacity;
+    LCValue* data;
+} LCArray;
+
 static inline uint32_t hash_string8(const uint8_t *str, size_t len, uint32_t h)
 {
     size_t i;
@@ -99,11 +106,17 @@ static void FreeClassObject(LCRuntime* rt, LCValue val) {
     lc_free(rt, val.ptr_val);
 }
 
-static void FreeArray(LCRuntime* rt, LCArray* arr) {
+static void FreeArray(LCRuntime* rt, LCValue val) {
+    LCArray* arr = (LCArray*)val.ptr_val;
     uint32_t i;
     for (i = 0; i < arr->len; i++) {
         LCRelease(rt, arr->data[i]);
     }
+    if (arr->data != NULL) {
+        lc_free(rt, arr->data);
+        arr->data = NULL;
+    }
+    lc_free(rt, arr);
 }
 
 static void FreeObject(LCRuntime* rt, LCValue val) {
@@ -117,7 +130,7 @@ static void FreeObject(LCRuntime* rt, LCValue val) {
         break;
 
     case LC_TY_ARRAY:
-        FreeArray(rt, (LCArray*)val.ptr_val);
+        FreeArray(rt, val);
         break;
         
     case LC_TY_STRING:
@@ -312,6 +325,31 @@ LCValue LCNewSymbolLen(LCRuntime* rt, const char* content, uint32_t len) {
     // TODO: enlarge symbol map
 
     return result;
+}
+
+LCArray* LCNewArrayWithCap(LCRuntime* rt, size_t cap) {
+    LCArray* result = (LCArray*)lc_malloc(rt, sizeof(LCArray));
+    result->header.count = 1;
+    result->header.class_id = 0;
+    result->capacity = cap;
+    result->len = 0;
+    result->data = (LCValue*)lc_mallocz(rt, sizeof(LCValue) * cap);
+    return result;
+}
+
+LCValue LCNewArray(LCRuntime* rt) {
+    LCArray* arr = LCNewArrayWithCap(rt, 8);
+    return (LCValue) { { .ptr_val = (LCObject*)arr },  LC_TY_ARRAY };
+}
+
+/**
+ * find the nearest number of times of 8
+ */
+LCValue LCNewArrayLen(LCRuntime* rt, size_t size) {
+    size_t remain = size % 8;
+    LCArray* arr = LCNewArrayWithCap(rt, size + (8 - remain));
+    arr->len = size;
+    return (LCValue) { { .ptr_val = (LCObject*)arr },  LC_TY_ARRAY };
 }
 
 LCValue LCNewSymbol(LCRuntime* rt, const char* content) {
