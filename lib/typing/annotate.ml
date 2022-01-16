@@ -582,7 +582,8 @@ and annotate_declaration env decl : T.Declaration.t =
 
     | Enum enum ->
       let enum = annotate_enum env enum in
-      -1, T.Declaration.Enum enum
+      let _, ty_var = T.Enum.(enum.name) in
+      ty_var, T.Declaration.Enum enum
 
     | Import import -> -1, T.Declaration.Import import
 
@@ -1093,11 +1094,12 @@ and annotate_enum env enum =
         ctx
         ~f:(fun node -> {
           node with
-          deps = List.concat deps;
+          deps = List.concat ([variable.var_id]::deps);
           loc = case_loc;
           check = (fun id ->
             let ty_def = {
               TypeDef.
+              enum_ctor_name = case_name.pident_name;
               enum_ctor_super_id = variable.var_id;
               enum_ctor_params = [];
             } in
@@ -1118,13 +1120,14 @@ and annotate_enum env enum =
       }, member_var.var_id 
     in
 
-    let cases, cases_deps = List.map ~f:annotate_case cases |> List.unzip in
+    let cases, _cases_deps = List.map ~f:annotate_case cases |> List.unzip in
 
     Type_context.map_node
       ctx
       ~f:(fun node -> {
         node with
-        deps = cases_deps;
+        (* deps = cases_deps; *)
+        deps = [];
         loc;
         check = (fun id ->
           let ty_def = {

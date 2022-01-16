@@ -8,20 +8,20 @@
 #endif
 
 typedef enum LCObjectType {
-    LC_TY_BOOL = -3,
-    LC_TY_F32 = -2,
-    LC_TY_I32 = -1,
     LC_TY_NULL = 0,
-    LC_TY_STRING = 1,
+    LC_TY_I32,
+    LC_TY_F32,
+    LC_TY_BOOL,
+    LC_TY_STRING = 64,
     LC_TY_SYMBOL,
     LC_TY_LAMBDA,
     LC_TY_CLASS_OBJECT_META,
-    LC_TY_ARRAY = 16,
+    LC_TY_ARRAY,
     LC_TY_CLASS_OBJECT,
-    LC_TY_BOXED_I64 = 24,
+    LC_TY_BOXED_I64,
     LC_TY_BOXED_U64,
     LC_TY_BOXED_F64,
-    LC_TY_MAX = 63,
+    LC_TY_MAX = 127,
 } LCObjectType;
 
 #define LC_OBJ_HEADER LCObjectHeader header;

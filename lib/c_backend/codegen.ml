@@ -159,8 +159,29 @@ and codegen_declaration env decl =
   | Class cls -> codegen_class env cls
   | Function_ _fun -> codegen_function env _fun
   | Declare _ -> ()
-  | Enum _ -> ()
+  | Enum enum -> codegen_enum env enum
   | Import _ -> ()
+
+and codegen_enum env enum =
+  let open Enum in
+  let { cases; _ } = enum in
+  List.iteri
+    ~f:(fun index case ->
+      let { case_name = (name, _ ); case_fields; _ } = case in
+      ps env (Format.sprintf "LCValue %s_ctor(LCRuntime* rt, LCValue this, int argc, LCValue* args) {\n" name);
+      (match case_fields with
+      | [] ->
+        ps env (Format.sprintf "    return MK_I32(%d);\n" index)
+      | _ ->
+        ps env "    LCValue ret = args[0];\n";
+        (* TODO(optimize): not all the value needs to retain *)
+        ps env "    LCRetain(ret);\n";
+        ps env (Format.sprintf "    ret.tag += (%d << 8) + 0x80;\n" index);
+        ps env "    return ret;\n"
+      );
+      ps env "}\n"
+    )
+    cases
 
 and codegen_class env _class =
   let open Declaration in
@@ -384,24 +405,36 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
     match callee.spec with
     | Expression.Identifier (sym_name, sym_id) -> (
       let ext_name_opt = Type_context.find_external_symbol env.env.ctx sym_id in
-      match ext_name_opt with
-      | Some ext_method_name -> (
-        pss env ext_method_name;
-        let params_len = List.length call_params in
-        let params_len_m1 = params_len - 1 in
-        pss env ("(rt, MK_NULL(), " ^ (Int.to_string params_len) ^ ", (LCValue[]){ ");
-        List.iteri
-          ~f:(fun index item ->
-            codegen_expression env item;
-            if index <> params_len_m1 then (
-              pss env ", "
-            )
-          )
-          call_params;
-        pss env "})"
+      let fun_name = match ext_name_opt with
+      | Some ext_method_name -> ext_method_name
+      (* it's a local function *)
+      | _ -> (
+        let ctor_of = Check_helper.find_construct_of env.env.ctx callee.ty_var in
+        let ctor_of, _ = Option.value_exn ctor_of in
+        let open Core_type.TypeDef in
+        match ctor_of.spec with
+        | Function _ -> failwith "function not implemented"
+        | EnumCtor enum_ctor -> (
+          let ctor_name = enum_ctor.enum_ctor_name ^ "_ctor" in
+          ctor_name
+        )
+        | _ ->
+          failwith (Format.sprintf "type %s: %s %d is not callable\n" sym_name ctor_of.name sym_id)
       )
-      | _ ->
-      failwith (Format.sprintf "can not find external %s %d\n" sym_name sym_id)
+      in
+      pss env fun_name;
+      let params_len = List.length call_params in
+      let params_len_m1 = params_len - 1 in
+      pss env ("(rt, MK_NULL(), " ^ (Int.to_string params_len) ^ ", (LCValue[]){ ");
+      List.iteri
+        ~f:(fun index item ->
+          codegen_expression env item;
+          if index <> params_len_m1 then (
+            pss env ", "
+          )
+        )
+        call_params;
+      pss env "})"
     )
     | Expression.Member (expr, name) -> (
       (* let ty_node = Type_context.get_node env.env.ctx expr.ty_var in *)
@@ -467,7 +500,9 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
   )
 
   | Block  _ -> ()
-  | Match _ -> ()
+  | Match _ -> (
+    pss env "MK_NULL()"
+  )
 
 (* return the number of temp values *)
 and codegen_function_block (env: t) block =

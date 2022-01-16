@@ -120,7 +120,7 @@ static void FreeArray(LCRuntime* rt, LCValue val) {
 }
 
 static void FreeObject(LCRuntime* rt, LCValue val) {
-    switch (val.tag) {
+    switch (val.tag & 0x7F) {
     case LC_TY_LAMBDA:
         FreeLambda(rt, (LCLambda*)val.ptr_val);
         break;
@@ -143,15 +143,9 @@ static void FreeObject(LCRuntime* rt, LCValue val) {
         break;
     
     default:
-        if (val.tag >= LC_TY_MAX) {
-            // variant
-            val.tag = (val.tag & LC_TY_MAX ) - 8;  // 8 for negative type
-            FreeObject(rt, val);
-        } else {
-            fprintf(stderr, "[LichenScript] internal error, unkown tag: %lld\n", val.tag);
-            abort();
-        }
-        break;
+        fprintf(stderr, "[LichenScript] internal error, unkown tag: %lld\n", val.tag);
+        abort();
+
     }
 }
 
@@ -234,7 +228,7 @@ void LCFreeRuntime(LCRuntime* rt) {
 }
 
 void LCRetain(LCValue val) {
-    if (val.tag >= 0) {
+    if (val.tag < 64) {
         return;
     }
     if (val.ptr_val->header.count == LC_NO_GC) {
@@ -244,7 +238,7 @@ void LCRetain(LCValue val) {
 }
 
 void LCRelease(LCRuntime* rt, LCValue val) {
-    if (val.tag <= 0) {
+    if ((val.tag & 0x7F) < 64) {
         return;
     }
     if (val.ptr_val->header.count == LC_NO_GC) {
