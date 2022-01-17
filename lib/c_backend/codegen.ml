@@ -41,17 +41,17 @@ type t = {
 type stmt_env = {
   env: t;
   stmt_buffer: Buffer.t;
-  mutable stmt_prepend_lines: string list;
-  mutable stmt_append_lines: string list;
-  mutable tmp_vars_counter: int;
+  stmt_prepend_lines: string list ref;
+  stmt_append_lines: string list ref;
+  tmp_vars_counter: int ref;
 }
 
 let create_stmt_env env = {
   env;
   stmt_buffer = Buffer.create 128;
-  stmt_prepend_lines = [];
-  stmt_append_lines = [];
-  tmp_vars_counter = 0;
+  stmt_prepend_lines = ref [];
+  stmt_append_lines = ref [];
+  tmp_vars_counter = ref 0;
 }
 
 let create ?(indent="    ") ~ctx () =
@@ -255,7 +255,7 @@ and codegen_class env _class =
         ps env "    LCValue ret = MK_NULL();\n";
         let stmts = codegen_function_block env (Option.value_exn _method.cls_method_body) in
         let max_tmp_value = List.fold ~init:0
-          ~f:(fun acc item -> if item.tmp_vars_counter > acc then item.tmp_vars_counter else acc)
+          ~f:(fun acc item -> if !(item.tmp_vars_counter) > acc then !(item.tmp_vars_counter) else acc)
           stmts
         in
 
@@ -275,7 +275,7 @@ and codegen_class env _class =
                 ps env line;
                 endl env
               )
-              stmt_env.stmt_prepend_lines;
+              !(stmt_env.stmt_prepend_lines);
             let content = Buffer.contents stmt_env.stmt_buffer in
             print_indents env;
             ps env content;
@@ -286,7 +286,7 @@ and codegen_class env _class =
                 ps env line;
                 endl env
               )
-              stmt_env.stmt_append_lines;
+              !(stmt_env.stmt_append_lines);
           )
           stmts;
         ps env "    return ret;\n";
@@ -363,15 +363,15 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
     )
 
     | String (str, _, _) -> (
-      let id = env.tmp_vars_counter in
-      env.tmp_vars_counter <- env.tmp_vars_counter + 1;
+      let id = !(env.tmp_vars_counter) in
+      env.tmp_vars_counter := !(env.tmp_vars_counter) + 1;
 
       let len = String.length str in
       let prepend_content = Format.sprintf "t[%d] = %s(rt, (const unsigned char*)\"%s\", %d);" id Primitives.Value.new_string_len str len in
       let append_content = Format.sprintf "%s(rt, t[%d]);" Primitives.Value.release id in
 
-      env.stmt_prepend_lines <- prepend_content::(env.stmt_prepend_lines);
-      env.stmt_append_lines <- append_content::(env.stmt_append_lines);
+      env.stmt_prepend_lines := prepend_content::!(env.stmt_prepend_lines);
+      env.stmt_append_lines := append_content::!(env.stmt_append_lines);
 
       pss env "t[";
       pss env (Int.to_string id);
@@ -499,9 +499,57 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
     pss env (Format.sprintf "%s_init(rt, MK_NULL())" init_name.pident_name);
   )
 
-  | Block  _ -> ()
-  | Match _ -> (
-    pss env "MK_NULL()"
+  | Block _ -> ()
+
+  | Match _match -> (
+    let { match_expr; match_clauses; _ } = _match in
+
+    let codegen_match_expr match_expr =
+      let expr_env = {
+        env with
+        stmt_buffer = Buffer.create 128;
+      } in
+      let match_expr_id = !(env.tmp_vars_counter) in
+      env.tmp_vars_counter := !(env.tmp_vars_counter) + 1;
+      pss expr_env (Format.sprintf "t[%d] = " match_expr_id);
+      codegen_expression expr_env match_expr;
+      pss expr_env ";\n";
+
+      let content = Buffer.contents expr_env.stmt_buffer in
+      env.stmt_prepend_lines := content::!(env.stmt_prepend_lines);
+      match_expr_id
+    in
+
+    let match_expr_id = codegen_match_expr match_expr in
+
+    let codegen_clause clause =
+      let clause_env = {
+        env with
+        stmt_buffer = Buffer.create 128;
+      } in
+      let { clause_pat = _; clause_consequent; _ } = clause in
+      pss clause_env (Format.sprintf "if (LC_VALUE_TAG(t[%d])) {\n" match_expr_id);
+
+      codegen_expression clause_env clause_consequent;
+
+      print_indents_s clause_env;
+      pss clause_env "}\n";
+
+      let content = Buffer.contents clause_env.stmt_buffer in
+      env.stmt_prepend_lines := List.append !(env.stmt_prepend_lines) [content];
+    in
+
+
+    let result_id = !(env.tmp_vars_counter) in
+    env.tmp_vars_counter := !(env.tmp_vars_counter) + 1;
+
+    env.stmt_prepend_lines := (Format.sprintf "t[%d] = MK_NULL();\n" result_id)::!(env.stmt_prepend_lines);
+
+    List.iter
+      ~f:codegen_clause
+      match_clauses;
+
+    pss env (Format.sprintf "t[%d]" result_id)
   )
 
 (* return the number of temp values *)
@@ -559,7 +607,7 @@ and codegen_function_impl env ~header ~scope ~body =
 
     let stmts = codegen_function_block env body in
     let max_tmp_value = List.fold ~init:0
-      ~f:(fun acc item -> if item.tmp_vars_counter > acc then item.tmp_vars_counter else acc)
+      ~f:(fun acc item -> if !(item.tmp_vars_counter) > acc then !(item.tmp_vars_counter) else acc)
       stmts
     in
 
@@ -580,7 +628,7 @@ and codegen_function_impl env ~header ~scope ~body =
             ps env line;
             endl env
           )
-          stmt_env.stmt_prepend_lines;
+          !(stmt_env.stmt_prepend_lines);
         let content = Buffer.contents stmt_env.stmt_buffer in
         print_indents env;
         ps env content;
@@ -591,13 +639,12 @@ and codegen_function_impl env ~header ~scope ~body =
             ps env line;
             endl env
           )
-          stmt_env.stmt_append_lines;
+          !(stmt_env.stmt_append_lines);
       )
       stmts;
 
     (* release all local vars *)
     if vars_len_m1 >= 0 then (
-      print_indents env;
       List.iter
         ~f:(fun (name, _item) ->
           print_indents env;

@@ -90,6 +90,7 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 #define LC_I32_RIGHT_SHIFT(l, r) MK_I32((l).int_val >> (r).int_val)
 #define LC_I32_BIT_OR(l, r) MK_I32((l).int_val | (r).int_val)
 #define LC_I32_BIT_AND(l, r) MK_I32((l).int_val & (r).int_val)
+#define LC_VALUE_TAG(v) (v.tag >> 8)
 
 #endif
 
