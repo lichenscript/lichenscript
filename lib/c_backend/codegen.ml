@@ -1,5 +1,6 @@
 open Lichenscript_codegen_utils
 open Lichenscript_typing
+open Lichenscript_parsing
 open C_op
 open Core_kernel
 
@@ -72,7 +73,23 @@ let rec codegen_statement (env: t) stmt =
   let open Stmt in
   let { spec; _ } = stmt in
   match spec with
-  | Expr expr -> codegen_expression env expr
+  | Expr expr ->
+    codegen_expression env expr;
+    ps env ";"
+
+  | VarDecl names -> (
+    ps env "LCValue ";
+    let len_m1 = (List.length names) - 1 in
+    List.iteri
+      ~f:(fun index name ->
+        ps env name;
+        if index <> len_m1 then (
+          ps env ", "
+        )
+      )
+      names;
+    ps env ";";
+  )
 
   (* | While { while_test; while_block; _ } -> (
     pss env "while (";
@@ -443,12 +460,29 @@ and codegen_expression (env: t) (expr: Expr.t) =
 
   ) *)
 
+  | I32Binary(op, left, right) -> (
+    let name =
+      match op with
+      | Asttypes.BinaryOp.Plus -> "LC_I32_PLUS"
+      | Asttypes.BinaryOp.Minus -> "LC_I32_MINUS"
+      | Asttypes.BinaryOp.Mult -> "LC_I32_MULT"
+      | Asttypes.BinaryOp.Div -> "LC_I32_DIV"
+      | Asttypes.BinaryOp.Equal -> "LC_I32_EQ"
+      | _ -> failwith "unsupport"
+    in
+    ps env name;
+    ps env "(";
+    codegen_expression env left;
+    ps env ", ";
+    codegen_expression env right;
+    ps env ")"
+  )
+
   | Assign(name, right) -> (
     (* TODO: release the left, retain the right *)
     ps env name;
     ps env " = ";
-    codegen_expression env right;
-    ps env ";"
+    codegen_expression env right
   )
 
 (* return the number of temp values *)

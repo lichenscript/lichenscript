@@ -7,6 +7,7 @@
  *)
 
 open Lichenscript_lex
+open Lichenscript_parsing
 
 module%gen rec Decl : sig
 
@@ -27,9 +28,9 @@ and Stmt : sig
 
   type spec =
   | If
-  | While
+  | While of Expr.t * Block.t
   | Expr of Expr.t
-  | VarDecl
+  | VarDecl of string list
   | Continue
   | Break
   | Retain of Expr.t
@@ -53,6 +54,7 @@ and Expr : sig
   | NewFloat of string
   | NewChar of char 
   | NewBoolean of bool
+  | I32Binary of Asttypes.BinaryOp.t * t * t
   | Call of int * t list
   | Assign of string * t
   | ExternalCall of string * t list

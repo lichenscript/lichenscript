@@ -53,7 +53,7 @@ List.map
  *)
 and transform_function env _fun =
   let open Function in
-  let { body; comments; header; _ } = _fun in
+  let { body; comments; header; scope; _ } = _fun in
 
   env.tmp_vars_count <- 0;
 
@@ -75,10 +75,31 @@ and transform_function env _fun =
     )
     header.params.params_content;
 
+  let local_vars = scope#vars in
+
+  let def = ref [] in
+
+  if (List.length local_vars) > 0 then (
+    let names =
+      List.map
+      ~f:(fun (var_name, variable) ->
+        Hashtbl.set env.name_map ~key:variable.var_id ~data:(get_local_var_name var_name variable.var_id);
+        var_name
+      )
+      local_vars;
+    in
+    def := [
+      { C_op.Stmt.
+        spec = VarDecl names;
+        loc = Loc.none;
+      }
+    ];
+  );
+
   let stmts = List.map ~f:(transform_statement env) body.body |> List.concat in
   let new_body = {
     C_op.Block.
-    body = stmts;
+    body = List.append !def stmts;
     loc = body.loc;
   } in
 
@@ -123,9 +144,48 @@ and transform_statement env stmt =
     } in
     List.concat [ tmp.prepend_stmts; [ expr ]; tmp.append_stmts ]
   )
-  | While _
-  | Binding _
-  | Block _
+
+  | While { while_test; while_block; while_loc } -> (
+    let transform_expression = transform_expression env while_test in
+
+    let bodys = List.map ~f:(transform_statement env) while_block.body |> List.concat in
+    let body = {
+      C_op.Block.
+      body = bodys;
+      loc = while_block.loc;
+    } in
+
+    List.concat [
+      transform_expression.prepend_stmts;
+      [
+        { C_op.Stmt.
+          spec = While(transform_expression.expr, body);
+          loc = while_loc;
+        }
+      ];
+      transform_expression.append_stmts;
+    ]
+  )
+
+  | Binding binding -> (
+    let name = Hashtbl.find_exn env.name_map binding.binding_ty_var in
+    let init_expr = transform_expression env binding.binding_init in
+    List.concat [
+      init_expr.prepend_stmts;
+      [
+        { C_op.Stmt.
+          spec = Expr { C_op.Expr.
+            spec = Assign(name, init_expr.expr);
+            loc = Loc.none;
+          };
+          loc = binding.binding_loc;
+        }
+      ];
+      init_expr.append_stmts;
+    ]
+  )
+
+  | Block _ -> failwith "block"
   | Break _ -> [
     { C_op.Stmt.
       spec = Break;
@@ -237,11 +297,28 @@ and transform_expression env expr =
     )
 
     | Member _
-    | Unary _
+    | Unary _ -> failwith "n"
 
-    | Binary _
-    | Update _
-    | Assign _
+    | Binary (op, left, right) -> (
+      let left' = transform_expression env left in
+      let right' = transform_expression env right in
+
+      prepend_stmts := List.concat [!prepend_stmts; left'.prepend_stmts; right'.prepend_stmts];
+      append_stmts := List.concat [!append_stmts; left'.append_stmts; right'.append_stmts];
+
+      C_op.Expr.I32Binary(op, left'.expr, right'.expr)
+    )
+
+    | Update _ -> failwith "update"
+    | Assign ((_, id), expr) -> (
+      let name = Hashtbl.find_exn env.name_map id in
+      let expr' = transform_expression env expr in
+
+      prepend_stmts := List.append !prepend_stmts expr'.prepend_stmts;
+      append_stmts := List.append !append_stmts expr'.append_stmts;
+
+      C_op.Expr.Assign(name, expr'.expr)
+    )
     | Block _
     | Init _
     | Match _ -> failwith "n"
