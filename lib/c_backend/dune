@@ -8,4 +8,4 @@
   lichenscript_codegen_utils
   core_kernel
  )
- (preprocess (pps ppx_deriving.show)))
+ (preprocess (pps ppx_gen_rec ppx_deriving.show)))

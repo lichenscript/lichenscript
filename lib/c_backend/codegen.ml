@@ -1,7 +1,6 @@
-open Lichenscript_typing.Typedtree
 open Lichenscript_codegen_utils
 open Lichenscript_typing
-open Lichenscript_parsing
+open C_op
 open Core_kernel
 
 let main_snippet ?init_name main_name = {|
@@ -19,14 +18,14 @@ int main() {
 }
 |}
 
-type cls_init =
+(* type cls_init =
   | InitClass of (string * string)
-  | InitMethods of (string * string)
+  | InitMethods of (string * string) *)
 
-type cls_method_entry = {
+(* type cls_method_entry = {
   cls_method_origin_name: string;
   cls_method_gen_name: string;
-}
+} *)
 
 type t = {
   indent: string;
@@ -35,23 +34,6 @@ type t = {
   mutable buffer: Buffer.t;
   mutable statements: string list;
   mutable scope: Codegen_scope.scope;
-  mutable cls_inits: cls_init list;
-}
-
-type stmt_env = {
-  env: t;
-  stmt_buffer: Buffer.t;
-  stmt_prepend_lines: string list ref;
-  stmt_append_lines: string list ref;
-  tmp_vars_counter: int ref;
-}
-
-let create_stmt_env env = {
-  env;
-  stmt_buffer = Buffer.create 128;
-  stmt_prepend_lines = ref [];
-  stmt_append_lines = ref [];
-  tmp_vars_counter = ref 0;
 }
 
 let create ?(indent="    ") ~ctx () =
@@ -64,15 +46,12 @@ let create ?(indent="    ") ~ctx () =
     buffer = Buffer.create 1024;
     statements = [];
     scope;
-    cls_inits = [];
   }
 
 let ps env content = Buffer.add_string env.buffer content
-let pss env content = Buffer.add_string env.stmt_buffer content
 
 let endl env = ps env "\n"
 
-let endl_s env = pss env "\n"
 
 let print_indents env =
   let count = ref 0 in
@@ -81,12 +60,6 @@ let print_indents env =
     count := !count + 1
   done
 
-let print_indents_s env =
-  let count = ref 0 in
-  while !count < env.env.indent_level do
-    pss env env.env.indent;
-    count := !count + 1
-  done
 
 let with_indent env cb =
   let prev_indent = env.indent_level in
@@ -95,21 +68,13 @@ let with_indent env cb =
   env.indent_level <- prev_indent;
   result
 
-let rec codegen_statement (env: stmt_env) stmt =
-  let open Statement in
+let rec codegen_statement (env: t) stmt =
+  let open Stmt in
   let { spec; _ } = stmt in
   match spec with
-  | Expr expr -> (
-    pss env "ret = ";
-    codegen_expression env expr;
-    pss env ";"
-  )
-  | Semi expr -> (
-    codegen_expression env expr;
-    pss env ";"
-  )
+  | Expr expr -> codegen_expression env expr
 
-  | While { while_test; while_block; _ } -> (
+  (* | While { while_test; while_block; _ } -> (
     pss env "while (";
     codegen_expression env while_test;
     pss env ".int_val";
@@ -122,47 +87,44 @@ let rec codegen_statement (env: stmt_env) stmt =
     print_indents_s env;
     pss env "}";
     endl_s env
-  )
+  ) *)
 
-  | Binding binding -> (
+  (* | Binding binding -> (
     let { binding_pat; binding_init; _ } = binding in
     codegen_pattern env binding_pat;
     pss env " = ";
     codegen_expression env binding_init;
     pss env ";"
+  ) *)
+
+  | Break -> (
+    print_indents env;
+    ps env "break;";
+    endl env;
   )
 
-  | Block _
-  | Break _
-  | Continue _
-  | Debugger -> ()
-
-  | Return expr_opt -> (
-    pss env "ret = ";
-    (match expr_opt with
-    | Some expr -> (
-      pss env " ";
-      codegen_expression env expr
-    )
-
-    | None -> ()
-    );
-    pss env ";"
+  | Continue -> (
+    print_indents env;
+    ps env "break;";
+    endl env;
   )
 
-  | Empty -> ()
+  | Release expr -> (
+    ps env "LCRelease(rt, ";
+    codegen_expression env expr;
+    ps env ");";
+    endl env;
+  )
+
+  | _ -> ()
 
 and codegen_declaration env decl =
-  let open Declaration in
+  let open Decl in
   let { spec; _ } = decl in
   match spec with
-  | Class cls -> codegen_class env cls
-  | Function_ _fun -> codegen_function env _fun
-  | Declare _ -> ()
-  | Enum enum -> codegen_enum env enum
-  | Import _ -> ()
+  | Func _fun -> codegen_function env _fun
 
-and codegen_enum env enum =
+(* and codegen_enum env enum =
   let open Enum in
   let { cases; _ } = enum in
   List.iteri
@@ -181,9 +143,9 @@ and codegen_enum env enum =
       );
       ps env "}\n"
     )
-    cases
+    cases *)
 
-and codegen_class env _class =
+(* and codegen_class env _class =
   let open Declaration in
   let { cls_id; cls_body; _ } = _class in
   let name = (match cls_id with
@@ -340,67 +302,77 @@ and codegen_class env _class =
     env.cls_inits <- (InitMethods (class_id_var_name, method_def_name))::env.cls_inits;
   );
 
-  ()
+  () *)
 
-and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
-  let open Expression in
+and codegen_expression (env: t) (expr: Expr.t) =
+  let open Expr in
   let { spec; _ } = expr in
   match spec with
-  | Constant cnst -> (
-    let open Lichenscript_parsing.Ast.Literal in
-    match cnst with
-    | Integer (raw, _) -> (
-      pss env Primitives.Value.mk_i32;
-      pss env "(";
-      pss env raw;
-      pss env ")"
-    )
-
-    | Char ch -> (
-      pss env "'";
-      pss env (Char.to_string ch);
-      pss env "'";
-    )
-
-    | String (str, _, _) -> (
-      let id = !(env.tmp_vars_counter) in
-      env.tmp_vars_counter := !(env.tmp_vars_counter) + 1;
-
-      let len = String.length str in
-      let prepend_content = Format.sprintf "t[%d] = %s(rt, (const unsigned char*)\"%s\", %d);" id Primitives.Value.new_string_len str len in
-      let append_content = Format.sprintf "%s(rt, t[%d]);" Primitives.Value.release id in
-
-      env.stmt_prepend_lines := prepend_content::!(env.stmt_prepend_lines);
-      env.stmt_append_lines := append_content::!(env.stmt_append_lines);
-
-      pss env "t[";
-      pss env (Int.to_string id);
-      pss env "]";
-    )
-
-    | Float (str, _) -> (
-      pss env Primitives.Value.mk_f32;
-      pss env "(";
-      pss env str;
-      pss env ")"
-    )
-
-    | Boolean true ->
-      pss env Primitives.Constant._true
-
-    | Boolean false ->
-      pss env Primitives.Constant._false
+  | NewInt value -> (
+      ps env Primitives.Value.mk_i32;
+      ps env "(";
+      ps env value;
+      ps env ")"
   )
 
-  | Identifier (name, _) -> (
-    pss env name
+  | NewChar ch -> (
+    ps env "'";
+    ps env (Char.to_string ch);
+    ps env "'";
   )
 
-  | Lambda
-  | If _
-  | Array _ -> ()
+  | NewString value -> (
+    let len = String.length value in
+    let value = Format.sprintf "%s(rt, (const unsigned char*)\"%s\", %d);" Primitives.Value.new_string_len value len in
+    ps env value
+  )
 
-  | Call call -> (
+  | NewFloat value -> (
+    ps env Primitives.Value.mk_f32;
+    ps env "(";
+    ps env value;
+    ps env ")"
+  )
+
+  | NewBoolean true ->
+    ps env Primitives.Constant._true
+
+  | NewBoolean false ->
+    ps env Primitives.Constant._false
+
+  | Ident value -> ps env value
+
+  | ExternalCall (fun_name, params) -> (
+    ps env fun_name;
+    let params_len = List.length params in
+    if List.is_empty params then (
+      ps env (Format.sprintf "(rt, MK_NULL(), %d, NULL)" params_len);
+    ) else  (
+      ps env (Format.sprintf "(rt, MK_NULL(), %d, (LCValue[]) {" params_len);
+
+      let len_m1 = params_len - 1 in
+
+      List.iteri
+        ~f:(fun index param ->
+          codegen_expression env param;
+          if index <> len_m1 then (
+            ps env ", "
+          )
+        )
+        params;
+
+      ps env "})";
+    )
+  )
+
+  | Call _ -> failwith "call"
+
+  | Temp id ->
+    ps env "t[";
+    ps env (Int.to_string id);
+    ps env "]"
+
+  (* | Call call -> (
     let { callee; call_params; _ } = call in
     match callee.spec with
     | Expression.Identifier (sym_name, sym_id) -> (
@@ -469,122 +441,54 @@ and codegen_expression (env: stmt_env) (expr: Typedtree.Expression.t) =
     | _ ->
       pss env "MK_NULL()"
 
-  )
+  ) *)
 
-  | Member _
-  | Unary _ -> ()
-
-  | Binary (op, left_id, right_id) -> (
-    let op_name = Primitives.Bin.prim op in
-    pss env op_name;
-    pss env "(";
-    codegen_expression env left_id;
-    pss env ", ";
-    codegen_expression env right_id;
-    pss env ")"
-  )
-
-  | Update _ -> ()
-
-  | Assign((name, _), right) -> (
+  | Assign(name, right) -> (
     (* TODO: release the left, retain the right *)
-    pss env name;
-    pss env " = ";
+    ps env name;
+    ps env " = ";
     codegen_expression env right;
-    pss env ";"
-  )
-
-  | Init init -> (
-    let { Ast.Expression. init_name; _ } = init in
-    pss env (Format.sprintf "%s_init(rt, MK_NULL())" init_name.pident_name);
-  )
-
-  | Block _ -> ()
-
-  | Match _match -> (
-    let { match_expr; match_clauses; _ } = _match in
-
-    let codegen_match_expr match_expr =
-      let expr_env = {
-        env with
-        stmt_buffer = Buffer.create 128;
-      } in
-      let match_expr_id = !(env.tmp_vars_counter) in
-      env.tmp_vars_counter := !(env.tmp_vars_counter) + 1;
-      pss expr_env (Format.sprintf "t[%d] = " match_expr_id);
-      codegen_expression expr_env match_expr;
-      pss expr_env ";\n";
-
-      let content = Buffer.contents expr_env.stmt_buffer in
-      env.stmt_prepend_lines := content::!(env.stmt_prepend_lines);
-      match_expr_id
-    in
-
-    let match_expr_id = codegen_match_expr match_expr in
-
-    let codegen_clause clause =
-      let clause_env = {
-        env with
-        stmt_buffer = Buffer.create 128;
-      } in
-      let { clause_pat = _; clause_consequent; _ } = clause in
-      pss clause_env (Format.sprintf "if (LC_VALUE_TAG(t[%d])) {\n" match_expr_id);
-
-      codegen_expression clause_env clause_consequent;
-
-      print_indents_s clause_env;
-      pss clause_env "}\n";
-
-      let content = Buffer.contents clause_env.stmt_buffer in
-      env.stmt_prepend_lines := List.append !(env.stmt_prepend_lines) [content];
-    in
-
-
-    let result_id = !(env.tmp_vars_counter) in
-    env.tmp_vars_counter := !(env.tmp_vars_counter) + 1;
-
-    env.stmt_prepend_lines := (Format.sprintf "t[%d] = MK_NULL();\n" result_id)::!(env.stmt_prepend_lines);
-
-    List.iter
-      ~f:codegen_clause
-      match_clauses;
-
-    pss env (Format.sprintf "t[%d]" result_id)
+    ps env ";"
   )
 
 (* return the number of temp values *)
 and codegen_function_block (env: t) block =
-  let open Block in
+  let open C_op.Block in
   let { body; _ } = block in
-  List.map
+  List.iter
     ~f:(fun stmt ->
-      let prev_buffer = env.buffer in
-      env.buffer <- Buffer.create 128;
-      
-      let stmt_env = create_stmt_env env in
-      codegen_statement stmt_env stmt;
-
-      env.statements <- (Buffer.contents env.buffer)::env.statements;
-      env.buffer <- prev_buffer;
-      stmt_env
+      print_indents env;
+      codegen_statement env stmt;
+      endl env;
     )
-    body
+    body;
 
-and codegen_identifier env id =
-  ps env (env.scope#codegen_id id)
+(* and codegen_identifier env id =
+  ps env (env.scope#codegen_id id) *)
 
-and codegen_function_impl env ~header ~scope ~body =
-  let open Function in
-  let fun_name = header.name in
+and codegen_function env (_fun: Func.t) =
+  let open Func in
   ps env "LCValue ";
-  codegen_identifier env (fun_name, header.id);
+  ps env _fun.name;
   ps env "(LCRuntime* rt, LCValue this, int arg_len, LCValue* args)";
   ps env " {";
   endl env;
 
   with_indent env (fun () ->
-    let vars = scope#vars in
-    let vars_len_m1 = (List.length vars) - 1 in
+    print_indents env;
+    ps env "LCValue ret = MK_NULL();\n";
+
+    if _fun.tmp_vars_count > 0 then (
+      print_indents env;
+      ps env (Format.sprintf "LCValue t[%d];\n" _fun.tmp_vars_count)
+    );
+
+    codegen_function_block env _fun.body;
+    print_indents env;
+    ps env "return ret;\n";
+  );
+
+  (* with_indent env (fun () ->
 
     print_indents env;
     ps env "LCValue ret = MK_NULL();";
@@ -605,43 +509,8 @@ and codegen_function_impl env ~header ~scope ~body =
       endl env;
     );
 
-    let stmts = codegen_function_block env body in
-    let max_tmp_value = List.fold ~init:0
-      ~f:(fun acc item -> if !(item.tmp_vars_counter) > acc then !(item.tmp_vars_counter) else acc)
-      stmts
-    in
+    let _stmts = codegen_function_block env _fun.body in
 
-    if max_tmp_value > 0 then (
-      print_indents env;
-      ps env "LCValue t[";
-      ps env (Int.to_string max_tmp_value);
-      ps env "];";
-      endl env;
-    );
-
-    (* print all stmts with indents *)
-    List.iter
-      ~f:(fun stmt_env ->
-        List.iter
-          ~f:(fun line ->
-            print_indents env;
-            ps env line;
-            endl env
-          )
-          !(stmt_env.stmt_prepend_lines);
-        let content = Buffer.contents stmt_env.stmt_buffer in
-        print_indents env;
-        ps env content;
-        endl env;
-        List.iter
-          ~f:(fun line ->
-            print_indents env;
-            ps env line;
-            endl env
-          )
-          !(stmt_env.stmt_append_lines);
-      )
-      stmts;
 
     (* release all local vars *)
     if vars_len_m1 >= 0 then (
@@ -662,35 +531,24 @@ and codegen_function_impl env ~header ~scope ~body =
     print_indents env;
     ps env "return ret;";
     endl env;
-  );
+  ); *)
 
   ps env "}\n"
-
-and codegen_function env (_fun: Typedtree.Function.t) =
-  let open Function in
-  (* let fun_node = Type_context.get_node env.ctx _fun.header.id in *)
-
-  codegen_function_impl env ~header:_fun.header ~scope:_fun.scope ~body:_fun.body;
-
-and codegen_pattern env pat =
-  let open Pattern in
-  let { spec; _ } = pat in
-  match spec with
-  | Symbol (name, _) ->
-    pss env name
-  | _ -> failwith "not implemented"
 
 let contents env = Buffer.contents env.buffer
 
 let codegen_program ?indent ~ctx (declarations: Typedtree.Declaration.t list) =
   let env = create ?indent ~ctx () in
-  ps env {|/* This file is auto generated by LCc */
+  ps env {|/* This file is auto generated by the LichenScript Compiler */
 #include <stdint.h>
 #include "runtime.h"
 |};
-  List.iter ~f:(codegen_declaration env) declarations;
 
-  let init_name = if not (List.is_empty env.cls_inits) then (
+  let c_decls = Transform.transform_declarations ctx declarations in
+
+  List.iter ~f:(codegen_declaration env) c_decls.declarations;
+
+  (* let init_name = if not (List.is_empty env.cls_inits) then (
     endl env;
     ps env (Format.sprintf "void %s(LCRuntime* rt) {\n" Primitives.Value.init_class_meta);
 
@@ -706,10 +564,11 @@ let codegen_program ?indent ~ctx (declarations: Typedtree.Declaration.t list) =
 
     ps env "}\n";
     Some (Primitives.Value.init_class_meta)
-  ) else None in
+  ) else None in *)
+  let init_name = None in
 
   (* if user has a main function *)
-  let main_name = env.scope#id_name_exn "main" in
+  let main_name = Option.value_exn c_decls.main_function_name in
   ps env (main_snippet ?init_name main_name);
 
   env
