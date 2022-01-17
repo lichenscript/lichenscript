@@ -346,20 +346,51 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     )
 
     | Init init -> (
-      let { init_loc; init_name; _ } = init in
+      let { init_loc; init_name; init_elements } = init in
       let ctx = Env.ctx env in
       let type_int = (Env.peek_scope env)#find_type_symbol init_name.pident_name in
+      let deps = ref [] in
+
+      let annotate_element elm =
+        match elm with
+        | InitSpread expr -> (
+          let expr = annotate_expression ~prev_deps env expr in
+          deps := expr.ty_var::!deps;
+          T.Expression.InitSpread expr
+        )
+        | InitEntry { init_entry_loc; init_entry_key; init_entry_value } -> (
+          let init_entry_value =
+            Option.map
+            ~f:(fun expr ->
+              let expr' = annotate_expression ~prev_deps env expr in
+              deps := expr'.ty_var::!deps;
+              expr'
+            )
+            init_entry_value
+          in
+          T.Expression.InitEntry {
+            init_entry_loc;
+            init_entry_key;
+            init_entry_value;
+          }
+        )
+      in
+
       match type_int with
       | Some v -> (
         let node = {
           value = TypeExpr.Ctor(v, []);
           loc = init_loc;
-          deps = [];
+          deps = List.rev !deps;
           (* TODO: check props and expressions *)
           check = none;
         } in
         let node_id = Type_context.new_id ctx node in
-        node_id, T.Expression.Init init
+        node_id, T.Expression.Init{
+          init_loc;
+          init_name = (init_name.pident_name, v);
+          init_elements = List.map ~f:annotate_element init_elements;
+        } 
       )
       | None -> (
         let err = Type_error.(make_error ctx init_loc (CannotFindName init_name.pident_name)) in

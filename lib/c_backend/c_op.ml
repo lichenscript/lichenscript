@@ -11,8 +11,17 @@ open Lichenscript_parsing
 
 module%gen rec Decl : sig
 
+  type _class = {
+    name: string;
+    original_name: string;
+    finalizer_name: string;
+    properties: string list;
+  }
+  [@@deriving show]
+
   type spec =
   | Func of Func.t
+  | Class of _class
   [@@deriving show]
 
   type t = {

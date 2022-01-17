@@ -24,9 +24,20 @@ module%gen rec Expression : sig
     attributes: Ast.attributes;
   }
 
+  and init_entry = {
+    init_entry_loc: Loc.t;
+    init_entry_key: Identifier.t;
+    init_entry_value: t option;
+  }
+
+  and init_element =
+  | InitSpread of Expression.t
+  | InitEntry of init_entry
+
   and init = {
     init_loc: Loc.t;
     init_name: (string * int);
+    init_elements: init_element list;
   }
 
   and _match = {
@@ -61,7 +72,7 @@ module%gen rec Expression : sig
 
     | Assign of (string * int) * t
     | Block of Block.t
-    | Init of Ast.Expression.init
+    | Init of init
     | Match of _match
 
   and call = {

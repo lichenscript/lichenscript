@@ -38,15 +38,20 @@ let rec transform_declaration env decl  =
   let open Declaration in
   let { spec; loc; _ } = decl in
   let specs = match spec with
-  | Class cls -> transform_class env cls
-  | Function_ _fun -> transform_function env _fun
-  | Enum enum -> transform_enum env enum
-  | Declare _
-  | Import _ -> []
-in
-List.map
-  ~f:(fun spec -> { C_op.Decl. spec; loc })
-  specs
+    | Class cls -> transform_class env cls
+    | Function_ _fun -> transform_function env _fun
+    | Enum enum -> transform_enum env enum
+    | Declare _
+    | Import _ -> []
+  in
+  List.map
+    ~f:(fun spec -> { C_op.Decl. spec; loc })
+    specs
+
+and distribute_name env (name, id) =
+  let fun_name = "LCC_" ^ name in
+  Hashtbl.set env.name_map ~key:id ~data:fun_name;
+  fun_name
 
 (*
  * distribute variable for params
@@ -54,15 +59,20 @@ List.map
 and transform_function env _fun =
   let open Function in
   let { body; comments; header; scope; _ } = _fun in
+  let original_name = header.name in
+  let fun_name = distribute_name env (original_name, header.id) in
 
-  env.tmp_vars_count <- 0;
-
-  let fun_name = "LCC_" ^ header.name in
-  Hashtbl.set env.name_map ~key:header.id ~data:fun_name;
-
-  if String.equal header.name "main" then (
+  if String.equal original_name "main" then (
     env.main_function_name <- Some fun_name
   );
+  [
+    transform_function_impl env ~name:fun_name ~params:header.params ~scope ~body ~comments
+  ]
+
+and transform_function_impl env ~name ~params ~body ~scope ~comments =
+  let open Function in
+
+  env.tmp_vars_count <- 0;
 
   List.iter
     ~f:(fun { param_pat; param_ty; _ } ->
@@ -73,7 +83,7 @@ and transform_function env _fun =
       in
       Hashtbl.set env.name_map ~key:param_ty ~data:(get_local_var_name param_name param_ty)
     )
-    header.params.params_content;
+    params.params_content;
 
   let local_vars = scope#vars in
 
@@ -105,15 +115,13 @@ and transform_function env _fun =
 
   let t_fun = {
     C_op.Func.
-    name = fun_name;
+    name;
     body = new_body;
     tmp_vars_count = env.tmp_vars_count;
     comments;
   } in
 
-  [
-    C_op.Decl.Func t_fun;
-  ]
+  C_op.Decl.Func t_fun;
 
 and transform_statement env stmt =
   let open Statement in
@@ -293,7 +301,13 @@ and transform_expression env expr =
 
       )
 
-      | _ -> failwith "not impement"
+      | _ -> (
+        let ty_id = callee.ty_var in
+        let ctor_opt = Check_helper.find_construct_of env.ctx ty_id in
+        let _, ctor_ty_id = Option.value_exn ctor_opt in
+        let name = Hashtbl.find_exn env.name_map ctor_ty_id in
+        C_op.Expr.ExternalCall(name, [])
+      )
     )
 
     | Member _
@@ -319,8 +333,14 @@ and transform_expression env expr =
 
       C_op.Expr.Assign(name, expr'.expr)
     )
-    | Block _
-    | Init _
+    | Block _ -> failwith "block"
+
+    | Init { init_name; _ } -> (
+      let _, init_name_id = init_name in
+      let fun_name = Hashtbl.find_exn env.name_map init_name_id in
+      C_op.Expr.ExternalCall(fun_name ^ "_init", [])
+    )
+
     | Match _ -> failwith "n"
   in
   {
@@ -332,12 +352,68 @@ and transform_expression env expr =
     append_stmts = List.rev !append_stmts;
   }
 
-and transform_class _env _cls =
-  []
+and transform_class env cls: C_op.Decl.spec list =
+  let open Declaration in
+  let { cls_id; cls_body; _ } = cls in
+  let original_name, _ = cls_id in
+  let fun_name = distribute_name env cls_id in
+  let finalizer_name = fun_name ^ "_finalizer" in
+
+  let properties =
+    List.fold
+      ~init:[]
+      ~f:(fun acc elm ->
+        match elm with
+        | Cls_method _ -> acc
+        | Cls_property prop -> (
+          let { cls_property_name; _ } = prop in
+          cls_property_name.pident_name::acc
+        )
+      )
+      cls_body.cls_body_elements;
+  in
+
+  let methods: C_op.Decl.spec list = 
+    List.fold
+      ~init:[]
+      ~f:(fun acc elm ->
+        match elm with
+        | Cls_method _method -> (
+          let { cls_method_name; cls_method_params; cls_method_body; cls_method_scope; _ } = _method in
+          (* let fun_name = distribute_name env cls_method_name in *)
+          let origin_method_name, method_id = cls_method_name in
+          let new_name = original_name ^ "_" ^ origin_method_name in
+          let new_name = distribute_name env (new_name, method_id) in
+          let _fun =
+            transform_function_impl
+              env
+              ~name:new_name
+              ~params:cls_method_params
+              ~scope:(Option.value_exn cls_method_scope)
+              ~body:(Option.value_exn cls_method_body)
+              ~comments:[]
+          in
+
+          _fun::acc
+          (* { C_op.Decl. spec = _fun; loc = cls_method_loc }::acc *)
+        )
+        | Cls_property _ -> acc
+      )
+      cls_body.cls_body_elements;
+  in
+
+  let cls = {
+    C_op.Decl.
+    name = fun_name;
+    original_name;
+    finalizer_name;
+    properties;
+  } in
+
+  List.append [ (C_op.Decl.Class cls) ] methods
 
 and transform_enum _env _enum =
   []
-
 
 type result = {
   main_function_name: string option;

@@ -1,6 +1,5 @@
 open Lichenscript_codegen_utils
 open Lichenscript_typing
-open Lichenscript_parsing
 open C_op
 open Core_kernel
 
@@ -91,28 +90,22 @@ let rec codegen_statement (env: t) stmt =
     ps env ";";
   )
 
-  (* | While { while_test; while_block; _ } -> (
-    pss env "while (";
-    codegen_expression env while_test;
-    pss env ".int_val";
-    pss env ") {";
-    endl_s env;
-    with_indent env.env (fun () ->
-      List.iter ~f:(codegen_statement env) while_block.body
+  | While (expr, block) -> (
+    ps env "while (";
+    codegen_expression env expr;
+    ps env ".int_val) {\n";
+    with_indent env (fun () -> 
+      List.iter
+        ~f:(fun stmt ->
+          print_indents env;
+          codegen_statement env stmt;
+          endl env;
+        )
+        block.body
     );
-    endl_s env;
-    print_indents_s env;
-    pss env "}";
-    endl_s env
-  ) *)
-
-  (* | Binding binding -> (
-    let { binding_pat; binding_init; _ } = binding in
-    codegen_pattern env binding_pat;
-    pss env " = ";
-    codegen_expression env binding_init;
-    pss env ";"
-  ) *)
+    print_indents env;
+    ps env "}"
+  )
 
   | Break -> (
     print_indents env;
@@ -140,6 +133,30 @@ and codegen_declaration env decl =
   let { spec; _ } = decl in
   match spec with
   | Func _fun -> codegen_function env _fun
+  | Class cls -> (
+    let { name; properties; _ } = cls in
+    let class_id_var_name = name ^ "_class_id" in
+    ps env (Format.sprintf "static LCClassID %s;\n" class_id_var_name);
+    ps env (Format.sprintf "typedef struct %s {" name);
+    endl env;
+
+    with_indent env (fun () -> 
+      print_indents env;
+      ps env "LC_OBJ_HEADER";
+      endl env;
+
+      List.iter
+        ~f:(fun prop_name ->
+          print_indents env;
+          ps env (Format.sprintf "LCValue %s;" prop_name);
+          endl env;
+        )
+        properties;
+    );
+
+    ps env (Format.sprintf "} %s;" name);
+    endl env;
+  )
 
 (* and codegen_enum env enum =
   let open Enum in
@@ -461,15 +478,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
   ) *)
 
   | I32Binary(op, left, right) -> (
-    let name =
-      match op with
-      | Asttypes.BinaryOp.Plus -> "LC_I32_PLUS"
-      | Asttypes.BinaryOp.Minus -> "LC_I32_MINUS"
-      | Asttypes.BinaryOp.Mult -> "LC_I32_MULT"
-      | Asttypes.BinaryOp.Div -> "LC_I32_DIV"
-      | Asttypes.BinaryOp.Equal -> "LC_I32_EQ"
-      | _ -> failwith "unsupport"
-    in
+    let name = Primitives.Bin.prim op in
     ps env name;
     ps env "(";
     codegen_expression env left;
