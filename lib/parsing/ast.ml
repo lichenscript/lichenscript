@@ -122,7 +122,6 @@ and Statement : sig
     | Semi of Expression.t (* Expr with a trailing semi-colon. *)
     | While of while_desc
     | Binding of var_binding
-    | Block of Block.t
     | Break of Identifier.t option
     | Continue of Identifier.t option
     | Debugger

@@ -119,6 +119,7 @@ and TypeDef : sig
 
   and enum_ctor = {
     enum_ctor_name: string;
+    enum_ctor_tag_id: int;
     enum_ctor_super_id: int;
     enum_ctor_params: int list;
   }
@@ -178,6 +179,7 @@ end = struct
 
   and enum_ctor = {
     enum_ctor_name: string;
+    enum_ctor_tag_id: int;
     enum_ctor_super_id: int;
     enum_ctor_params: int list;
   }

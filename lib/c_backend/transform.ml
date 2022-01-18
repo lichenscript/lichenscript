@@ -140,14 +140,15 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
 
   C_op.Decl.Func t_fun;
 
-and transform_statement env stmt =
+and transform_statement ?ret env stmt =
   let open Statement in
   let { spec; loc; _ } = stmt in
   let transform_return_expr expr =
     let tmp = transform_expression env expr in
+    let ret = Option.value ~default:"ret" ret in
     let assign = {
       C_op.Expr.
-      spec = Assign("ret", tmp.expr);
+      spec = Assign(ret, tmp.expr);
       loc;
     } in
     let expr = {
@@ -210,13 +211,13 @@ and transform_statement env stmt =
     ]
   )
 
-  | Block _ -> failwith "block"
   | Break _ -> [
     { C_op.Stmt.
       spec = Break;
       loc;
     }
   ]
+
   | Continue _ -> [
     { C_op.Stmt.
       spec = Continue;
@@ -354,7 +355,6 @@ and transform_expression env expr =
 
       C_op.Expr.Assign(name, expr'.expr)
     )
-    | Block _ -> failwith "block"
 
     | Init { init_name; _ } -> (
       let _, init_name_id = init_name in
@@ -362,47 +362,124 @@ and transform_expression env expr =
       C_op.Expr.ExternalCall(fun_name ^ "_init", [])
     )
 
+    | Block block -> (
+      let tmp_id = env.tmp_vars_count in
+      env.tmp_vars_count <- env.tmp_vars_count + 1;
+
+      let stmts = transform_block ~ret_id:tmp_id env block in
+
+      prepend_stmts := List.append !prepend_stmts stmts;
+
+      C_op.Expr.Temp tmp_id
+    )
+
     | Match _match -> (
-      let { match_expr; _ } = _match in
+      let { match_expr; match_clauses; _ } = _match in
       let match_expr = transform_expression env match_expr in
       let result_tmp = env.tmp_vars_count in
       env.tmp_vars_count <- env.tmp_vars_count + 1;
 
-      prepend_stmts := {
-        C_op.Stmt.
-        spec = Expr {
-          C_op.Expr.
-          spec = Assign ("t[" ^ (Int.to_string result_tmp) ^ "]", {
-            spec = Null;
+      prepend_stmts := List.append !prepend_stmts
+        [{
+          C_op.Stmt.
+          spec = Expr {
+            C_op.Expr.
+            spec = Assign ("t[" ^ (Int.to_string result_tmp) ^ "]", {
+              spec = Null;
+              loc = Loc.none;
+            });
             loc = Loc.none;
-          });
+          };
           loc = Loc.none;
-        };
-        loc = Loc.none;
-      }::!prepend_stmts;
+        }];
 
-      prepend_stmts := {
-        C_op.Stmt.
-        spec = If (match_expr.expr, {
-          C_op.Block.
-          body = [];
-          loc = Loc.none;
-        });
-        loc = Loc.none;
-      }::!prepend_stmts;
+      let tmp_counter = ref [] in
+
+      List.iter
+        ~f:(fun clause ->
+          let saved_tmp_count = env.tmp_vars_count in
+          let test_expr = transform_pattern_to_test env match_expr.expr clause.clause_pat in
+
+          let body = transform_expression env clause.clause_consequent in
+
+          prepend_stmts := List.append
+            !prepend_stmts
+            [{
+              C_op.Stmt.
+              spec = If (test_expr, {
+                C_op.Block.
+                body = List.concat [
+                  body.prepend_stmts;
+                  [{ C_op.Stmt.
+                    spec = Expr {
+                      spec = Assign("t[" ^ (Int.to_string result_tmp) ^ "]", body.expr);
+                      loc = Loc.none;
+                    };
+                    loc = Loc.none;
+                  }];
+                  body.append_stmts;
+                ];
+                loc = Loc.none;
+              });
+              loc = Loc.none;
+            }];
+
+          tmp_counter := env.tmp_vars_count::(!tmp_counter);
+          env.tmp_vars_count <- saved_tmp_count;
+        )
+        match_clauses;
+
+      (* use the max tmp vars *)
+      env.tmp_vars_count <- List.fold ~init:0 ~f:(fun acc item -> if item > acc then item else acc) !tmp_counter;
 
       C_op.Expr.Temp result_tmp
     )
 
   in
   {
-    prepend_stmts = List.rev !prepend_stmts;
+    prepend_stmts = !prepend_stmts;
     expr = {
       spec = expr_spec;
       loc;
     };
-    append_stmts = List.rev !append_stmts;
+    append_stmts = !append_stmts;
   }
+
+and transform_block env ~ret_id block =
+  let ret = "t[" ^ (Int.to_string ret_id) ^ "]" in
+  let stmts = List.map ~f:(transform_statement ~ret env) block.body |> List.concat in
+  stmts
+
+and transform_pattern_to_test env match_expr pat =
+  let open Pattern in
+  let { spec; loc } = pat in
+  match spec with
+  | Symbol (name, name_id) -> (
+    let ctor_opt = Check_helper.find_construct_of env.ctx name_id in
+    let ctor, _ = Option.value_exn ~message:(Format.sprintf "find enum ctor failed: %s %d" name name_id) ctor_opt in
+    let enum_ctor = Core_type.TypeDef.(
+      match ctor.spec with
+      | EnumCtor v -> v
+      | _ -> failwith "n"
+    ) in
+    { C_op.Expr.
+      spec = TagEqual(match_expr, enum_ctor.enum_ctor_tag_id);
+      loc;
+    }
+  )
+  | EnumCtor ((_name, name_id), _child) -> (
+    let ctor_opt = Check_helper.find_construct_of env.ctx name_id in
+    let ctor, _ = Option.value_exn ctor_opt in
+    let enum_ctor = Core_type.TypeDef.(
+      match ctor.spec with
+      | EnumCtor v -> v
+      | _ -> failwith "n"
+    ) in
+    { C_op.Expr.
+      spec = TagEqual(match_expr, enum_ctor.enum_ctor_tag_id);
+      loc;
+    }
+  )
 
 and transform_class env cls: C_op.Decl.spec list =
   let open Declaration in

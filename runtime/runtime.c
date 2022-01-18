@@ -81,21 +81,22 @@ static void free_i64_pool(LCRuntime* rt) {
     lc_free(rt, rt->i64_pool);
 }
 
-static void FreeObject(LCRuntime* rt, LCValue val);
+static void LCFreeObject(LCRuntime* rt, LCValue val);
 
-static void FreeLambda(LCRuntime* rt, LCLambda* obj) {
+static inline void LCFreeLambda(LCRuntime* rt, LCValue val) {
+    LCLambda* lambda = (LCLambda*)val.ptr_val; 
     size_t i;
-    for (i = 0; i < obj->captured_values_size; i++) {
-        LCRelease(rt, obj->captured_values[i]);
+    for (i = 0; i < lambda->captured_values_size; i++) {
+        LCRelease(rt, lambda->captured_values[i]);
     }
 
-    lc_free(rt, obj);
+    lc_free(rt, lambda);
 }
 
 /**
  * extract the finalizer from the class definition
  */
-static void FreeClassObject(LCRuntime* rt, LCValue val) {
+static void LCFreeClassObject(LCRuntime* rt, LCValue val) {
     LCObject* clsObj = (LCObject*)val.ptr_val;
     LCClassID cls_id = clsObj->header.class_id;
     LCClassMeta* meta = &rt->cls_meta_data[cls_id];
@@ -106,7 +107,7 @@ static void FreeClassObject(LCRuntime* rt, LCValue val) {
     lc_free(rt, val.ptr_val);
 }
 
-static void FreeArray(LCRuntime* rt, LCValue val) {
+static inline void LCFreeArray(LCRuntime* rt, LCValue val) {
     LCArray* arr = (LCArray*)val.ptr_val;
     uint32_t i;
     for (i = 0; i < arr->len; i++) {
@@ -119,18 +120,28 @@ static void FreeArray(LCRuntime* rt, LCValue val) {
     lc_free(rt, arr);
 }
 
-static void FreeObject(LCRuntime* rt, LCValue val) {
+static inline void LCFreeRefCell(LCRuntime* rt, LCValue val) {
+    LCRefCell* cell = (LCRefCell*)val.ptr_val;
+    LCRelease(rt, cell->value);
+    lc_free(rt, cell);
+}
+
+static void LCFreeObject(LCRuntime* rt, LCValue val) {
     switch (val.tag & 0x7F) {
+    case LC_TY_REFCELL:
+        LCFreeRefCell(rt, val);
+        break;
+
     case LC_TY_LAMBDA:
-        FreeLambda(rt, (LCLambda*)val.ptr_val);
+        LCFreeLambda(rt, val);
         break;
 
     case LC_TY_CLASS_OBJECT:
-        FreeClassObject(rt, val);
+        LCFreeClassObject(rt, val);
         break;
 
     case LC_TY_ARRAY:
-        FreeArray(rt, val);
+        LCFreeArray(rt, val);
         break;
         
     case LC_TY_STRING:
@@ -176,6 +187,11 @@ void lc_free(LCRuntime* rt, void* ptr) {
     lc_raw_free(ptr);
 }
 
+static LCClassDef Object_def = {
+    "Object",
+    NULL,
+};
+
 LCRuntime* LCNewRuntime() {
     LCRuntime* runtime = (LCRuntime*)lc_raw_malloc(sizeof(LCRuntime));
     memset(runtime, 0, sizeof(LCRuntime));
@@ -196,6 +212,9 @@ LCRuntime* LCNewRuntime() {
     runtime->cls_meta_size = 0;
     runtime->cls_meta_data = lc_malloc(runtime, sizeof(LCClassMeta) * runtime->cls_meta_cap);
 
+    // the ancester of all classes
+    LCDefineClass(runtime, &Object_def);
+
     return runtime;
 }
 
@@ -207,7 +226,7 @@ void LCFreeRuntime(LCRuntime* rt) {
         bucket_ptr = rt->symbol_buckets[i].next;
         while (bucket_ptr != NULL) {
             next = bucket_ptr->next;
-            FreeObject(rt, bucket_ptr->content);
+            LCFreeObject(rt, bucket_ptr->content);
             bucket_ptr = next;
         }
     }
@@ -245,7 +264,7 @@ void LCRelease(LCRuntime* rt, LCValue val) {
         return;
     }
     if (--val.ptr_val->header.count == 0) {
-        FreeObject(rt, val);
+        LCFreeObject(rt, val);
     }
 }
 
@@ -267,6 +286,30 @@ LCValue LCNewStringFromCStringLen(LCRuntime* rt, const unsigned char* content, u
 
 LCValue LCNewStringFromCString(LCRuntime* rt, const unsigned char* content) {
     return LCNewStringFromCStringLen(rt, content, strlen((const char*)content));
+}
+
+LCValue LCNewRefCell(LCRuntime* rt, LCValue value) {
+    LCRefCell* cell = (LCRefCell*)lc_mallocz(rt, sizeof(LCRefCell));
+    cell->header.count = 1;
+    LCRetain(value);
+    cell->value = value;
+    return (LCValue){ { .ptr_val = (LCObject*)cell }, LC_TY_REFCELL };
+}
+
+LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, int argc, LCValue* args) {
+    size_t size = sizeof(LCLambda) + argc * sizeof(LCValue);
+    LCLambda* lambda = (LCLambda*)lc_mallocz(rt, size);
+    lambda->header.count = 1;
+    lambda->c_fun = c_fun;
+    lambda->captured_values_size = argc;
+
+    size_t i;
+    for (i = 0; i < argc; i++) {
+        LCRetain(args[i]);
+        lambda->captured_values[i] = args[i];
+    }
+
+    return (LCValue){ { .ptr_val = (LCObject*)lambda }, LC_TY_LAMBDA };
 }
 
 LCValue LCNewSymbolLen(LCRuntime* rt, const char* content, uint32_t len) {

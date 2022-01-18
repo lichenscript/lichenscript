@@ -93,7 +93,7 @@ let rec codegen_statement (env: t) stmt =
   | If (test, block) -> (
     ps env "if (";
     codegen_expression env test;
-    ps env ".int_val) {\n";
+    ps env ") {\n";
     with_indent env (fun () -> 
       List.iter
         ~f:(fun stmt ->
@@ -395,6 +395,13 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env name;
     ps env " = ";
     codegen_expression env right
+  )
+
+  | TagEqual (expr, tag) -> (
+    ps env "LC_VALUE_TAG(";
+    codegen_expression env expr;
+    ps env ") == ";
+    ps env (Int.to_string tag)
   )
 
 (* return the number of temp values *)

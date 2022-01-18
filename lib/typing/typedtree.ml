@@ -105,7 +105,6 @@ and Statement : sig
     | Semi of Expression.t
     | While of while_desc
     | Binding of var_binding
-    | Block of Block.t
     | Break of Identifier.t option
     | Continue of Identifier.t option
     | Debugger

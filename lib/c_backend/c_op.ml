@@ -84,6 +84,7 @@ and Expr : sig
   | Assign of string * t
   | ExternalCall of string * t list
   | Ident of string 
+  | TagEqual of t * int
   | Temp of int
 
   and t = {

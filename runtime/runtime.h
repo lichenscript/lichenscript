@@ -2,6 +2,11 @@
 #include <stdint.h>
 #include <stdlib.h>
 
+#define likely(x)       __builtin_expect(!!(x), 1)
+#define unlikely(x)     __builtin_expect(!!(x), 0)
+#define force_inline inline __attribute__((always_inline))
+#define no_inline __attribute__((noinline))
+
 #define LC_NO_GC 0xFFFFFFFF
 #ifndef countof
 #define countof(x) (sizeof(x) / sizeof((x)[0]))
@@ -14,6 +19,7 @@ typedef enum LCObjectType {
     LC_TY_BOOL,
     LC_TY_STRING = 64,
     LC_TY_SYMBOL,
+    LC_TY_REFCELL,
     LC_TY_LAMBDA,
     LC_TY_CLASS_OBJECT_META,
     LC_TY_ARRAY,
@@ -106,6 +112,11 @@ typedef struct LCSymbolBucket {
     struct LCSymbolBucket* next;
 } LCSymbolBucket;
 
+typedef struct LCRefCell {
+    LC_OBJ_HEADER
+    LCValue value;
+} LCRefCell;
+
 typedef struct LCBox64 {
     LC_OBJ_HEADER
     union {
@@ -146,13 +157,16 @@ void LCRetain(LCValue obj);
 void LCRelease(LCRuntime* rt, LCValue obj);
 typedef struct LCLambda {
     LC_OBJ_HEADER
-    void*   c_fun;
-    size_t  captured_values_size;
-    LCValue captured_values[];
+    LCCFunction c_fun;
+    size_t      captured_values_size;
+    LCValue     captured_values[];
 } LCLambda;
 
 LCValue LCNewStringFromCStringLen(LCRuntime* rt, const unsigned char* content, uint32_t len);
 LCValue LCNewStringFromCString(LCRuntime* rt, const unsigned char* content);
+
+LCValue LCNewRefCell(LCRuntime* rt, LCValue value);
+LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, int argc, LCValue* args);
 
 LCValue LCNewArray(LCRuntime* rt);
 LCValue LCNewArrayLen(LCRuntime* rt, size_t size);

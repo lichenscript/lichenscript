@@ -86,11 +86,11 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       }
     )
 
-    | Block block -> (
+    (* | Block block -> (
       let block = annotate_block ~prev_deps env block in
       let dep = block.return_ty in
       [dep], (T.Statement.Block block)
-    )
+    ) *)
 
     | Break _
     | Continue _
@@ -874,15 +874,22 @@ and annotate_an_def_identifer env ident =
 and annotate_pattern env pat =
   let open Ast.Pattern in
   let { spec; loc } = pat in
+  let scope = Env.peek_scope env in
   let id, spec =
     match spec with
     | Identifier ident -> (
-      let name, id = annotate_an_def_identifer env ident in
-      id, (T.Pattern.Symbol (name, id))
+      let first_char = String.get ident.pident_name 0 in
+      if Char.is_uppercase first_char then (
+        let ctor_var = scope#find_var_symbol ident.pident_name in
+        let ctor = Option.value_exn ctor_var in
+        ctor.var_id, (T.Pattern.Symbol (ident.pident_name, ctor.var_id))
+      ) else (
+        let name, id = annotate_an_def_identifer env ident in
+        id, (T.Pattern.Symbol (name, id))
+      )
     )
 
     | EnumCtor(id, pat) -> (
-      let scope = Env.peek_scope env in
       let ctor_var = scope#find_var_symbol id.pident_name in
       if Option.is_none ctor_var then (
         let err = Type_error.(make_error (Env.ctx env) loc (CannotFindName id.pident_name)) in
@@ -1115,7 +1122,7 @@ and annotate_enum env enum =
   in
 
   Env.with_new_scope env scope (fun env ->
-    let annotate_case _case =
+    let annotate_case index _case =
       let { case_name; case_fields; case_loc } = _case in
       let member_var = Option.value_exn (scope#find_var_symbol case_name.pident_name) in
 
@@ -1130,6 +1137,7 @@ and annotate_enum env enum =
           check = (fun id ->
             let ty_def = {
               TypeDef.
+              enum_ctor_tag_id = index;
               enum_ctor_name = case_name.pident_name;
               enum_ctor_super_id = variable.var_id;
               enum_ctor_params = [];
@@ -1151,7 +1159,7 @@ and annotate_enum env enum =
       }, member_var.var_id 
     in
 
-    let cases, _cases_deps = List.map ~f:annotate_case cases |> List.unzip in
+    let cases, _cases_deps = List.mapi ~f:annotate_case cases |> List.unzip in
 
     Type_context.map_node
       ctx
