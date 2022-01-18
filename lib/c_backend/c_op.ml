@@ -25,9 +25,17 @@ module%gen rec Decl : sig
   }
   [@@deriving show]
 
+  type enum_ctor = {
+    enum_ctor_name: string;
+    enum_ctor_tag_id: int;
+    enum_cotr_params_size: int;
+  }
+  [@@deriving show]
+
   type spec =
   | Func of Func.t
   | Class of _class
+  | EnumCtor of enum_ctor
   | GlobalClassInit of string * class_init list
   [@@deriving show]
 
@@ -43,7 +51,7 @@ end
 and Stmt : sig
 
   type spec =
-  | If
+  | If of Expr.t * Block.t
   | While of Expr.t * Block.t
   | Expr of Expr.t
   | VarDecl of string list
@@ -65,6 +73,7 @@ end
 and Expr : sig
 
   type spec =
+  | Null
   | NewString of string
   | NewInt of string
   | NewFloat of string

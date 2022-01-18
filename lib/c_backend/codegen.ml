@@ -90,6 +90,23 @@ let rec codegen_statement (env: t) stmt =
     ps env ";";
   )
 
+  | If (test, block) -> (
+    ps env "if (";
+    codegen_expression env test;
+    ps env ".int_val) {\n";
+    with_indent env (fun () -> 
+      List.iter
+        ~f:(fun stmt ->
+          print_indents env;
+          codegen_statement env stmt;
+          endl env;
+        )
+        block.body
+    );
+    print_indents env;
+    ps env "}"
+  )
+
   | While (expr, block) -> (
     ps env "while (";
     codegen_expression env expr;
@@ -190,6 +207,20 @@ and codegen_declaration env decl =
     ps env "}\n";
   )
 
+  | EnumCtor ctor -> (
+    ps env (Format.sprintf "LCValue %s(LCRuntime* rt, LCValue this, int argv, LCValue* args) {\n" ctor.enum_ctor_name);
+    if ctor.enum_cotr_params_size = 0 then
+      ps env (Format.sprintf "    return (LCValue){ { .int_val = 0 }, (%d << 8) + 0x80 + LC_TY_NULL };\n" ctor.enum_ctor_tag_id)
+    else if ctor.enum_cotr_params_size = 1 then (
+      ps env "    LCValue ret = args[0];\n";
+      ps env (Format.sprintf "    ret.tag += (%d << 8) + 0x80;\n" ctor.enum_ctor_tag_id);
+      ps env "    return ret;\n"
+    ) else (
+      failwith "not implemented"
+    );
+    ps env "}\n";
+  )
+
   | GlobalClassInit(init_name, init_entries) -> (
       ps env (Format.sprintf "void %s(LCRuntime* rt) {\n" init_name);
 
@@ -207,195 +238,18 @@ and codegen_declaration env decl =
       ps env "}\n";
   )
 
-(* and codegen_enum env enum =
-  let open Enum in
-  let { cases; _ } = enum in
-  List.iteri
-    ~f:(fun index case ->
-      let { case_name = (name, _ ); case_fields; _ } = case in
-      ps env (Format.sprintf "LCValue %s_ctor(LCRuntime* rt, LCValue this, int argc, LCValue* args) {\n" name);
-      (match case_fields with
-      | [] ->
-        ps env (Format.sprintf "    return MK_I32(%d);\n" index)
-      | _ ->
-        ps env "    LCValue ret = args[0];\n";
-        (* TODO(optimize): not all the value needs to retain *)
-        ps env "    LCRetain(ret);\n";
-        ps env (Format.sprintf "    ret.tag += (%d << 8) + 0x80;\n" index);
-        ps env "    return ret;\n"
-      );
-      ps env "}\n"
-    )
-    cases *)
-
-(* and codegen_class env _class =
-  let open Declaration in
-  let { cls_id; cls_body; _ } = _class in
-  let name = (match cls_id with
-  | (name, _) -> name
-  ) in
-
-  let class_id_var_name = name ^ "_class_id" in
-  ps env (Format.sprintf "static LCClassID %s;\n" class_id_var_name);
-
-  (* gen properties *)
-  ps env (Format.sprintf "typedef struct %s {" name);
-  endl env;
-
-  with_indent env (fun () -> 
-    print_indents env;
-    ps env "LC_OBJ_HEADER";
-    endl env;
-
-    List.iter
-      ~f:(fun elm ->
-        match elm with
-        | Cls_method _ -> ()
-        | Cls_property prop -> (
-          let { cls_property_name; _ } = prop in
-          print_indents env;
-          ps env (Format.sprintf "LCValue %s;" cls_property_name.pident_name);
-          endl env;
-        )
-      )
-      cls_body.cls_body_elements;
-  );
-
-  ps env (Format.sprintf "} %s;" name);
-  endl env;
-
-  ps env (Format.sprintf "LCValue %s_init(LCRuntime* rt, LCValue ancester) {\n" name);
-  with_indent env (fun () ->
-    print_indents env;
-    ps env (Format.sprintf "%s* obj = lc_mallocz(rt, sizeof(%s));\n" name name);
-    print_indents env;
-    ps env (Format.sprintf "lc_init_object(rt, %s_class_id, (LCObject*)obj);\n" name);
-    print_indents env;
-    ps env "return MK_CLASS_OBJ(obj);\n";
-  );
-  ps env "}\n";
-
-  let methods = ref [] in
-
-  (* gen methods *)
-  List.iter
-    ~f:(fun elm ->
-      match elm with
-      | Cls_property _ -> ()
-      | Cls_method _method -> (
-        let method_name, method_id = _method.cls_method_name in
-        codegen_function_impl env
-          ~header:({
-            Typedtree.Function.
-            id = method_id;
-            name = method_name;
-            params = _method.cls_method_params;
-          })
-          ~scope:(Option.value_exn _method.cls_method_scope)
-          ~body:(Option.value_exn _method.cls_method_body);
-
-        let method_name, _ = _method.cls_method_name in
-        let gen_name = Format.sprintf "%s__%s" name method_name in
-        ps env (Format.sprintf "LCValue %s(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {\n" gen_name);
-        ps env "    LCValue ret = MK_NULL();\n";
-        let stmts = codegen_function_block env (Option.value_exn _method.cls_method_body) in
-        let max_tmp_value = List.fold ~init:0
-          ~f:(fun acc item -> if !(item.tmp_vars_counter) > acc then !(item.tmp_vars_counter) else acc)
-          stmts
-        in
-
-        if max_tmp_value > 0 then (
-          print_indents env;
-          ps env "LCValue t[";
-          ps env (Int.to_string max_tmp_value);
-          ps env "];";
-          endl env;
-        );
-
-        List.iter
-          ~f:(fun stmt_env ->
-            List.iter
-              ~f:(fun line ->
-                print_indents env;
-                ps env line;
-                endl env
-              )
-              !(stmt_env.stmt_prepend_lines);
-            let content = Buffer.contents stmt_env.stmt_buffer in
-            print_indents env;
-            ps env content;
-            endl env;
-            List.iter
-              ~f:(fun line ->
-                print_indents env;
-                ps env line;
-                endl env
-              )
-              !(stmt_env.stmt_append_lines);
-          )
-          stmts;
-        ps env "    return ret;\n";
-        ps env "}\n";
-
-        let open Declaration in
-        match _method.cls_method_modifier with
-        | Some Cls_modifier_static -> ()
-        | _ ->
-          methods := { cls_method_origin_name = method_name; cls_method_gen_name = gen_name }::(!methods)
-      )
-    )
-    cls_body.cls_body_elements;
-
-  ps env (Format.sprintf "void %s_finalizer(LCRuntime* rt, LCValue value) {\n" name);
-  (* with_indent env (fun () ->
-    print_indents env;
-    ps env (Format.sprintf "%s* obj = lc_mallocz(rt, sizeof(%s));\n" name name);
-    print_indents env;
-    ps env "obj->header.count = 1;\n";
-    print_indents env;
-    ps env "return MK_CLASS_OBJ(obj);\n";
-  ); *)
-  ps env "}\n";
-
-  let class_def_name = name ^ "_def" in
-  ps env (Format.sprintf "static LCClassDef %s = {\n" class_def_name);
-  with_indent env (fun () ->
-    print_indents env;
-    ps env (Format.sprintf "\"%s\",\n" name);
-    print_indents env;
-    ps env (Format.sprintf "%s_finalizer,\n" name);
-  );
-  ps env "};\n";
-
-  env.cls_inits <- (InitClass (class_id_var_name, class_def_name))::env.cls_inits;
-
-  if not (List.is_empty !methods) then (
-    let method_def_name = name ^ "_methods" in
-    ps env (Format.sprintf "static LCClassMethodDef %s[] = {\n" method_def_name);
-
-    (!methods
-    |> List.rev
-    |> List.iter
-    ~f:(fun entry ->
-      ps env (Format.sprintf "    {\"%s\", 0, %s},\n" entry.cls_method_origin_name entry.cls_method_gen_name)
-    ));
-
-    ps env "};\n";
-
-    env.cls_inits <- (InitMethods (class_id_var_name, method_def_name))::env.cls_inits;
-  );
-
-  () *)
-
 and codegen_expression (env: t) (expr: Expr.t) =
   let open Expr in
   let { spec; _ } = expr in
   match spec with
+  | Null ->
+    ps env "MK_NULL()"
+
   | NewInt value -> (
-      ps env Primitives.Value.mk_i32;
-      ps env "(";
-      ps env value;
-      ps env ")"
+    ps env Primitives.Value.mk_i32;
+    ps env "(";
+    ps env value;
+    ps env ")"
   )
 
   | NewChar ch -> (

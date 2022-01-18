@@ -300,21 +300,25 @@ and transform_expression env expr =
       let { callee; call_params; _ } = call in
       match callee with
       | { spec = Identifier (_, id); _ } -> (
+        let params_struct = List.map ~f:(transform_expression env) call_params in
+
+        let prepend, params, append = List.map ~f:(fun expr -> expr.prepend_stmts, expr.expr, expr.append_stmts) params_struct |> List.unzip3 in
+
+        prepend_stmts := List.append !prepend_stmts (List.concat prepend);
+        append_stmts := List.append !append_stmts (List.concat append);
         match Type_context.find_external_symbol env.ctx id with
+
         | Some ext_name -> (
-          let params_struct = List.map ~f:(transform_expression env) call_params in
-
-          let prepend, params, append = List.map ~f:(fun expr -> expr.prepend_stmts, expr.expr, expr.append_stmts) params_struct |> List.unzip3 in
-
-          prepend_stmts := List.append !prepend_stmts (List.concat prepend);
-          append_stmts := List.append !append_stmts (List.concat append);
 
           (* external method *)
           C_op.Expr.ExternalCall(ext_name, params)
         )
 
-        | None ->
-          failwith "not impelmented"
+        | None ->  (* it's a local function *)
+          let ctor_opt = Check_helper.find_construct_of env.ctx id in
+          let _, ctor_ty_id = Option.value_exn ctor_opt in
+          let name = Hashtbl.find_exn env.name_map ctor_ty_id in
+          C_op.Expr.ExternalCall(name, params)
 
       )
 
@@ -358,7 +362,38 @@ and transform_expression env expr =
       C_op.Expr.ExternalCall(fun_name ^ "_init", [])
     )
 
-    | Match _ -> failwith "n"
+    | Match _match -> (
+      let { match_expr; _ } = _match in
+      let match_expr = transform_expression env match_expr in
+      let result_tmp = env.tmp_vars_count in
+      env.tmp_vars_count <- env.tmp_vars_count + 1;
+
+      prepend_stmts := {
+        C_op.Stmt.
+        spec = Expr {
+          C_op.Expr.
+          spec = Assign ("t[" ^ (Int.to_string result_tmp) ^ "]", {
+            spec = Null;
+            loc = Loc.none;
+          });
+          loc = Loc.none;
+        };
+        loc = Loc.none;
+      }::!prepend_stmts;
+
+      prepend_stmts := {
+        C_op.Stmt.
+        spec = If (match_expr.expr, {
+          C_op.Block.
+          body = [];
+          loc = Loc.none;
+        });
+        loc = Loc.none;
+      }::!prepend_stmts;
+
+      C_op.Expr.Temp result_tmp
+    )
+
   in
   {
     prepend_stmts = List.rev !prepend_stmts;
@@ -434,8 +469,19 @@ and transform_class env cls: C_op.Decl.spec list =
 
   List.append [ (C_op.Decl.Class cls) ] methods
 
-and transform_enum _env _enum =
-  []
+and transform_enum env enum =
+  let open Enum in
+  let { cases; _ } = enum in
+  List.mapi
+    ~f:(fun index case ->
+      let new_name = distribute_name env case.case_name in
+      C_op.Decl.EnumCtor {
+        enum_ctor_name = new_name;
+        enum_ctor_tag_id = index;
+        enum_cotr_params_size = List.length case.case_fields;
+      }
+    )
+    cases
 
 type result = {
   main_function_name: string option;
