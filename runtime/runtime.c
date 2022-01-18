@@ -480,6 +480,11 @@ LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_le
     return MK_NULL();
 }
 
+LCValue LCEvalLambda(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCLambda* lambda = (LCLambda*)this.ptr_val;
+    return lambda->c_fun(rt, this, argc, args);
+}
+
 void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCObject* obj) {
     obj->header.count = 1;
     obj->header.class_id = cls_id;

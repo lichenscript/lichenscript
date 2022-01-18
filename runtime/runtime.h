@@ -192,6 +192,7 @@ void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_
 
 // dynamic dispatch by str
 LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_len, LCValue* args);
+LCValue LCEvalLambda(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 // TODO: dynamic dispatch by ATOM
 
 LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);

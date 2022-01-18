@@ -25,5 +25,11 @@ enum: compiler
 	./_build/default/bin/main.exe run ./examples/enum/main.wt \
 		$(FLAGS) -D ./_build_wt/enum
 
+lambda: compiler
+	rm -rf ./_build_wt/lambda
+	mkdir -p ./_build_wt/lambda
+	./_build/default/bin/main.exe run ./examples/lambda/main.wt \
+		$(FLAGS) -D ./_build_wt/lambda
+
 compiler:
 	dune build

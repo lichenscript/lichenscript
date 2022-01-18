@@ -1,0 +1,15 @@
+
+function anotherFun(callback: () => unit) {
+    callback();
+}
+
+function main() {
+    const a = 3;
+    let b = 4;
+    print("before call: ", b)
+    anotherFun(() => {
+        print("call in lambda: ", a);
+        b = 5;
+    });
+    print("after call: ", b)
+}

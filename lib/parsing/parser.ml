@@ -8,6 +8,35 @@ type parse_result = {
   include_module_ids: string list;
 }
 
+(*
+ * Relaxed params
+ *
+ * () => ()
+ * (a: string, b: i32) => ()
+ * (a: string, b: i32) : () => {}
+ * (Init {})
+ * (1 + 1)
+ *)
+module ReleaxedArrow = struct
+  type arrow ={
+    arrow_expr: Expression.t;
+    arrow_loc: Loc.t
+  }
+
+  type param = {
+    param_expr: Expression.t;
+    colon: Type.t option;
+  }
+
+  type t = {
+    params: param list;
+    return_type: Type.t option;
+    arrow: arrow option;
+    loc: Loc.t;
+  }
+  
+end
+
 let with_start_loc env start_loc =
   let loc = last_loc env in
   match loc with
@@ -762,6 +791,9 @@ and parse_assigment_expression env : Expression.t =
 
   | _ -> expr
 
+and parse_maybe_arrow_function env : Expression.t =
+  parse_binary_expression env
+
 and parse_binary_expression env : Expression.t =
   let open Expression in
   let rec parse_binary_enhance env left_expr left_token =
@@ -968,162 +1000,170 @@ and parse_primary_expression env : Expression.t =
   let start_loc = Peek.loc env in
   let next = Peek.token env in
 
-  let spec : Expression.spec =
-    match next with 
-    | Token.T_IDENTIFIER _ -> (
-      let ident = parse_identifier env in
-      match Peek.token env with
-      | Token.T_LCURLY -> (
-        Eat.token env;
-        let init_elements = ref [] in
-
-        while (Peek.token env) <> Token.T_RCURLY do
-          let start_loc = Peek.loc env in
-          let element =
-            match (Peek.token env) with
-            | Token.T_ELLIPSIS -> (
-              Eat.token env;
-              let expr = parse_expression env in
-              Expression.InitSpread expr
-            )
-            | _ ->  (
-              let init_entry_key = parse_identifier env in
-              let init_entry_value =
-                if (Peek.token env) = Token.T_COLON then (
-                  Eat.token env;
-                  Some (parse_expression env)
-                ) else
-                  None
-              in
-              Expression.InitEntry {
-                Expression.
-                init_entry_key;
-                init_entry_value;
-                init_entry_loc = with_start_loc env start_loc;
-              }
-            )
-          in
-          init_elements := element::(!init_elements);
-          if (Peek.token env) <> Token.T_RCURLY then (
-            Expect.token env T_COMMA
-          )
-        done;
-
-        Expect.token env Token.T_RCURLY;
-        Init {
-          init_name = ident;
-          init_elements = List.rev !init_elements;
-          init_loc = with_start_loc env start_loc;
-        }
-      )
-      | _ ->
-        Identifier ident
-    )
-
-    | Token.T_NUMBER { raw; _ } ->
-      Eat.token env;
-      Constant (Literal.Integer (raw, None))
-
-    | Token.T_STRING (loc, value, _, _) ->
-      Eat.token env;
-      Constant (Literal.String (value, loc, None))
-
-    | Token.T_TRUE ->
-      Eat.token env;
-      Constant (Literal.Boolean true)
-
-    | Token.T_FALSE ->
-      Eat.token env;
-      Constant (Literal.Boolean false)
-
-    | Token.T_IF ->
-      begin
-        let start_loc = Peek.loc env in
-        Eat.token env;
-        let if_test = parse_expression env in
-        let if_consequent = parse_statement env in
-        let has_else = Eat.maybe env Token.T_ELSE in
-        let if_alternative = if has_else then Some (parse_statement env) else None in
-        If {
-          if_test;
-          if_consequent;
-          if_alternative;
-          if_loc = with_start_loc env start_loc;
-        }
-      end
-
-    | Token.T_LBRACKET ->
-      begin
-        let result = ref [] in
-        Eat.token env;
-
-        while Peek.token env <> Token.T_RBRACKET do
-          let expr = parse_expression env in
-
-          if Peek.token env <> Token.T_RBRACKET then (
-            Expect.token env Token.T_COMMA;
-          );
-
-          result := expr::(!result);
-        done;
-
-        Expect.token env Token.T_RBRACKET;
-        Array (List.rev !result)
-      end
-
-    | Token.T_LCURLY ->
-      let blk = parse_block env in
-      Block blk
-
-    | Token.T_MATCH -> (
-      Eat.token env;
-      let continue_parse_body match_expr =
-        let relaxed_block = parse_relaxed_kv_block env in
-        Parser_helper.cast_relaxed_block_into_match ~start_loc match_expr relaxed_block
-      in
-      match (Peek.token env) with
+  if next = Token.T_LPAREN then
+    parse_group_expression env
+  else
+    let spec : Expression.spec =
+      match next with 
       | Token.T_IDENTIFIER _ -> (
-        let id = parse_identifier env in
-        let relaxed_block = parse_relaxed_kv_block env in
-        (* init and match *)
-        if (Peek.token env) = Token.T_LCURLY then (
-          let init = Parser_helper.cast_relaxed_block_into_init ~start_loc ~init_name:id relaxed_block in
-          continue_parse_body init
-        ) else (
-          let id_expr = {
-            Expression.
-            spec = Identifier id;
-            loc = id.pident_loc;
-            attributes = [];
-          } in
-          Parser_helper.cast_relaxed_block_into_match ~start_loc id_expr relaxed_block
+        let ident = parse_identifier env in
+        match Peek.token env with
+        | Token.T_LCURLY -> (
+          Eat.token env;
+          let init_elements = ref [] in
+
+          while (Peek.token env) <> Token.T_RCURLY do
+            let start_loc = Peek.loc env in
+            let element =
+              match (Peek.token env) with
+              | Token.T_ELLIPSIS -> (
+                Eat.token env;
+                let expr = parse_expression env in
+                Expression.InitSpread expr
+              )
+              | _ ->  (
+                let init_entry_key = parse_identifier env in
+                let init_entry_value =
+                  if (Peek.token env) = Token.T_COLON then (
+                    Eat.token env;
+                    Some (parse_expression env)
+                  ) else
+                    None
+                in
+                Expression.InitEntry {
+                  Expression.
+                  init_entry_key;
+                  init_entry_value;
+                  init_entry_loc = with_start_loc env start_loc;
+                }
+              )
+            in
+            init_elements := element::(!init_elements);
+            if (Peek.token env) <> Token.T_RCURLY then (
+              Expect.token env T_COMMA
+            )
+          done;
+
+          Expect.token env Token.T_RCURLY;
+          Init {
+            init_name = ident;
+            init_elements = List.rev !init_elements;
+            init_loc = with_start_loc env start_loc;
+          }
         )
+        | _ ->
+          Identifier ident
+      )
+
+      | Token.T_NUMBER { raw; _ } ->
+        Eat.token env;
+        Constant (Literal.Integer (raw, None))
+
+      | Token.T_STRING (loc, value, _, _) ->
+        Eat.token env;
+        Constant (Literal.String (value, loc, None))
+
+      | Token.T_TRUE ->
+        Eat.token env;
+        Constant (Literal.Boolean true)
+
+      | Token.T_FALSE ->
+        Eat.token env;
+        Constant (Literal.Boolean false)
+
+      | Token.T_IF ->
+        begin
+          let start_loc = Peek.loc env in
+          Eat.token env;
+          let if_test = parse_expression env in
+          let if_consequent = parse_statement env in
+          let has_else = Eat.maybe env Token.T_ELSE in
+          let if_alternative = if has_else then Some (parse_statement env) else None in
+          If {
+            if_test;
+            if_consequent;
+            if_alternative;
+            if_loc = with_start_loc env start_loc;
+          }
+        end
+
+      | Token.T_LBRACKET ->
+        begin
+          let result = ref [] in
+          Eat.token env;
+
+          while Peek.token env <> Token.T_RBRACKET do
+            let expr = parse_expression env in
+
+            if Peek.token env <> Token.T_RBRACKET then (
+              Expect.token env Token.T_COMMA;
+            );
+
+            result := expr::(!result);
+          done;
+
+          Expect.token env Token.T_RBRACKET;
+          Array (List.rev !result)
+        end
+
+      | Token.T_LCURLY ->
+        let blk = parse_block env in
+        Block blk
+
+      | Token.T_MATCH -> (
+        Eat.token env;
+        let continue_parse_body match_expr =
+          let relaxed_block = parse_relaxed_kv_block env in
+          Parser_helper.cast_relaxed_block_into_match ~start_loc match_expr relaxed_block
+        in
+        match (Peek.token env) with
+        | Token.T_IDENTIFIER _ -> (
+          let id = parse_identifier env in
+          let relaxed_block = parse_relaxed_kv_block env in
+          (* init and match *)
+          if (Peek.token env) = Token.T_LCURLY then (
+            let init = Parser_helper.cast_relaxed_block_into_init ~start_loc ~init_name:id relaxed_block in
+            continue_parse_body init
+          ) else (
+            let id_expr = {
+              Expression.
+              spec = Identifier id;
+              loc = id.pident_loc;
+              attributes = [];
+            } in
+            Parser_helper.cast_relaxed_block_into_match ~start_loc id_expr relaxed_block
+          )
+        )
+
+        | _ ->
+          let match_expr = parse_expression env in
+          continue_parse_body match_expr
       )
 
       | _ ->
-        let match_expr = parse_expression env in
-        continue_parse_body match_expr
-    )
+        let tok = Token.token_to_string next in
+        let lex_error = Lichenscript_lex.Lex_error.Unexpected tok in
+        let perr_spec = Parse_error.LexError lex_error in
+        let err =
+          { Parse_error.
+            perr_loc = with_start_loc env start_loc;
+            perr_spec;
+          }
+        in
+        Parse_error.error err
 
-    | _ ->
-      let tok = Token.token_to_string next in
-      let lex_error = Lichenscript_lex.Lex_error.Unexpected tok in
-      let perr_spec = Parse_error.LexError lex_error in
-      let err =
-        { Parse_error.
-          perr_loc = with_start_loc env start_loc;
-          perr_spec;
-        }
-      in
-      Parse_error.error err
+    in
 
-  in
+    {
+      spec;
+      loc = with_start_loc env start_loc;
+      attributes = [];
+    }
 
-  {
-    spec;
-    loc = with_start_loc env start_loc;
-    attributes = [];
-  }
+and parse_group_expression env =
+  Expect.token env Token.T_LPAREN;
+  Expect.token env Token.T_RPAREN;
+  failwith "n"
 
 and parse_relaxed_kv_block env = 
   let has_case = ref false in
@@ -1222,24 +1262,52 @@ and parse_pattern env : Pattern.t =
 and parse_type env : Type.t =
   let open Type in
   let start_loc = Peek.loc env in
-  let id = parse_identifier env in
-  let args = ref [] in
-
-  if Peek.token env = Token.T_LESS_THAN then (
+  match (Peek.token env) with
+  | Token.T_LPAREN -> (
+    let params = ref [] in
     Eat.token env;
 
-    while Peek.token env <> Token.T_GREATER_THAN do
-      let t = parse_type env in
-      args := t::(!args);
-      if Peek.token env <> Token.T_GREATER_THAN then (
-        Expect.token env Token.T_COMMA;
+    while (Peek.token env) <> Token.T_RPAREN do
+      let param = parse_type env in
+      params := param::!params;
+
+      if (Peek.token env) <> Token.T_RPAREN then (
+        Expect.token env Token.T_COMMA
       )
     done;
 
-    Expect.token env Token.T_GREATER_THAN
-  );
+    Expect.token env Token.T_RPAREN;
 
-  {
-    spec = Ty_ctor (id, List.rev !args);
-    loc = with_start_loc env start_loc;
-  }
+    Expect.token env Token.T_ARROW;
+
+    let return_ty = parse_type env in
+
+    {
+      spec = Ty_arrow (List.rev !params, return_ty);
+      loc = with_start_loc env start_loc;
+    }
+  )
+
+  | _ -> (
+    let id = parse_identifier env in
+    let args = ref [] in
+
+    if Peek.token env = Token.T_LESS_THAN then (
+      Eat.token env;
+
+      while Peek.token env <> Token.T_GREATER_THAN do
+        let t = parse_type env in
+        args := t::(!args);
+        if Peek.token env <> Token.T_GREATER_THAN then (
+          Expect.token env Token.T_COMMA;
+        )
+      done;
+
+      Expect.token env Token.T_GREATER_THAN
+    );
+
+    {
+      spec = Ty_ctor (id, List.rev !args);
+      loc = with_start_loc env start_loc;
+    }
+  )
