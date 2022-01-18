@@ -134,7 +134,7 @@ and codegen_declaration env decl =
   match spec with
   | Func _fun -> codegen_function env _fun
   | Class cls -> (
-    let { name; properties; _ } = cls in
+    let { name; properties; original_name; _ } = cls in
     let class_id_var_name = name ^ "_class_id" in
     ps env (Format.sprintf "static LCClassID %s;\n" class_id_var_name);
     ps env (Format.sprintf "typedef struct %s {" name);
@@ -156,6 +156,55 @@ and codegen_declaration env decl =
 
     ps env (Format.sprintf "} %s;" name);
     endl env;
+
+    ps env (Format.sprintf "void %s_finalizer(LCRuntime* rt, LCValue value) {\n" name);
+    (* with_indent env (fun () ->
+      print_indents env;
+      ps env (Format.sprintf "%s* obj = lc_mallocz(rt, sizeof(%s));\n" name name);
+      print_indents env;
+      ps env "obj->header.count = 1;\n";
+      print_indents env;
+      ps env "return MK_CLASS_OBJ(obj);\n";
+    ); *)
+    ps env "}\n";
+
+    let class_def_name = name ^ "_def" in
+    ps env (Format.sprintf "static LCClassDef %s = {\n" class_def_name);
+    with_indent env (fun () ->
+      print_indents env;
+      ps env (Format.sprintf "\"%s\",\n" original_name);
+      print_indents env;
+      ps env (Format.sprintf "%s_finalizer,\n" name);
+    );
+    ps env "};\n";
+
+    ps env (Format.sprintf "LCValue %s_init(LCRuntime* rt, LCValue this, int argv, LCValue* args) {\n" name);
+    with_indent env (fun () ->
+      print_indents env;
+      ps env (Format.sprintf "%s* obj = lc_mallocz(rt, sizeof(%s));\n" name name);
+      print_indents env;
+      ps env (Format.sprintf "lc_init_object(rt, %s_class_id, (LCObject*)obj);\n" name);
+      print_indents env;
+      ps env "return MK_CLASS_OBJ(obj);\n";
+    );
+    ps env "}\n";
+  )
+
+  | GlobalClassInit(init_name, init_entries) -> (
+      ps env (Format.sprintf "void %s(LCRuntime* rt) {\n" init_name);
+
+      List.iter
+        ~f:(fun entry ->
+          (* match entry with
+          | InitClass (id_name, gen_name) ->
+            ps env (Format.sprintf "    %s = LCDefineClass(rt, &%s);\n" id_name gen_name)
+          | InitMethods (id_name, cls_def_name) ->
+            ps env (Format.sprintf "    LCDefineClassMethod(rt, %s, %s, countof(%s));\n" id_name cls_def_name cls_def_name) *)
+          ps env (Format.sprintf "    %s = LCDefineClass(rt, &%s);\n" entry.class_id_name entry.class_def_name)
+        )
+        init_entries;
+
+      ps env "}\n";
   )
 
 (* and codegen_enum env enum =
@@ -591,27 +640,8 @@ let codegen_program ?indent ~ctx (declarations: Typedtree.Declaration.t list) =
 
   List.iter ~f:(codegen_declaration env) c_decls.declarations;
 
-  (* let init_name = if not (List.is_empty env.cls_inits) then (
-    endl env;
-    ps env (Format.sprintf "void %s(LCRuntime* rt) {\n" Primitives.Value.init_class_meta);
-
-    List.iter
-      ~f:(fun entry ->
-        match entry with
-        | InitClass (id_name, gen_name) ->
-          ps env (Format.sprintf "    %s = LCDefineClass(rt, &%s);\n" id_name gen_name)
-        | InitMethods (id_name, cls_def_name) ->
-          ps env (Format.sprintf "    LCDefineClassMethod(rt, %s, %s, countof(%s));\n" id_name cls_def_name cls_def_name)
-      )
-      (List.rev env.cls_inits);
-
-    ps env "}\n";
-    Some (Primitives.Value.init_class_meta)
-  ) else None in *)
-  let init_name = None in
-
   (* if user has a main function *)
   let main_name = Option.value_exn c_decls.main_function_name in
-  ps env (main_snippet ?init_name main_name);
+  ps env (main_snippet ?init_name:c_decls.global_class_init main_name);
 
   env

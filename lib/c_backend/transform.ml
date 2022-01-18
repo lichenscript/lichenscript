@@ -10,7 +10,8 @@ type t = {
   ctx: Type_context.t;
   name_map: (int, string) Hashtbl.t;
   mutable tmp_vars_count: int;
-  mutable main_function_name: string option
+  mutable main_function_name: string option;
+  mutable class_inits: C_op.Decl.class_init list;
 }
 
 type expr_result = {
@@ -24,6 +25,7 @@ let create ctx = {
   name_map = Hashtbl.create (module Int);
   tmp_vars_count = 0;
   main_function_name = None;
+  class_inits = [];
 }
 
 let preserved_name = [| "ret"; "rt"; "this"; "argc"; "argv"; "t" |]
@@ -106,10 +108,25 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
     ];
   );
 
+  let cleanup =
+    if (List.length local_vars) > 0 then (
+      List.map
+        ~f:(fun (name, _) ->
+          { C_op.Stmt.
+            spec = Release {
+              spec = Ident name;
+              loc = Loc.none;
+            };
+            loc = Loc.none;
+          }
+        )
+        local_vars
+    ) else [] in
+
   let stmts = List.map ~f:(transform_statement env) body.body |> List.concat in
   let new_body = {
     C_op.Block.
-    body = List.append !def stmts;
+    body = List.concat [ !def; stmts; cleanup ];
     loc = body.loc;
   } in
 
@@ -402,6 +419,11 @@ and transform_class env cls: C_op.Decl.spec list =
       cls_body.cls_body_elements;
   in
 
+  env.class_inits <- { C_op.Decl.
+    class_id_name = fun_name ^ "_class_id";
+    class_def_name = fun_name ^ "_def";
+  }::env.class_inits;
+
   let cls = {
     C_op.Decl.
     name = fun_name;
@@ -418,13 +440,32 @@ and transform_enum _env _enum =
 type result = {
   main_function_name: string option;
   declarations: C_op.Decl.t list;
+  global_class_init: string option;
 }
 
 let transform_declarations ctx declarations =
   let env = create ctx in
+
+  let declarations =
+    List.map ~f:(transform_declaration env) declarations
+    |> List.concat
+  in
+
+  let declarations, global_class_init =
+    if List.is_empty env.class_inits then
+      declarations, None
+    else (
+      let name = "LC_class_init" in
+      (List.append declarations [{
+        C_op.Decl.
+        spec = GlobalClassInit(name, List.rev env.class_inits);
+        loc = Loc.none;
+      }]), Some name
+    )
+  in
+
   {
     main_function_name = env.main_function_name;
-    declarations =
-      List.map ~f:(transform_declaration env) declarations
-      |> List.concat;
+    declarations;
+    global_class_init;
   }

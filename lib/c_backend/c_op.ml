@@ -19,9 +19,16 @@ module%gen rec Decl : sig
   }
   [@@deriving show]
 
+  type class_init = {
+    class_id_name: string;
+    class_def_name: string;
+  }
+  [@@deriving show]
+
   type spec =
   | Func of Func.t
   | Class of _class
+  | GlobalClassInit of string * class_init list
   [@@deriving show]
 
   type t = {
