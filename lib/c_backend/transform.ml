@@ -77,12 +77,8 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
   env.tmp_vars_count <- 0;
 
   List.iter
-    ~f:(fun { param_pat; param_ty; _ } ->
-      let param_name =
-        match param_pat.spec with
-        | Pattern.Symbol (name, _) -> name
-        | _ -> failwith "not implemented"
-      in
+    ~f:(fun { param_name; param_ty; _ } ->
+      let param_name, _ = param_name in
       Hashtbl.set env.name_map ~key:param_ty ~data:(get_local_var_name param_name param_ty)
     )
     params.params_content;
@@ -292,7 +288,7 @@ and transform_expression env expr =
       C_op.Expr.Ident name
     )
 
-    | Lambda
+    | Lambda _
     | If _
     | Array _ -> failwith "n1"
 

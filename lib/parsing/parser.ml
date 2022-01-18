@@ -11,7 +11,8 @@ type parse_result = {
 (*
  * Relaxed params
  *
- * () => ()
+ * () => {}
+ * (): unit => {}
  * (a: string, b: i32) => ()
  * (a: string, b: i32) : () => {}
  * (Init {})
@@ -25,12 +26,14 @@ module ReleaxedArrow = struct
 
   type param = {
     param_expr: Expression.t;
-    colon: Type.t option;
+    param_colon: (Type.t * Loc.t) option;
+    param_loc: Loc.t
   }
 
   type t = {
     params: param list;
-    return_type: Type.t option;
+    params_loc: Loc.t;
+    return_ty: Type.t option;
     arrow: arrow option;
     loc: Loc.t;
   }
@@ -515,7 +518,7 @@ and parse_params env: Function.params =
   let parse_param env: Function.param =
     let start_loc = Peek.loc env in
     let param_rest = Eat.maybe env Token.T_ELLIPSIS in
-    let param_pat = parse_pattern env in
+    let param_name = parse_identifier env in
     let param_ty =
       if Peek.token env == Token.T_COLON then
         begin
@@ -526,7 +529,7 @@ and parse_params env: Function.params =
         None
     in
     {
-      param_pat;
+      param_name;
       param_ty;
       param_loc = with_start_loc env start_loc;
       param_rest;
@@ -792,7 +795,147 @@ and parse_assigment_expression env : Expression.t =
   | _ -> expr
 
 and parse_maybe_arrow_function env : Expression.t =
-  parse_binary_expression env
+  let relaxed_arrow = parse_relaxed_arrow env in
+  (* cast to arrow function *)
+  match relaxed_arrow.arrow with
+  | Some arrow ->
+    let open Expression in
+    let lambda_params = {
+      Function.
+      params_content = List.map
+        (fun param ->
+          let open ReleaxedArrow in
+          let param_name =
+            match param.param_expr.spec with
+            | Expression.Identifier id ->
+              id
+            | _ ->
+              failwith "use identifier as arrow functions's param"
+          in
+          { Function.
+            param_name;
+            param_ty = Option.map (fun (ty, _) -> ty) param.param_colon;
+            param_loc = param.param_loc;
+            param_rest = false;
+          }
+        )
+        relaxed_arrow.params;
+      params_loc = relaxed_arrow.params_loc;
+    } in
+    let open ReleaxedArrow in
+    let lambda_body = arrow.arrow_expr in
+    let lambda = {
+      lambda_body;
+      lambda_params;
+      lambda_return_ty = ReleaxedArrow.(relaxed_arrow.return_ty);
+    } in
+    { Expression.
+      spec = Lambda lambda;
+      loc = relaxed_arrow.loc;
+      attributes = [];
+    }
+
+  | None -> (
+    match relaxed_arrow.params with
+    | first::[] -> (
+      (match first.param_colon with
+      | Some (_, perr_loc) ->
+        let tok = Token.token_to_string Token.T_COLON in
+        let lex_error = Lichenscript_lex.Lex_error.Unexpected tok in
+        let perr_spec = Parse_error.LexError lex_error in
+        let err =
+          { Parse_error.
+            perr_loc;
+            perr_spec;
+          }
+        in
+        Parse_error.error err
+
+      | None -> ()
+      );
+
+      first.param_expr
+    )
+
+    | _ -> (
+      let tok = Token.token_to_string Token.T_LPAREN in
+      let lex_error = Lichenscript_lex.Lex_error.Unexpected tok in
+      let perr_spec = Parse_error.LexError lex_error in
+      let err =
+        { Parse_error.
+          perr_loc = relaxed_arrow.params_loc;
+          perr_spec;
+        }
+      in
+      Parse_error.error err
+    )
+
+  )
+
+and parse_relaxed_arrow env : ReleaxedArrow.t =
+  let start_pos = Peek.loc env in
+
+  let parse_relaxed_param () =
+    let start_pos = Peek.loc env in
+    let param_expr = parse_expression env in
+    let param_colon =
+      if (Peek.token env) = Token.T_COLON then (
+        let start_pos = Peek.loc env in
+        Eat.token env;
+        Some (parse_type env, with_start_loc env start_pos)
+      )
+      else
+        None
+    in
+    { ReleaxedArrow.
+      param_expr;
+      param_colon;
+      param_loc = with_start_loc env start_pos;
+    }
+  in
+
+  let params = ref [] in
+
+  Expect.token env Token.T_LPAREN;
+
+  while (Peek.token env) <> Token.T_RPAREN do
+    let param = parse_relaxed_param () in
+    params := param::!params
+  done;
+
+  Expect.token env Token.T_RPAREN;
+  let params_loc = with_start_loc env start_pos in
+
+  let return_ty =
+    if (Peek.token env) = Token.T_COLON then (
+      Eat.token env;
+      Some (parse_type env)
+    ) else
+      None
+  in
+
+  let arrow =
+    if (Peek.token env) = Token.T_ARROW then (
+      let start_pos = Peek.loc env in
+      Eat.token env;
+      let arrow_expr = parse_expression env in
+      let arrow = {
+        ReleaxedArrow.
+        arrow_expr;
+        arrow_loc = with_start_loc env start_pos;
+      } in
+      Some arrow
+    ) else
+      None
+  in
+
+  { ReleaxedArrow.
+    params = List.rev !params;
+    params_loc;
+    return_ty;
+    arrow;
+    loc = with_start_loc env start_pos;
+  }
 
 and parse_binary_expression env : Expression.t =
   let open Expression in
@@ -1161,9 +1304,7 @@ and parse_primary_expression env : Expression.t =
     }
 
 and parse_group_expression env =
-  Expect.token env Token.T_LPAREN;
-  Expect.token env Token.T_RPAREN;
-  failwith "n"
+  parse_maybe_arrow_function env
 
 and parse_relaxed_kv_block env = 
   let has_case = ref false in

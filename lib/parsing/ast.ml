@@ -76,10 +76,16 @@ and Expression : sig
     clause_loc: Loc.t;
   }
 
+  and lambda = {
+    lambda_params: Function.params;
+    lambda_return_ty: Type.t option;
+    lambda_body: t;
+  }
+
   and spec =
     | Constant of Literal.t
     | Identifier of Identifier.t
-    | Lambda of Function.t
+    | Lambda of lambda
     | If of if_desc
     | Array of t list
     | Call of call
@@ -180,7 +186,7 @@ and Function : sig
   }
 
   and param =  {
-    param_pat: Pattern.t;
+    param_name: Identifier.t;
     param_ty: Type.t option;
     param_loc: Loc.t;
     param_rest: bool;

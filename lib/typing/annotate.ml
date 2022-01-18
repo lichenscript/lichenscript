@@ -166,7 +166,12 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         raise (Type_error.Error err)
     )
 
-    | Lambda _
+    | Lambda _lambda -> (
+      (* let { lambda_params; lambda_return_ty; lambda_body } = lambda in *)
+
+      -1, failwith "not implemented lambda"
+    )
+
     | If _
     | Array _  ->
       -1, failwith "not implemented"
@@ -945,8 +950,9 @@ and annotate_type env ty : (TypeExpr.t * int list) =
 and annotate_function_params env params = 
   let open Ast.Function in
   let annoate_param param =
-    let { param_pat; param_ty; param_loc; param_rest } = param in
-    let param_pat, param_id = annotate_pattern env param_pat in
+    let { param_name; param_ty; param_loc; param_rest } = param in
+    let param_name = annotate_an_def_identifer env param_name in
+    let _, param_id = param_name in
     let deps = ref [] in
     let value = ref TypeExpr.Unknown in
     Option.iter
@@ -965,7 +971,7 @@ and annotate_function_params env params =
     } in
     Type_context.update_node (Env.ctx env) param_id node;
     { T.Function.
-      param_pat;
+      param_name;
       param_ty = param_id;
       param_loc;
       param_rest;
@@ -1020,12 +1026,7 @@ and annotate_function env fun_ =
     (* add all params into scope *)
     List.iter
       ~f:(fun param -> 
-        let pat = param.param_pat in
-        let name = 
-          match pat.spec with
-          | T.Pattern.Symbol (name, _) -> name
-          | T.Pattern.EnumCtor _ -> failwith "not implement"
-        in
+        let name, _ = param.param_name in
         fun_scope#insert_var_symbol name {
           var_id = param.param_ty;
           var_kind = Ast.Pvar_let;

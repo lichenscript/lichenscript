@@ -52,10 +52,16 @@ module%gen rec Expression : sig
     clause_loc: Loc.t;
   }
 
+  and lambda = {
+    lambda_params: Function.params;
+    lambda_return_ty: Core_type.TypeExpr.t;
+    lambda_body: t;
+  }
+
   and spec =
     | Constant of Ast.Literal.t
     | Identifier of (string * int)
-    | Lambda
+    | Lambda of lambda
     | If of if_desc
     | Array of t list
     | Call of call
@@ -150,7 +156,7 @@ and Function : sig
   }
 
   and param = {
-    param_pat: Pattern.t;
+    param_name: (string * int);
     param_ty: int;
     param_loc: Loc.t;
     param_rest: bool;
