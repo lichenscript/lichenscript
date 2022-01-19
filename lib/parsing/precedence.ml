@@ -40,7 +40,6 @@ let binary_precedence = function
   | Token.T_MOD
     -> 11
 
-  | Token.T_INSTANCEOF
   | Token.T_IN
     -> 7
 

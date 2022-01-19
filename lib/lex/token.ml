@@ -19,8 +19,6 @@ type t =
   (* Syntax *)
   | T_LCURLY
   | T_RCURLY
-  | T_LCURLYBAR
-  | T_RCURLYBAR
   | T_LPAREN
   | T_RPAREN
   | T_LBRACKET
@@ -31,20 +29,14 @@ type t =
   | T_ARROW
   | T_ELLIPSIS
   | T_AT
-  | T_POUND
   (* Keywords *)
   | T_FUNCTION
   | T_IF
   | T_IN
-  | T_INSTANCEOF
   | T_RETURN
-  | T_SWITCH
   | T_THIS
   | T_THROW
-  | T_TRY
-  | T_VAR
   | T_WHILE
-  | T_WITH
   | T_CONST
   | T_LET
   | T_NULL
@@ -52,11 +44,10 @@ type t =
   | T_TRUE
   | T_BREAK
   | T_CASE
-  | T_CATCH
   | T_CONTINUE
   | T_DEFAULT
   | T_DO
-  | T_FINALLY
+  | T_FINAL
   | T_FOR
   | T_CLASS
   | T_EXTENDS
@@ -65,7 +56,6 @@ type t =
   | T_VIRTUAL
   | T_OVERRIDE
   | T_DELETE
-  | T_TYPEOF
   | T_VOID
   | T_ENUM
   | T_MATCH
@@ -201,15 +191,10 @@ let token_to_string = function
   | T_FUNCTION -> "T_FUNCTION"
   | T_IF -> "T_IF"
   | T_IN -> "T_IN"
-  | T_INSTANCEOF -> "T_INSTANCEOF"
   | T_RETURN -> "T_RETURN"
-  | T_SWITCH -> "T_SWITCH"
   | T_THIS -> "T_THIS"
   | T_THROW -> "T_THROW"
-  | T_TRY -> "T_TRY"
-  | T_VAR -> "T_VAR"
   | T_WHILE -> "T_WHILE"
-  | T_WITH -> "T_WITH"
   | T_CONST -> "T_CONST"
   | T_LET -> "T_LET"
   | T_NULL -> "T_NULL"
@@ -217,11 +202,10 @@ let token_to_string = function
   | T_TRUE -> "T_TRUE"
   | T_BREAK -> "T_BREAK"
   | T_CASE -> "T_CASE"
-  | T_CATCH -> "T_CATCH"
   | T_CONTINUE -> "T_CONTINUE"
   | T_DEFAULT -> "T_DEFAULT"
   | T_DO -> "T_DO"
-  | T_FINALLY -> "T_FINALLY"
+  | T_FINAL -> "T_FINAL"
   | T_FOR -> "T_FOR"
   | T_CLASS -> "T_CLASS"
   | T_EXTENDS -> "T_EXTENDS"
@@ -230,7 +214,6 @@ let token_to_string = function
   | T_VIRTUAL -> "T_VIRTUAL"
   | T_OVERRIDE -> "T_OVERRIDE"
   | T_DELETE -> "T_DELETE"
-  | T_TYPEOF -> "T_TYPEOF"
   | T_VOID -> "T_VOID"
   | T_ENUM -> "T_ENUM"
   | T_MATCH -> "T_MATCH"
@@ -255,8 +238,6 @@ let token_to_string = function
   | T_CHECKS -> "T_CHECKS"
   | T_LCURLY -> "T_LCURLY"
   | T_RCURLY -> "T_RCURLY"
-  | T_LCURLYBAR -> "T_LCURLYBAR"
-  | T_RCURLYBAR -> "T_RCURLYBAR"
   | T_LPAREN -> "T_LPAREN"
   | T_RPAREN -> "T_RPAREN"
   | T_LBRACKET -> "T_LBRACKET"
@@ -267,7 +248,6 @@ let token_to_string = function
   | T_ARROW -> "T_ARROW"
   | T_ELLIPSIS -> "T_ELLIPSIS"
   | T_AT -> "T_AT"
-  | T_POUND -> "T_POUND"
   | T_RSHIFT3_ASSIGN -> "T_RSHIFT3_ASSIGN"
   | T_RSHIFT_ASSIGN -> "T_RSHIFT_ASSIGN"
   | T_LSHIFT_ASSIGN -> "T_LSHIFT_ASSIGN"
@@ -338,8 +318,6 @@ let value_of_token = function
   | T_REGEXP (_, pattern, flags) -> "/" ^ pattern ^ "/" ^ flags
   | T_LCURLY -> "{"
   | T_RCURLY -> "}"
-  | T_LCURLYBAR -> "{|"
-  | T_RCURLYBAR -> "|}"
   | T_LPAREN -> "("
   | T_RPAREN -> ")"
   | T_LBRACKET -> "["
@@ -350,19 +328,13 @@ let value_of_token = function
   | T_ARROW -> "=>"
   | T_ELLIPSIS -> "..."
   | T_AT -> "@"
-  | T_POUND -> "#"
   | T_FUNCTION -> "function"
   | T_IF -> "if"
   | T_IN -> "in"
-  | T_INSTANCEOF -> "instanceof"
   | T_RETURN -> "return"
-  | T_SWITCH -> "switch"
   | T_THIS -> "this"
   | T_THROW -> "throw"
-  | T_TRY -> "try"
-  | T_VAR -> "var"
   | T_WHILE -> "while"
-  | T_WITH -> "with"
   | T_CONST -> "const"
   | T_LET -> "let"
   | T_NULL -> "null"
@@ -370,11 +342,10 @@ let value_of_token = function
   | T_TRUE -> "true"
   | T_BREAK -> "break"
   | T_CASE -> "case"
-  | T_CATCH -> "catch"
   | T_CONTINUE -> "continue"
   | T_DEFAULT -> "default"
   | T_DO -> "do"
-  | T_FINALLY -> "finally"
+  | T_FINAL -> "final"
   | T_FOR -> "for"
   | T_CLASS -> "class"
   | T_EXTENDS -> "extends"
@@ -383,7 +354,6 @@ let value_of_token = function
   | T_VIRTUAL -> "virtual"
   | T_OVERRIDE -> "override"
   | T_DELETE -> "delete"
-  | T_TYPEOF -> "typeof"
   | T_VOID -> "void"
   | T_ENUM -> "enum"
   | T_MATCH -> "match"
@@ -503,15 +473,10 @@ let is_keyword = function
   | T_FUNCTION
   | T_IF
   | T_IN
-  | T_INSTANCEOF
   | T_RETURN
-  | T_SWITCH
   | T_THIS
   | T_THROW
-  | T_TRY
-  | T_VAR
   | T_WHILE
-  | T_WITH
   | T_CONST
   | T_LET
   | T_NULL
@@ -519,18 +484,16 @@ let is_keyword = function
   | T_TRUE
   | T_BREAK
   | T_CASE
-  | T_CATCH
   | T_CONTINUE
   | T_DEFAULT
   | T_DO
-  | T_FINALLY
+  | T_FINAL
   | T_FOR
   | T_CLASS
   | T_EXTENDS
   | T_STATIC
   | T_ELSE
   | T_DELETE
-  | T_TYPEOF
   | T_VOID
   | T_ENUM
   | T_EXPORT
