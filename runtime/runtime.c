@@ -192,6 +192,14 @@ static LCClassDef Object_def = {
     NULL,
 };
 
+static LCValue LC_Object_toString(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    return LCNewStringFromCString(rt, (const unsigned char*)"Object");;
+}
+
+static LCClassMethodDef Object_method_def[] = {
+    { "toString", 0, LC_Object_toString }
+};
+
 LCRuntime* LCNewRuntime() {
     LCRuntime* runtime = (LCRuntime*)lc_raw_malloc(sizeof(LCRuntime));
     memset(runtime, 0, sizeof(LCRuntime));
@@ -213,7 +221,8 @@ LCRuntime* LCNewRuntime() {
     runtime->cls_meta_data = lc_malloc(runtime, sizeof(LCClassMeta) * runtime->cls_meta_cap);
 
     // the ancester of all classes
-    LCDefineClass(runtime, &Object_def);
+    LCClassID object_cls_id = LCDefineClass(runtime, &Object_def);
+    LCDefineClassMethod(runtime, object_cls_id, Object_method_def, countof(Object_method_def));
 
     return runtime;
 }

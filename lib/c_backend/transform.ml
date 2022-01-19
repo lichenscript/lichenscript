@@ -14,7 +14,7 @@ open Lichenscript_typing.Typedtree
  *)
 type transform_scope = {
   name_map: (string, C_op.symbol) Hashtbl.t;
-  raw: scope;
+  raw: scope option;
   prev: transform_scope option;
 }
 
@@ -26,7 +26,7 @@ let create_transform_scope scope = {
 
 type t = {
   ctx: Type_context.t;
-  mutable scope: transform_scope option;
+  mutable scope: transform_scope;
   mutable tmp_vars_count: int;
   mutable main_function_name: string option;
   mutable class_inits: C_op.Decl.class_init list;
@@ -39,16 +39,25 @@ type t = {
 let push_scope env scope =
   let scope = {
     scope with
-    prev = env.scope;
+    prev = Some env.scope;
   } in
-  env.scope <- Some scope
+  env.scope <- scope
 
 let pop_scope env =
-  let current = Option.value_exn env.scope in
-  env.scope <- current.prev
+  env.scope <- Option.value_exn env.scope.prev
 
-let find_variable _env _name =
-  failwith "n"
+let find_variable env name =
+  let rec find_in_scope scope =
+    match Hashtbl.find scope.name_map name with
+    | Some v -> v
+    | None -> (
+      match env.scope.prev with
+      | Some prev_scope -> find_in_scope prev_scope
+      | None -> failwith (Format.sprintf "can not find variable %s" name)
+    )
+  in
+  let scope = env.scope in
+  find_in_scope scope
 
 type expr_result = {
   prepend_stmts: C_op.Stmt.t list;
@@ -58,7 +67,7 @@ type expr_result = {
 
 let create ctx = {
   ctx;
-  scope = None;
+  scope = create_transform_scope None;
   tmp_vars_count = 0;
   main_function_name = None;
   class_inits = [];
@@ -99,7 +108,7 @@ let rec transform_declaration env decl =
 
 and distribute_name env name =
   let fun_name = "LCC_" ^ name in
-  let current_scope = Option.value_exn env.scope in
+  let current_scope = env.scope in
   Hashtbl.set current_scope.name_map ~key:name ~data:(SymLocal fun_name);
   fun_name
 
@@ -130,7 +139,7 @@ and transform_function env _fun =
 and transform_function_impl env ~name ~params ~body ~scope ~comments =
   let open Function in
 
-  let fun_scope = create_transform_scope scope in
+  let fun_scope = create_transform_scope (Some scope) in
   push_scope env fun_scope;
 
   let params_set = Hash_set.create (module String) in
@@ -293,7 +302,7 @@ and transform_statement ?ret env stmt =
       | _ -> failwith "unrechable"
     in
 
-    let scope = Option.value_exn env.scope in
+    let scope = env.scope in
 
     let should_var_captured variable =
       if !(variable.var_captured) then (
@@ -304,7 +313,7 @@ and transform_statement ?ret env stmt =
         false
     in
 
-    let variable = Option.value_exn (scope.raw#find_var_symbol original_name) in
+    let variable = Option.value_exn ((Option.value_exn scope.raw)#find_var_symbol original_name) in
 
     let name = Hashtbl.find_exn scope.name_map original_name in
     let init_expr = transform_expression env binding.binding_init in
@@ -423,7 +432,7 @@ and transform_expression env expr =
     )
 
     | Lambda lambda_content -> (
-      let parent_scope = Option.value_exn env.scope in
+      let parent_scope = env.scope in
       let fun_name = Option.value_exn ~message:"current function name not found" env.current_fun_name in
       let lambda_fun_name = "LCC_" ^ fun_name ^ "_lambda_" ^ (Int.to_string ty_var) in
 
@@ -456,7 +465,7 @@ and transform_expression env expr =
 
     | Call call -> (
       let open Expression in
-      let current_scope = Option.value_exn env.scope in
+      let current_scope = env.scope in
       let { callee; call_params; _ } = call in
       match callee with
       | { spec = Identifier (_, id); _ } -> (
@@ -490,7 +499,7 @@ and transform_expression env expr =
           | _ ->
             let ctor_opt = Check_helper.find_construct_of env.ctx id in
             let ctor_name, _ctor_ty_id = Option.value_exn ctor_opt in
-            let name = Hashtbl.find_exn current_scope.name_map ctor_name.name in
+            let name = find_variable env ctor_name.name in
             C_op.Expr.ExternalCall(name, params)
         )
 
@@ -519,8 +528,8 @@ and transform_expression env expr =
     )
 
     | Update _ -> failwith "update"
-    | Assign ((_, id), expr) -> (
-      let name = find_variable env id in
+    | Assign ((name, _), expr) -> (
+      let name = find_variable env name in
       let expr' = transform_expression env expr in
 
       prepend_stmts := List.append !prepend_stmts expr'.prepend_stmts;
@@ -530,8 +539,8 @@ and transform_expression env expr =
     )
 
     | Init { init_name; _ } -> (
-      let _, init_name_id = init_name in
-      let fun_name = find_variable env init_name_id in
+      let init_name, _ = init_name in
+      let fun_name = find_variable env init_name in
       C_op.Expr.ExternalCall((C_op.map_symbol ~f:(fun fun_name -> fun_name ^ "_init") fun_name), [])
     )
 
