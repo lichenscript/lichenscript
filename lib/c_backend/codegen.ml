@@ -253,8 +253,10 @@ and codegen_symbol env sym =
     ps env (Int.to_string param_index);
     ps env "]"
 
-  | SymLambda _ ->
-    ps env "lambda"
+  | SymLambda index ->
+    ps env "LCLambdaGetValue(rt, this, ";
+    ps env (Int.to_string index);
+    ps env ")"
 
 and codegen_expression (env: t) (expr: Expr.t) =
   let open Expr in
@@ -444,9 +446,27 @@ and codegen_expression (env: t) (expr: Expr.t) =
 
   | Assign(name, right) -> (
     (* TODO: release the left, retain the right *)
-    codegen_symbol env name;
-    ps env " = ";
-    codegen_expression env right
+    (let open C_op in
+    match name with
+    | SymLocal name ->
+      ps env name;
+      ps env " = ";
+      codegen_expression env right
+
+    | SymParam param_index ->
+      ps env "args[";
+      ps env (Int.to_string param_index);
+      ps env "]";
+      ps env " = ";
+      codegen_expression env right
+
+    | SymLambda index ->
+      ps env "LCLambdaSetRefValue(rt, this, ";
+      ps env (Int.to_string index);
+      ps env ", ";
+      codegen_expression env right;
+      ps env ")"
+    );
   )
 
   | TagEqual (expr, tag) -> (
