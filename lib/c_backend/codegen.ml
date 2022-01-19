@@ -140,7 +140,6 @@ let rec codegen_statement (env: t) stmt =
     ps env "LCRelease(rt, ";
     codegen_expression env expr;
     ps env ");";
-    endl env;
   )
 
   | _ -> ()
@@ -150,6 +149,13 @@ and codegen_declaration env decl =
   let { spec; _ } = decl in
   match spec with
   | Func _fun -> codegen_function env _fun
+
+  | LambdaDef lambda_def -> (
+    ps env (Format.sprintf "LCValue %s(LCRuntime* rt, LCValue this, int argc, LCValue* args) {\n" lambda_def.lambda_gen_name);
+    ps env "    return MK_NULL();\n";
+    ps env "}\n";
+  )
+
   | Class cls -> (
     let { name; properties; original_name; _ } = cls in
     let class_id_var_name = name ^ "_class_id" in
@@ -277,6 +283,34 @@ and codegen_expression (env: t) (expr: Expr.t) =
   | NewBoolean false ->
     ps env Primitives.Constant._false
 
+  | NewLambda (c_name, params) ->
+    ps env "LCNewLambda(rt, ";
+    ps env c_name;
+    ps env ", ";
+    if Array.is_empty params then
+      ps env "0, NULL"
+    else (
+      let params_len = Array.length params in
+      ps env (Int.to_string params_len);
+      ps env ", ";
+      ps env "(LCValue[]) {";
+      Array.iteri
+        ~f:(fun index param_name->
+          ps env param_name;
+          if index <> (params_len - 1) then (
+            ps env ", "
+          )
+        )
+        params;
+      ps env "}";
+    );
+    ps env ")";
+
+  | NewRef expr ->
+    ps env "LCNewRefCell(rt, ";
+    codegen_expression env expr;
+    ps env ")"
+
   | Ident value -> ps env value
 
   | ExternalCall (fun_name, params) -> (
@@ -307,7 +341,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
   | CallLambda (callee, _params) -> (
     ps env "LCEvalLambda(rt, ";
     codegen_expression env callee;
-    ps env "0, NULL)"
+    ps env ", 0, NULL)"
   )
 
   | Temp id ->

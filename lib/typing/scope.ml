@@ -3,6 +3,7 @@ open Lichenscript_parsing
 
 module SymbolTable = Hashtbl.Make_binable(String)
 module ExportTable = Map.Make(String)
+module CapturingVarMap = Map.Make(String)
 
 type variable = {
   var_id: int;
@@ -19,11 +20,15 @@ type property = {
   prop_visibility: Asttypes.visibility option;
 }
 
-class scope ?prev () = object
+class scope ?prev () = object(self)
   val var_symbols = SymbolTable.create ()
   val type_symbols = SymbolTable.create ()
   val mutable export_map: Asttypes.visibility option ExportTable.t = ExportTable.empty;
+  val mutable capturing_variables = CapturingVarMap.empty
   val mutable var_counter = 0
+
+  method find_local_var_symbol (name: string): variable option =
+    SymbolTable.find var_symbols name
 
   method find_var_symbol (name: string): variable option =
     let tmp = SymbolTable.find var_symbols name in
@@ -31,6 +36,32 @@ class scope ?prev () = object
     | Some _ -> tmp
     | None ->
       Option.(prev >>= (fun parent -> parent#find_var_symbol name))
+
+  method capturing_variables = capturing_variables
+
+  method set_variable_captured level (name: string): bool =
+    let variable = self#find_local_var_symbol name in
+    match variable with
+    | Some var ->
+      if level > 0 then (
+        var.var_captured := true;
+        true
+      ) else
+        false
+
+    | None -> (
+      (* is a captured *)
+      match prev with
+      | Some prev_scope -> (
+        if prev_scope#set_variable_captured (level+1) name then (
+          let id = CapturingVarMap.length capturing_variables in
+          capturing_variables <- CapturingVarMap.set capturing_variables ~key:name ~data:id;
+          true
+        ) else false
+      )
+
+      | None -> false
+    )
 
   method find_type_symbol (name: string): int option =
     let tmp = SymbolTable.find type_symbols name in

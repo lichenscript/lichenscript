@@ -55,6 +55,7 @@ module%gen rec Expression : sig
   and lambda = {
     lambda_params: Function.params;
     lambda_return_ty: Core_type.TypeExpr.t;
+    lambda_scope: scope;
     lambda_body: t;
   }
 

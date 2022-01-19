@@ -15,6 +15,7 @@ type t = {
    * a function can have multiple return
    *)
   mutable return_types: int list;
+  mutable in_lambda: bool;
 }
 
 let create ?(open_domains=[]) ~module_scope ctx =
@@ -26,9 +27,20 @@ let create ?(open_domains=[]) ~module_scope ctx =
     errors = [];
     scope_counter = 1;
     return_types = [];
+    in_lambda = false;
   }
 
 let ctx env = env.ctx
+
+let in_lambda env = env.in_lambda
+
+let set_in_lambda env v =
+  env.in_lambda <- v
+
+let capture_variable env ~name =
+  if env.in_lambda then 
+    ignore (env.current_scope#set_variable_captured 0 name)
+  else ()
 
 let set_current_scope env scope =
   env.current_scope <- scope

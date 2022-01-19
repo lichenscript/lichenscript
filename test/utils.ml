@@ -13,7 +13,7 @@ let parse_string_to_program content =
   let typed_tree =
     match result with
     | Result.Ok { tree = program; _ } ->
-        begin
+      begin
         (* Ast.pp_program Format.std_formatter program; *)
         try (
           Tree_helper.add_top_level_symbols_to_typed_env env program;

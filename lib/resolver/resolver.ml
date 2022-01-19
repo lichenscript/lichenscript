@@ -22,6 +22,8 @@ let create ~find_paths ~ctx () =
 class module_scope ~prev env extern_modules = object
   inherit Scope.scope ~prev () as super
 
+  method! set_variable_captured _level (_name: string) = false
+
   (* override *)
   method! find_var_symbol (name: string): Scope.variable option =
     let module_result = super#find_var_symbol name in

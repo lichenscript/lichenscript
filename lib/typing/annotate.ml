@@ -158,8 +158,11 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     | Identifier id -> (
       let ty_var_opt = (Env.peek_scope env)#find_var_symbol id.pident_name in
       match ty_var_opt with
-      | Some variable ->
+      | Some variable -> (
+        Env.capture_variable env ~name:id.pident_name;
         variable.var_id, (T.Expression.Identifier (id.pident_name, variable.var_id))
+      )
+
       | _ ->
         let err_spec = Type_error.CannotFindName id.pident_name in
         let err = Type_error.make_error (Env.ctx env) id.pident_loc err_spec in
@@ -167,37 +170,46 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     )
 
     | Lambda lambda -> (
-      let { lambda_params; lambda_return_ty; lambda_body } = lambda in
+      let lambda_scope = new scope ~prev:(Env.peek_scope env) () in
+      Env.with_new_scope env lambda_scope (fun env ->
+        let prev_in_lambda = Env.in_lambda env in
 
-      let params, deps = annotate_function_params env lambda_params in
+        Env.set_in_lambda env true;
+        let { lambda_params; lambda_return_ty; lambda_body } = lambda in
 
-      let lambda_return_ty, ret_deps =
-        match lambda_return_ty with
-        | Some t ->
-          let t, deps = annotate_type env t in
-          t, deps
-        | None -> (
-          let none_type = Env.ty_unit env in
-          TypeExpr.Ctor(none_type, []), []
-        )
-      in
+        let params, deps = annotate_function_params env lambda_params in
 
-      let lambda_body = annotate_expression ~prev_deps:(List.append deps ret_deps) env lambda_body in
+        let lambda_return_ty, ret_deps =
+          match lambda_return_ty with
+          | Some t ->
+            let t, deps = annotate_type env t in
+            t, deps
+          | None -> (
+            let none_type = Env.ty_unit env in
+            TypeExpr.Ctor(none_type, []), []
+          )
+        in
 
-      let node = {
-        value = TypeExpr.Unknown;
-        loc = loc;
-        check = none;
-        deps = [lambda_body.ty_var];
-      } in
+        let lambda_body = annotate_expression ~prev_deps:(List.append deps ret_deps) env lambda_body in
 
-      let node_id = Type_context.new_id (Env.ctx env) node in
+        let node = {
+          value = TypeExpr.Unknown;
+          loc = loc;
+          check = none;
+          deps = [lambda_body.ty_var];
+        } in
 
-      node_id, T.Expression.Lambda {
-        lambda_params = params;
-        lambda_body;
-        lambda_return_ty;
-      }
+        let node_id = Type_context.new_id (Env.ctx env) node in
+
+        Env.set_in_lambda env prev_in_lambda;
+
+        node_id, T.Expression.Lambda {
+          lambda_params = params;
+          lambda_body;
+          lambda_return_ty;
+          lambda_scope;
+        }
+      )
     )
 
     | If _
@@ -353,7 +365,10 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let ctx = Env.ctx env in
       let name, ty_int =
         match scope#find_var_symbol id.pident_name with
-        | Some var -> (id.pident_name, var.var_id)
+        | Some var ->
+          (* check all find_var_symbol to captured *)
+          Env.capture_variable env ~name:id.pident_name;
+          (id.pident_name, var.var_id)
         | None -> (
           let err = Type_error.(make_error ctx loc (CannotFindName id.pident_name)) in
           raise (Type_error.Error err)
@@ -923,6 +938,8 @@ and annotate_pattern env pat =
     | Identifier ident -> (
       let first_char = String.get ident.pident_name 0 in
       if Char.is_uppercase first_char then (
+        Env.capture_variable env ~name:ident.pident_name;
+
         let ctor_var = scope#find_var_symbol ident.pident_name in
         let ctor = Option.value_exn ctor_var in
         ctor.var_id, (T.Pattern.Symbol (ident.pident_name, ctor.var_id))

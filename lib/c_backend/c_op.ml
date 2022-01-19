@@ -8,6 +8,7 @@
 
 open Lichenscript_lex
 open Lichenscript_parsing
+open Lichenscript_typing
 
 module%gen rec Decl : sig
 
@@ -32,8 +33,16 @@ module%gen rec Decl : sig
   }
   [@@deriving show]
 
+  type lambda_def = {
+    lambda_content: Typedtree.Expression.lambda;
+    lambda_gen_name: string;
+    lambda_ty: int;
+  }
+  [@@deriving show]
+
   type spec =
   | Func of Func.t
+  | LambdaDef of lambda_def
   | Class of _class
   | EnumCtor of enum_ctor
   | GlobalClassInit of string * class_init list
@@ -78,7 +87,9 @@ and Expr : sig
   | NewInt of string
   | NewFloat of string
   | NewChar of char 
+  | NewLambda of (string * string array)
   | NewBoolean of bool
+  | NewRef of t
   | I32Binary of Asttypes.BinaryOp.t * t * t
   | CallLambda of t * t list
   | Call of int * t list

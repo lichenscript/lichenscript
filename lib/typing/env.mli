@@ -6,6 +6,12 @@ val create: ?open_domains:(string array list) -> module_scope:scope -> Type_cont
 
 val ctx : t -> Type_context.t
 
+val in_lambda: t -> bool
+
+val set_in_lambda: t -> bool -> unit
+
+val capture_variable: t -> name:string -> unit
+
 val set_current_scope: t -> scope -> unit
 
 val peek_scope: t -> scope
