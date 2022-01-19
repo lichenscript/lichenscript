@@ -244,6 +244,18 @@ and codegen_declaration env decl =
       ps env "}\n";
   )
 
+and codegen_symbol env sym =
+  let open C_op in
+  match sym with
+  | SymLocal name -> ps env name
+  | SymParam param_index ->
+    ps env "args[";
+    ps env (Int.to_string param_index);
+    ps env "]"
+
+  | SymLambda _ ->
+    ps env "lambda"
+
 and codegen_expression (env: t) (expr: Expr.t) =
   let open Expr in
   let { spec; _ } = expr in
@@ -296,7 +308,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
       ps env "(LCValue[]) {";
       Array.iteri
         ~f:(fun index param_name->
-          ps env param_name;
+          codegen_symbol env param_name;
           if index <> (params_len - 1) then (
             ps env ", "
           )
@@ -311,10 +323,10 @@ and codegen_expression (env: t) (expr: Expr.t) =
     codegen_expression env expr;
     ps env ")"
 
-  | Ident value -> ps env value
+  | Ident value -> codegen_symbol env value
 
   | ExternalCall (fun_name, params) -> (
-    ps env fun_name;
+    codegen_symbol env fun_name;
     let params_len = List.length params in
     if List.is_empty params then (
       ps env (Format.sprintf "(rt, MK_NULL(), %d, NULL)" params_len);
@@ -432,7 +444,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
 
   | Assign(name, right) -> (
     (* TODO: release the left, retain the right *)
-    ps env name;
+    codegen_symbol env name;
     ps env " = ";
     codegen_expression env right
   )

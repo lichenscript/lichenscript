@@ -9,7 +9,7 @@ open Lichenscript_typing.Typedtree
 
 type t = {
   ctx: Type_context.t;
-  name_map: (int, string) Hashtbl.t;
+  name_map: (int, C_op.symbol) Hashtbl.t;
   mutable tmp_vars_count: int;
   mutable main_function_name: string option;
   mutable class_inits: C_op.Decl.class_init list;
@@ -75,7 +75,7 @@ let rec transform_declaration env decl =
 
 and distribute_name env (name, id) =
   let fun_name = "LCC_" ^ name in
-  Hashtbl.set env.name_map ~key:id ~data:fun_name;
+  Hashtbl.set env.name_map ~key:id ~data:(SymLocal fun_name);
   fun_name
 
 (*
@@ -108,14 +108,22 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
   env.scope <- Some scope;
   env.tmp_vars_count <- 0;
 
-  List.iter
-    ~f:(fun { param_name; param_ty; _ } ->
+  let params_set = Hash_set.create (module String) in
+
+  List.iteri
+    ~f:(fun index { param_name; param_ty; _ } ->
       let param_name, _ = param_name in
-      Hashtbl.set env.name_map ~key:param_ty ~data:(get_local_var_name param_name param_ty)
+      Hash_set.add params_set param_name;
+      (* Hashtbl.set env.name_map ~key:param_ty ~data:(get_local_var_name param_name param_ty) *)
+      Hashtbl.set env.name_map ~key:param_ty ~data:(SymParam index)
     )
     params.params_content;
 
-  let local_vars = scope#vars in
+  (* filter all the params, get the "pure" local vars *)
+  let local_vars =
+    scope#vars
+    |> List.filter ~f:(fun (name, _) -> not (Hash_set.mem params_set name))
+  in
 
   let def = ref [] in
 
@@ -123,7 +131,7 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
     let names =
       List.map
       ~f:(fun (var_name, variable) ->
-        Hashtbl.set env.name_map ~key:variable.var_id ~data:(get_local_var_name var_name variable.var_id);
+        Hashtbl.set env.name_map ~key:variable.var_id ~data:(SymLocal (get_local_var_name var_name variable.var_id));
         var_name
       )
       local_vars;
@@ -142,7 +150,7 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
         ~f:(fun (name, _) ->
           { C_op.Stmt.
             spec = Release {
-              spec = Ident name;
+              spec = Ident (C_op.SymLocal name);
               loc = Loc.none;
             };
             loc = Loc.none;
@@ -195,7 +203,7 @@ and transform_statement ?ret env stmt =
     let ret = Option.value ~default:"ret" ret in
     let assign = {
       C_op.Expr.
-      spec = Assign(ret, tmp.expr);
+      spec = Assign(C_op.SymLocal ret, tmp.expr);
       loc;
     } in
     let expr = {
@@ -329,7 +337,7 @@ and auto_release_expr env ~prepend_stmts ~append_stmts expr =
 
   let assign_expr = {
     C_op.Expr.
-    spec = Assign(("t[" ^ (Int.to_string tmp_id) ^ "]"), expr);
+    spec = Assign(C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"), expr);
     loc = Loc.none;
   } in
 
@@ -372,8 +380,8 @@ and transform_expression env expr =
     )
 
     | Identifier (_, id) -> (
-      let name = Hashtbl.find_exn env.name_map id in
-      C_op.Expr.Ident name
+      let sym = Hashtbl.find_exn env.name_map id in
+      C_op.Expr.Ident sym
     )
 
     | Lambda lambda_content -> (
@@ -382,7 +390,7 @@ and transform_expression env expr =
 
       let capturing_variables = lambda_content.lambda_scope#capturing_variables in
 
-      let capturing_names = Array.create ~len:(Scope.CapturingVarMap.length capturing_variables) "" in
+      let capturing_names = Array.create ~len:(Scope.CapturingVarMap.length capturing_variables) (C_op.SymLocal "<unexpected>") in
 
       Scope.CapturingVarMap.iteri
       ~f:(fun ~key ~data -> 
@@ -394,12 +402,7 @@ and transform_expression env expr =
       )
       capturing_variables;
 
-      let lambda =  {
-        C_op.Decl.
-        lambda_gen_name = lambda_fun_name;
-        lambda_content;
-        lambda_ty = ty_var;
-      } in
+      let lambda = transform_lambda env ~lambda_gen_name:lambda_fun_name lambda_content ty_var in
 
       env.lambdas <- lambda::env.lambdas;
 
@@ -430,7 +433,7 @@ and transform_expression env expr =
         | Some ext_name -> (
 
           (* external method *)
-          C_op.Expr.ExternalCall(ext_name, params)
+          C_op.Expr.ExternalCall((C_op.SymLocal ext_name), params)
         )
 
         (* it's a local function *)
@@ -490,7 +493,7 @@ and transform_expression env expr =
     | Init { init_name; _ } -> (
       let _, init_name_id = init_name in
       let fun_name = Hashtbl.find_exn env.name_map init_name_id in
-      C_op.Expr.ExternalCall(fun_name ^ "_init", [])
+      C_op.Expr.ExternalCall((C_op.map_symbol ~f:(fun fun_name -> fun_name ^ "_init") fun_name), [])
     )
 
     | Block block -> (
@@ -515,7 +518,7 @@ and transform_expression env expr =
           C_op.Stmt.
           spec = Expr {
             C_op.Expr.
-            spec = Assign ("t[" ^ (Int.to_string result_tmp) ^ "]", {
+            spec = Assign (C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"), {
               spec = Null;
               loc = Loc.none;
             });
@@ -543,7 +546,7 @@ and transform_expression env expr =
                   body.prepend_stmts;
                   [{ C_op.Stmt.
                     spec = Expr {
-                      spec = Assign("t[" ^ (Int.to_string result_tmp) ^ "]", body.expr);
+                      spec = Assign(C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"), body.expr);
                       loc = Loc.none;
                     };
                     loc = Loc.none;
@@ -690,6 +693,14 @@ and transform_enum env enum =
       }
     )
     cases
+
+and transform_lambda _env ~lambda_gen_name content ty_var =
+  {
+    C_op.Decl.
+    lambda_gen_name;
+    lambda_content = content;
+    lambda_ty = ty_var;
+  }
 
 type result = {
   main_function_name: string option;

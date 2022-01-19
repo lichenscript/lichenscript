@@ -10,6 +10,18 @@ open Lichenscript_lex
 open Lichenscript_parsing
 open Lichenscript_typing
 
+type symbol =
+  | SymLocal of string
+  | SymParam of int
+  | SymLambda of int
+  [@@deriving show]
+
+let map_symbol ~f s =
+  match s with
+  | SymLocal name -> SymLocal (f name)
+  | SymParam _
+  | SymLambda _ -> s
+
 module%gen rec Decl : sig
 
   type _class = {
@@ -87,15 +99,15 @@ and Expr : sig
   | NewInt of string
   | NewFloat of string
   | NewChar of char 
-  | NewLambda of (string * string array)
+  | NewLambda of (string * symbol array)
   | NewBoolean of bool
   | NewRef of t
   | I32Binary of Asttypes.BinaryOp.t * t * t
   | CallLambda of t * t list
   | Call of int * t list
-  | Assign of string * t
-  | ExternalCall of string * t list
-  | Ident of string 
+  | Assign of symbol * t
+  | ExternalCall of symbol * t list
+  | Ident of symbol
   | TagEqual of t * int
   | Temp of int
 
