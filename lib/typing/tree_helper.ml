@@ -14,7 +14,7 @@ let add_top_level_symbols_to_typed_env typed_env tree =
       } in
       let new_id = Type_context.new_id (Env.ctx typed_env) node in
       let module_scope = (Env.peek_scope typed_env) in
-      module_scope#insert_var_symbol key { var_id = new_id; var_kind = Ast.Pvar_const };
+      module_scope#new_var_symbol key ~id:new_id ~kind:Ast.Pvar_const;
       module_scope#insert_type_symbol key new_id;
       module_scope#set_visibility key data;
     )

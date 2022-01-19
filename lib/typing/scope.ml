@@ -7,6 +7,7 @@ module ExportTable = Map.Make(String)
 type variable = {
   var_id: int;
   var_kind: Ast.var_kind;
+  var_captured: bool ref;
 }
 
 type class_element =
@@ -40,6 +41,13 @@ class scope ?prev () = object
 
   method insert_var_symbol name (var: variable) =
     SymbolTable.set var_symbols ~key:name ~data:var
+
+  method new_var_symbol name ~id ~kind =
+    SymbolTable.set var_symbols ~key:name ~data:{
+      var_id = id;
+      var_kind = kind;
+      var_captured = ref false;
+    }
 
   method insert_type_symbol name (sym: int) =
     SymbolTable.set type_symbols ~key:name ~data:sym

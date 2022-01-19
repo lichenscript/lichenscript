@@ -296,6 +296,19 @@ LCValue LCNewRefCell(LCRuntime* rt, LCValue value) {
     return (LCValue){ { .ptr_val = (LCObject*)cell }, LC_TY_REFCELL };
 }
 
+void LCRefCellSetValue(LCRuntime* rt, LCValue cell, LCValue value) {
+    LCRefCell* ref =(LCRefCell*)cell.ptr_val;
+    LCRelease(rt, ref->value);
+    LCRetain(value);
+    ref->value = value;
+}
+
+LCValue LCRefCellGetValue(LCValue cell) {
+    LCRefCell* ref =(LCRefCell*)cell.ptr_val;
+    LCRetain(ref->value);
+    return ref->value;
+}
+
 LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, int argc, LCValue* args) {
     size_t size = sizeof(LCLambda) + argc * sizeof(LCValue);
     LCLambda* lambda = (LCLambda*)lc_mallocz(rt, size);

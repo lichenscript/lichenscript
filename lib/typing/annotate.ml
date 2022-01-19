@@ -62,7 +62,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
 
       let scope = Env.peek_scope env in
       (* TODO: check redefinition? *)
-      scope#insert_var_symbol name { var_id = sym_id; var_kind = binding_kind };
+      scope#new_var_symbol name ~id:sym_id ~kind:binding_kind;
 
       let binding_init = annotate_expression ~prev_deps env binding_init in
 
@@ -1065,10 +1065,7 @@ and annotate_function env fun_ =
     List.iter
       ~f:(fun param -> 
         let name, _ = param.param_name in
-        fun_scope#insert_var_symbol name {
-          var_id = param.param_ty;
-          var_kind = Ast.Pvar_let;
-        };
+        fun_scope#new_var_symbol name ~id:param.param_ty ~kind:Ast.Pvar_let;
       )
       params.params_content;
 
@@ -1232,20 +1229,6 @@ and annotate_enum env enum =
 
 let annotate_program env (program: Ast.program) =
   let { Ast. pprogram_declarations; pprogram_top_level = _; pprogram_loc; _; } = program in
-
-  (* Hashtbl.iter_keys
-    ~f:(fun key ->
-      let node = {
-        value = TypeExpr.Unknown;
-        loc = Lichenscript_lex.Loc.none;
-        deps = [];
-        check = none;
-      } in
-      let new_id = Type_context.new_id (Env.ctx env) node in
-      (Env.peek_scope env)#insert_var_symbol key new_id
-    )
-    pprogram_top_level.names
-    ; *)
 
   let tprogram_declarations = List.map ~f:(annotate_declaration env) pprogram_declarations in
 

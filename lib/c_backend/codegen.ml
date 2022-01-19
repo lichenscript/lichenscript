@@ -304,6 +304,12 @@ and codegen_expression (env: t) (expr: Expr.t) =
 
   | Call _ -> failwith "call"
 
+  | CallLambda (callee, _params) -> (
+    ps env "LCEvalLambda(rt, ";
+    codegen_expression env callee;
+    ps env "0, NULL)"
+  )
+
   | Temp id ->
     ps env "t[";
     ps env (Int.to_string id);

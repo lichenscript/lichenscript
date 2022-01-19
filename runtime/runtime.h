@@ -166,6 +166,9 @@ LCValue LCNewStringFromCStringLen(LCRuntime* rt, const unsigned char* content, u
 LCValue LCNewStringFromCString(LCRuntime* rt, const unsigned char* content);
 
 LCValue LCNewRefCell(LCRuntime* rt, LCValue value);
+void LCRefCellSetValue(LCRuntime* rt, LCValue cell, LCValue value);
+LCValue LCRefCellGetValue(LCValue cell);
+
 LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, int argc, LCValue* args);
 
 LCValue LCNewArray(LCRuntime* rt);

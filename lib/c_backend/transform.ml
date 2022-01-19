@@ -56,7 +56,9 @@ and distribute_name env (name, id) =
   fun_name
 
 (*
- * distribute variable for params
+ * 1. Scan the function firstly, find out all the lambda expression
+ *    and captured variables
+ * 2. Transform body
  *)
 and transform_function env _fun =
   let open Function in
@@ -288,7 +290,9 @@ and transform_expression env expr =
       C_op.Expr.Ident name
     )
 
-    | Lambda _
+    | Lambda _ ->
+      failwith "lambda"
+
     | If _
     | Array _ -> failwith "n1"
 
@@ -311,11 +315,24 @@ and transform_expression env expr =
           C_op.Expr.ExternalCall(ext_name, params)
         )
 
-        | None ->  (* it's a local function *)
-          let ctor_opt = Check_helper.find_construct_of env.ctx id in
-          let _, ctor_ty_id = Option.value_exn ctor_opt in
-          let name = Hashtbl.find_exn env.name_map ctor_ty_id in
-          C_op.Expr.ExternalCall(name, params)
+        (* it's a local function *)
+        | None -> (
+          let callee_node = Type_context.get_node env.ctx callee.ty_var in
+          let deref_type = Check_helper.deref_type env.ctx callee_node.value in
+          match deref_type with
+          | Core_type.TypeExpr.Lambda _ -> (
+            let transformed_callee = transform_expression env callee in
+            prepend_stmts := List.append !prepend_stmts (List.append !prepend_stmts transformed_callee.prepend_stmts);
+            append_stmts := List.append !append_stmts (List.append !append_stmts transformed_callee.append_stmts);
+            C_op.Expr.CallLambda(transformed_callee.expr, [])
+          )
+
+          | _ ->
+            let ctor_opt = Check_helper.find_construct_of env.ctx id in
+            let _, ctor_ty_id = Option.value_exn ctor_opt in
+            let name = Hashtbl.find_exn env.name_map ctor_ty_id in
+            C_op.Expr.ExternalCall(name, params)
+        )
 
       )
 

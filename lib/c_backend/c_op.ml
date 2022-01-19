@@ -80,6 +80,7 @@ and Expr : sig
   | NewChar of char 
   | NewBoolean of bool
   | I32Binary of Asttypes.BinaryOp.t * t * t
+  | CallLambda of t * t list
   | Call of int * t list
   | Assign of string * t
   | ExternalCall of string * t list
