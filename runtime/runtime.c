@@ -325,6 +325,40 @@ LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, int argc, LCValue* args) {
     return (LCValue){ { .ptr_val = (LCObject*)lambda }, LC_TY_LAMBDA };
 }
 
+LCValue LCLambdaGetValue(LCRuntime* rt, LCValue lambda_val, int index) {
+    LCLambda* lambda = (LCLambda*)lambda_val.ptr_val;
+    LCValue ret = lambda->captured_values[index];
+    LCRetain(ret);
+    return ret;
+}
+
+LCValue LCLambdaGetRefValue(LCRuntime* rt, LCValue lambda_val, int index) {
+    LCLambda* lambda = (LCLambda*)lambda_val.ptr_val;
+    LCValue ret = lambda->captured_values[index];
+    if (ret.tag != LC_TY_REFCELL) {  // TODO: do NOT check in release
+        fprintf(stderr, "[LichenScript] value is not a ref\n");
+        abort();
+    }
+    return LCRefCellGetValue(ret);
+}
+
+void LCLambdaSetValue(LCRuntime* rt, LCValue lambda_val, int index, LCValue value) {
+    LCLambda* lambda = (LCLambda*)lambda_val.ptr_val;
+    LCRelease(rt, lambda->captured_values[index]);
+    LCRetain(value);
+    lambda->captured_values[index] = value;
+}
+
+void LCLambdaSetRefValue(LCRuntime* rt, LCValue lambda_val, int index, LCValue value) {
+    LCLambda* lambda = (LCLambda*)lambda_val.ptr_val;
+    LCValue ref = lambda->captured_values[index];
+    if (ref.tag != LC_TY_REFCELL) {  // TODO: do NOT check in release
+        fprintf(stderr, "[LichenScript] value is not a ref\n");
+        abort();
+    }
+    LCRefCellSetValue(rt, ref, value);
+}
+
 LCValue LCNewSymbolLen(LCRuntime* rt, const char* content, uint32_t len) {
     LCValue result = MK_NULL();
     // LCString* result = NULL;

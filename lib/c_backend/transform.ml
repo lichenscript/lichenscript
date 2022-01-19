@@ -17,7 +17,7 @@ type t = {
 
   (* for lambda generation *)
   mutable current_fun_name: string option;
-  mutable lambdas: C_op.Decl.lambda_def list;
+  mutable lambdas: C_op.Decl.t list;
 }
 
 type expr_result = {
@@ -57,13 +57,8 @@ let rec transform_declaration env decl =
     let specs = transform_function env _fun in
     let lambdas = env.lambdas in
     env.lambdas <- [];
-    let lambda_defs =
-      List.map
-      ~f:(fun lambda -> { C_op.Decl. spec = LambdaDef lambda; loc })
-      lambdas
-    in
     let bodys = List.map ~f:(fun spec -> { C_op.Decl. spec; loc }) specs in
-    List.append lambda_defs bodys
+    List.append lambdas bodys
   )
 
   | Enum enum -> (
@@ -694,12 +689,32 @@ and transform_enum env enum =
     )
     cases
 
-and transform_lambda _env ~lambda_gen_name content ty_var =
+and transform_lambda env ~lambda_gen_name content _ty_var =
+  let fake_block = {
+    Block.
+    body = [
+      { Statement.
+        spec = Expr content.lambda_body;
+        loc = Loc.none;
+        attributes = [];
+      }
+    ];
+    loc = Loc.none;
+    return_ty = content.lambda_body.ty_var;
+  } in
+
+  let _fun = transform_function_impl env
+    ~name:lambda_gen_name
+    ~params:content.lambda_params
+    ~scope:content.lambda_scope
+    ~body:fake_block
+    ~comments:[]
+  in
+
   {
     C_op.Decl.
-    lambda_gen_name;
-    lambda_content = content;
-    lambda_ty = ty_var;
+    spec = _fun;
+    loc = Loc.none;
   }
 
 type result = {

@@ -170,6 +170,10 @@ void LCRefCellSetValue(LCRuntime* rt, LCValue cell, LCValue value);
 LCValue LCRefCellGetValue(LCValue cell);
 
 LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, int argc, LCValue* args);
+LCValue LCLambdaGetValue(LCRuntime* rt, LCValue lambda, int index);
+LCValue LCLambdaGetRefValue(LCRuntime* rt, LCValue lambda, int index);
+void LCLambdaSetValue(LCRuntime* rt, LCValue lambda, int index, LCValue value);
+void LCLambdaSetRefValue(LCRuntime* rt, LCValue lambda, int index, LCValue value);
 
 LCValue LCNewArray(LCRuntime* rt);
 LCValue LCNewArrayLen(LCRuntime* rt, size_t size);
