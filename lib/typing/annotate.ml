@@ -166,10 +166,38 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         raise (Type_error.Error err)
     )
 
-    | Lambda _lambda -> (
-      (* let { lambda_params; lambda_return_ty; lambda_body } = lambda in *)
+    | Lambda lambda -> (
+      let { lambda_params; lambda_return_ty; lambda_body } = lambda in
 
-      -1, failwith "not implemented lambda"
+      let params, deps = annotate_function_params env lambda_params in
+
+      let lambda_return_ty, ret_deps =
+        match lambda_return_ty with
+        | Some t ->
+          let t, deps = annotate_type env t in
+          t, deps
+        | None -> (
+          let none_type = Env.ty_unit env in
+          TypeExpr.Ctor(none_type, []), []
+        )
+      in
+
+      let lambda_body = annotate_expression ~prev_deps:(List.append deps ret_deps) env lambda_body in
+
+      let node = {
+        value = TypeExpr.Unknown;
+        loc = loc;
+        check = none;
+        deps = [lambda_body.ty_var];
+      } in
+
+      let node_id = Type_context.new_id (Env.ctx env) node in
+
+      node_id, T.Expression.Lambda {
+        lambda_params = params;
+        lambda_body;
+        lambda_return_ty;
+      }
     )
 
     | If _
@@ -189,22 +217,32 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         check = (fun id ->
           let ctx = Env.ctx env in
           let ty_int = callee.ty_var in
-          let ty_def = Check_helper.find_construct_of ctx ty_int in
-          match ty_def with
-          | Some ({ TypeDef. spec = Function _fun; _ }, _) ->
+          let callee_node = Type_context.get_node ctx ty_int in
+          let deref_type_expr = Check_helper.deref_type ctx callee_node.value  in
+          match deref_type_expr with
+          | TypeExpr.Lambda(_params, ret) -> (
             (* TODO: check call params *)
-            Type_context.update_node_type ctx id _fun.fun_return
-
-          | Some ({ TypeDef. spec = EnumCtor enum_ctor; _}, _) -> (
-            let super_id = enum_ctor.enum_ctor_super_id in
-            Type_context.update_node_type ctx id (TypeExpr.Ctor (super_id, []))
+            Type_context.update_node_type ctx id ret
           )
+          | _ ->
+            begin
+              let ty_def = Check_helper.find_construct_of ctx ty_int in
+              match ty_def with
+              | Some ({ TypeDef. spec = Function _fun; _ }, _) ->
+                (* TODO: check call params *)
+                Type_context.update_node_type ctx id _fun.fun_return
 
-          | _ -> (
-            let _val = Type_context.get_node ctx ty_int in
-            let err = Type_error.(make_error ctx call_loc (NotCallable _val.value)) in
-            raise (Type_error.Error err)
-          )
+              | Some ({ TypeDef. spec = EnumCtor enum_ctor; _}, _) -> (
+                let super_id = enum_ctor.enum_ctor_super_id in
+                Type_context.update_node_type ctx id (TypeExpr.Ctor (super_id, []))
+              )
+
+              | _ -> (
+                let _val = Type_context.get_node ctx ty_int in
+                let err = Type_error.(make_error ctx call_loc (NotCallable _val.value)) in
+                raise (Type_error.Error err)
+              )
+            end
         );
       } in
 
@@ -943,7 +981,7 @@ and annotate_type env ty : (TypeExpr.t * int list) =
     let params, params_types_deps = List.map ~f:(annotate_type env) params |> List.unzip in
     let return_type, return_type_deps = annotate_type env result in
     deps := List.concat ((!deps)::return_type_deps::params_types_deps);
-    TypeExpr.Function(params, return_type), !deps
+    TypeExpr.Lambda(params, return_type), !deps
   )
   (* !deps *)
 

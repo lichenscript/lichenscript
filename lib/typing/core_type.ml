@@ -46,7 +46,7 @@ module rec TypeExpr : sig
     (*
      * (a: string) => i32
      *)
-    | Function of t list * t
+    | Lambda of t list * t
 
     (*
      * Alias of Array<T>
@@ -69,7 +69,7 @@ end = struct
     | Any
     | Ctor of int * (t list)
     | Ref of int
-    | Function of t list * t
+    | Lambda of t list * t
     | Array of t
     | TypeDef of TypeDef.t
 
@@ -85,7 +85,7 @@ end = struct
     | Any -> Format.fprintf formatter "any"
     | Ctor(i, _) -> Format.fprintf formatter "'%d" i
     | Ref i -> Format.fprintf formatter "ref '%d" i
-    | Function _ -> Format.fprintf formatter "function"
+    | Lambda _ -> Format.fprintf formatter "lambda"
     | Array _ -> Format.fprintf formatter "array"
     | TypeDef _ -> Format.fprintf formatter "typedef"
 

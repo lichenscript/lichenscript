@@ -108,7 +108,7 @@ and print_type_value ctx ty_value =
     let node = get_node ctx id in
     print_type_value ctx node.value
   )
-  | Function _ -> "function"
+  | Lambda _ -> "lambda"
   | Array _ -> "array"
   | TypeDef type_sym -> (
     let open Core_type.TypeDef in
