@@ -325,6 +325,11 @@ and codegen_expression (env: t) (expr: Expr.t) =
     codegen_expression env expr;
     ps env ")"
 
+  | GetRef ref ->
+    ps env "LCRefCellGetValue(";
+    codegen_symbol env ref;
+    ps env ")"
+
   | NewArray len ->
     ps env "LCNewArrayLen(rt, ";
     ps env (Int.to_string len);

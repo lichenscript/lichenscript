@@ -102,6 +102,7 @@ and Expr : sig
   | NewLambda of (string * symbol array)
   | NewBoolean of bool
   | NewRef of t
+  | GetRef of symbol
   | NewArray of int
   | ArraySetValue of (symbol * int * t)
   | I32Binary of Asttypes.BinaryOp.t * t * t

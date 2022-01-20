@@ -65,6 +65,14 @@ let find_variable env name =
   let scope = env.scope in
   find_in_scope scope
 
+let should_var_captured variable =
+  if !(variable.var_captured) then (
+    match variable.var_kind with
+    | Pvar_let -> true
+    | _ -> false
+  ) else
+    false
+
 type expr_result = {
   prepend_stmts: C_op.Stmt.t list;
   expr: C_op.Expr.t;
@@ -314,15 +322,6 @@ and transform_statement ?ret env stmt =
 
     let scope = env.scope in
 
-    let should_var_captured variable =
-      if !(variable.var_captured) then (
-        match variable.var_kind with
-        | Pvar_let -> true
-        | _ -> false
-      ) else
-        false
-    in
-
     let variable = Option.value_exn ((Option.value_exn scope.raw)#find_var_symbol original_name) in
 
     let name = Hashtbl.find_exn scope.name_map original_name in
@@ -437,8 +436,13 @@ and transform_expression env expr =
     )
 
     | Identifier (name, _) -> (
+      let variable_opt = (Option.value_exn env.scope.raw)#find_var_symbol name in
+      let variable = Option.value_exn variable_opt in
       let sym = find_variable env name in
-      C_op.Expr.Ident sym
+      if should_var_captured variable then (
+        C_op.Expr.GetRef sym
+      ) else
+        C_op.Expr.Ident sym
     )
 
     | Lambda lambda_content -> (

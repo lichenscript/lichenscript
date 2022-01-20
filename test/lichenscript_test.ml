@@ -158,6 +158,11 @@ and print_statistics env =
       )
     )
     env.suites;
+  if env.error_files = 0 then
+    Format.printf "%s[DONE]%s " TermColor.green TermColor.reset
+  else
+    Format.printf "%s[FAILED]%s " TermColor.green TermColor.reset
+  ;
   Format.printf "Totally: %d, finished: %d, failed: %d\n" env.totoal_files env.finished_files env.error_files
 
 and diff_stdout env suite =
@@ -172,9 +177,10 @@ and diff_stdout env suite =
       Format.printf "%s[TEST]%s %s\n" TermColor.green TermColor.reset suite.test_file;
       env.finished_files <- env.finished_files + 1
     ) else (
-      Format.printf "%s[Failed]%s %s" TermColor.red TermColor.reset suite.test_file;
-      Format.printf "Expect: %s" expect_file_content;
-      Format.printf "Actual: %s" std_out_content;
+      Format.printf "%s[ERROR]%s %s\n" TermColor.red TermColor.reset suite.test_file;
+      Format.printf "Expect:\n%s" expect_file_content;
+      Format.printf "Actual:\n%s" std_out_content;
+      env.error_files <- env.error_files + 1
     )
   ) else (
     Format.printf "%s[TEST]%s %s\n" TermColor.green TermColor.reset suite.test_file;

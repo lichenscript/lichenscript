@@ -1,3 +1,3 @@
-(test
+(executable
  (name lichenscript_test)
  (libraries core lichenscript_common))
