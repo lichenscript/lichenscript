@@ -143,11 +143,9 @@ and print_statistics env =
     ~f:(fun suite ->
       let _exit = Unix.waitpid suite.pid in
       match _exit with
-      | Ok _ -> (
-        Format.printf "%s[TEST]%s %s: \n" TermColor.green TermColor.reset suite.test_file;
-        Format.printf "%s" (Buffer.contents suite.stdout_buffer);
-        env.finished_files <- env.finished_files + 1
-      )
+      | Ok _ ->
+        diff_stdout env suite
+
       | Error (`Signal _ex) -> (
         Format.printf "%sFailed test:%s %s: \n" TermColor.red TermColor.reset suite.test_file;
         Format.printf "%s" (Buffer.contents suite.stdout_buffer);
@@ -161,6 +159,29 @@ and print_statistics env =
     )
     env.suites;
   Format.printf "Totally: %d, finished: %d, failed: %d\n" env.totoal_files env.finished_files env.error_files
+
+and diff_stdout env suite =
+  let std_out_content = Buffer.contents suite.stdout_buffer in
+
+  let dirname = Filename.dirname suite.test_file in
+  let expect_file = Filename.concat dirname "expect.txt" in
+
+  if Sys.is_file_exn expect_file then (
+    let expect_file_content = In_channel.read_all expect_file in
+    if String.equal expect_file_content std_out_content then (
+      Format.printf "%s[TEST]%s %s\n" TermColor.green TermColor.reset suite.test_file;
+      env.finished_files <- env.finished_files + 1
+    ) else (
+      Format.printf "%s[Failed]%s %s" TermColor.red TermColor.reset suite.test_file;
+      Format.printf "Expect: %s" expect_file_content;
+      Format.printf "Actual: %s" std_out_content;
+    )
+  ) else (
+    Format.printf "%s[TEST]%s %s\n" TermColor.green TermColor.reset suite.test_file;
+    Format.printf "%s" std_out_content;
+    env.finished_files <- env.finished_files + 1
+  )
+
 
 (*
  * Traverse the test_dir, findout all the .lc files
