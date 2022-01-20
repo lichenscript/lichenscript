@@ -296,6 +296,7 @@ and write_to_file build_dir mod_name content: string =
 and write_makefiles ~bin_name ~runtime_dir build_dir mods =
   let output_path = Filename.concat build_dir "Makefile" in
   let open Makefile in
+  let runtime_dir = Filename.concat runtime_dir "c" in
   let c_srcs = List.fold ~init:"runtime.o" ~f:(fun acc (m, _) -> (acc ^ " " ^ m ^ ".o")) mods in
   let entries = List.concat [
     [
