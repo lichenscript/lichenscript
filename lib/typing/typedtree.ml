@@ -81,6 +81,8 @@ module%gen rec Expression : sig
     | Block of Block.t
     | Init of init
     | Match of _match
+    | This
+    | Super
 
   and call = {
     callee: t;
@@ -151,8 +153,8 @@ and Function : sig
   }
 
   and header = {
-    id: int;
-    name: string;
+    name: (string * int);
+    name_loc: Loc.t;  (* used for sourcemap *)
     params: params;
   }
 

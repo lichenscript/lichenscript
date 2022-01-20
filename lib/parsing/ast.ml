@@ -97,6 +97,8 @@ and Expression : sig
     | Block of Block.t
     | Init of init
     | Match of _match
+    | This
+    | Super
 
   and t = {
     spec: spec;

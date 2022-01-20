@@ -550,6 +550,9 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       })
     )
 
+    | This
+    | Super -> failwith "not implemented this"
+
   in
   { T.Expression.
     spec;
@@ -668,8 +671,8 @@ and annotate_declaration env decl : T.Declaration.t =
 
         let header = {
           T.Function.
-          id = ty_id;
-          name = Identifier.(id.pident_name);
+          name = (Identifier.(id.pident_name), ty_id);
+          name_loc= Identifier.(id.pident_loc) ;
           params;
         } in
 
@@ -1151,8 +1154,8 @@ and annotate_function env fun_ =
     };
     { T.Function.
       header = {
-        id = fun_id;
-        name = header.id.pident_name;
+        name = (header.id.pident_name, fun_id);
+        name_loc = header.id.pident_loc;
         params;
       };
       scope = fun_scope;

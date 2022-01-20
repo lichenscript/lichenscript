@@ -1283,6 +1283,14 @@ and parse_primary_expression env : Expression.t =
           continue_parse_body match_expr
       )
 
+      | Token.T_THIS ->
+        Eat.token env;
+        This
+
+      | Token.T_SUPER ->
+        Eat.token env;
+        Super
+
       | _ ->
         let tok = Token.token_to_string next in
         let lex_error = Lichenscript_lex.Lex_error.Unexpected tok in

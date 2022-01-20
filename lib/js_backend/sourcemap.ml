@@ -64,7 +64,7 @@ class sourcemap_generator = object
   val buffer = Buffer.create 1024
 
   method add_location after_col file_id before_line before_col =
-    if file_id < 0 then false
+    if file_id < 0 then ()
     else (
       generate_vlq_str
         buffer
@@ -77,8 +77,6 @@ class sourcemap_generator = object
       _file_index <- file_id;
       _before_line <- before_line;
       _before_col <- before_col;
-
-      true
     )
       
 

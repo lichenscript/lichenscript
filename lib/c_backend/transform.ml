@@ -130,7 +130,7 @@ and distribute_name env name =
 and transform_function env _fun =
   let open Function in
   let { body; comments; header; scope; _ } = _fun in
-  let original_name = header.name in
+  let original_name, _ = header.name in
 
   env.current_fun_name <- Some original_name;
 
@@ -693,6 +693,8 @@ and transform_expression env expr =
 
       C_op.Expr.Temp result_tmp
     )
+
+    | _ -> failwith "not implemented"
 
   in
   {
