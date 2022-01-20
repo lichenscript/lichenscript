@@ -212,9 +212,23 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       )
     )
 
-    | If _
-    | Array _  ->
+    | If _ ->
       -1, failwith "not implemented"
+
+    | Array arr_list  -> (
+      let a_list = List.map ~f:(annotate_expression ~prev_deps env) arr_list in
+      let deps = List.map ~f:(fun expr -> expr.ty_var) a_list in
+
+      let ty_var = Type_context.new_id (Env.ctx env) {
+        value = TypeExpr.Unknown;
+        loc;
+        deps;
+        (* TODO: check expression *)
+        check = none;
+      } in
+
+      ty_var, (T.Expression.Array a_list)
+    )
 
     | Call call -> (
       let { callee; call_params; call_loc } = call in

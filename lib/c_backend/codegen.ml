@@ -325,6 +325,21 @@ and codegen_expression (env: t) (expr: Expr.t) =
     codegen_expression env expr;
     ps env ")"
 
+  | NewArray len ->
+    ps env "LCNewArrayLen(rt, ";
+    ps env (Int.to_string len);
+    ps env ")"
+
+  | ArraySetValue (sym, index, value) -> (
+    ps env "LCArraySetValue(rt, ";
+    codegen_symbol env sym;
+    ps env ", ";
+    ps env (Int.to_string index);
+    ps env ", ";
+    codegen_expression env value;
+    ps env ")";
+  )
+
   | Ident value -> codegen_symbol env value
 
   | ExternalCall (fun_name, params) -> (

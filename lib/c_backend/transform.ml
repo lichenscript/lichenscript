@@ -470,8 +470,63 @@ and transform_expression env expr =
       auto_release_expr env ~prepend_stmts ~append_stmts tmp
     )
 
-    | If _
-    | Array _ -> failwith "n1"
+    | If _ -> failwith "n2"
+
+    | Array arr_list -> (
+      let tmp_id = env.tmp_vars_count in
+      env.tmp_vars_count <- env.tmp_vars_count + 1;
+      let arr_len = List.length arr_list in
+
+      let tmp_sym = C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]") in
+
+      let init_stmt = {
+        C_op.Stmt.
+        spec = Expr {
+          C_op.Expr.
+          spec = Assign(tmp_sym, {
+            C_op.Expr.
+            spec = NewArray arr_len;
+            loc = Loc.none;
+          });
+          loc = Loc.none;
+        };
+        loc = Loc.none;
+      } in
+
+      let inits_exprs = List.map ~f:(transform_expression env) arr_list in
+
+      let init_prepends = List.map ~f:(fun e -> e.prepend_stmts) inits_exprs in
+      let init_appends = List.map ~f:(fun e -> e.append_stmts) inits_exprs in
+
+      let init_stmts =
+        List.mapi
+        ~f:(fun index expr ->
+          { C_op.Stmt.
+            spec = Expr { C_op.Expr.
+              spec = ArraySetValue(tmp_sym, index, expr.expr);
+              loc = Loc.none;
+            };
+            loc = Loc.none;
+          }
+        )
+        inits_exprs
+      in
+
+      prepend_stmts := List.concat [
+        !prepend_stmts;
+        List.concat init_prepends;
+        [init_stmt];
+        init_stmts;
+      ];
+
+      append_stmts := List.concat [
+        [ gen_release_temp tmp_id ];
+        !append_stmts;
+        List.concat init_appends;
+      ];
+
+      C_op.Expr.Temp tmp_id
+    )
 
     | Call call -> (
       let open Expression in

@@ -435,14 +435,25 @@ LCValue LCNewArray(LCRuntime* rt) {
     return (LCValue) { { .ptr_val = (LCObject*)arr },  LC_TY_ARRAY };
 }
 
-/**
- * find the nearest number of times of 8
- */
 LCValue LCNewArrayLen(LCRuntime* rt, size_t size) {
-    size_t remain = size % 8;
-    LCArray* arr = LCNewArrayWithCap(rt, size + (8 - remain));
+    size_t cap = size;
+    if (cap > 2 &&  cap % 2 != 0) {
+        cap += 1;
+    }
+    LCArray* arr = LCNewArrayWithCap(rt, cap);
     arr->len = size;
     return (LCValue) { { .ptr_val = (LCObject*)arr },  LC_TY_ARRAY };
+}
+
+void LCArraySetValue(LCRuntime* rt, LCValue this, int index, LCValue value) {
+    LCArray* arr = (LCArray*)this.ptr_val;
+    if (index >= arr->len) {
+        fprintf(stderr, "[LichenScript] index %d out of range, size: %d", index, arr->len);
+        abort();
+    }
+    LCRelease(rt, arr->data[index]);
+    LCRetain(value);
+    arr->data[index] = value;
 }
 
 LCValue LCNewSymbol(LCRuntime* rt, const char* content) {
