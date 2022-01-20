@@ -1,0 +1,4 @@
+(library
+ (name lichenscript_common)
+ (libraries core)
+)

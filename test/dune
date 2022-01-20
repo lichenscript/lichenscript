@@ -1,9 +1,3 @@
 (test
  (name lichenscript_test)
- (libraries
-  lichenscript_lex
-  lichenscript_parsing
-  lichenscript_typing
-  lichenscript_c
-  core
-  ounit2))
+ (libraries core lichenscript_common))

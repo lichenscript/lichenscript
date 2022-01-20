@@ -1,5 +1,5 @@
 open Core
-open Lichenscript_lex
+(* open Lichenscript_lex
 open Lichenscript_parsing
 open Lichenscript_typing
 
@@ -61,4 +61,4 @@ let parse_string_and_codegen content =
   let slices = String.split path ~on:'/' in
   let output_filename = List.last_exn slices in
   let env = Codegen_env.create ~output_filename config p in
-  Codegen.codegen_binary env path *)
+  Codegen.codegen_binary env path *) *)

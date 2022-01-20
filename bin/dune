@@ -7,4 +7,5 @@
   lichenscript_typing
   lichenscript_c
   lichenscript_resolver
+  lichenscript_common
   core))

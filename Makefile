@@ -31,5 +31,9 @@ lambda: compiler
 	./_build/default/bin/main.exe run ./examples/lambda/main.wt \
 		$(FLAGS) -D ./_build_wt/lambda
 
+tests: compiler
+	_build/default/test/lichenscript_test.exe ./examples -C ./_build/default/bin/main.exe \
+		-- $(FLAGS)
+
 compiler:
 	dune build

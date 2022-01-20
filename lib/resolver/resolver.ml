@@ -167,10 +167,13 @@ and parse_module_by_dir ~ctx env dir_path : string option =
       ~f:(fun item ->
         let child_path = Filename.concat mod_path item in
         if Sys.is_file_exn child_path then (
-          let test_result = Re.exec allow_suffix child_path |> Re.Group.all in
-          if Array.length test_result > 1 then ((* is a .lc file *)
-            compile_file_to_path ~ctx ~mod_path env child_path
-          )
+          try
+            let test_result = Re.exec allow_suffix child_path |> Re.Group.all in
+            if Array.length test_result > 1 then ((* is a .lc file *)
+              compile_file_to_path ~ctx ~mod_path env child_path
+            )
+          with
+          | _ -> ()
         ) else ()
       )
       children;
