@@ -29,6 +29,7 @@ wtc build <entry> [<args>]
   --std <dir>           Specify the directorey of std library.
                         If this is not passed, use the builtin version.
   --platform <platform> native/wasm/js, default: native
+  --debug               Enable debug message
   -h, --help            Show help message
 
 |}
@@ -68,6 +69,7 @@ and build_command args index : string option =
     let std = ref None in
     let buildDir = ref None in
     let runtimeDir = ref None in
+    let debug = ref false in
     let platform = ref "native" in
     let baseDir = ref Filename.current_dir_name in
     while !index < (Array.length args) do
@@ -77,6 +79,9 @@ and build_command args index : string option =
       | "-h" | "--help" ->
         Format.printf "%s" build_help_message;
         ignore (exit 0)
+
+      | "--debug" ->
+        debug := true
 
       | "--std" -> (
         if !index >= (Array.length args) then (
@@ -132,9 +137,9 @@ and build_command args index : string option =
       ignore (exit 1);
       None
     ) else 
-      build_entry (Option.value_exn !entry) !std !buildDir !runtimeDir
+      build_entry (Option.value_exn !entry) !std !buildDir !runtimeDir !debug
 
-and build_entry (entry: string) std_dir build_dir runtime_dir: string option =
+and build_entry (entry: string) std_dir build_dir runtime_dir debug: string option =
   let open Resolver in
   if Option.is_none std_dir then (
     Format.printf "std library is not found\n";
@@ -145,10 +150,16 @@ and build_entry (entry: string) std_dir build_dir runtime_dir: string option =
     ignore (exit 1)
   );
   try
-    let build_dir, result = Resolver.compile_file_path ~std_dir ~build_dir ~runtime_dir entry in
+    let entry_full_path = Filename.realpath entry in
+    let build_dir, result = Resolver.compile_file_path ~std_dir ~build_dir ~runtime_dir ~debug entry_full_path in
     run_make_in_dir build_dir;
     result
   with
+    | Unix.Unix_error (_, err, err_s) -> (
+      Format.printf "Failed: %s: %s %s\n" entry err err_s;
+      None
+    )
+
     | TypeCheckError errors ->
       List.iter
         ~f:(fun err ->

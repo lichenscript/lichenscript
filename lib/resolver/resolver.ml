@@ -194,7 +194,10 @@ let annotate_all_modules env =
         List.map
           ~f:(fun file -> 
             let { Module. typed_env; ast; _ } = file in
-            let typed_tree = Lichenscript_typing.Annotate.annotate_program typed_env (Option.value_exn ast) in
+            let typed_tree =
+              Lichenscript_typing.Annotate.annotate_program
+              typed_env (Option.value_exn ast)
+            in
             { file with
               (* clear the ast to released memory,
                * but don't know if there are other references
@@ -209,23 +212,23 @@ let annotate_all_modules env =
     )
     env.linker
 
-let typecheck_all_modules ~ctx env =
+let typecheck_all_modules ~ctx ~debug env =
   annotate_all_modules env;
-  let errors = Typecheck.type_check ctx in
+  let errors = Typecheck.type_check ctx ~debug () in
   if (List.length errors) > 0 then (
     raise (TypeCheckError errors)
   )
 
 (*
- * 1. parse all files with .wt of find path
- * 2. parse all program files with .wt of find path
+ * 1. parse all in the entry dir
+ * 2. annotate all files
  * 3. type check one by one
  *
  * All the files should be annotated before type check,
  * because cyclic dependencies is allowed.
  * Annotated parsed tree remain the "holes" to type check
  *)
-let rec compile_file_path ~std_dir ~build_dir ~runtime_dir entry_file_path =
+let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~debug entry_file_path =
   if Option.is_none std_dir then (
     Format.printf "std library is not found\n";
     ignore (exit 1)
@@ -243,11 +246,9 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir entry_file_path =
     let dir_of_entry = Filename.dirname entry_file_path in
     let entry_full_path = parse_module_by_dir ~ctx env dir_of_entry in
 
-    typecheck_all_modules ~ctx env;
+    typecheck_all_modules ~ctx ~debug env;
 
     (* open std.preclude to module scope *)
-    (* let content = In_channel.read_all entry_file_path in
-    let file_key = File_key.SourceFile entry_file_path in *)
 
     let main_mod = Option.value_exn (Linker.get_module env.linker (Option.value_exn entry_full_path)) in
     let file = List.hd_exn (Module.files main_mod) in
@@ -259,9 +260,8 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir entry_file_path =
       Format.printf "main function is not found, nothing to output";
       ignore (exit 0)
     );
-    (* TODO: check type is a function *)
 
-    let declarations = Linker.link_from_entry env.linker (Option.value_exn main_fun_id) in
+    let declarations = Linker.link_from_entry env.linker ~debug (Option.value_exn main_fun_id) in
 
     let output = Lichenscript_c.codegen ~ctx declarations in
     let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in

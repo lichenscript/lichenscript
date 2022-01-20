@@ -2,168 +2,6 @@
 open Core
 open Lichenscript_common.Cli_utils
 
-(* let temp_dir_name = "/tmp/test_waterlang/"
-
-let test_parser _ =
-  let result =  Parser.parse_string None "
-
-  @external(\"env\", \"console_log\")
-  declare function print(content: string);
-
-  class Array {
-
-    private __name: sring;
-
-    public static New() {
-
-    }
-
-  }
-
-  enum Result {
-    Ok,
-    Error,
-  }
-
-  @export
-  function main(args, args2: string, ...rest) {
-    let name = 3;
-    name = 4;
-  }
-  " in
-  match result with
-  | Result.Ok _program ->
-    (* Ast.pp_program Format.std_formatter program; *)
-    (* let _env = Lichenscript_typing.Env.create () in *)
-    (* let program = Lichenscript_typing.Annotate.annotate env program in
-    Lichenscript_typing.Typecheck.type_check env program; *)
-    assert true
-
-  | Result.Error errs ->
-    errs
-    |> List.rev
-    |> List.iter
-       (fun error ->
-         let str = Format.asprintf "%a" Parse_error.PP.error error in
-         let { Loc. line; column; } = error.perr_loc.start in
-         Format.printf "%d:%d %s\n" line column str;
-        );
-    assert false
-
-let test_codegen _ =
-  let source = "
-    function main(a: i32, b: i32): i32 {
-      return a + b;
-    }
-    "
-  in
-  let result = Utils.parse_string_and_codegen source in
-  Format.printf "%s" result
-
-let test_codegen_binary _ =
-  let source = "
-    @export
-    function main(a: i32, b: i32): i32 {
-      return a + b;
-    }
-    "
-  in
-  let result = Utils.parse_string_and_codegen source in
-  Format.printf "%s" result
-
-let test_type_checking _ =
-  let source = "
-    function main(a: i32, b: i32): f32 {
-      return a + b;
-    }
-    "
-  in
-  assert_raises
-    (Utils.ExpectedError "Error: 3:17 Type 'i32' can not be returned because 'f32' is expected")
-    (fun _ ->
-      Utils.parse_string_and_codegen source
-    )
-
-let test_function_call _ =
-  let source = "
-    function add(a: i32, b: i32): i32 {
-      return a + b;
-    }
-
-    function main(a: i32, b: i32): i32 {
-      return add(a, b);
-    }
-    "
-  in
-  let result = Utils.parse_string_and_codegen source in
-  Format.printf "%s" result
-
-let test_string _ =
-  let source = "
-    @external(\"env\", \"console_log\")
-    declare function print(content: string)
-
-    function main() {
-      let a: string = \"Hello World!\";
-      print(a);
-    }
-  "
-  in
-  let result = Utils.parse_string_and_codegen source in
-  Format.printf "%s" result;
-  ()
-
-  (* Core.Unix.mkdir_p temp_dir_name;
-  let test_output_name = temp_dir_name ^ "test_wtl" in
-  Format.printf "output name: %s" test_output_name;
-  let _result = Utils.parse_string_and_codegen source in
-  let in_chan = Core.Unix.open_process_in ("node " ^ test_output_name ^ ".js" ) in
-  let r = Core.In_channel.input_all in_chan in
-  Core.In_channel.close in_chan;
-  assert_equal r "Hello World!\n" *)
-
-let test_assignment _ =
-  let source = "
-    @external(\"env\", \"console_log\")
-    declare function print(content: string)
-
-    function main() {
-      let name: string = \"Hi\";
-      let counter: i32 = 0;
-      while 1 {
-        if counter > 10 {
-          break;
-        } else {
-          print(name);
-          counter = counter + 1;
-        }
-      }
-    }
-  "
-  in
-  (* let result = Utils.parse_string_and_codegen source in
-  Format.printf "%s" result *)
-  Core.Unix.mkdir_p temp_dir_name;
-  let test_output_name = temp_dir_name ^ "test_wtl_2" in
-  Format.printf "output name: %s" test_output_name;
-  let _result = Utils.parse_string_and_codegen source in
-  let in_chan = Core.Unix.open_process_in ("node " ^ test_output_name ^ ".js" ) in
-  let r = Core.In_channel.input_all in_chan in
-  Core.In_channel.close in_chan;
-  print_string r
-
-let suite =
-  "TestParser" >::: [
-    "test_parser" >:: test_parser;
-    "test_codegen" >:: test_codegen;
-    "test_codegen_binary" >:: test_codegen_binary;
-    "test_type_checking" >:: test_type_checking;
-    (* "test_function_call" >:: test_function_call;
-    "test_string" >:: test_string; *)
-
-    (* "test_assignment" >:: test_assignment; *)
-  ] *)
-
 type test_suite = {
   mutable stdout:        Core.Unix.File_descr.t option;
   pid:           Pid.t;
@@ -195,6 +33,7 @@ Test suite for LichenScript, usage:
 
 lichencscript_test <dirs> -- <rest>
 
+  -N, --name        Only run the test matched the name
   -C, --compiler    The path of the compiler
 
 |}
@@ -203,6 +42,7 @@ let rec main () =
   let index = ref 1 in
   let args = Sys.get_argv () in
   let compiler_path = ref "" in
+  let suite_name = ref None in
   let rest_args = ref [||] in
 
   let test_dir = Array.get args !index in
@@ -222,6 +62,16 @@ let rec main () =
         index := !index + 1
       end
 
+    | "-N" | "--name" ->
+      begin
+        if !index >= (Array.length args) then (
+          Format.printf "not enough args for %s\n" item;
+          ignore (exit 1)
+        );
+        suite_name := Some (Array.get args !index);
+        index := !index + 1
+      end
+
     | "--" -> (
       let length = Array.length args in
       rest_args := Array.slice args !index length;
@@ -235,7 +85,7 @@ let rec main () =
   done;
   let env = create  ~compiler_path:!compiler_path ~rest_args:!rest_args () in
   let full_path = Filename.realpath test_dir in
-  run_test_in_dir env full_path;
+  run_test_in_dir env ?name:!suite_name full_path;
   receive_all_messages env
 
 and remove_suite_by_fd env fd =
@@ -315,15 +165,25 @@ and print_statistics env =
 (*
  * Traverse the test_dir, findout all the .lc files
  *)
-and run_test_in_dir env test_dir =
+and run_test_in_dir env ?name test_dir =
   let filenames = Sys.ls_dir test_dir in
   List.iter
     ~f:(fun filename ->
       let child_path = Filename.concat test_dir filename in
       if Sys.is_directory_exn child_path then
-        run_test_in_dir env child_path
+        run_test_in_dir ?name env child_path
       else if (String.equal filename "main.lc") then (
-        run_test_for_file env child_path
+        let child_path_parts = Filename.parts test_dir in
+        let last_slice = List.last_exn child_path_parts in
+        match name with
+        | Some name ->
+          if String.equal last_slice name then
+            run_test_for_file env child_path
+          else ()
+
+        | _ ->
+          run_test_for_file env child_path
+
       ) else ()
     )
     filenames
@@ -331,10 +191,16 @@ and run_test_in_dir env test_dir =
 and run_test_for_file env test_file =
   env.totoal_files <- env.totoal_files + 1;
 
+  let dirname = Filename.dirname test_file in
+  let dirname_slices = Filename.parts dirname in
+  let dirname = List.last_exn dirname_slices in
+  let test_dir = Filename.concat "_test" dirname in
+  Unix.mkdir_p test_dir;
+
   let args = List.concat [
     [ env.compiler_path; "run"; test_file ];
-    [ "--" ];
     Array.to_list env.rest_args;
+    [ "-D"; test_dir ]
   ] in
 
   Out_channel.printf "Run test: %s\n" test_file;

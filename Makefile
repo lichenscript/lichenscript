@@ -4,7 +4,7 @@ FLAGS = --std ./std -R ./runtime --base ./examples
 hello_world: compiler
 	rm -rf ./_build_wt/hello_world
 	mkdir -p ./_build_wt/hello_world
-	./_build/default/bin/main.exe run ./examples/hello_world/main.wt \
+	./_build/default/bin/main.exe run ./examples/hello_world/main.lc \
 		$(FLAGS) -D ./_build_wt/hello_world
 
 fibonacci: compiler
@@ -30,10 +30,6 @@ lambda: compiler
 	mkdir -p ./_build_wt/lambda
 	./_build/default/bin/main.exe run ./examples/lambda/main.wt \
 		$(FLAGS) -D ./_build_wt/lambda
-
-tests: compiler
-	_build/default/test/lichenscript_test.exe ./examples -C ./_build/default/bin/main.exe \
-		-- $(FLAGS)
 
 compiler:
 	dune build

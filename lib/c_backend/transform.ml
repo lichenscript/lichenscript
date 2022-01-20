@@ -31,6 +31,12 @@ type t = {
   mutable main_function_name: string option;
   mutable class_inits: C_op.Decl.class_init list;
 
+  (*
+   * Some variables are local, but some are global,
+   * such as a method of a class, the contructor of enum, etc
+   *)
+  global_name_map: (int, C_op.symbol) Hashtbl.t;
+
   (* for lambda generation *)
   mutable current_fun_name: string option;
   mutable lambdas: C_op.Decl.t list;
@@ -65,15 +71,19 @@ type expr_result = {
   append_stmts: C_op.Stmt.t list;
 }
 
-let create ctx = {
-  ctx;
-  scope = create_transform_scope None;
-  tmp_vars_count = 0;
-  main_function_name = None;
-  class_inits = [];
-  current_fun_name = None;
-  lambdas = [];
-}
+let create ctx =
+  let scope = create_transform_scope None in
+  let global_name_map = Hashtbl.create (module Int) in
+  {
+    ctx;
+    scope;
+    tmp_vars_count = 0;
+    main_function_name = None;
+    class_inits = [];
+    global_name_map;
+    current_fun_name = None;
+    lambdas = [];
+  }
 
 let preserved_name = [| "ret"; "rt"; "this"; "argc"; "argv"; "t" |]
 
@@ -465,7 +475,7 @@ and transform_expression env expr =
 
     | Call call -> (
       let open Expression in
-      let current_scope = env.scope in
+      (* let current_scope = env.scope in *)
       let { callee; call_params; _ } = call in
       match callee with
       | { spec = Identifier (_, id); _ } -> (
@@ -508,9 +518,9 @@ and transform_expression env expr =
       | _ -> (
         let ty_id = callee.ty_var in
         let ctor_opt = Check_helper.find_construct_of env.ctx ty_id in
-        let ctor_name, _ctor_ty_id = Option.value_exn ctor_opt in
-        let name = Hashtbl.find_exn current_scope.name_map ctor_name.name in
-        C_op.Expr.ExternalCall(name, [])
+        let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
+        let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
+        C_op.Expr.ExternalCall(global_name, [])
       )
     )
 
@@ -678,9 +688,11 @@ and transform_pattern_to_test env match_expr pat =
 and transform_class env cls: C_op.Decl.spec list =
   let open Declaration in
   let { cls_id; cls_body; _ } = cls in
-  let original_name, _ = cls_id in
+  let original_name, cls_name_id = cls_id in
   let fun_name = distribute_name env original_name in
   let finalizer_name = fun_name ^ "_finalizer" in
+
+  Hashtbl.set env.global_name_map ~key:cls_name_id ~data:(SymLocal fun_name);
 
   let properties =
     List.fold
@@ -704,9 +716,12 @@ and transform_class env cls: C_op.Decl.spec list =
         | Cls_method _method -> (
           let { cls_method_name; cls_method_params; cls_method_body; cls_method_scope; _ } = _method in
           (* let fun_name = distribute_name env cls_method_name in *)
-          let origin_method_name, _method_id = cls_method_name in
+          let origin_method_name, method_id = cls_method_name in
           let new_name = original_name ^ "_" ^ origin_method_name in
           let new_name = distribute_name env new_name in
+
+          Hashtbl.set env.global_name_map ~key:method_id ~data:(SymLocal new_name);
+
           let _fun =
             transform_function_impl
               env

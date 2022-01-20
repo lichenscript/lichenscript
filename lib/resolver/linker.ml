@@ -24,7 +24,7 @@ let create ~ctx () =
     top_level_deps;
   }
 
-let link_from_entry env entry =
+let link_from_entry env ~debug entry =
   let reach_nodes = Array.create ~len:(ResizableArray.size env.ctx.ty_map) false in
 
   let orders = ref [] in
@@ -50,12 +50,14 @@ let link_from_entry env entry =
 
   iterate_node entry;
 
-  Format.printf "- entry %d\n" entry;
-  List.iteri
-    ~f:(fun index id ->
-      Format.printf "- %d: %d\n" index id
-    )
-    (List.rev !orders);
+  if debug then (
+    Format.eprintf "- entry %d\n" entry;
+    List.iteri
+      ~f:(fun index id ->
+        Format.printf "- %d: %d\n" index id
+      )
+      (List.rev !orders)
+  );
 
   let declarations =
     List.fold

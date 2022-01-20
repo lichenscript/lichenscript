@@ -5,7 +5,7 @@ open Core_kernel
 
 module IntHash = Hashtbl.Make(Int)
 
-let type_check ctx =
+let type_check ctx ?(debug=false) () =
   let size = Type_context.size ctx in
   let visited_mark = Array.create ~len:size false in
   let reversed_map = Array.create ~len:size [] in
@@ -68,11 +68,10 @@ let type_check ctx =
   (try
     List.iter ~f:iterate_node !no_deps;
   with
-  | e -> 
-    Type_context.print ctx;
+  | e -> (
+    if debug then
+      Type_context.print ctx
+    );
     raise e
   );
-  (* only for debug *)
-  Type_context.print ctx;
-
   []
