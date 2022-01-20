@@ -183,16 +183,60 @@ and build_entry (entry: string) std_dir build_dir runtime_dir debug: string opti
       None
 
 and run_make_in_dir build_dir =
-  Out_channel.printf "Spawn to build in %s\n" (TermColor.bold ^ build_dir ^ TermColor.reset);
+  (* Out_channel.printf "Spawn to build in %s\n" (TermColor.bold ^ build_dir ^ TermColor.reset); *)
   Out_channel.flush Out_channel.stdout;
   Out_channel.flush Out_channel.stderr;
+
+  let pipe_read, pipe_write = Unix.pipe () in
   match Unix.fork () with
   | `In_the_child -> 
+    Unix.dup2 ~src:pipe_write ~dst:Unix.stdout ();
+
+    Unix.close pipe_read;
+    Unix.close pipe_write;
+
     Unix.chdir build_dir;
     Unix.exec ~prog:"make" ~argv:["make";] () |> ignore
 
-  | `In_the_parent pid ->
-    ignore (Unix.waitpid pid)
+  | `In_the_parent pid -> (
+    Unix.close pipe_write;
+
+    let std_out_content = read_all_into_buffer pipe_read in
+
+    let result = Unix.waitpid pid in
+
+    match result with
+    | Ok _ -> ()
+    | Error _ -> Out_channel.print_string std_out_content
+  )
+
+and read_all_into_buffer pipe =
+  let buffer = Buffer.create 1024 in
+
+  let rec handle_message fd =
+    try
+      let content_bytes = Bytes.make 1024 (Char.of_int_exn 0) in
+      let read_bytes = Unix.read ~len:1024 ~buf:content_bytes fd in
+
+      if read_bytes = 0 then (
+        ()
+      ) else (
+        Buffer.add_subbytes buffer content_bytes ~pos:0 ~len:read_bytes;
+        handle_message fd
+      )
+    with exn -> 
+      match exn with
+      | Stdlib.End_of_file ->
+        ()
+
+      | _->
+        ()
+
+  in
+
+  handle_message pipe;
+
+  Buffer.contents buffer
 
 and print_loc_title ~prefix loc_opt =
   Loc. (

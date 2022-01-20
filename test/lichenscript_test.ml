@@ -144,7 +144,7 @@ and print_statistics env =
       let _exit = Unix.waitpid suite.pid in
       match _exit with
       | Ok _ -> (
-        Format.printf "Test: %s: \n" suite.test_file;
+        Format.printf "%s[TEST]%s %s: \n" TermColor.green TermColor.reset suite.test_file;
         Format.printf "%s" (Buffer.contents suite.stdout_buffer);
         env.finished_files <- env.finished_files + 1
       )
