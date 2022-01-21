@@ -1,0 +1,9 @@
+
+enum A {
+	case a
+	case b
+}
+
+function main() {
+
+}

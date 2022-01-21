@@ -167,13 +167,13 @@ and parse_module_by_dir ~ctx env dir_path : string option =
       ~f:(fun item ->
         let child_path = Filename.concat mod_path item in
         if Sys.is_file_exn child_path then (
-          try
+          try[@alert "-deprecated"]  (* disable the deprecated alert *)
             let test_result = Re.exec allow_suffix child_path |> Re.Group.all in
             if Array.length test_result > 1 then ((* is a .lc file *)
               compile_file_to_path ~ctx ~mod_path env child_path
             )
           with
-          | _ -> ()
+          | Not_found -> ()
         ) else ()
       )
       children;
@@ -251,6 +251,10 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~debug entry_file_pat
     (* open std.preclude to module scope *)
 
     let main_mod = Option.value_exn (Linker.get_module env.linker (Option.value_exn entry_full_path)) in
+    if List.is_empty (Module.files main_mod) then (
+      Format.printf "No files should be compiled\n";
+      ignore (exit 0)
+    );
     let file = List.hd_exn (Module.files main_mod) in
     
     let typed_tree: Typedtree.program = Option.value_exn Module.(file.typed_tree) in
