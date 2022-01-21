@@ -474,7 +474,24 @@ and transform_expression env expr =
       auto_release_expr env ~prepend_stmts ~append_stmts tmp
     )
 
-    | If _ -> failwith "n2"
+    | If if_desc -> (
+      let tmp_id = env.tmp_vars_count in
+      env.tmp_vars_count <- env.tmp_vars_count + 1;
+
+      let test = transform_expression env if_desc.if_test in
+
+      let consequent = transform_block ~ret_id:tmp_id env if_desc.if_consequent in
+      
+      let tmp_stmt = { C_op.Stmt.
+        spec = If (test.expr, consequent);
+        loc;
+      } in
+
+      prepend_stmts := List.concat [!prepend_stmts; test.prepend_stmts; [tmp_stmt]];
+      append_stmts := List.append test.append_stmts !append_stmts;
+
+      C_op.Expr.Temp tmp_id
+    )
 
     | Array arr_list -> (
       let tmp_id = env.tmp_vars_count in
@@ -597,7 +614,21 @@ and transform_expression env expr =
     )
 
     | Update _ -> failwith "update"
-    | Assign ((name, _), expr) -> (
+
+    (*
+     * There are a lot of cases of assignment.
+     *
+     * 1. Assign to an identifier: a = <expr>
+     *   - local variable
+     *   - local RefCel
+     *   - captured const
+     *   - captured refcell
+     * 2. Assign to a member: <expr>.xxx = <expr>
+     *   - property of a class
+     *   - setter of a class
+     *   - Assign to this property: this.xxx = expr
+     *)
+    | Assign (_, (name, _), expr) -> (
       let name = find_variable env name in
       let expr' = transform_expression env expr in
 
@@ -669,9 +700,8 @@ and transform_expression env expr =
             !prepend_stmts
             [{
               C_op.Stmt.
-              spec = If (test_expr, {
-                C_op.Block.
-                body = List.concat [
+              spec = If (test_expr,
+                List.concat [
                   body.prepend_stmts;
                   [{ C_op.Stmt.
                     spec = Expr {
@@ -681,9 +711,8 @@ and transform_expression env expr =
                     loc = Loc.none;
                   }];
                   body.append_stmts;
-                ];
-                loc = Loc.none;
-              });
+                ]
+              );
               loc = Loc.none;
             }];
 
@@ -710,7 +739,7 @@ and transform_expression env expr =
     append_stmts = !append_stmts;
   }
 
-and transform_block env ~ret_id block =
+and transform_block env ~ret_id block: C_op.Stmt.t list =
   let ret = "t[" ^ (Int.to_string ret_id) ^ "]" in
   let stmts = List.map ~f:(transform_statement ~ret env) block.body |> List.concat in
   stmts

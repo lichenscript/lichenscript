@@ -72,7 +72,7 @@ end
 and Stmt : sig
 
   type spec =
-  | If of Expr.t * Block.t
+  | If of Expr.t * Stmt.t list
   | While of Expr.t * Block.t
   | Expr of Expr.t
   | VarDecl of string list

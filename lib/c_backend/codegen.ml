@@ -90,9 +90,10 @@ let rec codegen_statement (env: t) stmt =
     ps env ";";
   )
 
-  | If (test, block) -> (
+  | If (test, stmts) -> (
     ps env "if (";
     codegen_expression env test;
+    ps env ".int_val";
     ps env ") {\n";
     with_indent env (fun () -> 
       List.iter
@@ -101,7 +102,7 @@ let rec codegen_statement (env: t) stmt =
           codegen_statement env stmt;
           endl env;
         )
-        block.body
+        stmts
     );
     print_indents env;
     ps env "}"

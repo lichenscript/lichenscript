@@ -8,12 +8,21 @@ Easy to integrated with the Web Ecosystem.
 
 Webassembly(AKA WASM) provides excellent performance approching native speed, but it's hard for front-end ecosystem to use it.
 
-## Features
+## Roadmap
 
-- Dynamic dispatching of class
-- Reference counting
-- Easily integrated with JavaScript/C
-- Subset of TypeScript
+| Syntax | Status |
+| ------- | ------ |
+| Lambda Expression | ✅ |
+| Pattern matching | ✅ |
+| Object inheritance | ✅ |
+| Operator overloading | 🔨 |
+| Customize getter/setter | 🔨 |
+| Async/await | 🔨 |
+
+| Target | Status |
+| ------ | ------ |
+| Compiled to C | ✅ |
+| Compiled to JavaScript | ✅ |
 
 ## Senerios
 

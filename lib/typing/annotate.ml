@@ -431,7 +431,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
     | Update _ -> -1, failwith "not implemented"
 
-    | Assign (_, id, expr) -> (
+    | Assign (op, id, expr) -> (
       let expr = annotate_expression ~prev_deps env expr in
       let scope = Env.peek_scope env in
       let ctx = Env.ctx env in
@@ -467,7 +467,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           )
         );
       } in
-      next_id, Assign((name, ty_int), expr)
+      next_id, Assign(op, (name, ty_int), expr)
     )
 
     | Block block -> (
