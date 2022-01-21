@@ -2,7 +2,7 @@
 function isPrime(num: i32): boolean {
     let counter = 0;
 
-    let i = 0;
+    let i = 2;
     while i < num {
         if num % i == 0 {
             counter += 1;

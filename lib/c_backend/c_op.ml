@@ -113,6 +113,7 @@ and Expr : sig
   | Ident of symbol
   | TagEqual of t * int
   | Temp of int
+  | IntValue of t
 
   and t = {
     loc: Loc.t;

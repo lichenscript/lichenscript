@@ -483,7 +483,7 @@ and transform_expression env expr =
       let consequent = transform_block ~ret_id:tmp_id env if_desc.if_consequent in
       
       let tmp_stmt = { C_op.Stmt.
-        spec = If (test.expr, consequent);
+        spec = If ({ C_op.Expr. spec = IntValue test.expr; loc = Loc.none; }, consequent);
         loc;
       } in
 
