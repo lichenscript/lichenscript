@@ -157,6 +157,7 @@ and build_entry (entry: string) std_dir build_dir runtime_dir debug: string opti
   with
     | Unix.Unix_error (_, err, err_s) -> (
       Format.printf "Failed: %s: %s %s\n" entry err err_s;
+      ignore (exit 2);
       None
     )
 
@@ -169,6 +170,7 @@ and build_entry (entry: string) std_dir build_dir runtime_dir debug: string opti
           Format.printf "%d:%d %a\n" start.line start.column (Type_error.PP.error_spec ~ctx) spec
         )
         errors;
+      ignore (exit 2);
       None
 
     | ParseError errors ->
@@ -180,6 +182,7 @@ and build_entry (entry: string) std_dir build_dir runtime_dir debug: string opti
           Format.printf "%d:%d %a\n" start.line start.column Parse_error.PP.error err
         )
         errors;
+      ignore (exit 2);
       None
 
 and run_make_in_dir build_dir =

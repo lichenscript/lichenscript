@@ -759,7 +759,60 @@ and parse_class_body env: Declaration.class_body =
   }
 
 and parse_expression env : Expression.t =
-  parse_assigment_expression env
+  let start_loc = Peek.loc env in
+  let expr = parse_assignment_expression env in
+  match expr.spec with
+  | Expression.Identifier id -> (
+    match Peek.token env with
+    | Token.T_LCURLY -> (
+      Eat.token env;
+      let init_elements = ref [] in
+
+      while (Peek.token env) <> Token.T_RCURLY do
+        let start_loc = Peek.loc env in
+        let element =
+          match (Peek.token env) with
+          | Token.T_ELLIPSIS -> (
+            Eat.token env;
+            let expr = parse_expression env in
+            Expression.InitSpread expr
+          )
+          | _ ->  (
+            let init_entry_key = parse_identifier env in
+            let init_entry_value =
+              if (Peek.token env) = Token.T_COLON then (
+                Eat.token env;
+                Some (parse_expression env)
+              ) else
+                None
+            in
+            Expression.InitEntry {
+              Expression.
+              init_entry_key;
+              init_entry_value;
+              init_entry_loc = with_start_loc env start_loc;
+            }
+          )
+        in
+        init_elements := element::(!init_elements);
+        if (Peek.token env) <> Token.T_RCURLY then (
+          Expect.token env T_COMMA
+        )
+      done;
+
+      Expect.token env Token.T_RCURLY;
+      { expr with
+        spec = Init {
+          init_name = id;
+          init_elements = List.rev !init_elements;
+          init_loc = with_start_loc env start_loc;
+        }
+      }
+    )
+  | _ -> expr
+  )
+
+  | _ -> expr
 
 and reinterpret_expression_as_id _env (expr: Expression.t) : Identifier.t =
   let { Expression. spec; loc; _; } = expr in
@@ -776,23 +829,39 @@ and reinterpret_expression_as_id _env (expr: Expression.t) : Identifier.t =
     in
     Parse_error.error err
 
-and parse_assigment_expression env : Expression.t =
+and parse_assignment_expression env : Expression.t =
   let start_pos = Peek.loc env in
   let expr = parse_binary_expression env in
   let next = Peek.token env in
-  match next with
-  | Token.T_ASSIGN ->
+  let op, ok =
+    match next with
+    | Token.T_ASSIGN -> None, true
+    | Token.T_PLUS_ASSIGN -> (Some Asttypes.AssignOp.PlusAssign), true
+    | Token.T_MINUS_ASSIGN -> (Some Asttypes.AssignOp.MinusAssign), true
+    | Token.T_MULT_ASSIGN -> (Some Asttypes.AssignOp.MinusAssign), true
+    | Token.T_DIV_ASSIGN -> (Some Asttypes.AssignOp.DivAssign), true
+    | Token.T_MOD_ASSIGN -> (Some Asttypes.AssignOp.ModAssign), true
+    | Token.T_LSHIFT_ASSIGN -> (Some Asttypes.AssignOp.LShiftAssign), true
+    | Token.T_RSHIFT_ASSIGN -> (Some Asttypes.AssignOp.RShiftAssign), true
+    | Token.T_RSHIFT3_ASSIGN -> (Some Asttypes.AssignOp.RShift3Assign), true
+    | Token.T_BIT_OR_ASSIGN -> (Some Asttypes.AssignOp.BitOrAssign), true
+    | Token.T_BIT_XOR_ASSIGN -> (Some Asttypes.AssignOp.BitXorAssign), true
+    | Token.T_BIT_AND_ASSIGN -> (Some Asttypes.AssignOp.BitAndAssign), true
+
+    | _ -> None, false
+  in
+  if ok then (
     Eat.token env;
     let left = reinterpret_expression_as_id env expr in
-    let right = parse_assigment_expression env in
-    let spec = Expression.Assign(left, right) in
+    let right = parse_assignment_expression env in
+    let spec = Expression.Assign(op, left, right) in
     {
       spec;
       loc = with_start_loc env start_pos;
       attributes = [];
     }
-
-  | _ -> expr
+  ) else
+    expr
 
 and parse_maybe_arrow_function env : Expression.t =
   let relaxed_arrow = parse_relaxed_arrow env in
@@ -1150,51 +1219,6 @@ and parse_primary_expression env : Expression.t =
       match next with 
       | Token.T_IDENTIFIER _ -> (
         let ident = parse_identifier env in
-        match Peek.token env with
-        | Token.T_LCURLY -> (
-          Eat.token env;
-          let init_elements = ref [] in
-
-          while (Peek.token env) <> Token.T_RCURLY do
-            let start_loc = Peek.loc env in
-            let element =
-              match (Peek.token env) with
-              | Token.T_ELLIPSIS -> (
-                Eat.token env;
-                let expr = parse_expression env in
-                Expression.InitSpread expr
-              )
-              | _ ->  (
-                let init_entry_key = parse_identifier env in
-                let init_entry_value =
-                  if (Peek.token env) = Token.T_COLON then (
-                    Eat.token env;
-                    Some (parse_expression env)
-                  ) else
-                    None
-                in
-                Expression.InitEntry {
-                  Expression.
-                  init_entry_key;
-                  init_entry_value;
-                  init_entry_loc = with_start_loc env start_loc;
-                }
-              )
-            in
-            init_elements := element::(!init_elements);
-            if (Peek.token env) <> Token.T_RCURLY then (
-              Expect.token env T_COMMA
-            )
-          done;
-
-          Expect.token env Token.T_RCURLY;
-          Init {
-            init_name = ident;
-            init_elements = List.rev !init_elements;
-            init_loc = with_start_loc env start_loc;
-          }
-        )
-        | _ ->
           Identifier ident
       )
 
@@ -1219,9 +1243,9 @@ and parse_primary_expression env : Expression.t =
           let start_loc = Peek.loc env in
           Eat.token env;
           let if_test = parse_expression env in
-          let if_consequent = parse_statement env in
+          let if_consequent = parse_block env in
           let has_else = Eat.maybe env Token.T_ELSE in
-          let if_alternative = if has_else then Some (parse_statement env) else None in
+          let if_alternative = if has_else then Some (parse_block env) else None in
           If {
             if_test;
             if_consequent;

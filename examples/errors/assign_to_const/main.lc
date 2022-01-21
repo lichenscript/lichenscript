@@ -1,0 +1,7 @@
+
+
+function main() {
+    const a = 3;
+    a = 4;
+    print(a);
+}

@@ -61,7 +61,20 @@ class sourcemap_generator = object
   val mutable _before_line = 1
   val mutable _before_col = 0
 
-  val buffer = Buffer.create 1024
+  val buffer =
+    begin
+      let result = Buffer.create 1024 in
+      Array.iter
+      ~f:(fun line -> Buffer.add_string result line)
+      [|
+        "{\n";
+        "  \"versioon\": 3,\n";
+        "  \"file\": \"\",\n";
+        "  \"sourceRoot\": \"\",\n";
+        "  \"names\": [],\n";
+      |];
+      result
+    end
 
   method add_location after_col file_id before_line before_col =
     if file_id < 0 then ()
@@ -78,6 +91,10 @@ class sourcemap_generator = object
       _before_line <- before_line;
       _before_col <- before_col;
     )
-      
+
+  method finalize =
+    Buffer.add_string buffer "  \"mappings\": \"";
+    Buffer.add_string buffer "\"\n";
+    Buffer.add_string buffer "}"
 
 end

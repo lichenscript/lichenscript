@@ -152,9 +152,7 @@ and print_statistics env =
         env.error_files <- env.error_files + 1
       )
       | Error (`Exit_non_zero code) -> (
-        Format.printf "%sFailed Test:%s %s, code: %d: \n" TermColor.red TermColor.reset suite.test_file code;
-        Format.printf "%s" (Buffer.contents suite.stdout_buffer);
-        env.error_files <- env.error_files + 1
+        handle_negative_exit env suite code
       )
     )
     env.suites;
@@ -165,11 +163,42 @@ and print_statistics env =
   ;
   Format.printf "Totally: %d, finished: %d, failed: %d\n" env.totoal_files env.finished_files env.error_files
 
+and handle_negative_exit env suite code =
+  let dirname = Filename.dirname suite.test_file in
+  let error_file = Filename.concat dirname "error.txt" in
+  if Sys.is_file_exn error_file then (
+    let error_content = In_channel.read_all error_file in
+    let stdout_content = Buffer.contents suite.stdout_buffer in
+    let stdout_lines = String.split ~on:'\n' stdout_content in
+    let found_expected =
+      List.fold
+        ~init:false
+        ~f:(fun acc line ->
+          if acc then acc
+          else
+            String.equal line error_content
+        )
+        stdout_lines
+    in
+    if found_expected then (
+      Format.printf "%s[TEST]%s %s\n" TermColor.green TermColor.reset suite.test_file;
+      env.finished_files <- env.finished_files + 1
+    ) else (
+      Format.printf "%s[ERROR]%s %s\n" TermColor.red TermColor.reset suite.test_file;
+      Format.printf "Expected error: %s\n" error_content;
+    )
+  ) else (
+    Format.printf "%sFailed Test:%s %s, code: %d: \n" TermColor.red TermColor.reset suite.test_file code;
+    Format.printf "%s" (Buffer.contents suite.stdout_buffer);
+    env.error_files <- env.error_files + 1
+  )
+
 and diff_stdout env suite =
   let std_out_content = Buffer.contents suite.stdout_buffer in
 
   let dirname = Filename.dirname suite.test_file in
   let expect_file = Filename.concat dirname "expect.txt" in
+  let error_file = Filename.concat dirname "error.txt" in
 
   if Sys.is_file_exn expect_file then (
     let expect_file_content = In_channel.read_all expect_file in
@@ -183,9 +212,14 @@ and diff_stdout env suite =
       env.error_files <- env.error_files + 1
     )
   ) else (
-    Format.printf "%s[TEST]%s %s\n" TermColor.green TermColor.reset suite.test_file;
-    Format.printf "%s" std_out_content;
-    env.finished_files <- env.finished_files + 1
+    if Sys.is_file_exn error_file then (
+      Format.printf "%s[ERROR]%s %s\n" TermColor.red TermColor.reset suite.test_file;
+      Format.printf "Expected to failed, but succeed\n";
+      env.error_files <- env.error_files + 1
+    ) else
+      Format.printf "%s[TEST]%s %s\n" TermColor.green TermColor.reset suite.test_file;
+      Format.printf "%s" std_out_content;
+      env.finished_files <- env.finished_files + 1
   )
 
 

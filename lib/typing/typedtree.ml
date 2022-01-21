@@ -92,8 +92,8 @@ module%gen rec Expression : sig
 
   and if_desc = {
     if_test: t;
-    if_consequent: Statement.t;
-    if_alternative: Statement.t option;
+    if_consequent: Block.t;
+    if_alternative: Block.t option;
     if_loc: Loc.t;
   }
   [@@deriving show]

@@ -212,8 +212,29 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       )
     )
 
-    | If _ ->
-      -1, failwith "not implemented"
+    | If _if -> (
+      let { if_test; if_consequent; if_alternative; if_loc } = _if in
+
+      let if_test = annotate_expression env ~prev_deps if_test in
+      let if_consequent = annotate_block ~prev_deps:[if_test.ty_var] env if_consequent in
+      let if_alternative = Option.map ~f:(annotate_block ~prev_deps:[if_test.ty_var] env) if_alternative in
+      let alt_deps = Option.map ~f:(fun b -> b.return_ty) if_alternative in
+
+      let node = {
+        value = TypeExpr.Unknown;
+        loc = loc;
+        check = none;
+        deps = List.append [if_consequent.return_ty] (Option.to_list alt_deps);
+      } in
+
+      let node_id = Type_context.new_id (Env.ctx env) node in
+      node_id, T.Expression.If {
+        if_test;
+        if_consequent;
+        if_alternative;
+        if_loc;
+      }
+    )
 
     | Array arr_list  -> (
       let a_list = List.map ~f:(annotate_expression ~prev_deps env) arr_list in
@@ -373,7 +394,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
     | Update _ -> -1, failwith "not implemented"
 
-    | Assign (id, expr) -> (
+    | Assign (_, id, expr) -> (
       let expr = annotate_expression ~prev_deps env expr in
       let scope = Env.peek_scope env in
       let ctx = Env.ctx env in
@@ -954,10 +975,15 @@ and annotate_pattern env pat =
     match spec with
     | Identifier ident -> (
       let first_char = String.get ident.pident_name 0 in
+      (* It's a enum contructor *)
       if Char.is_uppercase first_char then (
         Env.capture_variable env ~name:ident.pident_name;
 
         let ctor_var = scope#find_var_symbol ident.pident_name in
+        if Option.is_none ctor_var then (
+          let err = Type_error.(make_error (Env.ctx env) ident.pident_loc (NotAEnumConstructor ident.pident_name)) in
+          raise (Type_error.Error err)
+        );
         let ctor = Option.value_exn ctor_var in
         ctor.var_id, (T.Pattern.Symbol (ident.pident_name, ctor.var_id))
       ) else (

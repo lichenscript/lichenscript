@@ -37,6 +37,25 @@ module UnaryOp = struct
   
 end
 
+module AssignOp = struct
+
+  type t =
+    | PlusAssign
+    | MinusAssign
+    | MultAssign
+    | ExpAssign
+    | DivAssign
+    | ModAssign
+    | LShiftAssign
+    | RShiftAssign
+    | RShift3Assign
+    | BitOrAssign
+    | BitXorAssign
+    | BitAndAssign
+    [@@deriving show]
+  
+end
+
 module BinaryOp = struct
 
   type t =

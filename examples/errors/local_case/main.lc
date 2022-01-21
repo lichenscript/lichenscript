@@ -1,0 +1,5 @@
+
+function main() {
+    let A = 3;
+    print(A);
+}

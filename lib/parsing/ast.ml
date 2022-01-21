@@ -37,8 +37,8 @@ and Expression : sig
 
   type if_desc = {
     if_test: t;
-    if_consequent: Statement.t;
-    if_alternative: Statement.t option;
+    if_consequent: Block.t;
+    if_alternative: Block.t option;
     if_loc: Loc.t;
   }
 
@@ -93,7 +93,7 @@ and Expression : sig
     | Unary of Asttypes.UnaryOp.t * t
     | Binary of Asttypes.BinaryOp.t * t * t
     | Update of Asttypes.UpdateOp.t * t * bool (* prefix *)
-    | Assign of Identifier.t * t
+    | Assign of Asttypes.AssignOp.t option * Identifier.t * t
     | Block of Block.t
     | Init of init
     | Match of _match
