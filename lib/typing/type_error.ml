@@ -21,6 +21,7 @@ and spec =
   | CannotResolveTypeOfExpression
   | DeclareFunctionShouldSpecificExternal
   | NotAllTheCasesReturnSameType
+  | CapitalizedEnumMemeber of string
 
 let make_error ctx loc spec =
   { loc; spec; ctx }
@@ -94,6 +95,13 @@ module PP = struct
 
     | NotAllTheCasesReturnSameType ->
       Format.fprintf formatter "All the cases of match expression should return the same type"
+
+    | CapitalizedEnumMemeber name -> (
+      let first_char = String.get name 0 in
+      let upper_char = Char.uppercase_ascii first_char in
+      let new_name = String.mapi (fun index ch -> if index = 0 then upper_char else ch) name in
+      Format.fprintf formatter "The name of the enum member '%s' must be capitalized, try '%s'" name new_name
+    )
 
   let error ~ctx formatter err =
     let { spec; loc; _ } = err in

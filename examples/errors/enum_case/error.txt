@@ -1,0 +1,1 @@
+3:6 The name of the enum member 'a' must be capitalized, try 'A'

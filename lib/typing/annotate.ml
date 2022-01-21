@@ -1198,6 +1198,12 @@ and annotate_enum env enum =
 
       let fields_types, deps = List.map ~f:(annotate_type env) case_fields |> List.unzip in
 
+      let first_char = String.get case_name.pident_name 0 in
+      if not (Char.is_uppercase first_char) then (
+        let err = Type_error.(make_error ctx case_name.pident_loc (CapitalizedEnumMemeber case_name.pident_name)) in
+        raise (Type_error.Error err)
+      );
+
       Type_context.map_node
         ctx
         ~f:(fun node -> {
