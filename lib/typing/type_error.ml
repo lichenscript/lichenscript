@@ -1,4 +1,4 @@
-open Lichenscript_lex
+open Lichenscript_parsing.Asttypes
 open Core_type
 
 type t = {
@@ -17,7 +17,7 @@ and spec =
   | ParamsMismatch of TypeExpr.t
   | CannotPassParam of string * TypeExpr.t * TypeExpr.t
   | CannotReadMember of string * TypeExpr.t
-  | NotAddable of TypeDef.t * TypeDef.t
+  | CannotApplyBinary of BinaryOp.t * TypeExpr.t * TypeExpr.t
   | CannotResolveTypeOfExpression
   | DeclareFunctionShouldSpecificExternal
   | NotAllTheCasesReturnSameType
@@ -84,9 +84,9 @@ module PP = struct
       Format.fprintf formatter "Can not read member '%s' of type '%s'"
         name (pp_ty ty)
 
-    | NotAddable (left ,right) ->
-      Format.fprintf formatter "Type '%a' can not add '%a'"
-        TypeDef.pp left TypeDef.pp right
+    | CannotApplyBinary (op, left ,right) ->
+      Format.fprintf formatter "Can not apply %a to '%a' and '%a'"
+        BinaryOp.pp op TypeExpr.pp left TypeExpr.pp right
 
     | CannotResolveTypeOfExpression ->
       Format.fprintf formatter "Can not resolve type of expression"

@@ -57,7 +57,7 @@ let find_variable env name =
     match Hashtbl.find scope.name_map name with
     | Some v -> v
     | None -> (
-      match env.scope.prev with
+      match scope.prev with
       | Some prev_scope -> find_in_scope prev_scope
       | None -> failwith (Format.sprintf "can not find variable %s" name)
     )

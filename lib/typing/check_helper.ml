@@ -54,7 +54,60 @@ let type_assinable ctx left right =
   | _ ->
     false
 
-let type_addable left right =
-  let open TypeDef in
-  left.builtin && right.builtin && (String.equal left.name right.name) &&
-  (Array.mem [| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "string" |] ~equal:String.equal left.name)
+let type_addable ctx (left: TypeExpr.t) (right: TypeExpr.t) =
+  let left = deref_type ctx left in
+  let right = deref_type ctx right in
+  let open Core_type.TypeExpr in
+  match (left, right) with
+  | (Ctor (left_id, _), (Ctor (right_id, _))) -> (
+    let left_def_opt = find_construct_of ctx left_id in
+    let right_def_opt = find_construct_of ctx right_id in
+    (match (left_def_opt, right_def_opt) with
+      | (Some (left, _), Some (right, _)) -> (
+        let open TypeDef in
+        left.builtin && right.builtin && (String.equal left.name right.name) &&
+        (Array.mem [| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "string" |] ~equal:String.equal left.name)
+      )
+      | _ -> false
+    )
+  )
+  | _ -> false
+
+let type_arithmetic ctx (left: TypeExpr.t) (right: TypeExpr.t) =
+  let left = deref_type ctx left in
+  let right = deref_type ctx right in
+  let open Core_type.TypeExpr in
+  match (left, right) with
+  | (Ctor (left_id, _), (Ctor (right_id, _))) -> (
+    let left_def_opt = find_construct_of ctx left_id in
+    let right_def_opt = find_construct_of ctx right_id in
+    (match (left_def_opt, right_def_opt) with
+      | (Some (left, _), Some (right, _)) -> (
+        let open TypeDef in
+        left.builtin && right.builtin && (String.equal left.name right.name) &&
+        (Array.mem [| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; |] ~equal:String.equal left.name)
+      )
+      | _ -> false
+    )
+  )
+  | _ -> false
+
+let type_logic_compareable ctx left right =
+  let left = deref_type ctx left in
+  let right = deref_type ctx right in
+  let open Core_type.TypeExpr in
+  match (left, right) with
+  | (Ctor (left_id, _), (Ctor (right_id, _))) -> (
+    let left_node = Type_context.get_node ctx left_id in
+    let right_node = Type_context.get_node ctx right_id in
+    (match (left_node.value, right_node.value) with
+      | (TypeDef left, TypeDef right) -> (
+        let open TypeDef in
+        left.builtin && right.builtin && (String.equal left.name right.name) &&
+        (Array.mem [| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; |] ~equal:String.equal left.name)
+      )
+      | _ -> false
+    )
+  )
+
+  | _ -> false

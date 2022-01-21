@@ -257,10 +257,12 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let callee = annotate_expression ~prev_deps env callee in
       let call_params = List.map ~f:(annotate_expression ~prev_deps env) call_params in
 
+      let params_deps = List.map ~f:(fun expr -> expr.ty_var) call_params in
+
       let ty_var = Type_context.new_id (Env.ctx env) {
         value = TypeExpr.Unknown;
         loc;
-        deps = [ T.Expression.(callee.ty_var) ];
+        deps = List.append [ T.Expression.(callee.ty_var) ] params_deps;
         check = (fun id ->
           let ctx = Env.ctx env in
           let ty_int = callee.ty_var in
@@ -371,19 +373,54 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         loc;
         check = (fun id ->
           let ctx = Env.ctx env in
-          let left_def_opt = Check_helper.find_construct_of ctx left.ty_var in
-          let right_def_opt = Check_helper.find_construct_of ctx right.ty_var in
-          match (left_def_opt, right_def_opt) with
-          | (Some (left_sym, left_id), Some (right_sym, _)) -> (
-            if not (Check_helper.type_addable left_sym right_sym) then (
-              let err = Type_error.(make_error ctx loc (NotAddable (left_sym, right_sym))) in
+          let left_node = Type_context.get_node ctx left.ty_var in
+          let right_node = Type_context.get_node ctx right.ty_var in
+          let open Asttypes in
+          match op with
+          | BinaryOp.Plus -> (
+            if not (Check_helper.type_addable ctx left_node.value right_node.value) then (
+              let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
               raise (Type_error.Error err)
             );
-            Type_context.update_node_type ctx id (TypeExpr.Ctor(left_id, []))
+            Type_context.update_node_type ctx id left_node.value;
           )
+
+          | BinaryOp.Minus
+          | BinaryOp.Mult
+          | BinaryOp.Div
+          | BinaryOp.Exp
+          | BinaryOp.Mod
+          | BinaryOp.BitAnd
+          | BinaryOp.Xor
+          | BinaryOp.BitOr
+            -> (
+            if not (Check_helper.type_arithmetic ctx left_node.value right_node.value) then (
+              let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+              raise (Type_error.Error err)
+            );
+            Type_context.update_node_type ctx id left_node.value;
+          )
+
+          | BinaryOp.Equal
+          | BinaryOp.NotEqual
+          | BinaryOp.LessThan
+          | BinaryOp.LessThanEqual
+          | BinaryOp.GreaterThan
+          | BinaryOp.GreaterThanEqual
+            -> (
+              if not (Check_helper.type_logic_compareable ctx left_node.value right_node.value) then (
+                let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+                raise (Type_error.Error err)
+              );
+              let bool_ty = Env.ty_boolean env in
+              Type_context.update_node_type ctx id (TypeExpr.Ctor (bool_ty, []));
+            )
+
           | _ -> (
-            let err = Type_error.(make_error ctx loc CannotResolveTypeOfExpression) in
-            raise (Type_error.Error err)
+              if not (Check_helper.type_logic_compareable ctx left_node.value right_node.value) then (
+                let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+                raise (Type_error.Error err)
+              );
           )
         );
       } in
