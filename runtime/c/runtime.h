@@ -30,6 +30,19 @@ typedef enum LCObjectType {
     LC_TY_MAX = 127,
 } LCObjectType;
 
+typedef enum LCArithmeticType {
+    LC_ARTH_PLUS = 1,
+    LC_ARTH_MINUS,
+    LC_ARTH_MULT,
+    LC_ARTH_DIV,
+    LC_ARTH_MOD,
+    LC_ARTH_LSHIFT,
+    LC_ARTH_RSHIFT,
+    LC_ARTH_BIT_OR,
+    LC_ARTH_BIT_XOR,
+    LC_ARTH_BIT_AND,
+} LCArithmeticType;
+
 #define LC_OBJ_HEADER LCObjectHeader header;
 
 typedef struct LCObjectHeader {
@@ -154,6 +167,8 @@ void* lc_mallocz(LCRuntime* rt, size_t size);
 void* lc_realloc(LCRuntime* rt, void*, size_t size);
 void lc_free(LCRuntime* rt, void *);
 
+void LCUpdateValue(LCArithmeticType op, LCValue* left, LCValue right);
+
 void LCRetain(LCValue obj);
 void LCRelease(LCRuntime* rt, LCValue obj);
 typedef struct LCLambda {
@@ -172,6 +187,7 @@ LCValue LCRefCellGetValue(LCValue cell);
 
 LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, int argc, LCValue* args);
 LCValue LCLambdaGetValue(LCRuntime* rt, LCValue lambda, int index);
+LCValue* LCLambdaGetValuePointer(LCRuntime* rt, LCValue lambda, int index);
 LCValue LCLambdaGetRefValue(LCRuntime* rt, LCValue lambda, int index);
 void LCLambdaSetValue(LCRuntime* rt, LCValue lambda, int index, LCValue value);
 void LCLambdaSetRefValue(LCRuntime* rt, LCValue lambda, int index, LCValue value);

@@ -489,6 +489,31 @@ and codegen_expression (env: t) (expr: Expr.t) =
     );
   )
 
+  | Update (op, symbol, expr) -> (
+    ps env "LCUpdateValue(";
+    ps env (Primitives.Assign.to_arithmetic_op op);
+    ps env ", ";
+    (match symbol with
+    | SymLocal name ->
+      ps env "&";
+      ps env name
+
+    | SymParam param_index ->
+      ps env "&args[";
+      ps env (Int.to_string param_index);
+      ps env "]"
+
+    | SymLambda index ->
+      ps env "LCLambdaGetValuePointer(rt, this, ";
+      ps env (Int.to_string index);
+      ps env ")"
+
+    );
+    ps env ", ";
+    codegen_expression env expr;
+    ps env ")"
+  )
+
   | TagEqual (expr, tag) -> (
     ps env "LC_VALUE_TAG(";
     codegen_expression env expr;

@@ -38,15 +38,30 @@ module Bin = struct
     | GreaterThanEqual -> "LC_I32_GTEQ"
     | LShift -> "LC_I32_LEFT_SHIFT"
     | RShift -> "LC_I32_RIGHT_SHIFT"
-    | RShift3 -> failwith "not support"
     | Plus -> "LC_I32_PLUS"
-    | Minus -> "LC_I32_MINUX"
+    | Minus -> "LC_I32_MINUS"
     | Mult -> "LC_I32_MULT"
-    | Exp -> "LC_I32_EXP"
     | Div -> "LC_I32_DIV"
     | Mod -> "LC_I32_MOD"
     | BitOr -> "LC_I32_BIT_OR"
     | Xor -> "LC_I32_XOR"
     | BitAnd -> "LC_I32_BIT_AND"
+
+end
+
+module Assign = struct
+  
+  let to_arithmetic_op (op: Asttypes.AssignOp.t) =
+    match op with
+    | PlusAssign -> "LC_ARTH_PLUS"
+    | MinusAssign -> "LC_ARTH_MINUS"
+    | MultAssign -> "LC_ARTH_MULT"
+    | DivAssign -> "LC_ARTH_DIV"
+    | ModAssign -> "LC_ARTH_MOD"
+    | LShiftAssign -> "LC_ARTH_LSHIFT"
+    | RShiftAssign -> "LC_ARTH_RSHIFT"
+    | BitOrAssign -> "LC_ARTH_BIT_OR"
+    | BitXorAssign -> "LC_ARTH_BIT_XOR"
+    | BitAndAssign -> "LC_ARTH_BIT_AND"
   
 end

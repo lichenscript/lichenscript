@@ -628,14 +628,20 @@ and transform_expression env expr =
      *   - setter of a class
      *   - Assign to this property: this.xxx = expr
      *)
-    | Assign (_, (name, _), expr) -> (
+    | Assign (op_opt, (name, _), expr) -> (
       let name = find_variable env name in
       let expr' = transform_expression env expr in
 
       prepend_stmts := List.append !prepend_stmts expr'.prepend_stmts;
       append_stmts := List.append !append_stmts expr'.append_stmts;
 
-      C_op.Expr.Assign(name, expr'.expr)
+      match op_opt with
+      | None ->
+        C_op.Expr.Assign(name, expr'.expr)
+
+      | Some op ->
+        C_op.Expr.Update(op, name, expr'.expr)
+
     )
 
     | Init { init_name; _ } -> (

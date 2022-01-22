@@ -109,6 +109,7 @@ and Expr : sig
   | CallLambda of t * t list
   | Call of int * t list
   | Assign of symbol * t
+  | Update of Asttypes.AssignOp.t * symbol * t
   | ExternalCall of symbol * t list
   | Ident of symbol
   | TagEqual of t * int

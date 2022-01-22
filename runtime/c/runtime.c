@@ -3,6 +3,7 @@
 #include "string.h"
 #include "time.h"
 #include "stdio.h"
+#include "math.h"
 
 #define LC_INIT_SYMBOL_BUCKET_SIZE 128
 #define LC_INIT_CLASS_META_CAP 8
@@ -255,6 +256,85 @@ void LCFreeRuntime(LCRuntime* rt) {
     lc_raw_free(rt);
 }
 
+void LCUpdateValue(LCArithmeticType op, LCValue* left, LCValue right) {
+    LCValue* this = left;
+    int ty = this->tag & 0x7F;
+    if (ty == LC_TY_REFCELL) {
+        LCRefCell* ref_cell = (LCRefCell*)left->ptr_val;
+        this = &ref_cell->value;
+        ty = this->tag & 0x7F;
+    }
+
+    if (ty == LC_TY_I32) {
+        switch (op) {
+            case LC_ARTH_PLUS:
+                this->int_val += right.int_val;
+                break;
+
+            case LC_ARTH_MINUS:
+                this->int_val -= right.int_val;
+                break;
+
+            case LC_ARTH_MULT:
+                this->int_val *= right.int_val;
+                break;
+
+            case LC_ARTH_DIV:
+                this->int_val /= right.int_val;
+                break;
+
+            case LC_ARTH_MOD:
+                this->int_val %= right.int_val;
+                break;
+
+            case LC_ARTH_LSHIFT:
+                this->int_val <<= right.int_val;
+                break;
+
+            case LC_ARTH_RSHIFT:
+                this->int_val >>= right.int_val;
+                break;
+
+            case LC_ARTH_BIT_OR:
+                this->int_val |= right.int_val;
+                break;
+
+            case LC_ARTH_BIT_XOR:
+                this->int_val ^= right.int_val;
+                break;
+
+            case LC_ARTH_BIT_AND:
+                this->int_val &= right.int_val;
+                break;
+
+        }
+    } else if (ty == LC_TY_F32) {
+        switch (op) {
+            case LC_ARTH_PLUS:
+                this->float_val += right.float_val;
+                break;
+
+            case LC_ARTH_MINUS:
+                this->float_val -= right.float_val;
+                break;
+
+            case LC_ARTH_MULT:
+                this->float_val *= right.float_val;
+                break;
+
+            case LC_ARTH_DIV:
+                this->float_val /= right.float_val;
+                break;
+
+            default: {
+                fprintf(stderr, "[LichenScript] Can not apply op: %d for type: %d", op, ty);
+                abort();
+            }
+
+        }
+    }
+}
+
 void LCRetain(LCValue val) {
     if (val.tag < 64) {
         return;
@@ -339,6 +419,11 @@ LCValue LCLambdaGetValue(LCRuntime* rt, LCValue lambda_val, int index) {
     LCValue ret = lambda->captured_values[index];
     LCRetain(ret);
     return ret;
+}
+
+LCValue* LCLambdaGetValuePointer(LCRuntime* rt, LCValue lambda_val, int index) {
+    LCLambda* lambda = (LCLambda*)lambda_val.ptr_val;
+    return &lambda->captured_values[index];
 }
 
 LCValue LCLambdaGetRefValue(LCRuntime* rt, LCValue lambda_val, int index) {

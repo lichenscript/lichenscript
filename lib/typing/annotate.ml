@@ -388,13 +388,20 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           | BinaryOp.Minus
           | BinaryOp.Mult
           | BinaryOp.Div
-          | BinaryOp.Exp
+            -> (
+            if not (Check_helper.type_arithmetic ctx left_node.value right_node.value) then (
+              let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+              raise (Type_error.Error err)
+            );
+            Type_context.update_node_type ctx id left_node.value;
+          )
+
           | BinaryOp.Mod
           | BinaryOp.BitAnd
           | BinaryOp.Xor
           | BinaryOp.BitOr
             -> (
-            if not (Check_helper.type_arithmetic ctx left_node.value right_node.value) then (
+            if not (Check_helper.type_arithmetic_integer ctx left_node.value right_node.value) then (
               let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
               raise (Type_error.Error err)
             );

@@ -43,12 +43,10 @@ module AssignOp = struct
     | PlusAssign
     | MinusAssign
     | MultAssign
-    | ExpAssign
     | DivAssign
     | ModAssign
     | LShiftAssign
     | RShiftAssign
-    | RShift3Assign
     | BitOrAssign
     | BitXorAssign
     | BitAndAssign
@@ -69,11 +67,9 @@ module BinaryOp = struct
     | GreaterThanEqual
     | LShift
     | RShift
-    | RShift3
     | Plus
     | Minus
     | Mult
-    | Exp
     | Div
     | Mod
     | BitOr
@@ -94,11 +90,9 @@ module BinaryOp = struct
     | Token.T_GREATER_THAN_EQUAL -> GreaterThanEqual
     | Token.T_LSHIFT -> LShift
     | Token.T_RSHIFT -> RShift
-    | Token.T_RSHIFT3 -> RShift3
     | Token.T_PLUS -> Plus
     | Token.T_MINUS -> Minus
     | Token.T_MULT -> Mult
-    | Token.T_EXP -> Exp
     | Token.T_DIV -> Div
     | Token.T_MOD -> Mod
     | Token.T_BIT_OR -> BitOr

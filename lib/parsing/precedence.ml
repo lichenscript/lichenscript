@@ -28,7 +28,6 @@ let binary_precedence = function
 
   | Token.T_RSHIFT
   | Token.T_LSHIFT
-  | Token.T_RSHIFT3
     -> 8
 
   | Token.T_PLUS

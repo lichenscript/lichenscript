@@ -20,4 +20,5 @@ function main () {
     print("4: ", isPrime(4));
     print("5: ", isPrime(5));
     print("100: ", isPrime(100));
+    print("101: ", isPrime(101));
 }

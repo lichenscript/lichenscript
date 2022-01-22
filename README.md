@@ -15,6 +15,7 @@ Webassembly(AKA WASM) provides excellent performance approching native speed, bu
 | Lambda Expression | ✅ |
 | Pattern matching | ✅ |
 | Object inheritance | ✅ |
+| For Iterator | 🔨 |
 | Operator overloading | 🔨 |
 | Customize getter/setter | 🔨 |
 | Async/await | 🔨 |

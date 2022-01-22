@@ -79,7 +79,6 @@ type t =
   | T_AWAIT
   | T_CHECKS
   (* Operators *)
-  | T_RSHIFT3_ASSIGN
   | T_RSHIFT_ASSIGN
   | T_LSHIFT_ASSIGN
   | T_BIT_XOR_ASSIGN
@@ -88,7 +87,6 @@ type t =
   | T_MOD_ASSIGN
   | T_DIV_ASSIGN
   | T_MULT_ASSIGN
-  | T_EXP_ASSIGN
   | T_MINUS_ASSIGN
   | T_PLUS_ASSIGN
   | T_ASSIGN
@@ -111,12 +109,10 @@ type t =
   | T_GREATER_THAN
   | T_LSHIFT
   | T_RSHIFT
-  | T_RSHIFT3
   | T_PLUS
   | T_MINUS
   | T_DIV
   | T_MULT
-  | T_EXP
   | T_MOD
   | T_NOT
   | T_BIT_NOT
@@ -248,7 +244,6 @@ let token_to_string = function
   | T_ARROW -> "T_ARROW"
   | T_ELLIPSIS -> "T_ELLIPSIS"
   | T_AT -> "T_AT"
-  | T_RSHIFT3_ASSIGN -> "T_RSHIFT3_ASSIGN"
   | T_RSHIFT_ASSIGN -> "T_RSHIFT_ASSIGN"
   | T_LSHIFT_ASSIGN -> "T_LSHIFT_ASSIGN"
   | T_BIT_XOR_ASSIGN -> "T_BIT_XOR_ASSIGN"
@@ -257,7 +252,6 @@ let token_to_string = function
   | T_MOD_ASSIGN -> "T_MOD_ASSIGN"
   | T_DIV_ASSIGN -> "T_DIV_ASSIGN"
   | T_MULT_ASSIGN -> "T_MULT_ASSIGN"
-  | T_EXP_ASSIGN -> "T_EXP_ASSIGN"
   | T_MINUS_ASSIGN -> "T_MINUS_ASSIGN"
   | T_PLUS_ASSIGN -> "T_PLUS_ASSIGN"
   | T_ASSIGN -> "T_ASSIGN"
@@ -280,12 +274,10 @@ let token_to_string = function
   | T_GREATER_THAN -> "T_GREATER_THAN"
   | T_LSHIFT -> "T_LSHIFT"
   | T_RSHIFT -> "T_RSHIFT"
-  | T_RSHIFT3 -> "T_RSHIFT3"
   | T_PLUS -> "T_PLUS"
   | T_MINUS -> "T_MINUS"
   | T_DIV -> "T_DIV"
   | T_MULT -> "T_MULT"
-  | T_EXP -> "T_EXP"
   | T_MOD -> "T_MOD"
   | T_NOT -> "T_NOT"
   | T_BIT_NOT -> "T_BIT_NOT"
@@ -376,7 +368,6 @@ let value_of_token = function
   | T_ASYNC -> "async"
   | T_AWAIT -> "await"
   | T_CHECKS -> "%checks"
-  | T_RSHIFT3_ASSIGN -> ">>>="
   | T_RSHIFT_ASSIGN -> ">>="
   | T_LSHIFT_ASSIGN -> "<<="
   | T_BIT_XOR_ASSIGN -> "^="
@@ -385,7 +376,6 @@ let value_of_token = function
   | T_MOD_ASSIGN -> "%="
   | T_DIV_ASSIGN -> "/="
   | T_MULT_ASSIGN -> "*="
-  | T_EXP_ASSIGN -> "**="
   | T_MINUS_ASSIGN -> "-="
   | T_PLUS_ASSIGN -> "+="
   | T_ASSIGN -> "="
@@ -408,12 +398,10 @@ let value_of_token = function
   | T_GREATER_THAN -> ">"
   | T_LSHIFT -> "<<"
   | T_RSHIFT -> ">>"
-  | T_RSHIFT3 -> ">>>"
   | T_PLUS -> "+"
   | T_MINUS -> "-"
   | T_DIV -> "/"
   | T_MULT -> "*"
-  | T_EXP -> "**"
   | T_MOD -> "%"
   | T_NOT -> "!"
   | T_BIT_NOT -> "~"

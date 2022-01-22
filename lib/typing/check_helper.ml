@@ -54,60 +54,33 @@ let type_assinable ctx left right =
   | _ ->
     false
 
-let type_addable ctx (left: TypeExpr.t) (right: TypeExpr.t) =
+let check_is_primitive_type ~group ctx (left: TypeExpr.t) (right: TypeExpr.t) =
   let left = deref_type ctx left in
   let right = deref_type ctx right in
   let open Core_type.TypeExpr in
   match (left, right) with
-  | (Ctor (left_id, _), (Ctor (right_id, _))) -> (
+  | (Ctor (left_id, []), (Ctor (right_id, []))) -> (
     let left_def_opt = find_construct_of ctx left_id in
     let right_def_opt = find_construct_of ctx right_id in
     (match (left_def_opt, right_def_opt) with
       | (Some (left, _), Some (right, _)) -> (
         let open TypeDef in
         left.builtin && right.builtin && (String.equal left.name right.name) &&
-        (Array.mem [| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "string" |] ~equal:String.equal left.name)
+        (Array.mem group ~equal:String.equal left.name)
       )
       | _ -> false
     )
   )
   | _ -> false
 
-let type_arithmetic ctx (left: TypeExpr.t) (right: TypeExpr.t) =
-  let left = deref_type ctx left in
-  let right = deref_type ctx right in
-  let open Core_type.TypeExpr in
-  match (left, right) with
-  | (Ctor (left_id, _), (Ctor (right_id, _))) -> (
-    let left_def_opt = find_construct_of ctx left_id in
-    let right_def_opt = find_construct_of ctx right_id in
-    (match (left_def_opt, right_def_opt) with
-      | (Some (left, _), Some (right, _)) -> (
-        let open TypeDef in
-        left.builtin && right.builtin && (String.equal left.name right.name) &&
-        (Array.mem [| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; |] ~equal:String.equal left.name)
-      )
-      | _ -> false
-    )
-  )
-  | _ -> false
+let type_addable =
+  check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "string" |]
 
-let type_logic_compareable ctx left right =
-  let left = deref_type ctx left in
-  let right = deref_type ctx right in
-  let open Core_type.TypeExpr in
-  match (left, right) with
-  | (Ctor (left_id, _), (Ctor (right_id, _))) -> (
-    let left_node = Type_context.get_node ctx left_id in
-    let right_node = Type_context.get_node ctx right_id in
-    (match (left_node.value, right_node.value) with
-      | (TypeDef left, TypeDef right) -> (
-        let open TypeDef in
-        left.builtin && right.builtin && (String.equal left.name right.name) &&
-        (Array.mem [| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; |] ~equal:String.equal left.name)
-      )
-      | _ -> false
-    )
-  )
+let type_arithmetic =
+  check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; |]
 
-  | _ -> false
+let type_arithmetic_integer =
+  check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; |]
+
+let type_logic_compareable =
+  check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "string" |]

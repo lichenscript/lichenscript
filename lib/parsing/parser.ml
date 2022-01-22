@@ -843,7 +843,6 @@ and parse_assignment_expression env : Expression.t =
     | Token.T_MOD_ASSIGN -> (Some Asttypes.AssignOp.ModAssign), true
     | Token.T_LSHIFT_ASSIGN -> (Some Asttypes.AssignOp.LShiftAssign), true
     | Token.T_RSHIFT_ASSIGN -> (Some Asttypes.AssignOp.RShiftAssign), true
-    | Token.T_RSHIFT3_ASSIGN -> (Some Asttypes.AssignOp.RShift3Assign), true
     | Token.T_BIT_OR_ASSIGN -> (Some Asttypes.AssignOp.BitOrAssign), true
     | Token.T_BIT_XOR_ASSIGN -> (Some Asttypes.AssignOp.BitXorAssign), true
     | Token.T_BIT_AND_ASSIGN -> (Some Asttypes.AssignOp.BitAndAssign), true
