@@ -2,6 +2,9 @@
 class Array<T> {
 
     @external("wt_std_array_push")
-    push(item: T);
+    declare push(item: T);
+
+    declare get length(): i32;
+    declare set length(v: i32);
 
 }

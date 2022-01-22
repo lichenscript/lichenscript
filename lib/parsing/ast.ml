@@ -38,9 +38,13 @@ and Expression : sig
   type if_desc = {
     if_test: t;
     if_consequent: Block.t;
-    if_alternative: Block.t option;
+    if_alternative: if_alt option;
     if_loc: Loc.t;
   }
+
+  and if_alt =
+    | If_alt_if of if_desc
+    | If_alt_block of Block.t
 
   and call = {
     callee: t;
@@ -90,6 +94,7 @@ and Expression : sig
     | Array of t list
     | Call of call
     | Member of t * Identifier.t
+    | Index of t * t
     | Unary of Asttypes.UnaryOp.t * t
     | Binary of Asttypes.BinaryOp.t * t * t
     | Update of Asttypes.UpdateOp.t * t * bool (* prefix *)
@@ -215,6 +220,8 @@ and Type : sig
     | Ty_any
     | Ty_ctor of Identifier.t * t list
       (* List<int> *)
+
+    | Ty_array of t
 
     | Ty_arrow of
       t list *  (* params*)

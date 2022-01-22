@@ -55,6 +55,36 @@ class module_scope ~prev env extern_modules = object
         extern_modules
     )
 
+  method! find_type_symbol (name: string): int option =
+    let module_result = super#find_type_symbol name in
+    match module_result with
+    | Some _ -> module_result
+    | None -> (
+      (* not in the local and prev, find the symbol in other modules *)
+      List.fold_until
+        ~init:None
+        ~f:(fun acc extern_mod ->
+          if Option.is_some acc then
+            Base.Continue_or_stop.Stop acc
+          else
+            try
+              let _mod = Option.value_exn (Linker.get_module env.linker extern_mod) in
+              let export = Module.find_export _mod ~name in
+              let open Module in
+              match export with
+              | Some export ->
+                Base.Continue_or_stop.Stop (Some export.export_var.var_id)
+              | None ->
+                Base.Continue_or_stop.Continue None
+            with
+            | _ ->
+              Format.eprintf "unexpected: find module failed: %s\n" extern_mod;
+              Base.Continue_or_stop.Continue None
+        )
+        ~finish:(fun item -> item)
+        extern_modules
+    )
+
 end
 
 let last_piece_of_path path =

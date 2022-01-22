@@ -12,6 +12,7 @@ and spec =
   | CannotAssignToConstVar
   | CannotReturn of TypeExpr.t * TypeExpr.t
   | CannotFindName of string
+  | CannotGetIndex of TypeExpr.t
   | Redefinition of string
   | NotCallable of TypeExpr.t
   | ParamsMismatch of TypeExpr.t
@@ -67,6 +68,10 @@ module PP = struct
     | CannotFindName name ->
       Format.fprintf formatter "Can not find name '%s'" name
 
+    | CannotGetIndex ty ->
+      let left_type = Type_context.print_type_value ctx ty in
+      Format.fprintf formatter "Can not get index of type '%s'" left_type
+
     | Redefinition name ->
       Format.fprintf formatter "Redefinition of '%s'" name
 
@@ -85,8 +90,10 @@ module PP = struct
         name (pp_ty ty)
 
     | CannotApplyBinary (op, left ,right) ->
-      Format.fprintf formatter "Can not apply %a to '%a' and '%a'"
-        BinaryOp.pp op TypeExpr.pp left TypeExpr.pp right
+      let left_type = Type_context.print_type_value ctx left in
+      let right_type = Type_context.print_type_value ctx right in
+      Format.fprintf formatter "Can not apply '%s' to type '%s' and '%s'"
+        (BinaryOp.to_string op) left_type right_type
 
     | CannotResolveTypeOfExpression ->
       Format.fprintf formatter "Can not resolve type of expression"

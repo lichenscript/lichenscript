@@ -80,6 +80,15 @@ class scope ?prev () = object(self)
       var_captured = ref false;
     }
 
+  method print_type_symbols =
+    Option.iter ~f:(fun prev -> prev#print_type_symbols) prev;
+    SymbolTable.iteri
+      ~f:(fun ~key ~data ->
+        Format.eprintf "%s: %d\n" key data;
+      )
+      type_symbols
+
+
   method insert_type_symbol name (sym: int) =
     SymbolTable.set type_symbols ~key:name ~data:sym
 

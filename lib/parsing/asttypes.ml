@@ -99,6 +99,26 @@ module BinaryOp = struct
     | Token.T_BIT_XOR -> Xor
     | Token.T_BIT_AND -> BitAnd
     | _ -> failwith "unreachable"
+
+  let to_string = function
+    | Equal -> "=="
+    | NotEqual -> "!="
+    | StrictEqual -> "==="
+    | StrictNotEqual -> "!=="
+    | LessThan -> "<"
+    | LessThanEqual -> "<="
+    | GreaterThan -> ">"
+    | GreaterThanEqual -> ">="
+    | LShift -> "<<"
+    | RShift -> ">>"
+    | Plus -> "+"
+    | Minus -> "-"
+    | Mult -> "*"
+    | Div -> "/"
+    | Mod -> "%"
+    | BitOr -> "|"
+    | Xor -> "^"
+    | BitAnd -> "&"
   
 end
 

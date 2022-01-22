@@ -84,3 +84,10 @@ let type_arithmetic_integer =
 
 let type_logic_compareable =
   check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "string" |]
+
+let try_unwrap_array ctx expr =
+  let expr = deref_type ctx expr in
+  let open TypeExpr in
+  match expr with
+  | Array t -> Some t
+  | _ -> None

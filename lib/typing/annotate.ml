@@ -213,27 +213,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     )
 
     | If _if -> (
-      let { if_test; if_consequent; if_alternative; if_loc } = _if in
-
-      let if_test = annotate_expression env ~prev_deps if_test in
-      let if_consequent = annotate_block ~prev_deps:[if_test.ty_var] env if_consequent in
-      let if_alternative = Option.map ~f:(annotate_block ~prev_deps:[if_test.ty_var] env) if_alternative in
-      let alt_deps = Option.map ~f:(fun b -> b.return_ty) if_alternative in
-
-      let node = {
-        value = TypeExpr.Unknown;
-        loc = loc;
-        check = none;
-        deps = List.append [if_consequent.return_ty] (Option.to_list alt_deps);
-      } in
-
-      let node_id = Type_context.new_id (Env.ctx env) node in
-      node_id, T.Expression.If {
-        if_test;
-        if_consequent;
-        if_alternative;
-        if_loc;
-      }
+      let id, spec = annotate_expression_if ~prev_deps env _if in
+      id, T.Expression.If spec
     )
 
     | Array arr_list  -> (
@@ -359,6 +340,32 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       } in
       let id = Type_context.new_id ctx node in
       id, T.Expression.Member(expr, name)
+    )
+
+    | Index(expr, index_expr) -> (
+      let expr = annotate_expression ~prev_deps env expr in
+      let index_expr = annotate_expression ~prev_deps env index_expr in
+      let node = {
+        value = TypeExpr.Unknown;
+        deps = [ expr.ty_var; index_expr.ty_var ];
+        loc;
+        check = (fun id ->
+          let ctx = Env.ctx env in
+          let node = Type_context.get_node ctx expr.ty_var in
+          match (Check_helper.try_unwrap_array ctx node.value) with
+          | Some t ->
+            Type_context.update_node_type ctx id t
+
+          | None -> (
+            let err = Type_error.(make_error ctx loc (CannotGetIndex node.value)) in
+            raise (Type_error.Error err)
+          )
+        );
+      } in
+
+      let id = Type_context.new_id (Env.ctx env) node in
+
+      id, (T.Expression.Index(expr, index_expr))
     )
 
     | Unary _ -> -1, failwith "not implemented"
@@ -624,6 +631,46 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     loc;
     attributes;
     ty_var;
+  }
+
+and annotate_expression_if ~prev_deps env _if =
+  let open Ast.Expression in
+  let { if_test; if_consequent; if_alternative; if_loc } = _if in
+
+  let if_test = annotate_expression env ~prev_deps if_test in
+  let if_consequent = annotate_block ~prev_deps:[if_test.ty_var] env if_consequent in
+  let alt_deps = ref [] in
+  let if_alternative =
+    Option.map
+    ~f:(fun alt ->
+      match alt with
+      | If_alt_block block ->
+        let blk = annotate_block ~prev_deps:[if_test.ty_var] env block in
+        alt_deps := [blk.return_ty];
+        T.Expression.If_alt_block blk
+
+      | If_alt_if else_if ->
+        let id, else_if = annotate_expression_if ~prev_deps:[if_test.ty_var] env else_if in
+        alt_deps := [id];
+        T.Expression.If_alt_if else_if
+
+    )
+    if_alternative
+  in
+
+  let node = {
+    value = TypeExpr.Unknown;
+    loc = if_loc;
+    check = none;
+    deps = List.append [if_consequent.return_ty] !alt_deps;
+  } in
+
+  let node_id = Type_context.new_id (Env.ctx env) node in
+  node_id, { T.Expression.
+    if_test;
+    if_consequent;
+    if_alternative;
+    if_loc;
   }
 
 and annotate_block ~prev_deps env block : T.Block.t =
@@ -1074,6 +1121,7 @@ and annotate_type env ty : (TypeExpr.t * int list) =
     )
 
     | None -> (
+      (Env.peek_scope env)#print_type_symbols;
       let ctx = Env.ctx env in
       let err_spec = Type_error.CannotFindName pident_name in
       let err = Type_error.make_error ctx pident_loc err_spec in
@@ -1081,13 +1129,17 @@ and annotate_type env ty : (TypeExpr.t * int list) =
     )
 
   )
+  | Ty_array target -> (
+    let target_type, target_type_deps = annotate_type env target in
+    TypeExpr.Array target_type, target_type_deps
+  )
+
   | Ty_arrow (params, result) -> (
     let params, params_types_deps = List.map ~f:(annotate_type env) params |> List.unzip in
     let return_type, return_type_deps = annotate_type env result in
     deps := List.concat ((!deps)::return_type_deps::params_types_deps);
     TypeExpr.Lambda(params, return_type), !deps
   )
-  (* !deps *)
 
 and annotate_function_params env params = 
   let open Ast.Function in

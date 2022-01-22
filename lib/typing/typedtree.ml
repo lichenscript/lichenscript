@@ -17,12 +17,17 @@ module Pattern = struct
 end
 
 module%gen rec Expression : sig
-  type t = {
-    spec: spec;
-    loc: Loc.t;
-    ty_var: int;
-    attributes: Ast.attributes;
+
+  type if_desc = {
+    if_test: t;
+    if_consequent: Block.t;
+    if_alternative: if_alt option;
+    if_loc: Loc.t;
   }
+
+  and if_alt =
+    | If_alt_if of if_desc
+    | If_alt_block of Block.t
 
   and init_entry = {
     init_entry_loc: Loc.t;
@@ -67,6 +72,7 @@ module%gen rec Expression : sig
     | Array of t list
     | Call of call
     | Member of t * Identifier.t
+    | Index of t * t
     | Unary of
       Asttypes.UnaryOp.t *
       t
@@ -84,17 +90,17 @@ module%gen rec Expression : sig
     | This
     | Super
 
+  and t = {
+    spec: spec;
+    loc: Loc.t;
+    ty_var: int;
+    attributes: Ast.attributes;
+  }
+
   and call = {
     callee: t;
     call_params: t list;
     call_loc: Loc.t;
-  }
-
-  and if_desc = {
-    if_test: t;
-    if_consequent: Block.t;
-    if_alternative: Block.t option;
-    if_loc: Loc.t;
   }
   [@@deriving show]
   

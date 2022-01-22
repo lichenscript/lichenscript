@@ -1179,6 +1179,22 @@ and parse_left_handside_expression_allow_call env : Expression.t =
       in
       loop env expr
 
+    | Token.T_LBRACKET -> (* [] *)
+      begin
+        Eat.token env;
+        let index_expr = parse_expression env in
+        Expect.token env Token.T_RBRACKET;
+        let spec = Index(expr, index_expr) in
+        let expr =
+          {
+            spec;
+            loc = with_start_loc env start_pos;
+            attributes = [];
+          }
+        in
+        loop env expr
+      end
+
     | Token.T_LPAREN ->  (* ( )*)
       let call_params = parse_arguments env in
       let call =
@@ -1237,21 +1253,7 @@ and parse_primary_expression env : Expression.t =
         Eat.token env;
         Constant (Literal.Boolean false)
 
-      | Token.T_IF ->
-        begin
-          let start_loc = Peek.loc env in
-          Eat.token env;
-          let if_test = parse_expression env in
-          let if_consequent = parse_block env in
-          let has_else = Eat.maybe env Token.T_ELSE in
-          let if_alternative = if has_else then Some (parse_block env) else None in
-          If {
-            if_test;
-            if_consequent;
-            if_alternative;
-            if_loc = with_start_loc env start_loc;
-          }
-        end
+      | Token.T_IF -> If (parse_expression_if env)
 
       | Token.T_LBRACKET ->
         begin
@@ -1333,6 +1335,34 @@ and parse_primary_expression env : Expression.t =
       loc = with_start_loc env start_loc;
       attributes = [];
     }
+
+and parse_expression_if env =
+  let open Expression in
+  let start_loc = Peek.loc env in
+  Expect.token env Token.T_IF;
+  let if_test = parse_expression env in
+  let if_consequent = parse_block env in
+  let has_else = Eat.maybe env Token.T_ELSE in
+  let if_alternative =
+    if has_else then (
+      let alt =
+        if (Peek.token env) = Token.T_LCURLY then (
+          If_alt_block (parse_block env)
+        ) else (
+          let else_if = parse_expression_if env in
+          If_alt_if else_if
+        )
+      in
+      Some alt
+    ) else
+      None
+    in
+  { Expression.
+    if_test;
+    if_consequent;
+    if_alternative;
+    if_loc = with_start_loc env start_loc;
+  }
 
 and parse_group_expression env =
   parse_maybe_arrow_function env
@@ -1432,6 +1462,9 @@ and parse_pattern env : Pattern.t =
   }
 
 and parse_type env : Type.t =
+  parse_primary_type env
+
+and parse_primary_type env =
   let open Type in
   let start_loc = Peek.loc env in
   match (Peek.token env) with
@@ -1478,8 +1511,24 @@ and parse_type env : Type.t =
       Expect.token env Token.T_GREATER_THAN
     );
 
-    {
+    let prefix = {
       spec = Ty_ctor (id, List.rev !args);
       loc = with_start_loc env start_loc;
-    }
+    } in
+    parse_type_maybe_array env start_loc prefix
   )
+
+and parse_type_maybe_array env start_loc prev =
+  let open Type in
+  match (Peek.token env) with
+  | Token.T_LBRACKET -> (
+    Eat.token env;
+    Expect.token env Token.T_RBRACKET;
+    let prefix = {
+      spec = Ty_array prev;
+      loc = with_start_loc env start_loc;
+    } in
+    parse_type_maybe_array env start_loc prefix
+  )
+
+  | _ -> prev
