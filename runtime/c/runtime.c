@@ -530,9 +530,20 @@ LCValue LCNewArrayLen(LCRuntime* rt, size_t size) {
     return (LCValue) { { .ptr_val = (LCObject*)arr },  LC_TY_ARRAY };
 }
 
+LCValue LCArrayGetValue(LCRuntime* rt, LCValue this, int index) {
+    LCArray* arr = (LCArray*)this.ptr_val;
+    if (unlikely(index >= arr->len)) {
+        fprintf(stderr, "[LichenScript] index %d out of range, size: %d", index, arr->len);
+        abort();
+    }
+    LCValue item = arr->data[index];
+    LCRetain(item);
+    return item;
+}
+
 void LCArraySetValue(LCRuntime* rt, LCValue this, int index, LCValue value) {
     LCArray* arr = (LCArray*)this.ptr_val;
-    if (index >= arr->len) {
+    if (unlikely(index >= arr->len)) {
         fprintf(stderr, "[LichenScript] index %d out of range, size: %d", index, arr->len);
         abort();
     }

@@ -104,6 +104,7 @@ and Expr : sig
   | NewRef of t
   | GetRef of symbol
   | NewArray of int
+  | ArrayGetValue of (t * t)
   | ArraySetValue of (symbol * int * t)
   | I32Binary of Asttypes.BinaryOp.t * t * t
   | CallLambda of t * t list

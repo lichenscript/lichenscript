@@ -736,7 +736,16 @@ and transform_expression env expr =
 
     | This -> failwith "not implemented: this"
     | Super -> failwith "not implemented: super"
-    | Index _ -> failwith "not implemented: index"
+
+    | Index(expr, index) -> (
+      let expr = transform_expression env expr in
+      let index = transform_expression env index in
+
+      prepend_stmts := List.concat [ !prepend_stmts; index.prepend_stmts; expr.prepend_stmts ];
+      append_stmts := List.concat [ expr.append_stmts; index.append_stmts; !append_stmts ];
+
+      C_op.Expr.ArrayGetValue(expr.expr, { C_op.Expr. spec = IntValue index.expr; loc = Loc.none})
+    )
 
   in
   {

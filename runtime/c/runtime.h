@@ -194,6 +194,7 @@ void LCLambdaSetRefValue(LCRuntime* rt, LCValue lambda, int index, LCValue value
 
 LCValue LCNewArray(LCRuntime* rt);
 LCValue LCNewArrayLen(LCRuntime* rt, size_t size);
+LCValue LCArrayGetValue(LCRuntime* rt, LCValue this, int index);
 void LCArraySetValue(LCRuntime* rt, LCValue this, int index, LCValue value);
 
 LCValue LCNewSymbolLen(LCRuntime* rt, const char* content, uint32_t len);

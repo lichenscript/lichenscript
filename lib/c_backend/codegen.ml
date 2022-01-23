@@ -345,6 +345,14 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ")";
   )
 
+  | ArrayGetValue (sym, index) -> (
+    ps env "LCArrayGetValue(rt, ";
+    codegen_expression env sym;
+    ps env ", ";
+    codegen_expression env index;
+    ps env ")"
+  )
+
   | Ident value -> codegen_symbol env value
 
   | ExternalCall (fun_name, params) -> (
