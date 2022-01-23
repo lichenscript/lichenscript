@@ -31,7 +31,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       let ty_var = T.Expression.(expr.ty_var) in
 
       let node = {
-        value = TypeExpr.Ctor((Env.ty_unit env), []);
+        value = TypeExpr.Ctor(Ref (Env.ty_unit env), []);
         loc;
         deps = List.append prev_deps [ty_var];
         check = none;  (* TODO: check expr is empty *)
@@ -144,7 +144,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       in
 
       let node = {
-        value = TypeExpr.Ctor(ty_var, []);
+        value = TypeExpr.Ctor(Ref ty_var, []);
         loc = loc;
         check = none;
         deps = [ty_var];
@@ -186,7 +186,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
             t, deps
           | None -> (
             let none_type = Env.ty_unit env in
-            TypeExpr.Ctor(none_type, []), []
+            TypeExpr.Ctor(Ref none_type, []), []
           )
         in
 
@@ -232,52 +232,9 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       ty_var, (T.Expression.Array a_list)
     )
 
-    | Call call -> (
-      let { callee; call_params; call_loc } = call in
-
-      let callee = annotate_expression ~prev_deps env callee in
-      let call_params = List.map ~f:(annotate_expression ~prev_deps env) call_params in
-
-      let params_deps = List.map ~f:(fun expr -> expr.ty_var) call_params in
-
-      let ty_var = Type_context.new_id (Env.ctx env) {
-        value = TypeExpr.Unknown;
-        loc;
-        deps = List.append [ T.Expression.(callee.ty_var) ] params_deps;
-        check = (fun id ->
-          let ctx = Env.ctx env in
-          let ty_int = callee.ty_var in
-          let callee_node = Type_context.get_node ctx ty_int in
-          let deref_type_expr = Check_helper.deref_type ctx callee_node.value  in
-          match deref_type_expr with
-          | TypeExpr.Lambda(_params, ret) -> (
-            (* TODO: check call params *)
-            Type_context.update_node_type ctx id ret
-          )
-          | _ ->
-            begin
-              let ty_def = Check_helper.find_construct_of ctx ty_int in
-              match ty_def with
-              | Some ({ TypeDef. spec = Function _fun; _ }, _) ->
-                (* TODO: check call params *)
-                Type_context.update_node_type ctx id _fun.fun_return
-
-              | Some ({ TypeDef. spec = EnumCtor enum_ctor; _}, _) -> (
-                let super_id = enum_ctor.enum_ctor_super_id in
-                Type_context.update_node_type ctx id (TypeExpr.Ctor (super_id, []))
-              )
-
-              | _ -> (
-                let _val = Type_context.get_node ctx ty_int in
-                let err = Type_error.(make_error ctx call_loc (NotCallable _val.value)) in
-                raise (Type_error.Error err)
-              )
-            end
-        );
-      } in
-
-      ty_var, (T.Expression.Call { callee; call_params; call_loc })
-    )
+    | Call call ->
+      let ty_var, spec = annotate_expression_call ~prev_deps env loc call in
+      ty_var, (T.Expression.Call spec)
 
     (*
      * TODO: namespace
@@ -301,11 +258,11 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           in
           match expr_node.value with
           (* instance of type *)
-          | Ctor(ty_id, []) -> (
-            let ctor_node = Type_context.get_node ctx ty_id in
+          | Ctor(type_expr, []) -> (
+            let type_expr = Type_context.deref_type ctx type_expr in
             let open TypeDef in
-            match ctor_node.value with
-            | TypeDef { spec = Class cls; _ } -> (
+            match type_expr with
+            | TypeDef ({ spec = Class cls; _ }, _) -> (
               let result =
                 List.find ~f:(fun (elm_name, _) -> String.equal elm_name member_name)
                 cls.tcls_elements
@@ -321,7 +278,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           )
 
           (* type def itself *)
-          | TypeDef { spec = Class { tcls_static_elements; _ }; _ } -> (
+          | TypeDef ({ spec = Class { tcls_static_elements; _ }; _ }, _) -> (
             let result =
               List.find ~f:(fun (static_memeber_name, _) -> String.equal static_memeber_name member_name)
               tcls_static_elements
@@ -427,7 +384,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
                 raise (Type_error.Error err)
               );
               let bool_ty = Env.ty_boolean env in
-              Type_context.update_node_type ctx id (TypeExpr.Ctor (bool_ty, []));
+              Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
             )
 
           | _ -> (
@@ -460,7 +417,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           raise (Type_error.Error err)
         )
       in
-      let value = (TypeExpr.Ctor ((Env.ty_unit env), [])) in
+      let unit_type = Env.ty_unit env in
+      let value = (TypeExpr.Ctor (Ref unit_type, [])) in
       let next_id = Type_context.new_id ctx {
         value;
         deps = [ expr.ty_var; ty_int ];
@@ -523,7 +481,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       match type_int with
       | Some v -> (
         let node = {
-          value = TypeExpr.Ctor(v, []);
+          value = TypeExpr.Ctor(Ref v, []);
           loc = init_loc;
           deps = List.rev !deps;
           (* TODO: check props and expressions *)
@@ -570,7 +528,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           let ty =
             if List.is_empty match_clauses then (
               let ty_unit = Env.ty_unit env in
-              TypeExpr.Ctor(ty_unit, [])
+              TypeExpr.Ctor(Ref ty_unit, [])
             ) else (
               (* TODO: better way to check every clauses *)
               List.fold
@@ -578,23 +536,23 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
                 ~f:(fun acc item ->
                   let ctx = Env.ctx env in
                   let node = Type_context.get_node ctx item in
-                  (* let ctor_opt = Check_helper.find_construct_of (Env.ctx env) item in *)
-                  match (acc, node.value) with
+                  let node_expr = Type_context.deref_type ctx node.value in
+                  match (acc, node_expr) with
                   | TypeExpr.Unknown, _ ->
-                    node.value
+                    node_expr
 
                   | (TypeExpr.Ctor(c1, [])), (TypeExpr.Ctor (c2, [])) ->  (
-                    let c1_def = Check_helper.find_construct_of ctx c1 in
-                    let c2_def = Check_helper.find_construct_of ctx c2 in
+                    let c1_def = Type_context.deref_type ctx c1 in
+                    let c2_def = Type_context.deref_type ctx c2 in
                     (match (c1_def, c2_def) with
-                    | (Some (left_sym, _), Some (right_sym, _)) -> (
+                    | (TypeExpr.TypeDef (left_sym, _), TypeExpr.TypeDef (right_sym, _)) -> (
                       if TypeDef.(left_sym == right_sym) then ()
                       else
-                        let err = Type_error.(make_error (Env.ctx env) match_loc NotAllTheCasesReturnSameType) in
+                        let err = Type_error.(make_error (Env.ctx env) match_loc (NotAllTheCasesReturnSameType(c1_def, c2_def))) in
                         raise (Type_error.Error err)
                     )
                     | _ -> (
-                      let err = Type_error.(make_error (Env.ctx env) match_loc NotAllTheCasesReturnSameType) in
+                      let err = Type_error.(make_error (Env.ctx env) match_loc (NotAllTheCasesReturnSameType(c2_def, c2_def))) in
                       raise (Type_error.Error err)
                     ));
 
@@ -632,6 +590,52 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     attributes;
     ty_var;
   }
+
+and annotate_expression_call ~prev_deps env loc call =
+  let open Ast.Expression in
+  let { callee; call_params; call_loc } = call in
+
+  let callee = annotate_expression ~prev_deps env callee in
+  let call_params = List.map ~f:(annotate_expression ~prev_deps env) call_params in
+
+  let params_deps = List.map ~f:(fun expr -> expr.ty_var) call_params in
+
+  let ty_var = Type_context.new_id (Env.ctx env) {
+    value = TypeExpr.Unknown;
+    loc;
+    deps = List.append [ T.Expression.(callee.ty_var) ] params_deps;
+    check = (fun id ->
+      let ctx = Env.ctx env in
+      let ty_int = callee.ty_var in
+      let callee_node = Type_context.get_node ctx ty_int in
+      let deref_type_expr = Type_context.deref_type ctx callee_node.value  in
+      match deref_type_expr with
+      | TypeExpr.Lambda(_params, ret) -> (
+        (* TODO: check call params *)
+        Type_context.update_node_type ctx id ret
+      )
+      | _ ->
+        begin
+          let _ty_def = Check_helper.find_construct_of ctx deref_type_expr in
+          match deref_type_expr with
+          | TypeExpr.TypeDef ({ TypeDef. spec = Function _fun; _ }, _) ->
+            (* TODO: check call params *)
+            Type_context.update_node_type ctx id _fun.fun_return
+
+          | TypeExpr.TypeDef ({ TypeDef. spec = EnumCtor enum_ctor; _}, _) -> (
+            let super_id = enum_ctor.enum_ctor_super_id in
+            Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref super_id, []))
+          )
+
+          | _ -> (
+            let err = Type_error.(make_error ctx call_loc (NotCallable deref_type_expr)) in
+            raise (Type_error.Error err)
+          )
+        end
+    );
+  } in
+
+  ty_var, { T.Expression. callee; call_params; call_loc }
 
 and annotate_expression_if ~prev_deps env _if =
   let open Ast.Expression in
@@ -699,7 +703,7 @@ and annotate_block ~prev_deps env block : T.Block.t =
 
       | _ -> (
         let unit_type = Env.ty_unit env in
-        Type_context.update_node_type ctx id (TypeExpr.Ctor(unit_type, []))
+        Type_context.update_node_type ctx id (TypeExpr.Ctor(Ref unit_type, []))
       )
     );
   } in
@@ -750,7 +754,7 @@ and annotate_declaration env decl : T.Declaration.t =
           )
           | None -> (
             let unit_ty = Env.ty_unit env in
-            TypeExpr.Ctor(unit_ty, []), []
+            TypeExpr.Ctor(Ref unit_ty, []), []
           )
         in
 
@@ -765,7 +769,7 @@ and annotate_declaration env decl : T.Declaration.t =
         } in
 
         Type_context.update_node (Env.ctx env) ty_id {
-          value = TypeExpr.TypeDef ty_def;
+          value = TypeExpr.TypeDef(ty_def, ty_id);
           deps = List.append params_types fun_return_deps;
           loc = decl_loc;
           check = none;
@@ -954,7 +958,7 @@ and annotate_class env cls =
               | Some ty -> annotate_type env ty
               | None -> (
                 let unit_type = Env.ty_unit env in
-                TypeExpr.(Ctor (unit_type, [])), [unit_type]
+                TypeExpr.(Ctor (Ref unit_type, [])), [unit_type]
               )
             in
 
@@ -980,7 +984,7 @@ and annotate_class env cls =
                 |> List.filter
                   ~f:(fun id -> id <> cls_var.var_id)
                 ;
-                value = (TypeExpr.TypeDef new_type);
+                value = (TypeExpr.TypeDef(new_type, method_id));
               })
               method_id
               ;
@@ -1031,7 +1035,8 @@ and annotate_class env cls =
               tcls_elements = List.rev !tcls_elements;
               tcls_static_elements = List.rev !tcls_static_elements;
             };
-          }
+          },
+          cls_var.var_id
         );
         loc = cls.cls_loc;
         deps = 
@@ -1107,25 +1112,32 @@ and annotate_type env ty : (TypeExpr.t * int list) =
   let open Ast.Type in
   let { spec; _ } = ty in
   let deps = ref [] in
+  let scope = Env.peek_scope env in
   match spec with
   | Ty_any -> TypeExpr.Any, []
   | Ty_ctor(ctor, params) -> (
     let { Identifier. pident_name; pident_loc } = ctor in
-    let ty_var_opt = (Env.peek_scope env)#find_type_symbol pident_name in
-    match ty_var_opt with
-    | Some ty_var -> (
-      (* TODO: find ctor in the scope *)
-      let params, params_deps = List.map ~f:(annotate_type env) params |> List.unzip in
-      deps := List.concat (!deps::params_deps);
-      TypeExpr.Ctor (ty_var, params), [ty_var]
-    )
 
-    | None -> (
-      (Env.peek_scope env)#print_type_symbols;
-      let ctx = Env.ctx env in
-      let err_spec = Type_error.CannotFindName pident_name in
-      let err = Type_error.make_error ctx pident_loc err_spec in
-      raise (Type_error.Error err)
+    let params, params_deps = List.map ~f:(annotate_type env) params |> List.unzip in
+    deps := List.concat (!deps::params_deps);
+
+    if scope#is_generic_type_symbol pident_name then
+      TypeExpr.Ctor (TypeSymbol pident_name, params), !deps
+    else (
+      let ty_var_opt = (Env.peek_scope env)#find_type_symbol pident_name in
+      match ty_var_opt with
+      | Some ty_var -> (
+        (* TODO: find ctor in the scope *)
+        TypeExpr.Ctor (Ref ty_var, params), ty_var::!deps
+      )
+
+      | None -> (
+        (Env.peek_scope env)#print_type_symbols;
+        let ctx = Env.ctx env in
+        let err_spec = Type_error.CannotFindName pident_name in
+        let err = Type_error.make_error ctx pident_loc err_spec in
+        raise (Type_error.Error err)
+      )
     )
 
   )
@@ -1209,8 +1221,8 @@ and annotate_function env fun_ =
       | Some type_expr ->
         annotate_type env type_expr
       | None ->
-        let _unit = Env.ty_unit env in
-        TypeExpr.Ctor(_unit, []), []
+        let unit_type = Env.ty_unit env in
+        TypeExpr.Ctor(Ref unit_type, []), []
     in
 
     fun_deps := List.append !fun_deps return_ty_Deps;
@@ -1271,7 +1283,7 @@ and annotate_function env fun_ =
             fun_return = return_ty;
           };
         } in
-        Type_context.update_node_type ctx id (TypeExpr.TypeDef type_def)
+        Type_context.update_node_type ctx id (TypeExpr.TypeDef(type_def, id))
       );
     };
     { T.Function.
@@ -1296,19 +1308,12 @@ and annotate_enum env enum =
 
   let scope = new scope ~prev:scope () in
 
-  let type_vars =
+  let type_vars_names =
     List.map
       ~f:(fun ident ->
-        let node = {
-          Core_type.
-          value = Unknown;
-          check = none;
-          loc = ident.pident_loc;
-          deps = [];
-        } in
-        let id = Type_context.new_id (Env.ctx env) node in
-        scope#insert_type_symbol ident.pident_name id;
-        id
+        scope#insert_generic_type_symbol ident.pident_name;
+
+        ident.pident_name
       )
       type_vars
   in
@@ -1340,11 +1345,11 @@ and annotate_enum env enum =
               enum_ctor_super_id = variable.var_id;
               enum_ctor_params = [];
             } in
-            Type_context.update_node_type ctx id (TypeExpr.TypeDef {
+            Type_context.update_node_type ctx id (TypeExpr.TypeDef({
               builtin = false;
               name = case_name.pident_name;
               spec = EnumCtor ty_def;
-            })
+            }, id))
           )
         })
         member_var.var_id
@@ -1361,29 +1366,36 @@ and annotate_enum env enum =
 
     Type_context.map_node
       ctx
-      ~f:(fun node -> {
-        node with
-        (* deps = cases_deps; *)
-        deps = [];
-        loc;
-        check = (fun id ->
-          let ty_def = {
-            TypeDef.
-            enum_members = [];
-          } in
-          Type_context.update_node_type ctx id (TypeExpr.TypeDef {
-            builtin = false;
-            name = name.pident_name;
-            spec = Enum ty_def;
-          })
-        )
-      })
+      ~f:(fun node ->
+        let enum_params =
+          List.map
+          ~f:(fun id -> Identifier.(id.pident_name))
+          type_vars
+        in
+        { node with
+          (* deps = cases_deps; *)
+          deps = [];
+          loc;
+          check = (fun id ->
+            let ty_def = {
+              TypeDef.
+              enum_members = [];
+              enum_params;
+            } in
+            Type_context.update_node_type ctx id (TypeExpr.TypeDef({
+              builtin = false;
+              name = name.pident_name;
+              spec = Enum ty_def;
+            }, id))
+          )
+        }
+      )
       variable.var_id;
 
     { T.Enum.
       visibility;
       name = (name.pident_name, variable.var_id);
-      type_vars;
+      type_vars = type_vars_names;
       cases;
       loc;
     }

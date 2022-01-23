@@ -199,7 +199,7 @@ and Enum : sig
   type t = {
     visibility: Asttypes.visibility option;
     name: (string * int);
-    type_vars: int list;
+    type_vars: string list;  (* generic vars *)
     cases: case list;
     loc: Loc.t;
   }

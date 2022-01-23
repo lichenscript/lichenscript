@@ -12,6 +12,8 @@ type t = {
   declarations: (int, Typedtree.Declaration.t) Hashtbl.t;
 }
 
+let size ctx = ResizableArray.size ctx.ty_map
+
 let new_id ctx ty =
   let id = ResizableArray.size ctx.ty_map in
   ResizableArray.push ctx.ty_map ty;
@@ -38,13 +40,14 @@ let make_default_type_sym ctx scope =
   Array.iter
     ~f:(fun (name, spec) ->
       let sym = TypeDef.create ~builtin:true  name spec in
+      let id = size ctx in
       let node = {
-        value = TypeExpr.TypeDef sym;
+        value = TypeExpr.TypeDef (sym, id);
         loc = Lichenscript_lex.Loc.none;
         deps = [];
         check = none;
       } in
-      let id = new_id ctx node in
+      ignore (new_id ctx node);
       scope#insert_type_symbol name id;
     )
     names
@@ -87,6 +90,16 @@ let rec print_type_by_id ctx id =
   let item = get_node ctx id in
   print_type_value ctx item.value
 
+
+and deref_type ctx ty =
+  let open Core_type.TypeExpr in
+  match ty with
+  | Ref c ->
+    let node = get_node ctx c in
+    deref_type ctx node.value
+
+  | _ -> ty
+
 (* first level *)
 and print_type_value ctx ty_value =
   let open Core_type.TypeExpr in
@@ -94,23 +107,49 @@ and print_type_value ctx ty_value =
   | Unknown -> "unknown"
   | Any -> "any"
   | Ctor (var, []) -> (
-    let node = get_node ctx var in
-    match node.value with
-    | TypeDef type_sym ->
+    let var = deref_type ctx var in
+    match deref_type ctx var with
+    | TypeDef (type_sym, _) ->
       (Format.asprintf "%a" Core_type.TypeDef.pp type_sym)
 
     | _ ->
-      print_type_value ctx node.value
+      print_type_value ctx var
 
   )
-  | Ctor _ -> "ctor"
+
+  | Ctor (var, params) -> (
+    let var = deref_type ctx var in
+    let super =
+      match var with
+      | TypeDef (type_sym, _) ->
+        (Format.asprintf "%a" Core_type.TypeDef.pp type_sym)
+
+      | _ ->
+        print_type_value ctx var
+
+    in
+    let len = List.length params in
+    List.foldi
+      ~init:(super ^ "<")
+      ~f:(fun index acc item ->
+        let item_str = print_type_value ctx item in
+        acc ^ item_str ^ (
+          if index = (len - 1) then
+            ">"
+          else
+            ", "
+        )
+      )
+      params
+  )
+
   | Ref id -> (
     let node = get_node ctx id in
     print_type_value ctx node.value
   )
   | Lambda _ -> "lambda"
   | Array _ -> "array"
-  | TypeDef type_sym -> (
+  | TypeDef (type_sym, _) -> (
     let open Core_type.TypeDef in
     match type_sym.spec with
     | Function _fun -> (
@@ -125,6 +164,8 @@ and print_type_value ctx ty_value =
     | _ ->
       (Format.asprintf "(typeof %a)" Core_type.TypeDef.pp type_sym)
   )
+
+  | TypeSymbol sym -> sym
 
 let print ctx =
 

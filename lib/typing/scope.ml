@@ -23,9 +23,16 @@ type property = {
 class scope ?prev () = object(self)
   val var_symbols = SymbolTable.create ()
   val type_symbols = SymbolTable.create ()
+  val generic_type_symbol = Hash_set.create (module String)
   val mutable export_map: Asttypes.visibility option ExportTable.t = ExportTable.empty;
   val mutable capturing_variables = CapturingVarMap.empty
   val mutable var_counter = 0
+
+  method insert_generic_type_symbol (name: string) =
+    Hash_set.add generic_type_symbol name
+
+  method is_generic_type_symbol (name: string) =
+    Hash_set.mem generic_type_symbol name
 
   method find_local_var_symbol (name: string): variable option =
     SymbolTable.find var_symbols name

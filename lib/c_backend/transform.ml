@@ -572,7 +572,7 @@ and transform_expression env expr =
         (* it's a local function *)
         | None -> (
           let callee_node = Type_context.get_node env.ctx callee.ty_var in
-          let deref_type = Check_helper.deref_type env.ctx callee_node.value in
+          let deref_type = Type_context.deref_type env.ctx callee_node.value in
           match deref_type with
           | Core_type.TypeExpr.Lambda _ -> (
             let transformed_callee = transform_expression env callee in
@@ -583,7 +583,8 @@ and transform_expression env expr =
 
           (* it's a contructor *)
           | _ ->
-            let ctor_opt = Check_helper.find_construct_of env.ctx id in
+            let node = Type_context.get_node env.ctx id in
+            let ctor_opt = Check_helper.find_typedef_of env.ctx node.value in
             let ctor_name, _ctor_ty_id = Option.value_exn ctor_opt in
             let name = find_variable env ctor_name.name in
             C_op.Expr.ExternalCall(name, params)
@@ -592,8 +593,8 @@ and transform_expression env expr =
       )
 
       | _ -> (
-        let ty_id = callee.ty_var in
-        let ctor_opt = Check_helper.find_construct_of env.ctx ty_id in
+        let callee_node = Type_context.get_node env.ctx callee.ty_var in
+        let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
         let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
         let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
         C_op.Expr.ExternalCall(global_name, [])
@@ -733,7 +734,9 @@ and transform_expression env expr =
       C_op.Expr.Temp result_tmp
     )
 
-    | _ -> failwith "not implemented"
+    | This -> failwith "not implemented: this"
+    | Super -> failwith "not implemented: super"
+    | Index _ -> failwith "not implemented: index"
 
   in
   {
@@ -755,7 +758,8 @@ and transform_pattern_to_test env match_expr pat =
   let { spec; loc } = pat in
   match spec with
   | Symbol (name, name_id) -> (
-    let ctor_opt = Check_helper.find_construct_of env.ctx name_id in
+    let name_node = Type_context.get_node env.ctx name_id in
+    let ctor_opt = Check_helper.find_typedef_of env.ctx name_node.value in
     let ctor, _ = Option.value_exn ~message:(Format.sprintf "find enum ctor failed: %s %d" name name_id) ctor_opt in
     let enum_ctor = Core_type.TypeDef.(
       match ctor.spec with
@@ -768,7 +772,8 @@ and transform_pattern_to_test env match_expr pat =
     }
   )
   | EnumCtor ((_name, name_id), _child) -> (
-    let ctor_opt = Check_helper.find_construct_of env.ctx name_id in
+    let name_node = Type_context.get_node env.ctx name_id in
+    let ctor_opt = Check_helper.find_typedef_of env.ctx name_node.value in
     let ctor, _ = Option.value_exn ctor_opt in
     let enum_ctor = Core_type.TypeDef.(
       match ctor.spec with

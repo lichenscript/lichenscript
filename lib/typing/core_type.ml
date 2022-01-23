@@ -28,7 +28,7 @@ module rec TypeExpr : sig
      * 1,2,3 are instances of i32
      * "string" is instances of String
      *)
-    | Ctor of int * (t list)
+    | Ctor of t * (t list)
 
     (*
      * 1. On the contract of Ctor, `Ref` represents the original type itself.
@@ -53,7 +53,10 @@ module rec TypeExpr : sig
      *)
     | Array of t
 
-    | TypeDef of TypeDef.t
+    | TypeDef of (TypeDef.t * int)
+
+    (* used for generic *)
+    | TypeSymbol of string
 
   and function_type = {
     tfun_params: (string * t) list;
@@ -67,11 +70,12 @@ end = struct
   type t =
     | Unknown
     | Any
-    | Ctor of int * (t list)
+    | Ctor of t * (t list)
     | Ref of int
     | Lambda of t list * t
     | Array of t
-    | TypeDef of TypeDef.t
+    | TypeDef of (TypeDef.t * int)
+    | TypeSymbol of string
 
   and function_type = {
     tfun_params: (string * t) list;
@@ -83,11 +87,12 @@ end = struct
     match t with
     | Unknown -> Format.fprintf formatter "unkown"
     | Any -> Format.fprintf formatter "any"
-    | Ctor(i, _) -> Format.fprintf formatter "'%d" i
+    | Ctor _ -> Format.fprintf formatter "ctor"
     | Ref i -> Format.fprintf formatter "ref '%d" i
     | Lambda _ -> Format.fprintf formatter "lambda"
     | Array _ -> Format.fprintf formatter "array"
     | TypeDef _ -> Format.fprintf formatter "typedef"
+    | TypeSymbol sym -> Format.pp_print_string formatter sym
 
 end
 
@@ -103,6 +108,7 @@ and TypeDef : sig
 
   and enum_type = {
     enum_members: enum_member list;
+    enum_params: string list;
   }
 
   and _function = {
@@ -163,6 +169,7 @@ end = struct
 
   and enum_type = {
     enum_members: enum_member list;
+    enum_params: string list;
   }
 
   and _function = {

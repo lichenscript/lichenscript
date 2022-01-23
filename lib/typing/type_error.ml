@@ -13,6 +13,7 @@ and spec =
   | CannotReturn of TypeExpr.t * TypeExpr.t
   | CannotFindName of string
   | CannotGetIndex of TypeExpr.t
+  | CannotContructParamOfType of string * TypeExpr.t
   | Redefinition of string
   | NotCallable of TypeExpr.t
   | ParamsMismatch of TypeExpr.t
@@ -21,7 +22,7 @@ and spec =
   | CannotApplyBinary of BinaryOp.t * TypeExpr.t * TypeExpr.t
   | CannotResolveTypeOfExpression
   | DeclareFunctionShouldSpecificExternal
-  | NotAllTheCasesReturnSameType
+  | NotAllTheCasesReturnSameType of (TypeExpr.t * TypeExpr.t)
   | CapitalizedEnumMemeber of string
   | NotAEnumConstructor of string
 
@@ -72,6 +73,9 @@ module PP = struct
       let left_type = Type_context.print_type_value ctx ty in
       Format.fprintf formatter "Can not get index of type '%s'" left_type
 
+    | CannotContructParamOfType(name, ty) ->
+      Format.fprintf formatter "Can not construct param %s type '%s'" name (pp_ty ty)
+
     | Redefinition name ->
       Format.fprintf formatter "Redefinition of '%s'" name
 
@@ -101,8 +105,9 @@ module PP = struct
     | DeclareFunctionShouldSpecificExternal ->
       Format.fprintf formatter "Declare function should specify external symbol, use @external decorator"
 
-    | NotAllTheCasesReturnSameType ->
-      Format.fprintf formatter "All the cases of match expression should return the same type"
+    | NotAllTheCasesReturnSameType (prev, current) ->
+      Format.fprintf formatter "All the cases of match expression should return the same type, previous is %s, but got %s"
+        (pp_ty prev) (pp_ty current)
 
     | CapitalizedEnumMemeber name -> (
       let first_char = String.get name 0 in
