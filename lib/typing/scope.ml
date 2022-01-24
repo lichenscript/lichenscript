@@ -12,8 +12,10 @@ type variable = {
 }
 
 type class_element =
-| Cls_property of { prop_id: int; prop_visibility: Asttypes.visibility option; }
-| Cls_method of { method_id: int; method_visibility: Asttypes.visibility option; }
+  | Cls_property of { prop_id: int; prop_visibility: Asttypes.visibility option; }
+  | Cls_method of { method_id: int; method_visibility: Asttypes.visibility option; }
+  | Cls_getter of { getter_id: int; getter_visibility: Asttypes.visibility option; }
+  | Cls_setter of { setter_id: int; setter_visibility: Asttypes.visibility option; }
 
 type property = {
   prop_id: int;

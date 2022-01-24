@@ -669,25 +669,6 @@ and parse_class_body env: Declaration.class_body =
   let open Declaration in
   let parse_element env =
     let start_pos = Peek.loc env in
-    let v = parse_visibility env in
-
-    let cls_method_modifier =
-      match Peek.token env with
-      | Token.T_STATIC ->
-        Eat.token env;
-        Some Ast.Declaration.Cls_modifier_static
-
-      | Token.T_VIRTUAL ->
-        Eat.token env;
-        Some Ast.Declaration.Cls_modifier_virtual
-
-      | Token.T_OVERRIDE ->
-        Eat.token env;
-        Some Ast.Declaration.Cls_modifier_override
-
-      | _ -> None
-    in
-
     let attributes =
       if (Peek.token env) = Token.T_AT then
         parse_attributes env
@@ -695,52 +676,97 @@ and parse_class_body env: Declaration.class_body =
         []
     in
 
-    let id = parse_identifier env in
-
-    if Peek.token env = Token.T_LPAREN then
-      begin
-        let params = parse_params env in
-        let cls_method_return_ty =
-          if Peek.token env = Token.T_COLON then (
-            Eat.token env;
-            Some (parse_type env)
-          ) else
-            None
-        in
-        let cls_method_body =
-          if Peek.token env = Token.T_SEMICOLON then (
-            Eat.token env;
-            None
-          ) else
-            Some (parse_block env)
-        in
-        Cls_method {
-          cls_method_attributes = attributes;
-          cls_method_modifier;
-          cls_method_visibility = v;
-          cls_method_name = id;
-          cls_method_params = params;
-          cls_method_body;
-          cls_method_loc = with_start_loc env start_pos;
-          cls_method_return_ty;
-        }
-      end
-    else
-      begin
-        Expect.token env Token.T_COLON;
-        let cls_property_type = parse_type env in
-
-        if (Peek.token env) = Token.T_SEMICOLON then (
+    if (Peek.token env) = Token.T_DECLARE then (
+      Eat.token env;
+      let first_id = parse_identifier env in
+      let cls_decl_method_get_set =
+        match first_id.pident_name with
+        | "get" -> Some Cls_getter
+        | "set" -> Some Cls_setter
+        | _ -> None
+      in
+      let cls_decl_method_name =
+        match cls_decl_method_get_set with
+        | Some _ -> parse_identifier env
+        | None -> first_id
+      in
+      let params = parse_params env in
+      let cls_decl_method_return_ty =
+        if Peek.token env = Token.T_COLON then (
           Eat.token env;
-        );
-        Cls_property {
-          cls_property_attributes = attributes;
-          cls_property_visibility = v;
-          cls_property_loc = with_start_loc env start_pos;
-          cls_property_name = id;
-          cls_property_type;
-        }
-    end
+          Some (parse_type env)
+        ) else
+          None
+      in
+      Expect.token env Token.T_SEMICOLON;
+      Cls_declare {
+        cls_decl_method_attributes = attributes;
+        cls_decl_method_get_set;
+        cls_decl_method_name;
+        cls_decl_method_params = params;
+        cls_decl_method_loc = with_start_loc env start_pos;
+        cls_decl_method_return_ty;
+      }
+    ) else
+      let v = parse_visibility env in
+
+      let cls_method_modifier =
+        match Peek.token env with
+        | Token.T_STATIC ->
+          Eat.token env;
+          Some Ast.Declaration.Cls_modifier_static
+
+        | Token.T_VIRTUAL ->
+          Eat.token env;
+          Some Ast.Declaration.Cls_modifier_virtual
+
+        | Token.T_OVERRIDE ->
+          Eat.token env;
+          Some Ast.Declaration.Cls_modifier_override
+
+        | _ -> None
+      in
+
+      let id = parse_identifier env in
+
+      if Peek.token env = Token.T_LPAREN then
+        begin
+          let params = parse_params env in
+          let cls_method_return_ty =
+            if Peek.token env = Token.T_COLON then (
+              Eat.token env;
+              Some (parse_type env)
+            ) else
+              None
+          in
+          let cls_method_body = parse_block env in
+          Cls_method {
+            cls_method_attributes = attributes;
+            cls_method_modifier;
+            cls_method_visibility = v;
+            cls_method_name = id;
+            cls_method_params = params;
+            cls_method_body;
+            cls_method_loc = with_start_loc env start_pos;
+            cls_method_return_ty;
+          }
+        end
+      else
+        begin
+          Expect.token env Token.T_COLON;
+          let cls_property_type = parse_type env in
+
+          if (Peek.token env) = Token.T_SEMICOLON then (
+            Eat.token env;
+          );
+          Cls_property {
+            cls_property_attributes = attributes;
+            cls_property_visibility = v;
+            cls_property_loc = with_start_loc env start_pos;
+            cls_property_name = id;
+            cls_property_type;
+          }
+      end
   in
 
   let start_loc = Peek.loc env in

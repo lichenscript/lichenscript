@@ -71,8 +71,19 @@ end
 
 and Stmt : sig
 
+  type if_spec = {
+    if_test: Expr.t;
+    if_consequent: Stmt.t list;
+    if_alternate: if_alt option;
+  }
+
+  and if_alt =
+    | If_alt_if of if_spec
+    | If_alt_block of Stmt.t list
+  [@@deriving show]
+
   type spec =
-  | If of Expr.t * Stmt.t list
+  | If of if_spec
   | While of Expr.t * Block.t
   | Expr of Expr.t
   | VarDecl of string list
@@ -80,6 +91,8 @@ and Stmt : sig
   | Break
   | Retain of Expr.t
   | Release of Expr.t
+  | Label of string
+  | Goto of string
   [@@deriving show]
 
   type t = {

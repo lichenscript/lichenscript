@@ -292,9 +292,22 @@ and Declaration : sig
     cls_method_modifier: class_modifier option;
     cls_method_name: Identifier.t;
     cls_method_params: Function.params;
-    cls_method_body: Block.t option;
+    cls_method_body: Block.t;
     cls_method_loc: Loc.t;
     cls_method_return_ty: Type.t option;
+  }
+
+  and class_get_set =
+    | Cls_getter
+    | Cls_setter
+
+  and class_declare_method = {
+    cls_decl_method_attributes: attributes;
+    cls_decl_method_get_set: class_get_set option;
+    cls_decl_method_name: Identifier.t;
+    cls_decl_method_params: Function.params;
+    cls_decl_method_loc: Loc.t;
+    cls_decl_method_return_ty: Type.t option;
   }
 
   and class_modifier =
@@ -303,8 +316,9 @@ and Declaration : sig
     | Cls_modifier_override
 
   and class_body_element =
-    | Cls_method of class_method
     | Cls_property of class_property
+    | Cls_method of class_method
+    | Cls_declare of class_declare_method
   [@@deriving show]
 
   type import = {

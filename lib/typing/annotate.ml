@@ -236,11 +236,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let ty_var, spec = annotate_expression_call ~prev_deps env loc call in
       ty_var, (T.Expression.Call spec)
 
-    (*
-     * TODO: namespace
-     * class/enum static function
-     * object's property/method
-     *)
     | Member (expr, name) -> (
       let expr = annotate_expression ~prev_deps env expr in
       let ctx = Env.ctx env in
@@ -251,47 +246,14 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         deps = List.append prev_deps [expr.ty_var];
         check = (fun id ->
           let expr_node = Type_context.get_node ctx expr.ty_var in
-          let open TypeExpr in
-          let raise_error () =
+          let member_type_opt = Check_helper.find_member_of_type ctx expr_node.value member_name in
+          match member_type_opt with
+          | Some ty ->
+            Type_context.update_node_type ctx id ty
+
+          | None ->
             let err = Type_error.(make_error ctx loc (CannotReadMember(member_name, expr_node.value))) in
             raise (Type_error.Error err)
-          in
-          match expr_node.value with
-          (* instance of type *)
-          | Ctor(type_expr, []) -> (
-            let type_expr = Type_context.deref_type ctx type_expr in
-            let open TypeDef in
-            match type_expr with
-            | TypeDef ({ spec = Class cls; _ }, _) -> (
-              let result =
-                List.find ~f:(fun (elm_name, _) -> String.equal elm_name member_name)
-                cls.tcls_elements
-              in
-              match result with
-              | Some (_, member_id) ->
-                Type_context.update_node_type ctx id (TypeExpr.Ref member_id)
-
-              | _ -> raise_error ()
-            )
-            | _ ->
-              raise_error ()
-          )
-
-          (* type def itself *)
-          | TypeDef ({ spec = Class { tcls_static_elements; _ }; _ }, _) -> (
-            let result =
-              List.find ~f:(fun (static_memeber_name, _) -> String.equal static_memeber_name member_name)
-              tcls_static_elements
-            in
-
-            match result with
-            | Some (_, member_id) ->
-              Type_context.update_node_type ctx id (TypeExpr.Ref member_id)
-
-            | _ -> raise_error ()
-          )
-
-          | _ -> raise_error ()
 
         );
       } in
@@ -835,6 +797,12 @@ and annotate_class env cls =
   let prev_scope = Env.peek_scope env in
   let class_scope = new class_scope ~prev:prev_scope () in
 
+  List.iter
+    ~f:(fun ident ->
+      class_scope#insert_generic_type_symbol ident.pident_name;
+    )
+    cls.cls_type_vars;
+
   let tcls_static_elements = ref [] in
   let tcls_elements = ref [] in
   let props_deps = ref [] in
@@ -894,6 +862,46 @@ and annotate_class env cls =
             prop_visibility = cls_property_visibility;
           })
       )
+
+      | Cls_declare declare -> (
+        let { cls_decl_method_name; cls_decl_method_loc; cls_decl_method_get_set; _ } = declare in
+        let node = {
+          value = TypeExpr.Unknown;
+          deps = [];
+          loc = cls_decl_method_loc;
+          check = none;
+        } in
+        let node_id = Type_context.new_id ctx node in
+        tcls_elements := ((cls_decl_method_name.pident_name, node_id)::!tcls_elements);
+        match cls_decl_method_get_set with
+        | Some Cls_getter -> 
+          class_scope#insert_cls_element
+            cls_decl_method_name.pident_name
+            (Scope.Cls_getter {
+              getter_id = node_id;
+              (* temporary use public here *)
+              getter_visibility = Some Asttypes.Pvisibility_public;
+            })
+
+        | Some Cls_setter ->
+          class_scope#insert_cls_element
+            cls_decl_method_name.pident_name
+            (Scope.Cls_setter {
+              setter_id = node_id;
+              (* temporary use public here *)
+              setter_visibility = Some Asttypes.Pvisibility_public;
+            })
+
+        | None ->
+          class_scope#insert_cls_element
+            cls_decl_method_name.pident_name
+            (Scope.Cls_method {
+              method_id = node_id;
+              (* temporary use public here *)
+              method_visibility = Some Asttypes.Pvisibility_public;
+            })
+      )
+
     )
     cls.cls_body.cls_body_elements;
 
@@ -939,16 +947,11 @@ and annotate_class env cls =
           in
           Env.with_new_scope env method_scope (fun env ->
             let cls_method_params, cls_method_params_deps = annotate_function_params env cls_method_params in
-            let cls_method_body = Option.map ~f:(annotate_block ~prev_deps:cls_method_params_deps env) cls_method_body in
+            let cls_method_body = annotate_block ~prev_deps:cls_method_params_deps env cls_method_body in
 
             let this_deps = ref !props_deps in
 
-            Option.iter
-              ~f:(fun body_block ->
-                let t = Typedtree.Block.(body_block.return_ty) in
-                this_deps := t::(!this_deps);
-              )
-              cls_method_body;
+            this_deps := Typedtree.Block.(cls_method_body.return_ty)::(!this_deps);
 
             (* check return *)
             let _collected_returns = Env.take_return_types env in
@@ -1008,6 +1011,25 @@ and annotate_class env cls =
             cls_property_loc;
             cls_property_visibility;
             cls_property_name;
+          }
+        )
+
+        | Cls_declare declare -> (
+          let { cls_decl_method_attributes; cls_decl_method_name; cls_decl_method_params; cls_decl_method_loc; _ } = declare in
+          let declare_id =
+            match (class_scope#find_cls_element cls_decl_method_name.pident_name) with
+            | Some (Scope.Cls_method { method_id; _ }) -> method_id
+            | Some (Scope.Cls_getter { getter_id; _ }) -> getter_id
+            | Some (Scope.Cls_setter { setter_id; _ }) -> setter_id
+            | Some _ -> failwith "unexpected: expect class method, but got property"
+            | None -> failwith (Format.sprintf "unexpected: can not find class method %s" cls_decl_method_name.pident_name)
+          in
+          let cls_decl_method_params, _cls_method_params_deps = annotate_function_params env cls_decl_method_params in
+          T.Declaration.Cls_declare {
+            cls_decl_method_attributes;
+            cls_decl_method_loc;
+            cls_decl_method_name = cls_decl_method_name.pident_name, declare_id;
+            cls_decl_method_params;
           }
         )
       )

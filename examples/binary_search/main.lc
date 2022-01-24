@@ -1,7 +1,7 @@
 
 function binarySearch(data: i32[], key: i32): Option<i32> {
 	let low = 0;
-	let high = 0;
+	let high = data.length - 1;
 
 	while low <= high {
 		let mid = (low + high) / 2;

@@ -13,11 +13,13 @@
 #endif
 
 typedef enum LCObjectType {
+    LC_TY_I32 = -4,
+    LC_TY_F32 = -3,
+    LC_TY_BOOL = -2,
+    LC_TY_UNION = -1,
     LC_TY_NULL = 0,
-    LC_TY_I32,
-    LC_TY_F32,
-    LC_TY_BOOL,
-    LC_TY_STRING = 64,
+    LC_TY_UNION_OBJECT = 1,
+    LC_TY_STRING,
     LC_TY_SYMBOL,
     LC_TY_REFCELL,
     LC_TY_LAMBDA,
@@ -95,6 +97,7 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 #define MK_BOOL(v) ((LCValue) { { .int_val = (v) }, LC_TY_BOOL })
 #define MK_VARIANT_CLOSED(v) ((LCValue) { { .int_val = v }, (LC_TY_MAX + (v << 6)) })
 #define MK_CLASS_OBJ(obj) ((LCValue){ { .ptr_val = (LCObject*)obj }, LC_TY_CLASS_OBJECT })
+#define MK_UNION(v) ((LCValue) { { .int_val = v }, LC_TY_UNION })
 #define LC_I32_EQ(l, r) MK_BOOL((l).int_val == (r).int_val)
 #define LC_I32_NOT_EQ(l, r) MK_BOOL((l).int_val != (r).int_val)
 #define LC_I32_LT(l, r) MK_BOOL((l).int_val < (r).int_val)
@@ -110,7 +113,6 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 #define LC_I32_RIGHT_SHIFT(l, r) MK_I32((l).int_val >> (r).int_val)
 #define LC_I32_BIT_OR(l, r) MK_I32((l).int_val | (r).int_val)
 #define LC_I32_BIT_AND(l, r) MK_I32((l).int_val & (r).int_val)
-#define LC_VALUE_TAG(v) (v.tag >> 8)
 
 #endif
 
@@ -130,6 +132,13 @@ typedef struct LCRefCell {
     LC_OBJ_HEADER
     LCValue value;
 } LCRefCell;
+
+typedef struct LCUnionObject {
+    LC_OBJ_HEADER
+    int tag;
+    size_t size;
+    LCValue value[];
+} LCUnionObject;
 
 typedef struct LCBox64 {
     LC_OBJ_HEADER
@@ -184,6 +193,9 @@ LCValue LCNewStringFromCString(LCRuntime* rt, const unsigned char* content);
 LCValue LCNewRefCell(LCRuntime* rt, LCValue value);
 void LCRefCellSetValue(LCRuntime* rt, LCValue cell, LCValue value);
 LCValue LCRefCellGetValue(LCValue cell);
+
+LCValue LCNewUnionObject(LCRuntime* rt, int tag, int size, LCValue* args);
+int LCUnionGetType(LCValue);
 
 LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, int argc, LCValue* args);
 LCValue LCLambdaGetValue(LCRuntime* rt, LCValue lambda, int index);

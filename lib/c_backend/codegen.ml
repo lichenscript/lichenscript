@@ -90,22 +90,7 @@ let rec codegen_statement (env: t) stmt =
     ps env ";";
   )
 
-  | If (test, stmts) -> (
-    ps env "if (";
-    codegen_expression env test;
-    ps env ") {\n";
-    with_indent env (fun () -> 
-      List.iter
-        ~f:(fun stmt ->
-          print_indents env;
-          codegen_statement env stmt;
-          endl env;
-        )
-        stmts
-    );
-    print_indents env;
-    ps env "}"
-  )
+  | If if_spec -> codegen_expression_if env if_spec
 
   | While (expr, block) -> (
     ps env "while (";
@@ -142,7 +127,58 @@ let rec codegen_statement (env: t) stmt =
     ps env ");";
   )
 
-  | _ -> ()
+  | Retain expr ->
+    ps env "LCRetain(";
+    codegen_expression env expr;
+    ps env ");"
+
+  | Label label ->
+    ps env label;
+    ps env ":"
+
+  | Goto label ->
+    ps env "goto ";
+    ps env label;
+    ps env ";"
+
+and codegen_expression_if env if_spec =
+  let open C_op.Stmt in
+  let { if_test; if_consequent; if_alternate } = if_spec in
+  ps env "if (";
+  codegen_expression env if_test;
+  ps env ") {\n";
+  with_indent env (fun () -> 
+    List.iter
+      ~f:(fun stmt ->
+        print_indents env;
+        codegen_statement env stmt;
+        endl env;
+      )
+      if_consequent
+  );
+  print_indents env;
+  ps env "}";
+  match if_alternate with
+  | Some (If_alt_block blk) -> (
+    ps env " else {";
+    endl env;
+    with_indent env (fun () -> 
+      List.iter
+        ~f:(fun stmt ->
+          print_indents env;
+          codegen_statement env stmt;
+          endl env;
+        )
+        blk
+    );
+    print_indents env;
+    ps env "}";
+  )
+  | Some (If_alt_if if_spec) -> (
+    ps env " else ";
+    codegen_expression_if env if_spec
+  )
+  | None -> ()
 
 and codegen_declaration env decl =
   let open Decl in
@@ -216,13 +252,9 @@ and codegen_declaration env decl =
   | EnumCtor ctor -> (
     ps env (Format.sprintf "LCValue %s(LCRuntime* rt, LCValue this, int argv, LCValue* args) {\n" ctor.enum_ctor_name);
     if ctor.enum_cotr_params_size = 0 then
-      ps env (Format.sprintf "    return (LCValue){ { .int_val = 0 }, (%d << 8) + 0x80 + LC_TY_NULL };\n" ctor.enum_ctor_tag_id)
-    else if ctor.enum_cotr_params_size = 1 then (
-      ps env "    LCValue ret = args[0];\n";
-      ps env (Format.sprintf "    ret.tag += (%d << 8) + 0x80;\n" ctor.enum_ctor_tag_id);
-      ps env "    return ret;\n"
-    ) else (
-      failwith "not implemented"
+      ps env (Format.sprintf "    return MK_UNION(%d);\n" ctor.enum_ctor_tag_id)
+    else (
+      ps env (Format.sprintf "    return LCNewUnionObject(rt, %d, argv, args);\n" ctor.enum_ctor_tag_id)
     );
     ps env "}\n";
   )
@@ -523,7 +555,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
   )
 
   | TagEqual (expr, tag) -> (
-    ps env "LC_VALUE_TAG(";
+    ps env "LCUnionGetType(";
     codegen_expression env expr;
     ps env ") == ";
     ps env (Int.to_string tag)

@@ -2,11 +2,24 @@
 @external("lc_std_print")
 public declare function print(content: string);
 
-class Object {
+public class Object {
 
     virtual toString(): string {
         return "Object";
     }
+
+}
+
+public class Array<T> {
+
+    @external("lc_std_array_push")
+    declare push(item: T);
+
+    @external("lc_std_array_get_length")
+    declare get length(): i32;
+
+    @external("lc_std_array_set_length")
+    declare set length(v: i32);
 
 }
 

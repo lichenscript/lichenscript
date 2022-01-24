@@ -127,8 +127,23 @@ static inline void LCFreeRefCell(LCRuntime* rt, LCValue val) {
     lc_free(rt, cell);
 }
 
+static inline void LCFreeUnionObject(LCRuntime* rt, LCValue val) {
+    LCUnionObject* union_obj = (LCUnionObject*)val.ptr_val;
+
+    int i;
+    for (i = 0; i < union_obj->size; i++) {
+        LCRelease(rt, union_obj->value[i]);
+    }
+
+    lc_free(rt, union_obj);
+}
+
 static void LCFreeObject(LCRuntime* rt, LCValue val) {
-    switch (val.tag & 0x7F) {
+    switch (val.tag) {
+    case LC_TY_UNION_OBJECT:
+        LCFreeUnionObject(rt, val);
+        break;
+
     case LC_TY_REFCELL:
         LCFreeRefCell(rt, val);
         break;
@@ -258,11 +273,11 @@ void LCFreeRuntime(LCRuntime* rt) {
 
 void LCUpdateValue(LCArithmeticType op, LCValue* left, LCValue right) {
     LCValue* this = left;
-    int ty = this->tag & 0x7F;
+    int ty = this->tag;
     if (ty == LC_TY_REFCELL) {
         LCRefCell* ref_cell = (LCRefCell*)left->ptr_val;
         this = &ref_cell->value;
-        ty = this->tag & 0x7F;
+        ty = this->tag;
     }
 
     if (ty == LC_TY_I32) {
@@ -336,7 +351,7 @@ void LCUpdateValue(LCArithmeticType op, LCValue* left, LCValue right) {
 }
 
 void LCRetain(LCValue val) {
-    if (val.tag < 64) {
+    if (val.tag <= 0) {
         return;
     }
     if (val.ptr_val->header.count == LC_NO_GC) {
@@ -346,7 +361,7 @@ void LCRetain(LCValue val) {
 }
 
 void LCRelease(LCRuntime* rt, LCValue val) {
-    if ((val.tag & 0x7F) < 64) {
+    if (val.tag <= 0) {
         return;
     }
     if (val.ptr_val->header.count == LC_NO_GC) {
@@ -396,6 +411,33 @@ LCValue LCRefCellGetValue(LCValue cell) {
     LCRefCell* ref =(LCRefCell*)cell.ptr_val;
     LCRetain(ref->value);
     return ref->value;
+}
+
+LCValue LCNewUnionObject(LCRuntime* rt, int tag, int size, LCValue* args) {
+    size_t malloc_size = sizeof(LCUnionObject) + size * sizeof(LCValue);
+    LCUnionObject* union_obj = (LCUnionObject*)lc_mallocz(rt, malloc_size);
+
+    LCInitObject(&union_obj->header, LC_TY_STRING);
+
+    union_obj->tag = tag;
+    union_obj->size = size;
+
+    int i;
+    for (i = 0; i < size; i++) {
+        LCRetain(args[i]);
+        union_obj->value[i] = args[i];
+    }
+    
+    return (LCValue){ { .ptr_val = (LCObject*)union_obj }, LC_TY_UNION_OBJECT };
+}
+
+int LCUnionGetType(LCValue val) {
+    if (val.tag == LC_TY_UNION) {
+        return val.int_val;
+    }
+
+    LCUnionObject* union_obj = (LCUnionObject*)val.ptr_val;
+    return union_obj->tag;
 }
 
 LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, int argc, LCValue* args) {

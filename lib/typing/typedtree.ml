@@ -245,14 +245,22 @@ and Declaration : sig
     cls_method_modifier: Ast.Declaration.class_modifier option;
     cls_method_name: (string * int);
     cls_method_params: Function.params;
-    cls_method_body: Block.t option;
+    cls_method_body: Block.t;
     cls_method_scope: scope option;
     cls_method_loc: Loc.t;
   }
 
+  and class_declare_method = {
+    cls_decl_method_attributes: Ast.attributes;
+    cls_decl_method_name: (string * int);
+    cls_decl_method_params: Function.params;
+    cls_decl_method_loc: Loc.t;
+  }
+
   and class_body_element =
-    | Cls_method of class_method
     | Cls_property of class_property
+    | Cls_method of class_method
+    | Cls_declare of class_declare_method
     [@@deriving show]
 
   type spec =

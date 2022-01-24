@@ -107,3 +107,52 @@ let contruct_enum_case ctx enum_ctor _param_types =
     )
   )
   | _ -> failwith "super of enum case is not a enum" *)
+
+(*
+  * TODO: namespace
+  * class/enum static function
+  * object's property/method
+  *
+  * Special case:
+  * 1. for array: T[]
+  *    share the member of Array<T>
+  *
+  *)
+let find_member_of_type ctx type_expr member_name =
+  let type_expr = Type_context.deref_type ctx type_expr in
+  match type_expr with
+  | Ctor(type_expr, []) -> (
+    let type_expr = Type_context.deref_type ctx type_expr in
+    let open TypeDef in
+    match type_expr with
+    | TypeDef ({ spec = Class cls; _ }, _) -> (
+      let result =
+        List.find ~f:(fun (elm_name, _) -> String.equal elm_name member_name)
+        cls.tcls_elements
+      in
+      match result with
+      | Some (_, member_id) ->
+        Some (TypeExpr.Ref member_id)
+        (* Type_context.update_node_type ctx id (TypeExpr.Ref member_id) *)
+
+      | _ -> None
+    )
+    | _ -> None
+  )
+
+  (* it's type def itself, find the static member *)
+  | TypeDef ({ spec = Class { tcls_static_elements; _ }; _ }, _) -> (
+    let result =
+      List.find ~f:(fun (static_memeber_name, _) -> String.equal static_memeber_name member_name)
+      tcls_static_elements
+    in
+
+    match result with
+    | Some (_, member_id) ->
+      Some (TypeExpr.Ref member_id)
+
+    | _ -> None
+  )
+
+  | _ -> None
+
