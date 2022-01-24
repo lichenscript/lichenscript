@@ -130,9 +130,21 @@ and TypeDef : sig
     enum_ctor_params: int list;
   }
 
+  and method_get_set =
+   | Getter
+   | Setter
+
+  and class_method = {
+    method_cls_id: int;
+    method_get_set: method_get_set option;
+    method_params: TypeExpr.t list;
+    method_return: TypeExpr.t;
+  }
+
   and spec =
     | Primitive
     | Class of class_type 
+    | ClassMethod of class_method
     | Alias of TypeExpr.t
     | Module_ of module_type
     | Function of _function
@@ -191,9 +203,21 @@ end = struct
     enum_ctor_params: int list;
   }
 
+  and method_get_set =
+   | Getter
+   | Setter
+
+  and class_method = {
+    method_cls_id: int;
+    method_get_set: method_get_set option;
+    method_params: TypeExpr.t list;
+    method_return: TypeExpr.t;
+  }
+
   and spec =
     | Primitive
     | Class of class_type 
+    | ClassMethod of class_method
     | Alias of TypeExpr.t
     | Module_ of module_type
     | Function of _function

@@ -118,10 +118,10 @@ let contruct_enum_case ctx enum_ctor _param_types =
   *    share the member of Array<T>
   *
   *)
-let find_member_of_type ctx type_expr member_name =
+let rec find_member_of_type ctx ~scope type_expr member_name =
   let type_expr = Type_context.deref_type ctx type_expr in
   match type_expr with
-  | Ctor(type_expr, []) -> (
+  | Ctor(type_expr, _) -> (
     let type_expr = Type_context.deref_type ctx type_expr in
     let open TypeDef in
     match type_expr with
@@ -152,6 +152,18 @@ let find_member_of_type ctx type_expr member_name =
       Some (TypeExpr.Ref member_id)
 
     | _ -> None
+  )
+
+  | Array t -> (
+    let ty_int_opt = scope#find_type_symbol "Array" in
+    match ty_int_opt with
+    | Some ty_int -> (
+      let array_node = Type_context.get_node ctx ty_int in
+      (* building type Array<T> *)
+      let ctor_type = TypeExpr.Ctor(array_node.value, [t]) in
+      find_member_of_type ctx ~scope ctor_type member_name
+    )
+    | None -> failwith "Can not find Array type in current scope"
   )
 
   | _ -> None

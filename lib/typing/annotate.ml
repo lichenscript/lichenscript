@@ -239,6 +239,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     | Member (expr, name) -> (
       let expr = annotate_expression ~prev_deps env expr in
       let ctx = Env.ctx env in
+      let scope = Env.peek_scope env in
       let member_name = name.pident_name in
       let node = {
         value = TypeExpr.Unknown;
@@ -246,7 +247,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         deps = List.append prev_deps [expr.ty_var];
         check = (fun id ->
           let expr_node = Type_context.get_node ctx expr.ty_var in
-          let member_type_opt = Check_helper.find_member_of_type ctx expr_node.value member_name in
+          let member_type_opt = Check_helper.find_member_of_type ctx ~scope expr_node.value member_name in
           match member_type_opt with
           | Some ty ->
             Type_context.update_node_type ctx id ty
@@ -956,7 +957,7 @@ and annotate_class env cls =
             (* check return *)
             let _collected_returns = Env.take_return_types env in
 
-            let fun_return, return_ty_deps =
+            let method_return, return_ty_deps =
               match cls_method_return_ty with
               | Some ty -> annotate_type env ty
               | None -> (
@@ -965,15 +966,27 @@ and annotate_class env cls =
               )
             in
 
-            let new_type = {
-              TypeDef.
-              builtin = false;
-              name = cls_method_name.pident_name;
-              spec = Function {
-                fun_params = [];
-                fun_return;
-              };
-            } in
+            let new_type =
+              match _method.cls_method_modifier with
+              | Some Cls_modifier_static -> { TypeDef.
+                builtin = false;
+                name = cls_method_name.pident_name;
+                spec = Function {
+                  fun_params = [];
+                  fun_return = method_return;
+                };
+              }
+              | _ -> { TypeDef.
+                builtin = false;
+                name = cls_method_name.pident_name;
+                spec = ClassMethod {
+                  method_cls_id = cls_var.var_id;
+                  method_get_set = None;
+                  method_params = [];
+                  method_return;
+                };
+              }
+            in
 
             (* class method deps *)
             method_deps := List.append !method_deps [method_id];
@@ -1044,6 +1057,7 @@ and annotate_class env cls =
     let cls_id = tcls_name, cls_var.var_id in
     let cls_body = annotate_class_body cls_body in
 
+    (* reduced all method and elements here *)
     Type_context.map_node ctx 
       ~f:(fun node -> {
         node with
