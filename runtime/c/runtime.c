@@ -409,7 +409,6 @@ void LCRefCellSetValue(LCRuntime* rt, LCValue cell, LCValue value) {
 
 LCValue LCRefCellGetValue(LCValue cell) {
     LCRefCell* ref =(LCRefCell*)cell.ptr_val;
-    LCRetain(ref->value);
     return ref->value;
 }
 
@@ -459,7 +458,6 @@ LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, int argc, LCValue* args) {
 LCValue LCLambdaGetValue(LCRuntime* rt, LCValue lambda_val, int index) {
     LCLambda* lambda = (LCLambda*)lambda_val.ptr_val;
     LCValue ret = lambda->captured_values[index];
-    LCRetain(ret);
     return ret;
 }
 
@@ -575,18 +573,17 @@ LCValue LCNewArrayLen(LCRuntime* rt, size_t size) {
 LCValue LCArrayGetValue(LCRuntime* rt, LCValue this, int index) {
     LCArray* arr = (LCArray*)this.ptr_val;
     if (unlikely(index >= arr->len)) {
-        fprintf(stderr, "[LichenScript] index %d out of range, size: %d", index, arr->len);
+        fprintf(stderr, "[LichenScript] index %d out of range, size: %d\n", index, arr->len);
         abort();
     }
     LCValue item = arr->data[index];
-    LCRetain(item);
     return item;
 }
 
 void LCArraySetValue(LCRuntime* rt, LCValue this, int index, LCValue value) {
     LCArray* arr = (LCArray*)this.ptr_val;
     if (unlikely(index >= arr->len)) {
-        fprintf(stderr, "[LichenScript] index %d out of range, size: %d", index, arr->len);
+        fprintf(stderr, "[LichenScript] index %d out of range, size: %d\n", index, arr->len);
         abort();
     }
     LCRelease(rt, arr->data[index]);
@@ -663,7 +660,7 @@ void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_
 
 LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_len, LCValue* args) {
     if (this.tag <= 0) {
-        fprintf(stderr, "[LichenScript] try to invoke on primitive type");
+        fprintf(stderr, "[LichenScript] try to invoke on primitive type\n");
         abort();
     }
 

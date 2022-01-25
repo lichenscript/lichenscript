@@ -11,11 +11,21 @@ type variable = {
   var_captured: bool ref;
 }
 
-type class_element =
-  | Cls_property of { prop_id: int; prop_visibility: Asttypes.visibility option; }
-  | Cls_method of { method_id: int; method_visibility: Asttypes.visibility option; }
-  | Cls_getter of { getter_id: int; getter_visibility: Asttypes.visibility option; }
-  | Cls_setter of { setter_id: int; setter_visibility: Asttypes.visibility option; }
+module ClsElm = struct
+
+  type spec =
+    | Property
+    | Method
+    | Getter
+    | Setter
+
+  type t = {
+    name: (string * int);
+    spec: spec;
+    visibility: Asttypes.visibility option;
+  }
+  
+end
 
 type property = {
   prop_id: int;
@@ -115,10 +125,10 @@ class scope ?prev () = object(self)
   method get_visibility name: Lichenscript_parsing.Asttypes.visibility option =
     Option.join (ExportTable.find export_map name)
 
-  method find_cls_element (_name: string): class_element option =
+  method find_cls_element (_name: string) (_spec: ClsElm.spec): ClsElm.t option =
     failwith "only allowed in class scope"
 
-  method insert_cls_element (_name: string) (_var: class_element) : unit =
+  method insert_cls_element (_var: ClsElm.t) : unit =
     failwith "only allowed in class scope"
 
 end
@@ -126,13 +136,18 @@ end
 class class_scope ?prev () = object
   inherit scope ?prev ()
 
-  val properties = SymbolTable.create ()
+  val mutable elements = []
 
-  method! find_cls_element name : class_element option =
-    SymbolTable.find properties name
+  method! find_cls_element name spec : ClsElm.t option =
+    List.find
+      ~f:(fun elm ->
+        let elm_name, _ = ClsElm.(elm.name) in
+        (String.equal elm_name name) && (phys_equal spec elm.spec)
+      )
+      elements
 
-  method! insert_cls_element name var =
-    SymbolTable.set properties ~key:name ~data:var
+  method! insert_cls_element elm =
+    elements <- elm::elements
 
 end
 

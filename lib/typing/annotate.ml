@@ -249,8 +249,21 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           let expr_node = Type_context.get_node ctx expr.ty_var in
           let member_type_opt = Check_helper.find_member_of_type ctx ~scope expr_node.value member_name in
           match member_type_opt with
-          | Some ty ->
-            Type_context.update_node_type ctx id ty
+          (* maybe it's a getter *)
+          | Some (Ref ref_id) -> (
+            let node = Type_context.get_node ctx ref_id in
+            let open TypeDef in
+            match node.value with
+            | TypeDef ({ spec = ClassMethod { method_get_set = Some Getter; method_return; _ }; _ }, _) ->
+              Type_context.update_node_type ctx id method_return
+
+            | _ ->
+              Type_context.update_node_type ctx id (Ref ref_id)
+
+          )
+
+          | Some ty_expr -> (* maybe it's a getter *)
+            Type_context.update_node_type ctx id ty_expr
 
           | None ->
             let err = Type_error.(make_error ctx loc (CannotReadMember(member_name, expr_node.value))) in
@@ -585,6 +598,10 @@ and annotate_expression_call ~prev_deps env loc call =
             (* TODO: check call params *)
             Type_context.update_node_type ctx id _fun.fun_return
 
+          | TypeExpr.TypeDef ({ TypeDef. spec = ClassMethod _method; _ }, _) ->
+            (* TODO: check call params *)
+            Type_context.update_node_type ctx id _method.method_return
+
           | TypeExpr.TypeDef ({ TypeDef. spec = EnumCtor enum_ctor; _}, _) -> (
             let super_id = enum_ctor.enum_ctor_super_id in
             Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref super_id, []))
@@ -831,11 +848,11 @@ and annotate_class env cls =
         | _ -> (
           tcls_elements := ((cls_method_name.pident_name, node_id)::!tcls_elements);
           class_scope#insert_cls_element
-            cls_method_name.pident_name
-            (Scope.Cls_method {
-              method_id = node_id;
-              method_visibility = cls_method_visibility;
-            })
+            { Scope.ClsElm.
+              name = (cls_method_name.pident_name, node_id);
+              spec = Method;
+              visibility = cls_method_visibility;
+            }
         )
       )
       | Cls_property property -> (
@@ -857,11 +874,11 @@ and annotate_class env cls =
          props_deps := node_id::(!props_deps);
 
         class_scope#insert_cls_element
-          cls_property_name.pident_name
-          (Scope.Cls_property {
-            prop_id = node_id;
-            prop_visibility = cls_property_visibility;
-          })
+          { Scope.ClsElm.
+            name = (cls_property_name.pident_name, node_id);
+            spec = Property;
+            visibility = cls_property_visibility;
+          }
       )
 
       | Cls_declare declare -> (
@@ -877,30 +894,30 @@ and annotate_class env cls =
         match cls_decl_method_get_set with
         | Some Cls_getter -> 
           class_scope#insert_cls_element
-            cls_decl_method_name.pident_name
-            (Scope.Cls_getter {
-              getter_id = node_id;
+            { Scope.ClsElm.
+              name = (cls_decl_method_name.pident_name, node_id);
+              spec = Getter;
               (* temporary use public here *)
-              getter_visibility = Some Asttypes.Pvisibility_public;
-            })
+              visibility = Some Asttypes.Pvisibility_public;
+            }
 
         | Some Cls_setter ->
           class_scope#insert_cls_element
-            cls_decl_method_name.pident_name
-            (Scope.Cls_setter {
-              setter_id = node_id;
+            { Scope.ClsElm.
+              name = cls_decl_method_name.pident_name, node_id;
+              spec = Setter;
               (* temporary use public here *)
-              setter_visibility = Some Asttypes.Pvisibility_public;
-            })
+              visibility = Some Asttypes.Pvisibility_public;
+            }
 
         | None ->
           class_scope#insert_cls_element
-            cls_decl_method_name.pident_name
-            (Scope.Cls_method {
-              method_id = node_id;
+            { Scope.ClsElm.
+              name = cls_decl_method_name.pident_name, node_id;
+              spec = Method;
               (* temporary use public here *)
-              method_visibility = Some Asttypes.Pvisibility_public;
-            })
+              visibility = Some Asttypes.Pvisibility_public;
+            }
       )
 
     )
@@ -940,9 +957,8 @@ and annotate_class env cls =
             )
 
             | _ -> (
-              match (class_scope#find_cls_element cls_method_name.pident_name) with
-              | Some (Scope.Cls_method { method_id; _ }) -> method_id
-              | Some _ -> failwith "unexpected: expect class method, but got property"
+              match (class_scope#find_cls_element cls_method_name.pident_name ClsElm.Method) with
+              | Some ({ name = _, method_id; _ }) -> method_id
               | None -> failwith (Format.sprintf "unexpected: can not find class method %s" cls_method_name.pident_name)
             )
           in
@@ -1028,16 +1044,67 @@ and annotate_class env cls =
         )
 
         | Cls_declare declare -> (
-          let { cls_decl_method_attributes; cls_decl_method_name; cls_decl_method_params; cls_decl_method_loc; _ } = declare in
+          let { cls_decl_method_attributes; cls_decl_method_name; cls_decl_method_params; cls_decl_method_loc; cls_decl_method_return_ty; cls_decl_method_get_set; _ } = declare in
+
+          let find_flag =
+            match cls_decl_method_get_set with
+            | Some Ast.Declaration.Cls_getter -> ClsElm.Getter
+            | Some Ast.Declaration.Cls_setter -> ClsElm.Setter
+            | None -> ClsElm.Method
+          in
+
           let declare_id =
-            match (class_scope#find_cls_element cls_decl_method_name.pident_name) with
-            | Some (Scope.Cls_method { method_id; _ }) -> method_id
-            | Some (Scope.Cls_getter { getter_id; _ }) -> getter_id
-            | Some (Scope.Cls_setter { setter_id; _ }) -> setter_id
-            | Some _ -> failwith "unexpected: expect class method, but got property"
+            match (class_scope#find_cls_element cls_decl_method_name.pident_name find_flag) with
+            | Some ({ name = _, id; _ }) -> id
             | None -> failwith (Format.sprintf "unexpected: can not find class method %s" cls_decl_method_name.pident_name)
           in
-          let cls_decl_method_params, _cls_method_params_deps = annotate_function_params env cls_decl_method_params in
+
+          let cls_decl_method_params, cls_method_params_deps = annotate_function_params env cls_decl_method_params in
+
+          let method_return, return_ty_deps =
+            match cls_decl_method_return_ty with
+            | Some ty -> annotate_type env ty
+            | None -> (
+              let unit_type = Env.ty_unit env in
+              TypeExpr.(Ctor (Ref unit_type, [])), [unit_type]
+            )
+          in
+
+          let method_get_set =
+            Option.map
+            ~f:(fun get_set ->
+              match get_set with
+              | Ast.Declaration.Cls_getter -> TypeDef.Getter
+              | Ast.Declaration.Cls_setter -> TypeDef.Setter
+            )
+            cls_decl_method_get_set
+          in
+
+          let new_type =
+            { TypeDef.
+              builtin = false;
+              name = cls_decl_method_name.pident_name;
+              spec = ClassMethod {
+                method_cls_id = cls_var.var_id;
+                method_get_set;
+                method_params = [];
+                method_return;
+              };
+            }
+          in
+
+          Type_context.map_node ctx
+            ~f:(fun node -> {
+              node with
+              deps = (List.append cls_method_params_deps return_ty_deps)
+              |> List.filter
+                ~f:(fun id -> id <> cls_var.var_id)
+              ;
+              value = (TypeExpr.TypeDef(new_type, declare_id));
+            })
+            declare_id
+            ;
+
           T.Declaration.Cls_declare {
             cls_decl_method_attributes;
             cls_decl_method_loc;
