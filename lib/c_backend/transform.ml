@@ -338,7 +338,7 @@ and transform_statement ?ret env stmt =
     let variable = Option.value_exn ((Option.value_exn scope.raw)#find_var_symbol original_name) in
 
     let name = Hashtbl.find_exn scope.name_map original_name in
-    let init_expr = transform_expression env binding.binding_init in
+    let init_expr = transform_expression ~is_move:true env binding.binding_init in
 
     let assign_expr =
       if should_var_captured variable then (
@@ -409,7 +409,7 @@ and gen_release_temp id =
     loc = Loc.none;
   }
 
-and auto_release_expr env ~prepend_stmts ~append_stmts expr =
+and auto_release_expr env ?(is_move=false) ~prepend_stmts ~append_stmts expr =
   let tmp_id = env.tmp_vars_count in
   env.tmp_vars_count <- env.tmp_vars_count + 1;
 
@@ -429,11 +429,13 @@ and auto_release_expr env ~prepend_stmts ~append_stmts expr =
 
   let result = C_op.Expr.Temp tmp_id in
 
-  append_stmts := (gen_release_temp tmp_id)::!append_stmts;
+  if not is_move then (
+    append_stmts := (gen_release_temp tmp_id)::!append_stmts
+  );
 
   result
 
-and transform_expression env expr =
+and transform_expression ?(is_move=false) env expr =
   let open Expression in
   let { spec; loc; ty_var; _ } = expr in
   let prepend_stmts = ref [] in
@@ -444,7 +446,7 @@ and transform_expression env expr =
       let open Literal in
       match literal with
       | String(content, _, _) -> 
-        auto_release_expr env ~prepend_stmts ~append_stmts ({
+        auto_release_expr env ~is_move ~prepend_stmts ~append_stmts ({
           C_op.Expr.
           spec = NewString content;
           loc = Loc.none;
@@ -470,7 +472,7 @@ and transform_expression env expr =
         match node_type with
         | TypeExpr.TypeDef({ TypeDef. spec = EnumCtor _; _ }, _) ->
           let sym = find_variable env name in
-          C_op.Expr.ExternalCall(sym, [])
+          C_op.Expr.ExternalCall(sym, None, [])
 
         | _ -> failwith "unknown identifier"
       ) else (
@@ -574,7 +576,7 @@ and transform_expression env expr =
       ];
 
       append_stmts := List.concat [
-        [ gen_release_temp tmp_id ];
+        if not is_move then [ gen_release_temp tmp_id ] else [];
         !append_stmts;
         List.concat init_appends;
       ];
@@ -599,7 +601,7 @@ and transform_expression env expr =
         | Some ext_name -> (
 
           (* external method *)
-          C_op.Expr.ExternalCall((C_op.SymLocal ext_name), params)
+          C_op.Expr.ExternalCall((C_op.SymLocal ext_name), None, params)
         )
 
         (* it's a local function *)
@@ -620,7 +622,7 @@ and transform_expression env expr =
             let ctor_opt = Check_helper.find_typedef_of env.ctx node.value in
             let ctor_name, _ctor_ty_id = Option.value_exn ctor_opt in
             let name = find_variable env ctor_name.name in
-            C_op.Expr.ExternalCall(name, params)
+            C_op.Expr.ExternalCall(name, None, params)
         )
 
       )
@@ -630,11 +632,37 @@ and transform_expression env expr =
         let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
         let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
         let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
-        C_op.Expr.ExternalCall(global_name, [])
+        C_op.Expr.ExternalCall(global_name, None, [])
       )
     )
 
-    | Member _
+    | Member(expr, id) -> (
+      let expr_result = transform_expression env expr in
+      prepend_stmts := List.append !prepend_stmts expr_result.prepend_stmts;
+      append_stmts := List.append expr_result.append_stmts !append_stmts;
+
+      let node = Type_context.get_node env.ctx expr.ty_var in
+
+      let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) node.value id.pident_name in
+      (* could be a property of a getter *)
+      let open Core_type.TypeDef in
+      match member with
+      | Some (Ref ref_id) -> (
+        let ref_node = Type_context.get_node env.ctx ref_id in
+        let ref_expr = Type_context.deref_type env.ctx ref_node.value in
+        match ref_expr with
+        | Core_type.TypeExpr.TypeDef ({ spec = ClassMethod { method_get_set = Some Getter; _ }; _ }, method_id) -> (
+          let ext_sym_opt = Type_context.find_external_symbol env.ctx method_id in
+          let ext_sym = Option.value_exn ext_sym_opt in
+          C_op.Expr.ExternalCall(SymLocal ext_sym, Some expr_result.expr, [])
+        )
+
+        |_ -> failwith "unreachable"
+      )
+
+      | _ -> failwith (Format.sprintf "unexpected: can not find member %s of id %d" id.pident_name expr.ty_var)
+    )
+
     | Unary _ -> failwith "n"
 
     | Binary (op, left, right) -> (
@@ -681,7 +709,7 @@ and transform_expression env expr =
     | Init { init_name; _ } -> (
       let init_name, _ = init_name in
       let fun_name = find_variable env init_name in
-      C_op.Expr.ExternalCall((C_op.map_symbol ~f:(fun fun_name -> fun_name ^ "_init") fun_name), [])
+      C_op.Expr.ExternalCall((C_op.map_symbol ~f:(fun fun_name -> fun_name ^ "_init") fun_name), None, [])
     )
 
     | Block block -> (

@@ -226,7 +226,16 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         loc;
         deps;
         (* TODO: check expression *)
-        check = none;
+        check = (fun id ->
+          if List.is_empty arr_list then (
+            Type_context.update_node_type (Env.ctx env) id TypeExpr.(Array Unknown)
+          ) else (
+            let first = List.hd_exn a_list in
+            let first_type = T.Expression.(first.ty_var) in
+            let first_node = Type_context.get_node (Env.ctx env) first_type in
+            Type_context.update_node_type (Env.ctx env) id TypeExpr.(Array first_node.value)
+          )
+        );
       } in
 
       ty_var, (T.Expression.Array a_list)
@@ -882,7 +891,7 @@ and annotate_class env cls =
       )
 
       | Cls_declare declare -> (
-        let { cls_decl_method_name; cls_decl_method_loc; cls_decl_method_get_set; _ } = declare in
+        let { cls_decl_method_name; cls_decl_method_loc; cls_decl_method_get_set; cls_decl_method_attributes; _ } = declare in
         let node = {
           value = TypeExpr.Unknown;
           deps = [];
@@ -890,6 +899,17 @@ and annotate_class env cls =
           check = none;
         } in
         let node_id = Type_context.new_id ctx node in
+
+        (match List.last cls_decl_method_attributes with
+        | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; _ } ->
+          Type_context.set_external_symbol (Env.ctx env) node_id ext_name
+
+        | _ ->
+          let open Type_error in
+          let err = make_error (Env.ctx env) cls_decl_method_loc DeclareFunctionShouldSpecificExternal in
+          raise (Error err)
+        );
+
         tcls_elements := ((cls_decl_method_name.pident_name, node_id)::!tcls_elements);
         match cls_decl_method_get_set with
         | Some Cls_getter -> 

@@ -576,8 +576,7 @@ LCValue LCArrayGetValue(LCRuntime* rt, LCValue this, int index) {
         fprintf(stderr, "[LichenScript] index %d out of range, size: %d\n", index, arr->len);
         abort();
     }
-    LCValue item = arr->data[index];
-    return item;
+    return arr->data[index];
 }
 
 void LCArraySetValue(LCRuntime* rt, LCValue this, int index, LCValue value) {
@@ -698,4 +697,9 @@ LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
     }
     printf("\n");
     return MK_NULL();
+}
+
+LCValue lc_std_array_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    LCArray* arr = (LCArray*)this.ptr_val;
+    return MK_I32(arr->len);
 }

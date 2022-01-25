@@ -387,13 +387,21 @@ and codegen_expression (env: t) (expr: Expr.t) =
 
   | Ident value -> codegen_symbol env value
 
-  | ExternalCall (fun_name, params) -> (
+  | ExternalCall (fun_name, ths, params) -> (
     codegen_symbol env fun_name;
     let params_len = List.length params in
+    ps env "(rt, ";
+    (match ths with
+    | Some e -> codegen_expression env e
+    | None ->
+      ps env "MK_NULL()"
+    );
+    ps env ", ";
     if List.is_empty params then (
-      ps env (Format.sprintf "(rt, MK_NULL(), %d, NULL)" params_len);
+      ps env (Int.to_string params_len);
+      ps env ", NULL)"
     ) else  (
-      ps env (Format.sprintf "(rt, MK_NULL(), %d, (LCValue[]) {" params_len);
+      ps env (Format.sprintf "%d, (LCValue[]) {" params_len);
 
       let len_m1 = params_len - 1 in
 

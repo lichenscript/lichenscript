@@ -83,14 +83,14 @@ end = struct
   }
 
   (* only used internally *)
-  let pp formatter t =
+  let rec pp formatter t =
     match t with
     | Unknown -> Format.fprintf formatter "unkown"
     | Any -> Format.fprintf formatter "any"
     | Ctor _ -> Format.fprintf formatter "ctor"
     | Ref i -> Format.fprintf formatter "ref '%d" i
     | Lambda _ -> Format.fprintf formatter "lambda"
-    | Array _ -> Format.fprintf formatter "array"
+    | Array t -> Format.fprintf formatter "%a[]" pp t
     | TypeDef _ -> Format.fprintf formatter "typedef"
     | TypeSymbol sym -> Format.pp_print_string formatter sym
 
