@@ -24,6 +24,27 @@ let create_transform_scope scope = {
   prev = None;
 }
 
+type cls_meta = {
+  cls_id: int;
+  cls_gen_name: string;
+  (*
+   * logical name -> realname
+   *
+   * only this class, does NOT includes ancester's
+   *)
+  cls_fields_map: (string, string) Hashtbl.t;
+
+  (* all generating fields, including ancester's *)
+  cls_fields: string list;
+}
+
+let create_cls_meta cls_id cls_gen_name cls_fields : cls_meta = {
+  cls_id;
+  cls_gen_name;
+  cls_fields_map = Hashtbl.create (module String);
+  cls_fields;
+}
+
 type t = {
   ctx: Type_context.t;
   mutable scope: transform_scope;
@@ -37,6 +58,8 @@ type t = {
    * such as a method of a class, the contructor of enum, etc
    *)
   global_name_map: (int, C_op.symbol) Hashtbl.t;
+
+  cls_meta_map: (int, cls_meta) Hashtbl.t;
 
   (* for lambda generation *)
   mutable current_fun_name: string option;
@@ -83,6 +106,7 @@ type expr_result = {
 let create ctx =
   let scope = create_transform_scope None in
   let global_name_map = Hashtbl.create (module Int) in
+  let cls_meta_map = Hashtbl.create (module Int) in
   {
     ctx;
     scope;
@@ -91,6 +115,7 @@ let create ctx =
     class_inits = [];
     has_early_return = false;
     global_name_map;
+    cls_meta_map;
     current_fun_name = None;
     lambdas = [];
   }
@@ -698,6 +723,20 @@ and transform_expression ?(is_move=false) env expr =
         C_op.Expr.ExternalCall(SymLocal ext_sym, Some expr_result.expr, [])
       )
 
+      (* it's a property *) 
+      | Some _ -> (
+        let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
+        let expr_ctor_opt = Check_helper.find_construct_of env.ctx expr_type in
+        match expr_ctor_opt with
+        | Some (_, expr_id) -> (
+          let cls_meta = Hashtbl.find_exn env.cls_meta_map expr_id in
+          let prop_name = Hashtbl.find_exn cls_meta.cls_fields_map id.pident_name in
+          C_op.Expr.GetField(expr_result.expr, cls_meta.cls_gen_name, prop_name)
+        )
+
+        | _ -> failwith "can not find ctor of expr, maybe it's a property"
+      )
+
       | _ -> failwith (Format.sprintf "unexpected: can not find member %s of id %d" id.pident_name expr.ty_var)
     )
 
@@ -836,7 +875,9 @@ and transform_expression ?(is_move=false) env expr =
       C_op.Expr.Temp result_tmp
     )
 
-    | This -> failwith "not implemented: this"
+    | This ->
+      C_op.Expr.Ident SymThis
+
     | Super -> failwith "not implemented: super"
 
     | Index(expr, index) -> (
@@ -928,6 +969,31 @@ and transform_pattern_to_test env match_expr pat =
     }
   )
 
+and generate_cls_meta cls gen_name =
+  let open Declaration in
+  let { cls_id; cls_body; _ } = cls in
+  let properties =
+    List.filter_map
+      ~f:(fun elm ->
+        match elm with
+        | Cls_method _ -> None
+        | Cls_property prop -> Some prop
+        | Cls_declare _ -> None
+      )
+      cls_body.cls_body_elements;
+  in
+  let prop_names =
+    List.map
+    ~f:(fun prop -> prop.cls_property_name.pident_name)
+    properties
+  in
+  let _, cls_name_id = cls_id in
+  let result = create_cls_meta cls_name_id gen_name prop_names in
+  List.iter
+    ~f:(fun field_name -> Hashtbl.set result.cls_fields_map ~key:field_name ~data:field_name)
+    result.cls_fields;
+  result
+
 and transform_class env cls: C_op.Decl.spec list =
   let open Declaration in
   let { cls_id; cls_body; _ } = cls in
@@ -937,20 +1003,8 @@ and transform_class env cls: C_op.Decl.spec list =
 
   Hashtbl.set env.global_name_map ~key:cls_name_id ~data:(SymLocal fun_name);
 
-  let properties =
-    List.fold
-      ~init:[]
-      ~f:(fun acc elm ->
-        match elm with
-        | Cls_method _ -> acc
-        | Cls_property prop -> (
-          let { cls_property_name; _ } = prop in
-          cls_property_name.pident_name::acc
-        )
-        | Cls_declare _ -> failwith "unimplemented: declare"
-      )
-      cls_body.cls_body_elements;
-  in
+  let cls_meta = generate_cls_meta cls fun_name in
+  Hashtbl.set env.cls_meta_map ~key:cls_meta.cls_id ~data:cls_meta;
 
   let class_methods = ref [] in
 
@@ -1015,7 +1069,7 @@ and transform_class env cls: C_op.Decl.spec list =
     name = fun_name;
     original_name;
     finalizer_name;
-    properties;
+    properties = cls_meta.cls_fields;
   } in
 
   List.append [ (C_op.Decl.Class cls) ] methods

@@ -131,9 +131,14 @@ class scope ?prev () = object(self)
   method insert_cls_element (_var: ClsElm.t) : unit =
     failwith "only allowed in class scope"
 
+  method this_expr : Core_type.TypeExpr.t =
+    match prev with
+    | Some prev -> prev#this_expr
+    | None -> failwith "only allowed in class scope"
+
 end
 
-class class_scope ?prev () = object
+class class_scope ?prev this_expr = object
   inherit scope ?prev ()
 
   val mutable elements = []
@@ -148,6 +153,8 @@ class class_scope ?prev () = object
 
   method! insert_cls_element elm =
     elements <- elm::elements
+
+  method! this_expr = this_expr
 
 end
 

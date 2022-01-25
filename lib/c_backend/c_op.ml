@@ -14,13 +14,16 @@ type symbol =
   | SymLocal of string
   | SymParam of int
   | SymLambda of int
+  | SymThis
   [@@deriving show]
 
 let map_symbol ~f s =
   match s with
   | SymLocal name -> SymLocal (f name)
   | SymParam _
-  | SymLambda _ -> s
+  | SymLambda _
+  | SymThis
+    -> s
 
 module%gen rec Decl : sig
   type class_method_tuple = {
@@ -138,6 +141,7 @@ and Expr : sig
   | TagEqual of t * int
   | Temp of int
   | IntValue of t
+  | GetField of t * string * string (* expr classname fieldname *)
 
   and t = {
     loc: Loc.t;

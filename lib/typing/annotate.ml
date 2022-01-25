@@ -556,7 +556,21 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       })
     )
 
-    | This
+    | This -> (
+      let scope = Env.peek_scope env in
+      let this_expr = scope#this_expr in
+      (* TODO: generic *)
+      let node = {
+        value = this_expr;
+        loc;
+        check = none;
+        deps = [];
+      } in
+
+      let node_id = Type_context.new_id (Env.ctx env) node in
+      node_id, T.Expression.This
+    )
+
     | Super -> failwith "not implemented this"
 
   in
@@ -812,7 +826,9 @@ and annotate_class env cls =
   let cls_var = Option.value_exn ((Env.peek_scope env)#find_var_symbol cls.cls_id.pident_name) in
 
   let prev_scope = Env.peek_scope env in
-  let class_scope = new class_scope ~prev:prev_scope () in
+
+  let this_expr = TypeExpr.Ctor(Ref cls_var.var_id, List.map ~f:Identifier.(fun id -> TypeExpr.TypeSymbol id.pident_name) cls.cls_type_vars) in
+  let class_scope = new class_scope ~prev:prev_scope this_expr in
 
   List.iter
     ~f:(fun ident ->

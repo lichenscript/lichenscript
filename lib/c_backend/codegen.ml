@@ -310,6 +310,8 @@ and codegen_symbol env sym =
     ps env (Int.to_string index);
     ps env ")"
 
+  | SymThis -> ps env "this"
+
 and codegen_expression (env: t) (expr: Expr.t) =
   let open Expr in
   let { spec; _ } = expr in
@@ -554,6 +556,8 @@ and codegen_expression (env: t) (expr: Expr.t) =
       ps env ", ";
       codegen_expression env right;
       ps env ")"
+
+    | SymThis -> failwith "impossible assgning to this"
     );
   )
 
@@ -576,6 +580,8 @@ and codegen_expression (env: t) (expr: Expr.t) =
       ps env (Int.to_string index);
       ps env ")"
 
+    | SymThis -> failwith "impossible to updating this"
+
     );
     ps env ", ";
     codegen_expression env expr;
@@ -593,6 +599,16 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env "(";
     codegen_expression env e;
     ps env ").int_val"
+
+  | GetField(expr, cls_name, field_name) -> (
+    ps env "LCCast(";
+    codegen_expression env expr;
+    ps env ", ";
+    ps env cls_name;
+    ps env "*";
+    ps env ")->";
+    ps env field_name
+  )
 
   | Invoke (expr, name, params) -> (
     ps env "LCInvokeStr(rt, ";
