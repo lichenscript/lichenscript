@@ -260,20 +260,40 @@ and codegen_declaration env decl =
   )
 
   | GlobalClassInit(init_name, init_entries) -> (
-      ps env (Format.sprintf "void %s(LCRuntime* rt) {\n" init_name);
-
-      List.iter
-        ~f:(fun entry ->
-          (* match entry with
-          | InitClass (id_name, gen_name) ->
-            ps env (Format.sprintf "    %s = LCDefineClass(rt, &%s);\n" id_name gen_name)
-          | InitMethods (id_name, cls_def_name) ->
-            ps env (Format.sprintf "    LCDefineClassMethod(rt, %s, %s, countof(%s));\n" id_name cls_def_name cls_def_name) *)
-          ps env (Format.sprintf "    %s = LCDefineClass(rt, &%s);\n" entry.class_id_name entry.class_def_name)
+    List.iter
+      ~f:(fun entry ->
+        let { class_name; class_methods; _} = entry in
+        if not (List.is_empty class_methods) then (
+          ps env (Format.sprintf "static LCClassMethodDef %s_methods[] = {\n" class_name);
+          with_indent env (fun () ->
+            List.iter
+              ~f:(fun m ->
+                print_indents env;
+                ps env "{ \"";
+                ps env m.class_method_name;
+                ps env "\", 0, ";
+                ps env m.class_method_gen_name;
+                ps env " },\n"
+              )
+              class_methods
+          );
+          ps env "};\n"
         )
-        init_entries;
+      )
+      init_entries;
 
-      ps env "}\n";
+    ps env (Format.sprintf "void %s(LCRuntime* rt) {\n" init_name);
+
+    List.iter
+      ~f:(fun entry ->
+        ps env (Format.sprintf "    %s = LCDefineClass(rt, &%s);\n" entry.class_id_name entry.class_def_name);
+        if not (List.is_empty entry.class_methods) then (
+          ps env (Format.sprintf "    LCDefineClassMethod(rt, %s, %s_methods, countof(%s_methods));\n" entry.class_id_name entry.class_name entry.class_name)
+        )
+      )
+      init_entries;
+
+    ps env "}\n";
   )
 
 and codegen_symbol env sym =
@@ -574,6 +594,30 @@ and codegen_expression (env: t) (expr: Expr.t) =
     codegen_expression env e;
     ps env ").int_val"
 
+  | Invoke (expr, name, params) -> (
+    ps env "LCInvokeStr(rt, ";
+    codegen_expression env expr;
+    ps env ", \"";
+    ps env name;
+    ps env "\", ";
+    let params_len = List.length params in
+    if params_len = 0 then
+      ps env "0, NULL)"
+    else (
+      ps env (Int.to_string params_len);
+      ps env ", ";
+      ps env "(LCValue[]) {";
+      List.iteri
+        ~f:(fun index param_name->
+          codegen_expression env param_name;
+          if index <> (params_len - 1) then (
+            ps env ", "
+          )
+        )
+        params;
+      ps env "})";
+    )
+  )
 
 (* return the number of temp values *)
 and codegen_function_block (env: t) block =

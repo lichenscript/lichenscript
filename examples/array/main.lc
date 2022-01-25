@@ -6,5 +6,8 @@ function main() {
     let i = 0;
     while i < 100 {
         a.push(i);
+        i += 1;
     }
+
+    print("arr len after push: ", a.length);
 }

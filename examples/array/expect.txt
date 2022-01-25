@@ -1,0 +1,2 @@
+arr len: 8
+arr len after push: 108

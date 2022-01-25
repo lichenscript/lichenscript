@@ -23,6 +23,12 @@ let map_symbol ~f s =
   | SymLambda _ -> s
 
 module%gen rec Decl : sig
+  type class_method_tuple = {
+    class_method_name: string;
+    class_method_gen_name: string;
+  }
+  [@@deriving show]
+
 
   type _class = {
     name: string;
@@ -33,8 +39,10 @@ module%gen rec Decl : sig
   [@@deriving show]
 
   type class_init = {
-    class_id_name: string;
+    class_name: string;
+    class_id_name:  string;
     class_def_name: string;
+    class_methods:  class_method_tuple list;
   }
   [@@deriving show]
 
@@ -122,6 +130,7 @@ and Expr : sig
   | I32Binary of Asttypes.BinaryOp.t * t * t
   | CallLambda of t * t list
   | Call of int * t list
+  | Invoke of t * string * t list
   | Assign of symbol * t
   | Update of Asttypes.AssignOp.t * symbol * t
   | ExternalCall of symbol * t option * t list

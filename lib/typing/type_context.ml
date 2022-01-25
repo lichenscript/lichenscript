@@ -100,6 +100,10 @@ and deref_type ctx ty =
 
   | _ -> ty
 
+and deref_node_type ctx id =
+  let node = get_node ctx id in
+  deref_type ctx node.value
+
 (* first level *)
 and print_type_value ctx ty_value =
   let open Core_type.TypeExpr in

@@ -703,3 +703,17 @@ LCValue lc_std_array_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValu
     LCArray* arr = (LCArray*)this.ptr_val;
     return MK_I32(arr->len);
 }
+
+LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    LCArray* arr = (LCArray*)this.ptr_val;
+
+    if (arr->len == arr->capacity) {
+        arr->capacity *= 2;
+        arr->data = lc_realloc(rt, arr->data, arr->capacity * sizeof(LCValue));
+    }
+
+    LCRetain(args[0]);
+    arr->data[arr->len++] = args[0];
+
+    return MK_NULL();
+}

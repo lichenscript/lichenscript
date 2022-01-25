@@ -137,6 +137,7 @@ and TypeDef : sig
   and class_method = {
     method_cls_id: int;
     method_get_set: method_get_set option;
+    method_is_virtual: bool;
     method_params: TypeExpr.t list;
     method_return: TypeExpr.t;
   }
@@ -210,6 +211,7 @@ end = struct
   and class_method = {
     method_cls_id: int;
     method_get_set: method_get_set option;
+    method_is_virtual: bool;
     method_params: TypeExpr.t list;
     method_return: TypeExpr.t;
   }

@@ -237,3 +237,4 @@ LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCObject* obj);
 
 LCValue lc_std_array_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
+LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);

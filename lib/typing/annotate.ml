@@ -259,19 +259,11 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           let member_type_opt = Check_helper.find_member_of_type ctx ~scope expr_node.value member_name in
           match member_type_opt with
           (* maybe it's a getter *)
-          | Some (Ref ref_id) -> (
-            let node = Type_context.get_node ctx ref_id in
-            let open TypeDef in
-            match node.value with
-            | TypeDef ({ spec = ClassMethod { method_get_set = Some Getter; method_return; _ }; _ }, _) ->
-              Type_context.update_node_type ctx id method_return
-
-            | _ ->
-              Type_context.update_node_type ctx id (Ref ref_id)
-
+          | Some (TypeDef ({ spec = ClassMethod { method_get_set = Some Getter; method_return; _ }; _ }, _), _) -> (
+            Type_context.update_node_type ctx id method_return
           )
 
-          | Some ty_expr -> (* maybe it's a getter *)
+          | Some (ty_expr, _) ->
             Type_context.update_node_type ctx id ty_expr
 
           | None ->
@@ -520,8 +512,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
                 ~init:TypeExpr.Unknown
                 ~f:(fun acc item ->
                   let ctx = Env.ctx env in
-                  let node = Type_context.get_node ctx item in
-                  let node_expr = Type_context.deref_type ctx node.value in
+                  let node_expr = Type_context.deref_node_type ctx item in
                   match (acc, node_expr) with
                   | TypeExpr.Unknown, _ ->
                     node_expr
@@ -592,8 +583,7 @@ and annotate_expression_call ~prev_deps env loc call =
     check = (fun id ->
       let ctx = Env.ctx env in
       let ty_int = callee.ty_var in
-      let callee_node = Type_context.get_node ctx ty_int in
-      let deref_type_expr = Type_context.deref_type ctx callee_node.value  in
+      let deref_type_expr = Type_context.deref_node_type ctx ty_int  in
       match deref_type_expr with
       | TypeExpr.Lambda(_params, ret) -> (
         (* TODO: check call params *)
@@ -982,6 +972,12 @@ and annotate_class env cls =
               | None -> failwith (Format.sprintf "unexpected: can not find class method %s" cls_method_name.pident_name)
             )
           in
+          let method_is_virtual =
+            match cls_method_modifier with
+            | Some Ast.Declaration.Cls_modifier_virtual
+            | Some Ast.Declaration.Cls_modifier_override -> true
+            | _ -> false
+          in
           Env.with_new_scope env method_scope (fun env ->
             let cls_method_params, cls_method_params_deps = annotate_function_params env cls_method_params in
             let cls_method_body = annotate_block ~prev_deps:cls_method_params_deps env cls_method_body in
@@ -1018,6 +1014,7 @@ and annotate_class env cls =
                 spec = ClassMethod {
                   method_cls_id = cls_var.var_id;
                   method_get_set = None;
+                  method_is_virtual;
                   method_params = [];
                   method_return;
                 };
@@ -1107,6 +1104,7 @@ and annotate_class env cls =
               spec = ClassMethod {
                 method_cls_id = cls_var.var_id;
                 method_get_set;
+                method_is_virtual = false;
                 method_params = [];
                 method_return;
               };

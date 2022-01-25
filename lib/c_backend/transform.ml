@@ -466,15 +466,14 @@ and transform_expression ?(is_move=false) env expr =
     | Identifier (name, name_id) -> (
       let first_char = String.get name 0 in
       if Char.is_uppercase first_char then (
-        let node = Type_context.get_node env.ctx name_id in
-        let node_type = Type_context.deref_type env.ctx node.value in
+        let node_type = Type_context.deref_node_type env.ctx name_id in
         let open Core_type in
         match node_type with
         | TypeExpr.TypeDef({ TypeDef. spec = EnumCtor _; _ }, _) ->
           let sym = find_variable env name in
           C_op.Expr.ExternalCall(sym, None, [])
 
-        | _ -> failwith "unknown identifier"
+        | _ -> failwith (Format.sprintf "unknown identifier: %s" name)
       ) else (
         let variable_opt = (Option.value_exn env.scope.raw)#find_var_symbol name in
         let variable = Option.value_exn variable_opt in
@@ -588,14 +587,15 @@ and transform_expression ?(is_move=false) env expr =
       let open Expression in
       (* let current_scope = env.scope in *)
       let { callee; call_params; _ } = call in
+      let params_struct = List.map ~f:(transform_expression env) call_params in
+
+      let prepend, params, append = List.map ~f:(fun expr -> expr.prepend_stmts, expr.expr, expr.append_stmts) params_struct |> List.unzip3 in
+
+      prepend_stmts := List.append !prepend_stmts (List.concat prepend);
+      append_stmts := List.append !append_stmts (List.concat append);
+
       match callee with
       | { spec = Identifier (_, id); _ } -> (
-        let params_struct = List.map ~f:(transform_expression env) call_params in
-
-        let prepend, params, append = List.map ~f:(fun expr -> expr.prepend_stmts, expr.expr, expr.append_stmts) params_struct |> List.unzip3 in
-
-        prepend_stmts := List.append !prepend_stmts (List.concat prepend);
-        append_stmts := List.append !append_stmts (List.concat append);
         match Type_context.find_external_symbol env.ctx id with
 
         | Some ext_name -> (
@@ -606,8 +606,7 @@ and transform_expression ?(is_move=false) env expr =
 
         (* it's a local function *)
         | None -> (
-          let callee_node = Type_context.get_node env.ctx callee.ty_var in
-          let deref_type = Type_context.deref_type env.ctx callee_node.value in
+          let deref_type = Type_context.deref_node_type env.ctx callee.ty_var in
           match deref_type with
           | Core_type.TypeExpr.Lambda _ -> (
             let transformed_callee = transform_expression env callee in
@@ -625,6 +624,52 @@ and transform_expression ?(is_move=false) env expr =
             C_op.Expr.ExternalCall(name, None, params)
         )
 
+      )
+
+      | { spec = Member(expr, id); _ } -> (
+        let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
+        let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) expr_type id.pident_name in
+        match member with
+        | Some (TypeDef ({ spec = ClassMethod { method_is_virtual = true; _ }; _ }, _), _) -> (
+          let this_expr = transform_expression env expr in
+
+          prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
+          append_stmts := List.append !append_stmts this_expr.append_stmts;
+
+          C_op.Expr.Invoke(this_expr.expr, id.pident_name, params);
+        )
+
+        | Some (TypeDef ({ spec = ClassMethod { method_get_set = None; _ }; _ }, method_id), _) -> (
+          (* only class method needs a this_expr, this is useless for a static function *)
+          let this_expr = transform_expression env expr in
+
+          prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
+          append_stmts := List.append !append_stmts this_expr.append_stmts;
+
+          match Type_context.find_external_symbol env.ctx method_id with
+          | Some ext_name -> (
+            (* external method *)
+            C_op.Expr.ExternalCall((C_op.SymLocal ext_name), Some this_expr.expr, params)
+          )
+          (* TODO: check if it's a virtual function *)
+          | _ ->
+            let callee_node = Type_context.get_node env.ctx callee.ty_var in
+            let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
+            let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
+            let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
+            C_op.Expr.ExternalCall(global_name, None, [])
+        )
+
+        (* it's a static function *)
+        | Some (TypeDef ({ spec = Function _; _ }, fun_id), _) -> (
+          let callee_node = Type_context.get_node env.ctx fun_id in
+          let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
+          let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
+          let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
+          C_op.Expr.ExternalCall(global_name, None, [])
+        )
+
+        | _ -> failwith (Format.sprintf "2 member %s is not callable" id.pident_name)
       )
 
       | _ -> (
@@ -647,17 +692,10 @@ and transform_expression ?(is_move=false) env expr =
       (* could be a property of a getter *)
       let open Core_type.TypeDef in
       match member with
-      | Some (Ref ref_id) -> (
-        let ref_node = Type_context.get_node env.ctx ref_id in
-        let ref_expr = Type_context.deref_type env.ctx ref_node.value in
-        match ref_expr with
-        | Core_type.TypeExpr.TypeDef ({ spec = ClassMethod { method_get_set = Some Getter; _ }; _ }, method_id) -> (
-          let ext_sym_opt = Type_context.find_external_symbol env.ctx method_id in
-          let ext_sym = Option.value_exn ext_sym_opt in
-          C_op.Expr.ExternalCall(SymLocal ext_sym, Some expr_result.expr, [])
-        )
-
-        |_ -> failwith "unreachable"
+      | Some (Core_type.TypeExpr.TypeDef ({ spec = ClassMethod { method_get_set = Some Getter; _ }; _ }, method_id), _) -> (
+        let ext_sym_opt = Type_context.find_external_symbol env.ctx method_id in
+        let ext_sym = Option.value_exn ext_sym_opt in
+        C_op.Expr.ExternalCall(SymLocal ext_sym, Some expr_result.expr, [])
       )
 
       | _ -> failwith (Format.sprintf "unexpected: can not find member %s of id %d" id.pident_name expr.ty_var)
@@ -914,6 +952,8 @@ and transform_class env cls: C_op.Decl.spec list =
       cls_body.cls_body_elements;
   in
 
+  let class_methods = ref [] in
+
   let methods: C_op.Decl.spec list = 
     List.fold
       ~init:[]
@@ -927,6 +967,22 @@ and transform_class env cls: C_op.Decl.spec list =
           let new_name = distribute_name env new_name in
 
           Hashtbl.set env.global_name_map ~key:method_id ~data:(SymLocal new_name);
+
+          let open Core_type in
+          let node_type = Type_context.deref_node_type env.ctx method_id in
+          let is_virtual =
+            match node_type with
+            | TypeExpr.TypeDef ({ spec = TypeDef.ClassMethod { method_is_virtual = true; _ }; _ }, _) ->
+              true
+            | _ -> false
+          in
+
+          if is_virtual then (
+            class_methods := { C_op.Decl.
+              class_method_name = origin_method_name;
+              class_method_gen_name = new_name;
+            }::!class_methods
+          );
 
           let _fun =
             transform_function_impl
@@ -948,8 +1004,10 @@ and transform_class env cls: C_op.Decl.spec list =
   in
 
   env.class_inits <- { C_op.Decl.
+    class_name = fun_name;
     class_id_name = fun_name ^ "_class_id";
     class_def_name = fun_name ^ "_def";
+    class_methods = List.rev !class_methods;
   }::env.class_inits;
 
   let cls = {

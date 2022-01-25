@@ -132,8 +132,8 @@ let rec find_member_of_type ctx ~scope type_expr member_name =
       in
       match result with
       | Some (_, member_id) ->
-        Some (TypeExpr.Ref member_id)
-        (* Type_context.update_node_type ctx id (TypeExpr.Ref member_id) *)
+        let node = Type_context.get_node ctx member_id in
+        Some (node.value, member_id)
 
       | _ -> None
     )
@@ -149,7 +149,8 @@ let rec find_member_of_type ctx ~scope type_expr member_name =
 
     match result with
     | Some (_, member_id) ->
-      Some (TypeExpr.Ref member_id)
+      let node = Type_context.get_node ctx member_id in
+      Some (node.value, member_id)
 
     | _ -> None
   )
