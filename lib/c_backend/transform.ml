@@ -366,12 +366,27 @@ and transform_statement ?ret env stmt =
       spec = Assign(C_op.SymLocal ret, tmp.expr);
       loc;
     } in
+    (*
+     * It's returning the function directly, it's not need to retain,
+     * because it's directly assining to "ret" variable.
+     *
+     * But it should retain if it's a normal block.
+     *)
+    let retain_expr =
+      if String.equal ret "ret" then []
+      else
+        [{
+          C_op.Stmt.
+          spec = Retain { C_op.Expr. spec = Ident (C_op.SymLocal ret); loc;};
+          loc;
+        }]
+    in
     let expr = {
       C_op.Stmt.
       spec = Expr assign;
       loc;
     } in
-    List.concat [ tmp.prepend_stmts; [ expr ]; tmp.append_stmts ]
+    List.concat [ tmp.prepend_stmts; [ expr ]; retain_expr; tmp.append_stmts ]
   in
   match spec with
   | Expr expr -> transform_return_expr ?ret expr

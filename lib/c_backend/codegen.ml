@@ -698,58 +698,13 @@ and codegen_function env (_fun: Func.t) =
 
     if _fun.tmp_vars_count > 0 then (
       print_indents env;
-      ps env (Format.sprintf "LCValue t[%d];\n" _fun.tmp_vars_count)
+      ps env (Format.sprintf "LCValue t[%d] = {0};\n" _fun.tmp_vars_count)
     );
 
     codegen_function_block env _fun.body;
     print_indents env;
     ps env "return ret;\n";
   );
-
-  (* with_indent env (fun () ->
-
-    print_indents env;
-    ps env "LCValue ret = MK_NULL();";
-    endl env;
-
-    if vars_len_m1 >= 0 then (
-      print_indents env;
-      ps env "LCValue ";
-      List.iteri
-        ~f:(fun index (name, _item) ->
-          ps env name;
-          if index <> vars_len_m1 then
-            ps env ", "
-          else ()
-        )
-        vars;
-      ps env ";";
-      endl env;
-    );
-
-    let _stmts = codegen_function_block env _fun.body in
-
-
-    (* release all local vars *)
-    if vars_len_m1 >= 0 then (
-      List.iter
-        ~f:(fun (name, _item) ->
-          print_indents env;
-          (* TODO: only release GC object *)
-          ps env "LCRelease(rt, ";
-          ps env name;
-          ps env ");";
-          endl env;
-        )
-        vars;
-      ps env ";";
-      endl env;
-    );
-
-    print_indents env;
-    ps env "return ret;";
-    endl env;
-  ); *)
 
   ps env "}\n"
 

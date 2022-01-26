@@ -2,10 +2,11 @@
 function main() {
     let i = 3;
 
-    {
+    let j = {
         let i = "string";  // cover the previous variable
         print(i);
-    }
+        i
+    };
 
-    print(i);
+    print(i, " ", j);
 }
