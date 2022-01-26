@@ -180,6 +180,7 @@ and Block : sig
   type t = {
     body: Statement.t list;
     loc: Loc.t;
+    scope: scope;
     return_ty: int;
   }
   [@@deriving show]

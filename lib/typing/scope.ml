@@ -39,6 +39,13 @@ class scope ?prev () = object(self)
   val mutable export_map: Asttypes.visibility option ExportTable.t = ExportTable.empty;
   val mutable capturing_variables = CapturingVarMap.empty
   val mutable var_counter = 0
+  val mutable children = []
+
+  (* only add blocks, do NOT add a lambda *)
+  method add_child (child: scope) =
+    children <- child::children
+
+  method children = List.rev children
 
   method insert_generic_type_symbol (name: string) =
     Hash_set.add generic_type_symbol name
@@ -93,7 +100,7 @@ class scope ?prev () = object(self)
     SymbolTable.set var_symbols ~key:name ~data:var
 
   method new_var_symbol name ~id ~kind =
-    SymbolTable.set var_symbols ~key:name ~data:{
+    SymbolTable.add var_symbols ~key:name ~data:{
       var_id = id;
       var_kind = kind;
       var_captured = ref false;

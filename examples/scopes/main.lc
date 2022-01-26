@@ -1,0 +1,11 @@
+
+function main() {
+    let i = 3;
+
+    {
+        let i = "string";  // cover the previous variable
+        print(i);
+    }
+
+    print(i);
+}

@@ -44,7 +44,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
     | While _while -> (
       let { while_test; while_block; while_loc } = _while in
       let while_test = annotate_expression ~prev_deps env while_test in
-      let while_block = annotate_block ~prev_deps:[while_test.ty_var] env while_block in
+      let while_block = annotate_block_expr ~prev_deps:[while_test.ty_var] env while_block in
       let next_desp = [ while_block.return_ty ] in
       next_desp, T.Statement.While { while_test; while_block; while_loc }
     )
@@ -62,7 +62,12 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
 
       let scope = Env.peek_scope env in
       (* TODO: check redefinition? *)
-      scope#new_var_symbol name ~id:sym_id ~kind:binding_kind;
+      (match scope#new_var_symbol name ~id:sym_id ~kind:binding_kind with
+      | `Duplicate -> (
+        let err = Type_error.(make_error (Env.ctx env) binding_loc (Redefinition name)) in
+        raise Type_error.(Error err)
+      )
+      | _ -> ());
 
       let binding_init = annotate_expression ~prev_deps env binding_init in
 
@@ -424,7 +429,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     )
 
     | Block block -> (
-      let block = annotate_block ~prev_deps env block in
+      let block = annotate_block_expr ~prev_deps env block in
       T.Block.(block.return_ty), (T.Expression.Block block)
     )
 
@@ -639,14 +644,14 @@ and annotate_expression_if ~prev_deps env _if =
   let { if_test; if_consequent; if_alternative; if_loc } = _if in
 
   let if_test = annotate_expression env ~prev_deps if_test in
-  let if_consequent = annotate_block ~prev_deps:[if_test.ty_var] env if_consequent in
+  let if_consequent = annotate_block_expr ~prev_deps:[if_test.ty_var] env if_consequent in
   let alt_deps = ref [] in
   let if_alternative =
     Option.map
     ~f:(fun alt ->
       match alt with
       | If_alt_block block ->
-        let blk = annotate_block ~prev_deps:[if_test.ty_var] env block in
+        let blk = annotate_block_expr ~prev_deps:[if_test.ty_var] env block in
         alt_deps := [blk.return_ty];
         T.Expression.If_alt_block blk
 
@@ -674,7 +679,7 @@ and annotate_expression_if ~prev_deps env _if =
     if_loc;
   }
 
-and annotate_block ~prev_deps env block : T.Block.t =
+and annotate_block_impl ~prev_deps env block : T.Block.t =
   let open Ast.Block in
   let { body; loc } = block in
   let body_dep, body_stmts =
@@ -708,8 +713,18 @@ and annotate_block ~prev_deps env block : T.Block.t =
   { T.Block.
     body = body_stmts;
     loc;
+    scope = Env.peek_scope env;
     return_ty;
   }
+
+and annotate_block_expr ~prev_deps env block : T.Block.t =
+  let prev_scope = Env.peek_scope env in
+  let block_scope = new scope ~prev:prev_scope () in
+  prev_scope#add_child block_scope;
+
+  Env.with_new_scope env block_scope (fun env ->
+    annotate_block_impl ~prev_deps env block
+  )
 
 and annotate_declaration env decl : T.Declaration.t =
   let open Ast.Declaration in
@@ -1000,7 +1015,7 @@ and annotate_class env cls =
           in
           Env.with_new_scope env method_scope (fun env ->
             let cls_method_params, cls_method_params_deps = annotate_function_params env cls_method_params in
-            let cls_method_body = annotate_block ~prev_deps:cls_method_params_deps env cls_method_body in
+            let cls_method_body = annotate_block_impl ~prev_deps:cls_method_params_deps env cls_method_body in
 
             let this_deps = ref !props_deps in
 
@@ -1373,13 +1388,18 @@ and annotate_function env fun_ =
 
     (* add all params into scope *)
     List.iter
-      ~f:(fun param -> 
+      ~f:(fun (param: Typedtree.Function.param) -> 
         let name, _ = param.param_name in
-        fun_scope#new_var_symbol name ~id:param.param_ty ~kind:Ast.Pvar_let;
+        match fun_scope#new_var_symbol name ~id:param.param_ty ~kind:Ast.Pvar_const with
+        | `Duplicate -> (
+          let err = Type_error.(make_error (Env.ctx env) param.param_loc (Redefinition name)) in
+          raise Type_error.(Error err)
+        )
+        | _ -> ()
       )
       params.params_content;
 
-    let body = annotate_block ~prev_deps:params_types env body in
+    let body = annotate_block_impl ~prev_deps:params_types env body in
     let collected_returns = Env.take_return_types env in
 
     (* defined return *)

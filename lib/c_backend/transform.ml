@@ -77,6 +77,12 @@ let push_scope env scope =
 let pop_scope env =
   env.scope <- Option.value_exn env.scope.prev
 
+let with_scope env scope cb =
+  push_scope env scope;
+  let result = cb env in
+  pop_scope env;
+  result
+
 let find_variable env name =
   let rec find_in_scope scope =
     match Hashtbl.find scope.name_map name with
@@ -333,23 +339,26 @@ and transform_statement ?ret env stmt =
   | While { while_test; while_block; while_loc } -> (
     let transform_expression = transform_expression env while_test in
 
-    let bodys = List.map ~f:(transform_statement env) while_block.body |> List.concat in
-    let body = {
-      C_op.Block.
-      body = bodys;
-      loc = while_block.loc;
-    } in
+    let scope = create_transform_scope (Some while_block.scope) in
+    with_scope env scope (fun env ->
+      let bodys = List.map ~f:(transform_statement env) while_block.body |> List.concat in
+      let body = {
+        C_op.Block.
+        body = bodys;
+        loc = while_block.loc;
+      } in
 
-    List.concat [
-      transform_expression.prepend_stmts;
-      [
-        { C_op.Stmt.
-          spec = While(transform_expression.expr, body);
-          loc = while_loc;
-        }
-      ];
-      transform_expression.append_stmts;
-    ]
+      List.concat [
+        transform_expression.prepend_stmts;
+        [
+          { C_op.Stmt.
+            spec = While(transform_expression.expr, body);
+            loc = while_loc;
+          }
+        ];
+        transform_expression.append_stmts;
+      ]
+    )
   )
 
   | Binding binding -> (
@@ -361,7 +370,10 @@ and transform_statement ?ret env stmt =
 
     let scope = env.scope in
 
-    let variable = Option.value_exn ((Option.value_exn scope.raw)#find_var_symbol original_name) in
+    let variable = Option.value_exn
+      ~message:(Format.sprintf "%d:%d can not find %s" binding.binding_loc.start.line binding.binding_loc.start.column original_name)
+      ((Option.value_exn scope.raw)#find_var_symbol original_name)
+    in
 
     let name = Hashtbl.find_exn scope.name_map original_name in
     let init_expr = transform_expression ~is_move:true env binding.binding_init in
@@ -863,28 +875,30 @@ and transform_expression ?(is_move=false) env expr =
       C_op.Expr.ExternalCall((C_op.map_symbol ~f:(fun fun_name -> fun_name ^ "_init") fun_name), None, params)
     )
 
-    | Block block -> (
-      let tmp_id = env.tmp_vars_count in
-      env.tmp_vars_count <- env.tmp_vars_count + 1;
+    | Block block ->
+      let block_scope = create_transform_scope (Some block.scope) in
+      with_scope env block_scope (fun env ->
+        let tmp_id = env.tmp_vars_count in
+        env.tmp_vars_count <- env.tmp_vars_count + 1;
 
-      let init = { C_op.Stmt.
-        spec = Expr {
-          C_op.Expr.
-          spec = Assign (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"), {
-            spec = Null;
+        let init = { C_op.Stmt.
+          spec = Expr {
+            C_op.Expr.
+            spec = Assign (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"), {
+              spec = Null;
+              loc = Loc.none;
+            });
             loc = Loc.none;
-          });
+          };
           loc = Loc.none;
-        };
-        loc = Loc.none;
-      } in
+        } in
 
-      let stmts = transform_block ~ret_id:tmp_id env block in
+        let stmts = transform_block ~ret_id:tmp_id env block in
 
-      prepend_stmts := List.concat [!prepend_stmts; [init]; stmts];
+        prepend_stmts := List.concat [!prepend_stmts; [init]; stmts];
 
-      C_op.Expr.Temp tmp_id
-    )
+        C_op.Expr.Temp tmp_id
+      )
 
     | Match _match -> (
       let { match_expr; match_clauses; _ } = _match in
@@ -1198,6 +1212,7 @@ and transform_lambda env ~lambda_gen_name content _ty_var =
         attributes = [];
       }
     ];
+    scope = content.lambda_scope;
     loc = Loc.none;
     return_ty = content.lambda_body.ty_var;
   } in
