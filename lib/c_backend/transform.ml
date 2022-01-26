@@ -46,6 +46,18 @@ let create_cls_meta cls_id cls_gen_name cls_fields : cls_meta = {
   cls_fields;
 }
 
+type current_fun_meta = {
+  fun_name: string;
+  used_name: string Hash_set.t;
+}
+
+let preserved_name = [ "ret"; "rt"; "this"; "argc"; "argv"; "t" ]
+
+let create_current_fun_meta fun_name = {
+  fun_name;
+  used_name = Hash_set.of_list (module String) preserved_name;
+}
+
 type t = {
   ctx: Type_context.t;
   mutable scope: transform_scope;
@@ -63,7 +75,7 @@ type t = {
   cls_meta_map: (int, cls_meta) Hashtbl.t;
 
   (* for lambda generation *)
-  mutable current_fun_name: string option;
+  mutable current_fun_name: current_fun_meta option;
   mutable lambdas: C_op.Decl.t list;
 }
 
@@ -127,10 +139,8 @@ let create ctx =
     lambdas = [];
   }
 
-let preserved_name = [| "ret"; "rt"; "this"; "argc"; "argv"; "t" |]
-
-let get_local_var_name realname ty_int =
-  if Array.mem preserved_name ~equal:String.equal realname then
+let get_local_var_name fun_meta realname ty_int =
+  if Hash_set.mem fun_meta.used_name realname then
     realname ^ "_" ^ (Int.to_string ty_int)
   else
     realname
@@ -174,7 +184,7 @@ and transform_function env _fun =
   let { body; comments; header; scope; _ } = _fun in
   let original_name, _ = header.name in
 
-  env.current_fun_name <- Some original_name;
+  env.current_fun_name <- Some (create_current_fun_meta original_name);
   env.has_early_return <- false;
 
   let fun_name = distribute_name env original_name in
@@ -192,6 +202,7 @@ and transform_function env _fun =
 and transform_function_impl env ~name ~params ~body ~scope ~comments =
   let open Function in
 
+  let fun_meta = Option.value_exn env.current_fun_name in
   let fun_scope = create_transform_scope (Some scope) in
   push_scope env fun_scope;
 
@@ -226,7 +237,10 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
     let names =
       List.map
       ~f:(fun (var_name, variable) ->
-        Hashtbl.set fun_scope.name_map ~key:var_name ~data:(SymLocal (get_local_var_name var_name variable.var_id));
+        Hashtbl.set
+          fun_scope.name_map
+          ~key:var_name
+          ~data:(SymLocal (get_local_var_name fun_meta var_name variable.var_id));
         var_name
       )
       local_vars;
@@ -525,8 +539,8 @@ and transform_expression ?(is_move=false) env expr =
 
     | Lambda lambda_content -> (
       let parent_scope = env.scope in
-      let fun_name = Option.value_exn ~message:"current function name not found" env.current_fun_name in
-      let lambda_fun_name = "LCC_" ^ fun_name ^ "_lambda_" ^ (Int.to_string ty_var) in
+      let fun_meta = Option.value_exn ~message:"current function name not found" env.current_fun_name in
+      let lambda_fun_name = "LCC_" ^ fun_meta.fun_name ^ "_lambda_" ^ (Int.to_string ty_var) in
 
       let capturing_variables = lambda_content.lambda_scope#capturing_variables in
 
@@ -1088,6 +1102,8 @@ and transform_class env cls: C_op.Decl.spec list =
   let original_name, cls_name_id = cls_id in
   let fun_name = distribute_name env original_name in
   let finalizer_name = fun_name ^ "_finalizer" in
+
+  env.current_fun_name <- Some (create_current_fun_meta original_name);
 
   Hashtbl.set env.global_name_map ~key:cls_name_id ~data:(SymLocal fun_name);
 

@@ -1,0 +1,5 @@
+
+function main() {
+    let a = 3;
+    let a = "3";
+}
