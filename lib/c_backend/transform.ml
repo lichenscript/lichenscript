@@ -752,11 +752,26 @@ and transform_expression ?(is_move=false) env expr =
 
       let left_type = Type_context.deref_node_type env.ctx left.ty_var in
 
+      let open Core_type in
       match (left_type, op) with
-      | (Core_type.TypeExpr.String, BinaryOp.Plus) ->
+      | (TypeExpr.String, BinaryOp.Plus) ->
         let spec = auto_release_expr env ~prepend_stmts ~append_stmts {
           C_op.Expr.
           spec = ExternalCall(SymLocal "lc_std_string_concat", None, [left'.expr; right'.expr]);
+          loc = Loc.none;
+        } in
+        spec
+
+      | (TypeExpr.String, BinaryOp.Equal)
+      | (TypeExpr.String, BinaryOp.NotEqual)
+      | (TypeExpr.String, BinaryOp.LessThan)
+      | (TypeExpr.String, BinaryOp.LessThanEqual)
+      | (TypeExpr.String, BinaryOp.GreaterThan)
+      | (TypeExpr.String, BinaryOp.GreaterThanEqual)
+        ->
+        let spec = auto_release_expr env ~prepend_stmts ~append_stmts {
+          C_op.Expr.
+          spec = StringCmp(op, left'.expr, right'.expr);
           loc = Loc.none;
         } in
         spec

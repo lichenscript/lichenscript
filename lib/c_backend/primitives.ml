@@ -30,8 +30,6 @@ module Bin = struct
     match op with
     | Equal -> "LC_I32_EQ"
     | NotEqual -> "LC_I32_NOT_EQ"
-    | StrictEqual
-    | StrictNotEqual -> failwith "not support"
     | LessThan -> "LC_I32_LT"
     | LessThanEqual -> "LC_I32_LTEQ"
     | GreaterThan -> "LC_I32_GT"
@@ -46,6 +44,16 @@ module Bin = struct
     | BitOr -> "LC_I32_BIT_OR"
     | Xor -> "LC_I32_XOR"
     | BitAnd -> "LC_I32_BIT_AND"
+
+  let to_cmp (op: Asttypes.BinaryOp.t) =
+    match op with
+    | Equal -> "LC_CMP_EQ"
+    | NotEqual -> "LC_CMP_NEQ"
+    | LessThan -> "LC_CMP_LT"
+    | LessThanEqual -> "LC_CMP_LTEQ"
+    | GreaterThan -> "LC_CMP_GT"
+    | GreaterThanEqual -> "LC_CMP_GTEQ"
+    | _ -> failwith "unreachable"
 
 end
 

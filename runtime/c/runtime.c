@@ -704,6 +704,7 @@ static LCValue lc_new_string8(LCRuntime* rt, const unsigned char* buf, uint32_t 
     }
     result->is_wide_char = 0;
     result->length = buf_len;
+    result->hash = 0;
     
     return (LCValue){ { .ptr_val = (LCObject*)result }, LC_TY_STRING };
 }
@@ -751,6 +752,7 @@ static LCValue string_buffer_end(StringBuffer *s) {
     }
     str->is_wide_char = s->is_wide_char;
     str->length = s->len;
+    str->hash = 0;
     s->str = NULL;
     return (LCValue){ { .ptr_val = (LCObject*)str }, LC_TY_STRING };
 }
@@ -1178,4 +1180,102 @@ LCValue lc_std_string_concat(LCRuntime* rt, LCValue this, int arg_len, LCValue* 
 LCValue lc_std_string_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
     LCString* str = (LCString*)this.ptr_val;
     return MK_I32(str->length);
+}
+
+static force_inline uint16_t* new_widen_string(LCString* s) {
+    uint16_t* r = malloc(sizeof(uint16_t) * s->length);
+    for (int i = 0; i < s->length; i++) {
+        r[i] = s->u.str8[i];
+    }
+    return r;
+}
+
+static no_inline int lc_std_string_cmp_slow(LCString* s1, LCString* s2) {
+    const uint16_t* str1;
+    const uint16_t* str2;
+    uint16_t* r1 = NULL;
+    uint16_t* r2 = NULL;
+
+    if (s1->is_wide_char) {
+        str1 = s1->u.str16;
+    } else {
+        r1 = new_widen_string(s1);
+        str1 = r1;
+    }
+
+    if (s2->is_wide_char) {
+        str2 = s2->u.str16;
+    } else {
+        r2 = new_widen_string(s2);
+        str2 = r2;
+    }
+
+    int result = memcmp(str1, str2, s1->length * 2);
+
+    if (r1) {
+        free(r1);
+    }
+
+    if (r2) {
+        free(r2);
+    }
+
+    return result;
+}
+
+LCValue lc_std_string_cmp(LCRuntime* rt, LCCmpType cmp_type, LCValue left, LCValue right) {
+    int cmp_result, hash1, hash2;
+    LCString* s1 = (LCString*)(left.ptr_val);
+    LCString* s2 = (LCString*)(right.ptr_val);
+
+    // quick check
+    if (cmp_type == LC_CMP_EQ) {
+        if (s1->length != s2->length) {
+            return LCFalse;
+        }
+
+        if (s1->is_wide_char != s2->is_wide_char) {
+            return LCFalse;
+        }
+        hash1 = s1->hash;
+        hash2 = s2->hash;
+
+        if (hash1 != 0 && hash2 != 0 && hash1 != hash2) {
+            return LCFalse;
+        }
+    }
+
+    cmp_result = s1->length - s2->length;
+    if (cmp_result != 0) {
+        goto cmp;
+    }
+
+    if (!s1->is_wide_char && !s2->is_wide_char) {
+        cmp_result = strcmp((const char*)s1->u.str8, (const char *)s2->u.str8);
+    } else {
+        cmp_result = lc_std_string_cmp_slow(s1, s2);
+    }
+
+cmp:
+    switch (cmp_type) {
+    case LC_CMP_EQ:
+        return cmp_result == 0 ? LCTrue : LCFalse;
+
+    case LC_CMP_NEQ:
+        return cmp_result != 0 ? LCTrue : LCFalse;
+
+    case LC_CMP_LT:
+        return cmp_result < 0 ? LCTrue : LCFalse;
+
+    case LC_CMP_LTEQ:
+        return cmp_result <= 0 ? LCTrue : LCFalse;
+
+    case LC_CMP_GT:
+        return cmp_result > 0 ? LCTrue : LCFalse;
+
+    case LC_CMP_GTEQ:
+        return cmp_result >= 0 ? LCTrue : LCFalse;
+
+    }
+    return LCFalse;
 }

@@ -50,6 +50,15 @@ typedef enum LCArithmeticType {
     LC_ARTH_BIT_AND,
 } LCArithmeticType;
 
+typedef enum LCCmpType {
+    LC_CMP_EQ = 0,
+    LC_CMP_NEQ,
+    LC_CMP_LT,
+    LC_CMP_LTEQ,
+    LC_CMP_GT,
+    LC_CMP_GTEQ,
+} LCCmpType;
+
 #define LC_OBJ_HEADER LCObjectHeader header;
 
 typedef struct LCObjectHeader {
@@ -254,3 +263,4 @@ LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* arg
 
 LCValue lc_std_string_concat(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 LCValue lc_std_string_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
+LCValue lc_std_string_cmp(LCRuntime* rt, LCCmpType cmp_type, LCValue left, LCValue right);

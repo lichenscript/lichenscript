@@ -147,6 +147,7 @@ and Expr : sig
   | Temp of int
   | IntValue of t
   | GetField of t * string * string (* expr classname fieldname *)
+  | StringCmp of Asttypes.BinaryOp.t * t * t
 
   and t = {
     loc: Loc.t;

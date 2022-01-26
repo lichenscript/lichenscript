@@ -1,3 +1,9 @@
 11
 4
 Hello LichenScript
+true
+false
+lt: true
+gt: false
+lt2: false
+gt2: true

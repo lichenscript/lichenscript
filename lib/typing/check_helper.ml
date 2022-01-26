@@ -63,7 +63,7 @@ let type_addable ctx left right =
   match (left, right) with
   | TypeExpr.String, TypeExpr.String -> true
   | _ ->
-    check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "string" |] ctx left right
+    check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64" |] ctx left right
 
 let type_arithmetic =
   check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; |]
@@ -71,8 +71,13 @@ let type_arithmetic =
 let type_arithmetic_integer =
   check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; |]
 
-let type_logic_compareable =
-  check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "string" |]
+let type_logic_compareable ctx left right =
+  let left = Type_context.deref_type ctx left in
+  let right = Type_context.deref_type ctx right in
+  match (left, right) with
+  | TypeExpr.String, TypeExpr.String -> true
+  | _ ->
+    check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64" |] ctx left right
 
 let try_unwrap_array ctx expr =
   let expr = Type_context.deref_type ctx expr in

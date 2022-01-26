@@ -634,6 +634,16 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env field_name
   )
 
+  | StringCmp(op, left, right) -> (
+    ps env "lc_std_string_cmp(rt, ";
+    ps env (Primitives.Bin.to_cmp op);
+    ps env ", ";
+    codegen_expression env left;
+    ps env ", ";
+    codegen_expression env right;
+    ps env ")"
+  )
+
   | Invoke (expr, name, params) -> (
     ps env "LCInvokeStr(rt, ";
     codegen_expression env expr;

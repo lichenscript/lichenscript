@@ -59,8 +59,6 @@ module BinaryOp = struct
   type t =
     | Equal
     | NotEqual
-    | StrictEqual
-    | StrictNotEqual
     | LessThan
     | LessThanEqual
     | GreaterThan
@@ -82,8 +80,6 @@ module BinaryOp = struct
     function
     | Token.T_EQUAL -> Equal
     | Token.T_NOT_EQUAL -> NotEqual
-    | Token.T_STRICT_EQUAL -> StrictEqual
-    | Token.T_STRICT_NOT_EQUAL -> StrictNotEqual
     | Token.T_LESS_THAN -> LessThan
     | Token.T_LESS_THAN_EQUAL -> LessThanEqual
     | Token.T_GREATER_THAN -> GreaterThan
@@ -103,8 +99,6 @@ module BinaryOp = struct
   let to_string = function
     | Equal -> "=="
     | NotEqual -> "!="
-    | StrictEqual -> "==="
-    | StrictNotEqual -> "!=="
     | LessThan -> "<"
     | LessThanEqual -> "<="
     | GreaterThan -> ">"
