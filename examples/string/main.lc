@@ -10,4 +10,5 @@ function main() {
     print("gt: ", name > "LichenScript2");
     print("lt2: ", "你好" > "nh");
     print("gt2: ", "你好" < "nh");
+    print(name.slice(2, 6));
 }

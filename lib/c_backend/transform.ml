@@ -713,7 +713,7 @@ and transform_expression ?(is_move=false) env expr =
             let transformed_callee = transform_expression env callee in
             prepend_stmts := List.append !prepend_stmts (List.append !prepend_stmts transformed_callee.prepend_stmts);
             append_stmts := List.append !append_stmts (List.append !append_stmts transformed_callee.append_stmts);
-            C_op.Expr.CallLambda(transformed_callee.expr, [])
+            C_op.Expr.CallLambda(transformed_callee.expr, params)
           )
 
           (* it's a contructor *)
@@ -758,7 +758,7 @@ and transform_expression ?(is_move=false) env expr =
             let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
             let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
             let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
-            C_op.Expr.ExternalCall(global_name, None, [])
+            C_op.Expr.ExternalCall(global_name, None, params)
         )
 
         (* it's a static function *)
@@ -767,7 +767,7 @@ and transform_expression ?(is_move=false) env expr =
           let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
           let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
           let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
-          C_op.Expr.ExternalCall(global_name, None, [])
+          C_op.Expr.ExternalCall(global_name, None, params)
         )
 
         | _ -> failwith (Format.sprintf "2 member %s is not callable" id.pident_name)
@@ -778,7 +778,7 @@ and transform_expression ?(is_move=false) env expr =
         let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
         let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
         let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
-        C_op.Expr.ExternalCall(global_name, None, [])
+        C_op.Expr.ExternalCall(global_name, None, params)
       )
     )
 

@@ -17,6 +17,8 @@
 #define lc_raw_realloc realloc
 #define lc_raw_free free
 
+#define MK_STRING(v) (LCValue){ { .ptr_val = (LCObject*)v }, LC_TY_STRING }
+
 static inline int max_int(int a, int b)
 {
     if (a > b)
@@ -695,7 +697,6 @@ static int string_buffer_putc(StringBuffer *s, uint32_t c)
 static LCValue lc_new_string8(LCRuntime* rt, const unsigned char* buf, uint32_t buf_len) {
     uint32_t acquire_len = sizeof(LCString) + buf_len + 1;
     LCString* result = lc_mallocz(rt, acquire_len);
-    memset(result, 0, acquire_len);
 
     LCInitObject(&result->header, LC_TY_STRING);
 
@@ -706,7 +707,7 @@ static LCValue lc_new_string8(LCRuntime* rt, const unsigned char* buf, uint32_t 
     result->length = buf_len;
     result->hash = 0;
     
-    return (LCValue){ { .ptr_val = (LCObject*)result }, LC_TY_STRING };
+    return MK_STRING(result);
 }
 
 static int string_buffer_write8(StringBuffer *s, const uint8_t *p, int len)
@@ -754,7 +755,7 @@ static LCValue string_buffer_end(StringBuffer *s) {
     str->length = s->len;
     str->hash = 0;
     s->str = NULL;
-    return (LCValue){ { .ptr_val = (LCObject*)str }, LC_TY_STRING };
+    return MK_STRING(str);
 }
 
 LCValue LCNewStringFromCStringLen(LCRuntime* rt, const unsigned char* buf, uint32_t buf_len) {
@@ -1278,4 +1279,48 @@ cmp:
 
     }
     return LCFalse;
+}
+
+LCValue lc_std_string_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    int begin = args[0].int_val;
+    int end = args[1].int_val;
+    LCString* s = (LCString*)(this.ptr_val);
+    LCString* result;
+    int max_len = s->length;
+    int need_len; 
+    uint32_t acquire_len;
+
+    begin = min_int(max_int(begin, 0), max_len);
+    end = min_int(max_int(end, 0), max_len);
+
+    need_len = end - begin;
+
+    if (begin >= end) {
+        return lc_new_string8(rt, NULL, 0);
+    }
+
+    if (!s->is_wide_char) {
+        acquire_len = sizeof(LCString) + need_len + 1;
+        result = lc_mallocz(rt, acquire_len);
+
+        LCInitObject(&result->header, LC_TY_STRING);
+
+        memcpy(result->u.str8, s->u.str8 + begin, need_len);
+        result->u.str8[need_len] = 0;
+
+        result->length = need_len;
+        result->is_wide_char = 0;
+        result->hash = 0;
+
+        return MK_STRING(result);
+    }
+
+    acquire_len = sizeof(LCString) + need_len * 2;
+    LCInitObject(&result->header, LC_TY_STRING);
+    memcpy(result->u.str16, s->u.str16 + begin, need_len * 2);
+    result->length = need_len;
+    result->is_wide_char = 1;
+    result->hash = 0;
+
+    return MK_STRING(result);
 }
