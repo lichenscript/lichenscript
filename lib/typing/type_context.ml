@@ -34,7 +34,6 @@ let make_default_type_sym ctx scope =
     ("f32", Primitive);
     ("f64", Primitive);
     ("char", Primitive);
-    ("string", Primitive);  (* alias for String *)
     ("boolean", Primitive);
   |] in
   Array.iter
@@ -153,6 +152,7 @@ and print_type_value ctx ty_value =
   )
   | Lambda _ -> "lambda"
   | Array _ -> "array"
+  | String -> "string"
   | TypeDef (type_sym, _) -> (
     let open Core_type.TypeDef in
     match type_sym.spec with

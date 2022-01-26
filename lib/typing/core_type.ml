@@ -53,6 +53,8 @@ module rec TypeExpr : sig
      *)
     | Array of t
 
+    | String
+
     | TypeDef of (TypeDef.t * int)
 
     (* used for generic *)
@@ -74,6 +76,7 @@ end = struct
     | Ref of int
     | Lambda of t list * t
     | Array of t
+    | String
     | TypeDef of (TypeDef.t * int)
     | TypeSymbol of string
 
@@ -91,6 +94,7 @@ end = struct
     | Ref i -> Format.fprintf formatter "ref '%d" i
     | Lambda _ -> Format.fprintf formatter "lambda"
     | Array t -> Format.fprintf formatter "%a[]" pp t
+    | String -> Format.fprintf formatter "string"
     | TypeDef _ -> Format.fprintf formatter "typedef"
     | TypeSymbol sym -> Format.pp_print_string formatter sym
 

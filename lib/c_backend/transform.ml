@@ -2,6 +2,7 @@
  * Convert TypedTree to C-op
  *)
 open Core_kernel
+open Lichenscript_parsing.Asttypes
 open Lichenscript_parsing.Ast
 open Lichenscript_typing
 open Lichenscript_typing.Scope
@@ -450,7 +451,7 @@ and auto_release_expr env ?(is_move=false) ~prepend_stmts ~append_stmts expr =
     loc = Loc.none;
   } in
 
-  prepend_stmts := prepend_stmt::!prepend_stmts;
+  prepend_stmts := List.append !prepend_stmts [prepend_stmt];
 
   let result = C_op.Expr.Temp tmp_id in
 
@@ -749,7 +750,19 @@ and transform_expression ?(is_move=false) env expr =
       prepend_stmts := List.concat [!prepend_stmts; left'.prepend_stmts; right'.prepend_stmts];
       append_stmts := List.concat [!append_stmts; left'.append_stmts; right'.append_stmts];
 
-      C_op.Expr.I32Binary(op, left'.expr, right'.expr)
+      let left_type = Type_context.deref_node_type env.ctx left.ty_var in
+
+      match (left_type, op) with
+      | (Core_type.TypeExpr.String, BinaryOp.Plus) ->
+        let spec = auto_release_expr env ~prepend_stmts ~append_stmts {
+          C_op.Expr.
+          spec = ExternalCall(SymLocal "lc_std_string_concat", None, [left'.expr; right'.expr]);
+          loc = Loc.none;
+        } in
+        spec
+
+      | _ ->
+        C_op.Expr.I32Binary(op, left'.expr, right'.expr)
     )
 
     | Update _ -> failwith "update"

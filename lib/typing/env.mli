@@ -36,8 +36,6 @@ val ty_f32: t -> int
 
 val ty_char: t -> int
 
-val ty_string: t -> int
-
 val ty_boolean: t -> int
 
 val ty_unit: t -> int

@@ -123,31 +123,35 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     match spec with
     | Constant cnst -> (
       let open Ast.Literal in
-      let ty_var =
+      let deps, value =
         match cnst with
         | Integer _ ->
-          Option.value_exn (root_scope#find_type_symbol "i32")
+          let ty_var = Option.value_exn (root_scope#find_type_symbol "i32") in
+          [ty_var], TypeExpr.Ctor(Ref ty_var, [])
 
         | Char _ ->
-          Option.value_exn (root_scope#find_type_symbol "char")
+          let ty_var = Option.value_exn (root_scope#find_type_symbol "char") in
+          [ty_var], TypeExpr.Ctor(Ref ty_var, [])
 
         (* 'c' *)
         | String _ ->
-          Option.value_exn (root_scope#find_type_symbol "string")
+          [], TypeExpr.String
 
         | Float _ ->
-          Option.value_exn (root_scope#find_type_symbol "f32")
+          let ty_var = Option.value_exn (root_scope#find_type_symbol "f32") in
+          [ty_var], TypeExpr.Ctor(Ref ty_var, [])
 
         | Boolean _ -> 
-          Option.value_exn (root_scope#find_type_symbol "boolean")
+          let ty_var = Option.value_exn (root_scope#find_type_symbol "boolean") in
+          [ty_var], TypeExpr.Ctor(Ref ty_var, [])
 
       in
 
       let node = {
-        value = TypeExpr.Ctor(Ref ty_var, []);
+        value;
         loc = loc;
         check = none;
-        deps = [ty_var];
+        deps;
       } in
 
       let node_id = Type_context.new_id (Env.ctx env) node in
@@ -1252,6 +1256,7 @@ and annotate_type env ty : (TypeExpr.t * int list) =
   let scope = Env.peek_scope env in
   match spec with
   | Ty_any -> TypeExpr.Any, []
+  | Ty_ctor({ pident_name = "string"; _ }, []) -> TypeExpr.String, []
   | Ty_ctor(ctor, params) -> (
     let { Identifier. pident_name; pident_loc } = ctor in
 

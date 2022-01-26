@@ -5,6 +5,10 @@
 #include "stdio.h"
 #include "math.h"
 
+#if defined(__APPLE__)
+#include <malloc/malloc.h>
+#endif
+
 #define LC_INIT_SYMBOL_BUCKET_SIZE 128
 #define LC_INIT_CLASS_META_CAP 8
 #define I64_POOL_SIZE 1024
@@ -12,6 +16,124 @@
 #define lc_raw_malloc malloc
 #define lc_raw_realloc realloc
 #define lc_raw_free free
+
+static inline int max_int(int a, int b)
+{
+    if (a > b)
+        return a;
+    else
+        return b;
+}
+
+static inline int min_int(int a, int b)
+{
+    if (a < b)
+        return a;
+    else
+        return b;
+}
+
+/* Note: at most 31 bits are encoded. At most UTF8_CHAR_LEN_MAX bytes
+   are output. */
+int unicode_to_utf8(uint8_t *buf, unsigned int c)
+{
+    uint8_t *q = buf;
+
+    if (c < 0x80) {
+        *q++ = c;
+    } else {
+        if (c < 0x800) {
+            *q++ = (c >> 6) | 0xc0;
+        } else {
+            if (c < 0x10000) {
+                *q++ = (c >> 12) | 0xe0;
+            } else {
+                if (c < 0x00200000) {
+                    *q++ = (c >> 18) | 0xf0;
+                } else {
+                    if (c < 0x04000000) {
+                        *q++ = (c >> 24) | 0xf8;
+                    } else if (c < 0x80000000) {
+                        *q++ = (c >> 30) | 0xfc;
+                        *q++ = ((c >> 24) & 0x3f) | 0x80;
+                    } else {
+                        return 0;
+                    }
+                    *q++ = ((c >> 18) & 0x3f) | 0x80;
+                }
+                *q++ = ((c >> 12) & 0x3f) | 0x80;
+            }
+            *q++ = ((c >> 6) & 0x3f) | 0x80;
+        }
+        *q++ = (c & 0x3f) | 0x80;
+    }
+    return q - buf;
+}
+
+static const unsigned int utf8_min_code[5] = {
+    0x80, 0x800, 0x10000, 0x00200000, 0x04000000,
+};
+
+static const unsigned char utf8_first_code_mask[5] = {
+    0x1f, 0xf, 0x7, 0x3, 0x1,
+};
+
+/* return -1 if error. *pp is not updated in this case. max_len must
+   be >= 1. The maximum length for a UTF8 byte sequence is 6 bytes. */
+int unicode_from_utf8(const uint8_t *p, int max_len, const uint8_t **pp)
+{
+    int l, c, b, i;
+
+    c = *p++;
+    if (c < 0x80) {
+        *pp = p;
+        return c;
+    }
+    switch(c) {
+    case 0xc0: case 0xc1: case 0xc2: case 0xc3:
+    case 0xc4: case 0xc5: case 0xc6: case 0xc7:
+    case 0xc8: case 0xc9: case 0xca: case 0xcb:
+    case 0xcc: case 0xcd: case 0xce: case 0xcf:
+    case 0xd0: case 0xd1: case 0xd2: case 0xd3:
+    case 0xd4: case 0xd5: case 0xd6: case 0xd7:
+    case 0xd8: case 0xd9: case 0xda: case 0xdb:
+    case 0xdc: case 0xdd: case 0xde: case 0xdf:
+        l = 1;
+        break;
+    case 0xe0: case 0xe1: case 0xe2: case 0xe3:
+    case 0xe4: case 0xe5: case 0xe6: case 0xe7:
+    case 0xe8: case 0xe9: case 0xea: case 0xeb:
+    case 0xec: case 0xed: case 0xee: case 0xef:
+        l = 2;
+        break;
+    case 0xf0: case 0xf1: case 0xf2: case 0xf3:
+    case 0xf4: case 0xf5: case 0xf6: case 0xf7:
+        l = 3;
+        break;
+    case 0xf8: case 0xf9: case 0xfa: case 0xfb:
+        l = 4;
+        break;
+    case 0xfc: case 0xfd:
+        l = 5;
+        break;
+    default:
+        return -1;
+    }
+    /* check that we have enough characters */
+    if (l > (max_len - 1))
+        return -1;
+    c &= utf8_first_code_mask[l - 1];
+    for(i = 0; i < l; i++) {
+        b = *p++;
+        if (b < 0x80 || b >= 0xc0)
+            return -1;
+        c = (c << 6) | (b & 0x3f);
+    }
+    if (c < utf8_min_code[l - 1])
+        return -1;
+    *pp = p;
+    return c;
+}
 
 typedef struct LCClassMeta {
     LCClassDef* cls_def;
@@ -198,6 +320,31 @@ void* lc_realloc(LCRuntime* rt, void* ptr, size_t size) {
     return lc_raw_realloc(ptr, size);
 }
 
+size_t lc_malloc_usable_size_platform(const void *ptr) {
+#if defined(__APPLE__)
+    return malloc_size(ptr);
+#endif
+    return 0;
+}
+
+size_t lc_malloc_usable_size(LCRuntime *rt, const void *ptr) {
+    return lc_malloc_usable_size_platform(ptr);
+}
+
+void *lc_realloc2(LCRuntime *rt, void *ptr, size_t size, size_t *pslack)
+{
+    void *ret;
+    ret = lc_realloc(rt, ptr, size);
+    if (unlikely(!ret && size != 0)) {
+        return NULL;
+    }
+    if (pslack) {
+        size_t new_size = lc_malloc_usable_size(rt, ret);
+        *pslack = (new_size > size) ? new_size - size : 0;
+    }
+    return ret;
+}
+
 void lc_free(LCRuntime* rt, void* ptr) {
     rt->malloc_state.malloc_count--;
     lc_raw_free(ptr);
@@ -376,16 +523,290 @@ void LCInitObject(LCObjectHeader* header, LCObjectType obj_type) {
     header->count = 1;
 }
 
-LCValue LCNewStringFromCStringLen(LCRuntime* rt, const unsigned char* content, uint32_t len) {
-    uint32_t acquire_len = sizeof(LCString) + len + 1;
+/* Note: the string contents are uninitialized */
+static LCString *lc_alloc_string_rt(LCRuntime *rt, int max_len, int is_wide_char)
+{
+    LCString *str;
+    str = lc_malloc(rt, sizeof(LCString) + (max_len << is_wide_char) + 1 - is_wide_char);
+    if (unlikely(!str)) {
+        return NULL;
+    }
+    str->header.count = 1;
+    str->is_wide_char = is_wide_char;
+    str->length = max_len;
+    str->hash = 0;          /* optional but costless */
+    return str;
+}
+
+typedef struct StringBuffer {
+    LCRuntime *rt;
+    LCString *str;
+    int len;
+    int size;
+    int is_wide_char;
+    int error_status;
+} StringBuffer;
+
+/* It is valid to call string_buffer_end() and all string_buffer functions even
+   if string_buffer_init() or another string_buffer function returns an error.
+   If the error_status is set, string_buffer_end() returns JS_EXCEPTION.
+ */
+static int string_buffer_init2(LCRuntime* rt, StringBuffer *s, int size,
+                               int is_wide)
+{
+    s->rt = rt;
+    s->size = size;
+    s->len = 0;
+    s->is_wide_char = is_wide;
+    s->error_status = 0;
+    s->str = lc_alloc_string_rt(rt, size, is_wide);
+    if (unlikely(!s->str)) {
+        s->size = 0;
+        return s->error_status = -1;
+    }
+    return 0;
+}
+
+static inline int string_buffer_init(LCRuntime* rt, StringBuffer *s, int size)
+{
+    return string_buffer_init2(rt, s, size, 0);
+}
+
+static void string_buffer_free(StringBuffer *s)
+{
+    lc_free(s->rt, s->str);
+    s->str = NULL;
+}
+
+static no_inline int string_buffer_widen(StringBuffer *s, int size)
+{
+    LCString *str;
+    size_t slack;
+    int i;
+
+    if (s->error_status)
+        return -1;
+
+    str = lc_realloc2(s->rt, s->str, sizeof(LCString) + (size << 1), &slack);
+    // if (!str)
+    //     return string_buffer_set_error(s);
+    size += slack >> 1;
+    for(i = s->len; i-- > 0;) {
+        str->u.str16[i] = str->u.str8[i];
+    }
+    s->is_wide_char = 1;
+    s->size = size;
+    s->str = str;
+    return 0;
+}
+
+#define LC_STRING_LEN_MAX ((1 << 30) - 1)
+
+static no_inline int string_buffer_realloc(StringBuffer *s, int new_len, int c)
+{
+    LCString *new_str;
+    int new_size;
+    size_t new_size_bytes, slack;
+
+    if (s->error_status)
+        return -1;
+
+    if (new_len > LC_STRING_LEN_MAX) {
+        fprintf(stderr, "string too long");
+        abort();
+    }
+    new_size = min_int(max_int(new_len, s->size * 3 / 2), LC_STRING_LEN_MAX);
+    if (!s->is_wide_char && c >= 0x100) {
+        return string_buffer_widen(s, new_size);
+    }
+    new_size_bytes = sizeof(LCString) + (new_size << s->is_wide_char) + 1 - s->is_wide_char;
+    new_str = lc_realloc2(s->rt, s->str, new_size_bytes, &slack);
+    if (!new_str) {
+        fprintf(stderr, "malloc memory for string failed");
+        abort();
+    }
+    new_size = min_int(new_size + (slack >> s->is_wide_char), LC_STRING_LEN_MAX);
+    s->size = new_size;
+    s->str = new_str;
+    return 0;
+}
+
+static no_inline int string_buffer_putc_slow(StringBuffer *s, uint32_t c)
+{
+    if (unlikely(s->len >= s->size)) {
+        if (string_buffer_realloc(s, s->len + 1, c))
+            return -1;
+    }
+    if (s->is_wide_char) {
+        s->str->u.str16[s->len++] = c;
+    } else if (c < 0x100) {
+        s->str->u.str8[s->len++] = c;
+    } else {
+        if (string_buffer_widen(s, s->size))
+            return -1;
+        s->str->u.str16[s->len++] = c;
+    }
+    return 0;
+}
+
+/* 0 <= c <= 0xff */
+static int string_buffer_putc8(StringBuffer *s, uint32_t c)
+{
+    if (unlikely(s->len >= s->size)) {
+        if (string_buffer_realloc(s, s->len + 1, c))
+            return -1;
+    }
+    if (s->is_wide_char) {
+        s->str->u.str16[s->len++] = c;
+    } else {
+        s->str->u.str8[s->len++] = c;
+    }
+    return 0;
+}
+
+/* 0 <= c <= 0xffff */
+static int string_buffer_putc16(StringBuffer *s, uint32_t c)
+{
+    if (likely(s->len < s->size)) {
+        if (s->is_wide_char) {
+            s->str->u.str16[s->len++] = c;
+            return 0;
+        } else if (c < 0x100) {
+            s->str->u.str8[s->len++] = c;
+            return 0;
+        }
+    }
+    return string_buffer_putc_slow(s, c);
+}
+
+/* 0 <= c <= 0x10ffff */
+static int string_buffer_putc(StringBuffer *s, uint32_t c)
+{
+    if (unlikely(c >= 0x10000)) {
+        /* surrogate pair */
+        c -= 0x10000;
+        if (string_buffer_putc16(s, (c >> 10) + 0xd800))
+            return -1;
+        c = (c & 0x3ff) + 0xdc00;
+    }
+    return string_buffer_putc16(s, c);
+}
+
+static LCValue lc_new_string8(LCRuntime* rt, const unsigned char* buf, uint32_t buf_len) {
+    uint32_t acquire_len = sizeof(LCString) + buf_len + 1;
     LCString* result = lc_mallocz(rt, acquire_len);
     memset(result, 0, acquire_len);
 
     LCInitObject(&result->header, LC_TY_STRING);
 
-    memcpy(result->content, content, len);
+    if (buf_len > 0) {
+        memcpy(result->u.str8, buf, buf_len);
+    }
+    result->is_wide_char = 0;
+    result->length = buf_len;
     
     return (LCValue){ { .ptr_val = (LCObject*)result }, LC_TY_STRING };
+}
+
+static int string_buffer_write8(StringBuffer *s, const uint8_t *p, int len)
+{
+    int i;
+
+    if (s->len + len > s->size) {
+        if (string_buffer_realloc(s, s->len + len, 0))
+            return -1;
+    }
+    if (s->is_wide_char) {
+        for (i = 0; i < len; i++) {
+            s->str->u.str16[s->len + i] = p[i];
+        }
+        s->len += len;
+    } else {
+        memcpy(&s->str->u.str8[s->len], p, len);
+        s->len += len;
+    }
+    return 0;
+}
+
+static LCValue string_buffer_end(StringBuffer *s) {
+    LCString *str;
+    str = s->str;
+    if (s->len == 0) {
+        lc_free(s->rt, str);
+        s->str = NULL;
+        return lc_new_string8(s->rt, NULL, 0);
+    }
+    if (s->len < s->size) {
+        /* smaller size so js_realloc should not fail, but OK if it does */
+        /* XXX: should add some slack to avoid unnecessary calls */
+        /* XXX: might need to use malloc+free to ensure smaller size */
+        str = lc_realloc(s->rt, str, sizeof(LCString) +
+                            (s->len << s->is_wide_char) + 1 - s->is_wide_char);
+        if (str == NULL)
+            str = s->str;
+        s->str = str;
+    }
+    if (!s->is_wide_char) {
+        str->u.str8[s->len] = 0;
+    }
+    str->is_wide_char = s->is_wide_char;
+    str->length = s->len;
+    s->str = NULL;
+    return (LCValue){ { .ptr_val = (LCObject*)str }, LC_TY_STRING };
+}
+
+LCValue LCNewStringFromCStringLen(LCRuntime* rt, const unsigned char* buf, uint32_t buf_len) {
+    const unsigned char* buf_end = buf + buf_len;
+    const unsigned char* p = buf;
+    const unsigned char* p_next;
+    uint32_t c;
+    size_t len;
+    StringBuffer sb;
+
+    while (p < buf_end && *p < 128) {
+        p++;
+    }
+    len = p - buf;
+
+    if (p == buf_end) {  /* ANSCII string */
+        return lc_new_string8(rt, buf, buf_len);
+    }
+    if (string_buffer_init(rt, &sb, buf_len)) {
+        abort();
+    }
+    string_buffer_write8(&sb, buf, len);
+    while (p < buf_end) {
+        if (*p < 128) {
+            string_buffer_putc8(&sb, *p++);
+        } else {
+            /* parse utf-8 sequence, return 0xFFFFFFFF for error */
+            c = unicode_from_utf8(p, buf_end - p, &p_next);
+            if (c < 0x10000) {
+                p = p_next;
+            } else if (c <= 0x10FFFF) {
+                p = p_next;
+                /* surrogate pair */
+                c -= 0x10000;
+                string_buffer_putc16(&sb, (c >> 10) + 0xd800);
+                c = (c & 0x3ff) + 0xdc00;
+            } else {
+                /* invalid char */
+                c = 0xfffd;
+                /* skip the invalid chars */
+                /* XXX: seems incorrect. Why not just use c = *p++; ? */
+                while (p < buf_end && (*p >= 0x80 && *p < 0xc0))
+                    p++;
+                if (p < buf_end) {
+                    p++;
+                    while (p < buf_end && (*p >= 0x80 && *p < 0xc0))
+                        p++;
+                }
+            }
+            string_buffer_putc16(&sb, c);
+        }
+    }
+
+    return string_buffer_end(&sb);
 }
 
 LCValue LCNewStringFromCString(LCRuntime* rt, const unsigned char* content) {
@@ -509,7 +930,7 @@ LCValue LCNewSymbolLen(LCRuntime* rt, const char* content, uint32_t len) {
         }
 
         str_ptr = (LCString*)bucket_at_index->content.ptr_val;
-        if (strcmp((const char *)str_ptr->content, content) == 0) {
+        if (strcmp((const char *)str_ptr->u.str8, content) == 0) {
             result = bucket_at_index->content;
             break;
         }
@@ -602,7 +1023,7 @@ LCValue LCRunMain(LCProgram* program) {
 }
 
 static void std_print_string(LCString* str) {
-    printf("%s", str->content);
+    printf("%s", str->u.str8);
 }
 
 static void std_print_val(LCRuntime* rt, LCValue val) {
@@ -716,4 +1137,45 @@ LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* arg
     arr->data[arr->len++] = args[0];
 
     return MK_NULL();
+}
+
+static void copy_str16(uint16_t *dst, const LCString *p, int offset, int len)
+{
+    if (p->is_wide_char) {
+        memcpy(dst, p->u.str16 + offset, len * 2);
+    } else {
+        const uint8_t *src1 = p->u.str8 + offset;
+        int i;
+
+        for(i = 0; i < len; i++)
+            dst[i] = src1[i];
+    }
+}
+
+LCValue lc_std_string_concat(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    LCString *p;
+    int is_wide_char;
+
+    LCString* s1 = (LCString*)(args[0].ptr_val);
+    LCString* s2 = (LCString*)(args[1].ptr_val);
+    is_wide_char = s1->is_wide_char | s2->is_wide_char;
+
+    uint32_t len = s1->length + s2->length;
+
+    p = lc_alloc_string_rt(rt, len, is_wide_char);
+    if (!is_wide_char) {
+        memcpy(p->u.str8, s1->u.str8, s1->length);
+        memcpy(p->u.str8 + s1->length, s2->u.str8, s2->length);
+        p->u.str8[len] = '\0';
+    } else {
+        copy_str16(p->u.str16, s1, 0, s1->length);
+        copy_str16(p->u.str16 + s1->length, s2, 0, s2->length);
+    }
+
+    return (LCValue){ { .ptr_val = (LCObject*)p }, LC_TY_STRING };
+}
+
+LCValue lc_std_string_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    LCString* str = (LCString*)this.ptr_val;
+    return MK_I32(str->length);
 }

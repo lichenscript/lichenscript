@@ -119,9 +119,14 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 
 typedef struct LCString {
     LC_OBJ_HEADER
-    uint32_t length;
+    uint32_t length: 31;
+    uint8_t is_wide_char : 1;
+
     uint32_t hash;
-    unsigned char content[];
+    union {
+        uint8_t str8[0];
+        uint16_t str16[0];
+    } u;
 } LCString;
 
 typedef struct LCSymbolBucket {
@@ -175,6 +180,7 @@ void LCFreeRuntime(LCRuntime* rt);
 void* lc_malloc(LCRuntime* rt, size_t size);
 void* lc_mallocz(LCRuntime* rt, size_t size);
 void* lc_realloc(LCRuntime* rt, void*, size_t size);
+void* lc_realloc2(LCRuntime *ctx, void *ptr, size_t size, size_t *pslack);
 void lc_free(LCRuntime* rt, void *);
 
 void LCUpdateValue(LCArithmeticType op, LCValue* left, LCValue right);
@@ -239,3 +245,6 @@ void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCObject* obj);
 
 LCValue lc_std_array_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
+
+LCValue lc_std_string_concat(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
+LCValue lc_std_string_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);

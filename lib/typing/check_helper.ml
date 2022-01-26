@@ -57,8 +57,13 @@ let check_is_primitive_type ~group ctx (left: TypeExpr.t) (right: TypeExpr.t) =
     | _ -> false
   )
 
-let type_addable =
-  check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "string" |]
+let type_addable ctx left right =
+  let left = Type_context.deref_type ctx left in
+  let right = Type_context.deref_type ctx right in
+  match (left, right) with
+  | TypeExpr.String, TypeExpr.String -> true
+  | _ ->
+    check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "string" |] ctx left right
 
 let type_arithmetic =
   check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; |]
@@ -165,6 +170,18 @@ let rec find_member_of_type ctx ~scope type_expr member_name =
       find_member_of_type ctx ~scope ctor_type member_name
     )
     | None -> failwith "Can not find Array type in current scope"
+  )
+
+  | String -> (
+    let ty_int_opt = scope#find_type_symbol "String" in
+    match ty_int_opt with
+    | Some ty_int -> (
+      let array_node = Type_context.get_node ctx ty_int in
+      (* building type Array<T> *)
+      let ctor_type = TypeExpr.Ctor(array_node.value, []) in
+      find_member_of_type ctx ~scope ctor_type member_name
+    )
+    | None -> failwith "Can not find String type in current scope"
   )
 
   | _ -> None
