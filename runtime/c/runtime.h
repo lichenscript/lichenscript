@@ -13,8 +13,13 @@
 #endif
 
 typedef enum LCObjectType {
+    LC_TY_F64 = -9,
+    LC_TY_F32 = -8,
+    LC_TY_U64 = -7,
+    LC_TY_I64 = -6,
+    LC_TY_U32 = -5,
     LC_TY_I32 = -4,
-    LC_TY_F32 = -3,
+    LC_TY_CHAR = -3,
     LC_TY_BOOL = -2,
     LC_TY_UNION = -1,
     LC_TY_NULL = 0,
@@ -93,6 +98,7 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 
 #define MK_NULL() ((LCValue) { { .int_val = 0 }, LC_TY_NULL })
 #define MK_I32(v) ((LCValue) { { .int_val = v }, LC_TY_I32 })
+#define MK_CHAR(v) ((LCValue) { { .int_val = v }, LC_TY_CHAR })
 #define MK_F32(v) ((LCValue) { { .float_val = v }, LC_TY_F32 })
 #define MK_BOOL(v) ((LCValue) { { .int_val = (v) }, LC_TY_BOOL })
 #define MK_VARIANT_CLOSED(v) ((LCValue) { { .int_val = v }, (LC_TY_MAX + (v << 6)) })
