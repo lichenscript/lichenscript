@@ -8,22 +8,45 @@ open Lichenscript_typing
 open Lichenscript_typing.Scope
 open Lichenscript_typing.Typedtree
 
-(*
- * The same variable(type_id) has different meaning in different scope,
- * In a lambda expression, a captured value represents a value to this,
- * but int outer scope, it's a local variable.
- *)
-type transform_scope = {
-  name_map: (string, C_op.symbol) Hashtbl.t;
-  raw: scope option;
-  prev: transform_scope option;
-}
+module TScope = struct
+  (* Why name_map?
+   * 1. The same variable(type_id) has different meaning in different scope,
+   *    In a lambda expression, a captured value represents a value to this,
+   *    but int outer scope, it's a local variable.
+   *)
+  type t = {
+    name_map: (string, C_op.symbol) Hashtbl.t;
+    raw: scope option;
+    prev: t option;
+  }
 
-let create_transform_scope scope = {
-  name_map = Hashtbl.create (module String);
-  raw = scope;
-  prev = None;
-}
+  let create scope =
+    let name_map = Hashtbl.create (module String) in
+    {
+      name_map;
+      raw = scope;
+      prev = None;
+    }
+
+  let rec find_variable scope name =
+    let find_in_prev () =
+      match scope.prev with
+      | Some prev_scope -> find_variable prev_scope name
+      | None -> failwith (Format.sprintf "can not find variable %s" name)
+    in
+    match Hashtbl.find scope.name_map name with
+    | Some v -> v
+    | None -> find_in_prev ()
+
+  let distribute_name current_scope name =
+    let fun_name = "LCC_" ^ name in
+    Hashtbl.set current_scope.name_map ~key:name ~data:(SymLocal fun_name);
+    fun_name
+
+  let set_name scope =
+    Hashtbl.set scope.name_map
+  
+end
 
 type cls_meta = {
   cls_id: int;
@@ -49,6 +72,7 @@ let create_cls_meta cls_id cls_gen_name cls_fields : cls_meta = {
 type current_fun_meta = {
   fun_name: string;
   used_name: string Hash_set.t;
+  mutable def_local_names: string list;
 }
 
 let preserved_name = [ "ret"; "rt"; "this"; "argc"; "argv"; "t" ]
@@ -56,11 +80,12 @@ let preserved_name = [ "ret"; "rt"; "this"; "argc"; "argv"; "t" ]
 let create_current_fun_meta fun_name = {
   fun_name;
   used_name = Hash_set.of_list (module String) preserved_name;
+  def_local_names = [];
 }
 
 type t = {
   ctx: Type_context.t;
-  mutable scope: transform_scope;
+  mutable scope: TScope.t;
   mutable tmp_vars_count: int;
   mutable main_function_name: string option;
   mutable class_inits: C_op.Decl.class_init list;
@@ -79,7 +104,7 @@ type t = {
   mutable lambdas: C_op.Decl.t list;
 }
 
-let push_scope env scope =
+let push_scope env (scope: TScope.t) =
   let scope = {
     scope with
     prev = Some env.scope;
@@ -95,18 +120,8 @@ let with_scope env scope cb =
   pop_scope env;
   result
 
-let find_variable env name =
-  let rec find_in_scope scope =
-    match Hashtbl.find scope.name_map name with
-    | Some v -> v
-    | None -> (
-      match scope.prev with
-      | Some prev_scope -> find_in_scope prev_scope
-      | None -> failwith (Format.sprintf "can not find variable %s" name)
-    )
-  in
-  let scope = env.scope in
-  find_in_scope scope
+let find_variable env =
+  TScope.find_variable env.scope
 
 let should_var_captured variable =
   if !(variable.var_captured) then (
@@ -123,7 +138,7 @@ type expr_result = {
 }
 
 let create ctx =
-  let scope = create_transform_scope None in
+  let scope = TScope.create None in
   let global_name_map = Hashtbl.create (module Int) in
   let cls_meta_map = Hashtbl.create (module Int) in
   {
@@ -140,10 +155,14 @@ let create ctx =
   }
 
 let get_local_var_name fun_meta realname ty_int =
-  if Hash_set.mem fun_meta.used_name realname then
-    realname ^ "_" ^ (Int.to_string ty_int)
-  else
-    realname
+  let name =
+    if Hash_set.mem fun_meta.used_name realname then
+      realname ^ "_" ^ (Int.to_string ty_int)
+    else
+      realname
+  in
+  Hash_set.add fun_meta.used_name name;
+  name
 
 let rec transform_declaration env decl =
   let open Declaration in
@@ -168,11 +187,8 @@ let rec transform_declaration env decl =
   | Declare _
   | Import _ -> []
 
-and distribute_name env name =
-  let fun_name = "LCC_" ^ name in
-  let current_scope = env.scope in
-  Hashtbl.set current_scope.name_map ~key:name ~data:(SymLocal fun_name);
-  fun_name
+and distribute_name env =
+  TScope.distribute_name env.scope
 
 (*
  * 1. Scan the function firstly, find out all the lambda expression
@@ -199,11 +215,28 @@ and transform_function env _fun =
 
   [ result ]
 
+
+and distribute_name_to_scope scope fun_meta local_vars : unit =
+  let local_names =
+    local_vars
+    |> List.map
+      ~f:(fun (var_name, variable) ->
+        let gen_name = get_local_var_name fun_meta var_name variable.var_id in
+        TScope.set_name
+          scope
+          ~key:var_name
+          ~data:(SymLocal gen_name);
+
+        gen_name
+      )
+  in
+  fun_meta.def_local_names <- List.append fun_meta.def_local_names local_names
+
 and transform_function_impl env ~name ~params ~body ~scope ~comments =
   let open Function in
 
   let fun_meta = Option.value_exn env.current_fun_name in
-  let fun_scope = create_transform_scope (Some scope) in
+  let fun_scope = TScope.create (Some scope) in
   push_scope env fun_scope;
 
   let params_set = Hash_set.create (module String) in
@@ -213,14 +246,14 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
       let param_name, _ = param_name in
       Hash_set.add params_set param_name;
       (* Hashtbl.set env.name_map ~key:param_ty ~data:(get_local_var_name param_name param_ty) *)
-      Hashtbl.set fun_scope.name_map ~key:param_name ~data:(SymParam index)
+      TScope.set_name fun_scope ~key:param_name ~data:(SymParam index)
     )
     params.params_content;
 
   let capturing_variables = scope#capturing_variables in
   Scope.CapturingVarMap.iteri
     ~f:(fun ~key:name ~data:idx ->
-      Hashtbl.set fun_scope.name_map ~key:name ~data:(SymLambda idx);
+      TScope.set_name fun_scope ~key:name ~data:(SymLambda idx);
       Hash_set.add params_set name;
     )
     capturing_variables;
@@ -231,27 +264,7 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
     |> List.filter ~f:(fun (name, _) -> not (Hash_set.mem params_set name))
   in
 
-  let def = ref [] in
-
-  if (List.length local_vars) > 0 then (
-    let names =
-      List.map
-      ~f:(fun (var_name, variable) ->
-        Hashtbl.set
-          fun_scope.name_map
-          ~key:var_name
-          ~data:(SymLocal (get_local_var_name fun_meta var_name variable.var_id));
-        var_name
-      )
-      local_vars;
-    in
-    def := [
-      { C_op.Stmt.
-        spec = VarDecl names;
-        loc = Loc.none;
-      }
-    ];
-  );
+  distribute_name_to_scope fun_scope fun_meta local_vars;
 
   let max_tmp_value = ref env.tmp_vars_count in
 
@@ -299,9 +312,24 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
         local_vars
     ) else [] in
 
+  let generate_name_def () =
+    let names = fun_meta.def_local_names in
+    [{ C_op.Stmt.
+      spec = VarDecl names;
+      loc = Loc.none;
+    }]
+  in
+
+  let def =
+    if (List.length local_vars) > 0 then (
+      generate_name_def ()
+    ) else
+      []
+  in
+
   let new_body = {
     C_op.Block.
-    body = List.concat [ !def; stmts; cleanup_label; cleanup ];
+    body = List.concat [ def; stmts; cleanup_label; cleanup ];
     loc = body.loc;
   } in
 
@@ -318,6 +346,14 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
   env.tmp_vars_count <- !max_tmp_value;
 
   C_op.Decl.Func t_fun;
+
+and create_scope_and_distribute_vars env raw_scope =
+  let scope = TScope.create (Some raw_scope) in
+  let local_vars = raw_scope#vars in
+
+  distribute_name_to_scope scope (Option.value_exn env.current_fun_name) local_vars;
+
+  scope
 
 and transform_statement ?ret env stmt =
   let open Statement in
@@ -353,26 +389,23 @@ and transform_statement ?ret env stmt =
   | While { while_test; while_block; while_loc } -> (
     let transform_expression = transform_expression env while_test in
 
-    let scope = create_transform_scope (Some while_block.scope) in
-    with_scope env scope (fun env ->
-      let bodys = List.map ~f:(transform_statement env) while_block.body |> List.concat in
-      let body = {
-        C_op.Block.
-        body = bodys;
-        loc = while_block.loc;
-      } in
+    let bodys = transform_block ?ret env while_block in
+    let body = {
+      C_op.Block.
+      body = bodys;
+      loc = while_block.loc;
+    } in
 
-      List.concat [
-        transform_expression.prepend_stmts;
-        [
-          { C_op.Stmt.
-            spec = While(transform_expression.expr, body);
-            loc = while_loc;
-          }
-        ];
-        transform_expression.append_stmts;
-      ]
-    )
+    List.concat [
+      transform_expression.prepend_stmts;
+      [
+        { C_op.Stmt.
+          spec = While(transform_expression.expr, body);
+          loc = while_loc;
+        }
+      ];
+      transform_expression.append_stmts;
+    ]
   )
 
   | Binding binding -> (
@@ -389,7 +422,7 @@ and transform_statement ?ret env stmt =
       ((Option.value_exn scope.raw)#find_var_symbol original_name)
     in
 
-    let name = Hashtbl.find_exn scope.name_map original_name in
+    let name = TScope.find_variable scope original_name in
     let init_expr = transform_expression ~is_move:true env binding.binding_init in
 
     let assign_expr =
@@ -549,7 +582,7 @@ and transform_expression ?(is_move=false) env expr =
       (* pass the capturing values into the deeper scope *)
       Scope.CapturingVarMap.iteri
       ~f:(fun ~key ~data -> 
-        let name = Hashtbl.find_exn parent_scope.name_map key in
+        let name = TScope.find_variable parent_scope key in
         Array.set capturing_names data name
       )
       capturing_variables;
@@ -569,7 +602,8 @@ and transform_expression ?(is_move=false) env expr =
     | If if_desc ->
       let tmp_id = env.tmp_vars_count in
       env.tmp_vars_count <- env.tmp_vars_count + 1;
-      let spec = transform_expression_if env ~ret_id:tmp_id ~prepend_stmts ~append_stmts loc if_desc in
+      let tmp_var = "t[" ^ (Int.to_string tmp_id) ^ "]" in
+      let spec = transform_expression_if env ~ret:tmp_var ~prepend_stmts ~append_stmts loc if_desc in
       let tmp_stmt = { C_op.Stmt.
         spec = If spec;
         loc;
@@ -890,29 +924,27 @@ and transform_expression ?(is_move=false) env expr =
     )
 
     | Block block ->
-      let block_scope = create_transform_scope (Some block.scope) in
-      with_scope env block_scope (fun env ->
-        let tmp_id = env.tmp_vars_count in
-        env.tmp_vars_count <- env.tmp_vars_count + 1;
+      let tmp_id = env.tmp_vars_count in
+      env.tmp_vars_count <- env.tmp_vars_count + 1;
+      let tmp_var = "t[" ^ (Int.to_string tmp_id) ^ "]" in
 
-        let init = { C_op.Stmt.
-          spec = Expr {
-            C_op.Expr.
-            spec = Assign (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"), {
-              spec = Null;
-              loc = Loc.none;
-            });
+      let init = { C_op.Stmt.
+        spec = Expr {
+          C_op.Expr.
+          spec = Assign (C_op.SymLocal tmp_var, {
+            spec = Null;
             loc = Loc.none;
-          };
+          });
           loc = Loc.none;
-        } in
+        };
+        loc = Loc.none;
+      } in
 
-        let stmts = transform_block ~ret_id:tmp_id env block in
+      let stmts = transform_block ~ret:tmp_var env block in
 
-        prepend_stmts := List.concat [!prepend_stmts; [init]; stmts];
+      prepend_stmts := List.concat [!prepend_stmts; [init]; stmts];
 
-        C_op.Expr.Temp tmp_id
-      )
+      C_op.Expr.Temp tmp_id
 
     | Match _match -> (
       let { match_expr; match_clauses; _ } = _match in
@@ -1002,21 +1034,21 @@ and transform_expression ?(is_move=false) env expr =
     append_stmts = !append_stmts;
   }
 
-and transform_expression_if env ~ret_id ~prepend_stmts ~append_stmts loc if_desc =
+and transform_expression_if env ?ret ~prepend_stmts ~append_stmts loc if_desc =
   let open Typedtree.Expression in
 
   let test = transform_expression env if_desc.if_test in
 
   let if_test = { C_op.Expr. spec = IntValue test.expr; loc = Loc.none; } in
-  let consequent = transform_block ~ret_id env if_desc.if_consequent in
+  let consequent = transform_block ?ret env if_desc.if_consequent in
   let if_alternate =
     Option.map
     ~f:(fun alt ->
       match alt with
       | If_alt_if if_spec ->
-        C_op.Stmt.If_alt_if (transform_expression_if env ~ret_id ~prepend_stmts ~append_stmts loc if_spec)
+        C_op.Stmt.If_alt_if (transform_expression_if env ?ret ~prepend_stmts ~append_stmts loc if_spec)
       | If_alt_block blk ->
-        let consequent = transform_block ~ret_id env blk in
+        let consequent = transform_block ?ret env blk in
         C_op.Stmt.If_alt_block consequent
     )
     if_desc.if_alternative
@@ -1033,10 +1065,30 @@ and transform_expression_if env ~ret_id ~prepend_stmts ~append_stmts loc if_desc
   append_stmts := List.append test.append_stmts !append_stmts;
   spec
 
-and transform_block env ~ret_id block: C_op.Stmt.t list =
-  let ret = "t[" ^ (Int.to_string ret_id) ^ "]" in
-  let stmts = List.map ~f:(transform_statement ~ret env) block.body |> List.concat in
-  stmts
+and transform_block env ?ret (block: Typedtree.Block.t): C_op.Stmt.t list =
+  let block_scope = create_scope_and_distribute_vars env block.scope in
+  with_scope env block_scope (fun env ->
+    let stmts = List.map ~f:(transform_statement ?ret env) block.body |> List.concat in
+
+    let local_vars = block.scope#vars in
+    let cleanup =
+      if (List.length local_vars) > 0 then (
+        List.map
+          ~f:(fun (name, _) ->
+            let sym = TScope.find_variable block_scope name in
+            { C_op.Stmt.
+              spec = Release {
+                spec = Ident sym;
+                loc = Loc.none;
+              };
+              loc = Loc.none;
+            }
+          )
+          local_vars
+      ) else [] in
+
+    List.append stmts cleanup
+  )
 
 and transform_pattern_to_test env match_expr pat =
   let open Pattern in
