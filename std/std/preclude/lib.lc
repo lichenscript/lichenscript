@@ -23,6 +23,13 @@ public class Array<T> {
 
 }
 
+public class String {
+
+    @external("lc_std_string_get_length")
+    declare get length(): i32;
+
+}
+
 public enum Option<A> {
     case Some(A)
     case None

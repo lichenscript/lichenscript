@@ -193,7 +193,7 @@ and codegen_declaration env decl =
   )
 
   | Class cls -> (
-    let { name; properties; original_name; _ } = cls in
+    let { name; properties; original_name; finalizer; _ } = cls in
     let class_id_var_name = name ^ "_class_id" in
     ps env (Format.sprintf "static LCClassID %s;\n" class_id_var_name);
     ps env (Format.sprintf "typedef struct %s {" name);
@@ -216,16 +216,22 @@ and codegen_declaration env decl =
     ps env (Format.sprintf "} %s;" name);
     endl env;
 
-    ps env (Format.sprintf "void %s_finalizer(LCRuntime* rt, LCValue value) {\n" name);
-    (* with_indent env (fun () ->
-      print_indents env;
-      ps env (Format.sprintf "%s* obj = lc_mallocz(rt, sizeof(%s));\n" name name);
-      print_indents env;
-      ps env "obj->header.count = 1;\n";
-      print_indents env;
-      ps env "return MK_CLASS_OBJ(obj);\n";
-    ); *)
-    ps env "}\n";
+    (match finalizer with
+    | Some finalizer -> (
+      ps env (Format.sprintf "void %s(LCRuntime* rt, LCValue this) {\n" finalizer.finalizer_name);
+      with_indent env (fun () ->
+        List.iter
+        ~f:(fun stmt ->
+          print_indents env;
+          codegen_statement env stmt;
+          endl env
+        )
+        finalizer.finalizer_content
+      );
+      ps env "}\n";
+    )
+    | None -> ()
+    );
 
     let class_def_name = name ^ "_def" in
     ps env (Format.sprintf "static LCClassDef %s = {\n" class_def_name);
@@ -233,7 +239,13 @@ and codegen_declaration env decl =
       print_indents env;
       ps env (Format.sprintf "\"%s\",\n" original_name);
       print_indents env;
-      ps env (Format.sprintf "%s_finalizer,\n" name);
+      (match finalizer with
+      | Some finalizer ->
+        ps env finalizer.finalizer_name
+      | None ->
+        ps env "MK_NULL()"
+      );
+      ps env ",\n";
     );
     ps env "};\n";
 
@@ -243,6 +255,18 @@ and codegen_declaration env decl =
       ps env (Format.sprintf "%s* obj = lc_mallocz(rt, sizeof(%s));\n" name name);
       print_indents env;
       ps env (Format.sprintf "lc_init_object(rt, %s_class_id, (LCObject*)obj);\n" name);
+
+      List.iteri
+        ~f:(fun index prop -> 
+          print_indents env;
+          ps env (Format.sprintf "LCRetain(args[%d]);" index);
+          endl env;
+          print_indents env;
+          ps env (Format.sprintf "obj->%s = args[%d];" prop index);
+          endl env;
+        )
+        properties;
+
       print_indents env;
       ps env "return MK_CLASS_OBJ(obj);\n";
     );

@@ -32,11 +32,16 @@ module%gen rec Decl : sig
   }
   [@@deriving show]
 
+  type class_finalizer = {
+    finalizer_name: string;
+    finalizer_content: Stmt.t list;
+  }
+  [@@deriving show]
 
   type _class = {
     name: string;
     original_name: string;
-    finalizer_name: string;
+    finalizer: class_finalizer option;
     properties: string list;
   }
   [@@deriving show]

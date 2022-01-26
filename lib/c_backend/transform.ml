@@ -783,10 +783,56 @@ and transform_expression ?(is_move=false) env expr =
 
     )
 
-    | Init { init_name; _ } -> (
-      let init_name, _ = init_name in
+    | Init { init_name; init_elements; _ } -> (
+      let init_name, init_name_id = init_name in
+
+      let cls_meta = Hashtbl.find_exn env.cls_meta_map init_name_id in
+
+      (* logical name -> real name *)
+      let init_fiels_tuples = Hashtbl.to_alist cls_meta.cls_fields_map in
+
+      let logical_names =
+        List.map
+          ~f:(fun real_name ->
+            let logical_name, _ = List.find_exn ~f:(fun (_, real_name') -> String.equal real_name real_name') init_fiels_tuples in
+            logical_name
+          )
+          cls_meta.cls_fields
+      in
+
+      let init_params =
+        List.map
+        ~f:(fun name ->
+          let elm =
+            List.find_exn
+            ~f:(fun elm ->
+              match elm with
+              | InitEntry { init_entry_key; _} ->
+                String.equal name init_entry_key.pident_name
+              | _ -> false
+            )
+            init_elements
+          in
+          match elm with
+          | InitEntry { init_entry_value; _} -> Option.value_exn init_entry_value
+          | _ -> failwith "unreachable"
+        )
+        logical_names
+      in
+
+      let params =
+        List.map
+        ~f:(fun p ->
+          let tmp = transform_expression env p in
+          prepend_stmts := List.append !prepend_stmts tmp.prepend_stmts;
+          append_stmts := List.append tmp.append_stmts !append_stmts;
+          tmp.expr
+        )
+        init_params
+      in
+
       let fun_name = find_variable env init_name in
-      C_op.Expr.ExternalCall((C_op.map_symbol ~f:(fun fun_name -> fun_name ^ "_init") fun_name), None, [])
+      C_op.Expr.ExternalCall((C_op.map_symbol ~f:(fun fun_name -> fun_name ^ "_init") fun_name), None, params)
     )
 
     | Block block -> (
@@ -1064,15 +1110,40 @@ and transform_class env cls: C_op.Decl.spec list =
     class_methods = List.rev !class_methods;
   }::env.class_inits;
 
+  let finalizer = generate_finalizer finalizer_name cls_meta in
+
   let cls = {
     C_op.Decl.
     name = fun_name;
     original_name;
-    finalizer_name;
+    finalizer = Some finalizer;
     properties = cls_meta.cls_fields;
   } in
 
   List.append [ (C_op.Decl.Class cls) ] methods
+
+and generate_finalizer name class_meta =
+  let this_expr = {
+    C_op.Expr.
+    spec = Ident SymThis;
+    loc = Loc.none;
+  } in
+  let finalizer_content =
+    List.map
+    ~f:(fun field_name -> {
+      C_op.Stmt.
+      spec = Release { C_op.Expr.
+        spec = GetField (this_expr, class_meta.cls_gen_name, field_name);
+        loc = Loc.none;
+      };
+      loc = Loc.none;
+    })
+    class_meta.cls_fields
+  in
+  {
+    finalizer_name = name;
+    finalizer_content;
+  }
 
 and transform_enum env enum =
   let open Enum in
