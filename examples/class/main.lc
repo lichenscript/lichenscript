@@ -22,6 +22,10 @@ class Child extends Base {
         };
     }
 
+    virtual setName(value: string) {
+        this.name = value;
+    }
+
     override printName() {
         print("name: ", this.name)
     }

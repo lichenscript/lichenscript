@@ -444,6 +444,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         deps = [ expr.ty_var; left'.ty_var ];
         loc;
         check = (fun _ ->
+          let ctx = Env.ctx env in
           (match left' with
           | { T.Expression. spec = Identifier (name, _); _ } -> (
             let variable = Option.value_exn (scope#find_var_symbol name) in
@@ -454,6 +455,21 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
               raise (Type_error.Error err)
             )
             | _ -> ());
+          )
+
+          | { spec = Member(left_expr, name) ; _ } -> (
+            let left_type = Type_context.deref_node_type ctx left_expr.ty_var in
+            let member_opt = Check_helper.find_member_of_type ctx ~scope:(Env.peek_scope env) left_type name.pident_name in
+            match member_opt with
+            | Some _ -> ()
+            | None -> (
+              let err = Type_error.(make_error ctx loc (CannotReadMember(name.pident_name, left_type))) in
+              raise (Type_error.Error err)
+            )
+          )
+
+          | { spec = Index _ ; _ } -> (
+            failwith "unimplemented: assigning to index"
           )
 
           | _ -> ()
@@ -1078,6 +1094,9 @@ and annotate_class env cls =
           in
           Env.with_new_scope env method_scope (fun env ->
             let cls_method_params, cls_method_params_deps = annotate_function_params env cls_method_params in
+
+            add_all_params_into_scope env method_scope cls_method_params;
+
             let cls_method_body = annotate_block_impl ~prev_deps:cls_method_params_deps env cls_method_body in
 
             let this_deps = ref !props_deps in
@@ -1408,6 +1427,20 @@ and annotate_function_params env params =
   let params, params_types = List.map ~f:annoate_param params_content |> List.unzip in
   { T.Function. params_content = params; params_loc }, params_types
 
+and add_all_params_into_scope env scope params =
+  let open T.Function in
+  List.iter
+    ~f:(fun (param: T.Function.param) -> 
+      let name, _ = param.param_name in
+      match scope#new_var_symbol name ~id:param.param_ty ~kind:Ast.Pvar_const with
+      | `Duplicate -> (
+        let err = Type_error.(make_error (Env.ctx env) param.param_loc (Redefinition name)) in
+        raise Type_error.(Error err)
+      )
+      | _ -> ()
+    )
+    params.params_content;
+
 and annotate_function env fun_ =
   let open Ast.Function in
 
@@ -1449,18 +1482,7 @@ and annotate_function env fun_ =
 
     let params, params_types = annotate_function_params env header.params in
 
-    (* add all params into scope *)
-    List.iter
-      ~f:(fun (param: Typedtree.Function.param) -> 
-        let name, _ = param.param_name in
-        match fun_scope#new_var_symbol name ~id:param.param_ty ~kind:Ast.Pvar_const with
-        | `Duplicate -> (
-          let err = Type_error.(make_error (Env.ctx env) param.param_loc (Redefinition name)) in
-          raise Type_error.(Error err)
-        )
-        | _ -> ()
-      )
-      params.params_content;
+    add_all_params_into_scope env fun_scope params;
 
     let body = annotate_block_impl ~prev_deps:params_types env body in
     let collected_returns = Env.take_return_types env in

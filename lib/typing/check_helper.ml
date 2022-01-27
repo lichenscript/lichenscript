@@ -38,6 +38,7 @@ let type_assinable ctx left right =
   match (left, right) with
   | (Any, _) -> true
   | (_, Any) -> false
+  | (String, String) -> true
   | _ -> (
     let c1_def = find_construct_of ctx left in
     let c2_def = find_construct_of ctx right in
@@ -139,6 +140,22 @@ let contruct_enum_case ctx enum_ctor _param_types =
     )
   )
   | _ -> failwith "super of enum case is not a enum" *)
+
+let find_classname_of_type ctx type_expr =
+  let type_expr = Type_context.deref_type ctx type_expr in
+  match type_expr with
+  | Ctor(type_expr, _) -> (
+    let type_expr = Type_context.deref_type ctx type_expr in
+    let open TypeDef in
+    match type_expr with
+    | TypeDef ({ spec = Class cls; _ }, _) -> (
+      Some cls.tcls_name
+    )
+    | _ -> None
+  )
+
+  | _ -> None
+
 
 (*
   * TODO: namespace

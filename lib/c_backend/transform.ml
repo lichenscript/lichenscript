@@ -552,6 +552,35 @@ and auto_release_expr env ?(is_move=false) ~append_stmts ty_var expr =
     assign_expr
   )
 
+and prepend_expr env ~prepend_stmts ~append_stmts expr =
+  match expr with
+  | { C_op.Expr. spec = Ident C_op.SymThis; _ } -> expr.spec
+  | _ ->
+    let tmp_id = env.tmp_vars_count in
+    env.tmp_vars_count <- env.tmp_vars_count + 1;
+
+    let assign_expr = {
+      C_op.Expr.
+      spec = Assign({
+        spec = Ident (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"));
+        loc = Loc.none;
+      }, expr);
+      loc = Loc.none;
+    } in
+
+    let prepend_stmt = {
+      C_op.Stmt.
+      spec = Expr assign_expr;
+      loc = Loc.none;
+    } in
+
+    prepend_stmts := List.append !prepend_stmts [prepend_stmt];
+
+    let result = C_op.Expr.Temp tmp_id in
+
+    append_stmts := (gen_release_temp tmp_id)::!append_stmts;
+
+    result
 
 and transform_expression ?(is_move=false) env expr =
   let open Expression in
@@ -880,30 +909,54 @@ and transform_expression ?(is_move=false) env expr =
      *   - Assign to this property: this.xxx = expr
      *)
     | Assign (op_opt, left_expr, expr) -> (
-      let left_expr' =
-        match left_expr with
-        (* transform_expression env left_expr *)
-        | { spec = Typedtree.Expression.Identifier (name, _); loc; _ } -> (
-          let name = find_variable env name in
-          { C_op.Expr. spec = Ident name; loc; }
-        )
-
-        | _ ->
-          Format.eprintf "Unexpected left: %a" Typedtree.Expression.pp left_expr;
-          failwith "unreachable"
-      in
       let expr' = transform_expression env expr in
 
       prepend_stmts := List.concat [ !prepend_stmts; expr'.prepend_stmts ];
       append_stmts := List.concat [ !append_stmts; expr'.append_stmts ];
 
-      match op_opt with
-      | None ->
-        C_op.Expr.Assign(left_expr', expr'.expr)
+      match (left_expr, op_opt) with
+      (* transform_expression env left_expr *)
+      | ({ spec = Typedtree.Expression.Identifier (name, _); loc; _ }, _) -> (
+        let name = find_variable env name in
+        let left_expr' = { C_op.Expr. spec = Ident name; loc; } in
+        match op_opt with
+        | None ->
+          C_op.Expr.Assign(left_expr', expr'.expr)
 
-      | Some op ->
-        C_op.Expr.Update(op, left_expr', expr'.expr)
+        | Some op ->
+          C_op.Expr.Update(op, left_expr', expr'.expr)
+      )
 
+      (* TODO: maybe it's a setter? *)
+      | ({ spec = Typedtree.Expression.Member (main_expr, id); _ }, None) -> (
+        let transform_main_expr = transform_expression env main_expr in
+
+        prepend_stmts := List.concat [ !prepend_stmts; transform_main_expr.prepend_stmts ];
+        append_stmts := List.concat [ !append_stmts; transform_main_expr.append_stmts ];
+
+        let boxed_main_expr = prepend_expr env ~prepend_stmts ~append_stmts transform_main_expr.expr in
+
+        let main_expr_ty = Type_context.deref_node_type env.ctx main_expr.ty_var in
+        let classname_opt = Check_helper.find_classname_of_type env.ctx main_expr_ty in
+        let classname = Option.value_exn ~message:"can not find member of class" classname_opt in
+        let gen_classname = find_variable env classname in
+        let unwrap_name =
+          match gen_classname with
+          | C_op.SymLocal name -> name
+          | _ -> failwith "unrechable"
+        in
+
+        let left_expr = { C_op.Expr.
+          spec = GetField({ spec = boxed_main_expr; loc = Loc.none }, unwrap_name, id.pident_name);
+          loc = Loc.none;
+        } in
+
+        C_op.Expr.Assign(left_expr, expr'.expr)
+      )
+
+      | _ ->
+        Format.eprintf "Unexpected left: %a" Typedtree.Expression.pp left_expr;
+        failwith "unreachable"
     )
 
     | Init { init_name; init_elements; _ } -> (
@@ -1219,6 +1272,9 @@ and transform_class env cls: C_op.Decl.spec list =
         match elm with
         | Cls_method _method -> (
           let { cls_method_name; cls_method_params; cls_method_body; cls_method_scope; _ } = _method in
+
+          env.tmp_vars_count <- 0;
+
           (* let fun_name = distribute_name env cls_method_name in *)
           let origin_method_name, method_id = cls_method_name in
           let new_name = original_name ^ "_" ^ origin_method_name in
