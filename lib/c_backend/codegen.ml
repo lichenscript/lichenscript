@@ -558,7 +558,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ")"
   )
 
-  | Assign(name, right) -> (
+  | Assign({ C_op.Expr. spec = Ident name; _ }, right) -> (
     (* TODO: release the left, retain the right *)
     (let open C_op in
     match name with
@@ -585,7 +585,11 @@ and codegen_expression (env: t) (expr: Expr.t) =
     );
   )
 
-  | Update (op, symbol, expr) -> (
+  | Assign(_, _) ->
+    Format.eprintf "Unexpected assigning to %a" C_op.Expr.pp expr;
+    failwith "unrechable"
+
+  | Update (op, { C_op.Expr. spec = Ident symbol; _ }, expr) -> (
     ps env "LCUpdateValue(";
     ps env (Primitives.Assign.to_arithmetic_op op);
     ps env ", ";
@@ -611,6 +615,8 @@ and codegen_expression (env: t) (expr: Expr.t) =
     codegen_expression env expr;
     ps env ")"
   )
+
+  | Update _ -> failwith "unrechable"
 
   | TagEqual (expr, tag) -> (
     ps env "LCUnionGetType(";

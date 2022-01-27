@@ -98,7 +98,7 @@ and Expression : sig
     | Unary of Asttypes.UnaryOp.t * t
     | Binary of Asttypes.BinaryOp.t * t * t
     | Update of Asttypes.UpdateOp.t * t * bool (* prefix *)
-    | Assign of Asttypes.AssignOp.t option * Identifier.t * t
+    | Assign of Asttypes.AssignOp.t option * t * t
     | Block of Block.t
     | Init of init
     | Match of _match

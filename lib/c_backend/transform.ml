@@ -363,7 +363,7 @@ and transform_statement ?ret env stmt =
     let ret = Option.value ~default:"ret" ret in
     let assign = {
       C_op.Expr.
-      spec = Assign(C_op.SymLocal ret, tmp.expr);
+      spec = Assign({ spec = Ident (C_op.SymLocal ret); loc = Loc.none }, tmp.expr);
       loc;
     } in
     (*
@@ -447,12 +447,18 @@ and transform_statement ?ret env stmt =
           loc = Loc.none;
         } in
         { C_op.Expr.
-          spec = Assign(name, init_expr);
+          spec = Assign({
+            spec = Ident name;
+            loc = Loc.none;
+          }, init_expr);
           loc = Loc.none;
         }
       ) else
         { C_op.Expr.
-          spec = Assign(name, init_expr.expr);
+          spec = Assign({
+            spec = Ident name;
+            loc = Loc.none;
+          }, init_expr.expr);
           loc = Loc.none;
         }
     in
@@ -515,7 +521,10 @@ and auto_release_expr env ?(is_move=false) ~prepend_stmts ~append_stmts expr =
 
   let assign_expr = {
     C_op.Expr.
-    spec = Assign(C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"), expr);
+    spec = Assign({
+      spec = Ident (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"));
+      loc = Loc.none;
+    }, expr);
     loc = Loc.none;
   } in
 
@@ -639,7 +648,10 @@ and transform_expression ?(is_move=false) env expr =
         C_op.Stmt.
         spec = Expr {
           C_op.Expr.
-          spec = Assign(tmp_sym, {
+          spec = Assign({
+            spec = Ident tmp_sym;
+            loc = Loc.none;
+          }, {
             C_op.Expr.
             spec = NewArray arr_len;
             loc = Loc.none;
@@ -870,19 +882,30 @@ and transform_expression ?(is_move=false) env expr =
      *   - setter of a class
      *   - Assign to this property: this.xxx = expr
      *)
-    | Assign (op_opt, (name, _), expr) -> (
-      let name = find_variable env name in
+    | Assign (op_opt, left_expr, expr) -> (
+      let left_expr' =
+        match left_expr with
+        (* transform_expression env left_expr *)
+        | { spec = Typedtree.Expression.Identifier (name, _); loc; _ } -> (
+          let name = find_variable env name in
+          { C_op.Expr. spec = Ident name; loc; }
+        )
+
+        | _ ->
+          Format.eprintf "Unexpected left: %a" Typedtree.Expression.pp left_expr;
+          failwith "unreachable"
+      in
       let expr' = transform_expression env expr in
 
-      prepend_stmts := List.append !prepend_stmts expr'.prepend_stmts;
-      append_stmts := List.append !append_stmts expr'.append_stmts;
+      prepend_stmts := List.concat [ !prepend_stmts; expr'.prepend_stmts ];
+      append_stmts := List.concat [ !append_stmts; expr'.append_stmts ];
 
       match op_opt with
       | None ->
-        C_op.Expr.Assign(name, expr'.expr)
+        C_op.Expr.Assign(left_expr', expr'.expr)
 
       | Some op ->
-        C_op.Expr.Update(op, name, expr'.expr)
+        C_op.Expr.Update(op, left_expr', expr'.expr)
 
     )
 
@@ -946,7 +969,10 @@ and transform_expression ?(is_move=false) env expr =
       let init = { C_op.Stmt.
         spec = Expr {
           C_op.Expr.
-          spec = Assign (C_op.SymLocal tmp_var, {
+          spec = Assign ({
+            spec = Ident (C_op.SymLocal tmp_var);
+            loc = Loc.none;
+          }, {
             spec = Null;
             loc = Loc.none;
           });
@@ -972,7 +998,10 @@ and transform_expression ?(is_move=false) env expr =
           C_op.Stmt.
           spec = Expr {
             C_op.Expr.
-            spec = Assign (C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"), {
+            spec = Assign ({
+              spec = Ident (C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"));
+              loc = Loc.none;
+            }, {
               spec = Null;
               loc = Loc.none;
             });
@@ -1001,7 +1030,10 @@ and transform_expression ?(is_move=false) env expr =
                     body.prepend_stmts;
                     [{ C_op.Stmt.
                       spec = Expr {
-                        spec = Assign(C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"), body.expr);
+                        spec = Assign({
+                          spec = Ident (C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"));
+                          loc = Loc.none;
+                        }, body.expr);
                         loc = Loc.none;
                       };
                       loc = Loc.none;

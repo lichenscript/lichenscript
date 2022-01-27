@@ -14,6 +14,7 @@ and spec =
   | CannotFindName of string
   | CannotGetIndex of TypeExpr.t
   | CannotContructParamOfType of string * TypeExpr.t
+  | InvalidAssign
   | Redefinition of string
   | NotCallable of TypeExpr.t
   | ParamsMismatch of TypeExpr.t
@@ -75,6 +76,9 @@ module PP = struct
 
     | CannotContructParamOfType(name, ty) ->
       Format.fprintf formatter "Can not construct param %s type '%s'" name (pp_ty ty)
+
+    | InvalidAssign ->
+      Format.fprintf formatter "The left-hand side of an assignment expression must be a variable or a property access."
 
     | Redefinition name ->
       Format.fprintf formatter "Redefinition of '%s'" name

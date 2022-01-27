@@ -388,18 +388,44 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
     | Update _ -> -1, failwith "not implemented"
 
-    | Assign (op, id, expr) -> (
+    (*
+     * 1. assigning to local vars: a = 3
+     * 2. assigning to member:
+     *    this.a = 3
+     *    some().a = 3
+     * 3. assinging to index: a[0] = 3
+     *)
+    | Assign (op, left, expr) -> (
       let expr = annotate_expression ~prev_deps env expr in
       let scope = Env.peek_scope env in
       let ctx = Env.ctx env in
-      let name, ty_int =
-        match scope#find_var_symbol id.pident_name with
-        | Some var ->
-          (* check all find_var_symbol to captured *)
-          Env.capture_variable env ~name:id.pident_name;
-          (id.pident_name, var.var_id)
-        | None -> (
-          let err = Type_error.(make_error ctx loc (CannotFindName id.pident_name)) in
+      let left' =
+        match left with
+        | { spec = Identifier id; _; } -> (
+          match scope#find_var_symbol id.pident_name with
+          | Some var ->
+            (* check all find_var_symbol to captured *)
+            Env.capture_variable env ~name:id.pident_name;
+            { T.Expression.
+              spec = Identifier (id.pident_name, var.var_id);
+              loc = id.pident_loc;
+              ty_var = var.var_id;
+              attributes = [];
+            }
+          | None -> (
+            let err = Type_error.(make_error ctx loc (CannotFindName id.pident_name)) in
+            raise (Type_error.Error err)
+          )
+        )
+
+        | { spec = Member _ ; _ } ->
+          failwith "assigning to member"
+
+        | { spec = Index _ ; _ } ->
+          failwith "assigning to index"
+
+        | _ -> (
+          let err = Type_error.(make_error ctx loc InvalidAssign) in
           raise (Type_error.Error err)
         )
       in
@@ -407,17 +433,26 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let value = (TypeExpr.Ctor (Ref unit_type, [])) in
       let next_id = Type_context.new_id ctx {
         value;
-        deps = [ expr.ty_var; ty_int ];
+        deps = [ expr.ty_var; left'.ty_var ];
         loc;
         check = (fun _ ->
-          let variable = Option.value_exn (scope#find_var_symbol name) in
-          (match variable.var_kind with
-          | Ast.Pvar_const -> (
-            let err = Type_error.(make_error ctx loc CannotAssignToConstVar) in
-            raise (Type_error.Error err)
+
+          (match left' with
+          | { T.Expression. spec = Identifier (name, _); _ } -> (
+            let variable = Option.value_exn (scope#find_var_symbol name) in
+
+            (match variable.var_kind with
+            | Ast.Pvar_const -> (
+              let err = Type_error.(make_error ctx loc CannotAssignToConstVar) in
+              raise (Type_error.Error err)
+            )
+            | _ -> ());
           )
-          | _ -> ());
-          let sym_node = Type_context.get_node ctx ty_int in
+
+          | _ -> ()
+          );
+
+          let sym_node = Type_context.get_node ctx left'.ty_var in
           let expr_node = Type_context.get_node ctx expr.ty_var in
           if not (Check_helper.type_assinable ctx sym_node.value expr_node.value) then (
             let err = Type_error.(make_error ctx loc (NotAssignable(sym_node.value, expr_node.value))) in
@@ -425,7 +460,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           )
         );
       } in
-      next_id, Assign(op, (name, ty_int), expr)
+      next_id, Assign(op, left', expr)
     )
 
     | Block block -> (

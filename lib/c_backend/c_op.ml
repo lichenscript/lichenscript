@@ -139,8 +139,8 @@ and Expr : sig
   | CallLambda of t * t list
   | Call of int * t list
   | Invoke of t * string * t list
-  | Assign of symbol * t
-  | Update of Asttypes.AssignOp.t * symbol * t
+  | Assign of t * t
+  | Update of Asttypes.AssignOp.t * t * t
   | ExternalCall of symbol * t option * t list
   | Ident of symbol
   | TagEqual of t * int

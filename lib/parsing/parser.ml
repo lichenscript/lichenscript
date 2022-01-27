@@ -840,7 +840,7 @@ and parse_expression env : Expression.t =
 
   | _ -> expr
 
-and reinterpret_expression_as_id _env (expr: Expression.t) : Identifier.t =
+(* and reinterpret_expression_as_id _env (expr: Expression.t) : Identifier.t =
   let { Expression. spec; loc; _; } = expr in
   match spec with
   | Identifier id ->
@@ -853,11 +853,11 @@ and reinterpret_expression_as_id _env (expr: Expression.t) : Identifier.t =
         perr_spec = Parse_error.IsNotLeftValue;
       }
     in
-    Parse_error.error err
+    Parse_error.error err *)
 
 and parse_assignment_expression env : Expression.t =
   let start_pos = Peek.loc env in
-  let expr = parse_binary_expression env in
+  let left = parse_binary_expression env in
   let next = Peek.token env in
   let op, ok =
     match next with
@@ -877,7 +877,7 @@ and parse_assignment_expression env : Expression.t =
   in
   if ok then (
     Eat.token env;
-    let left = reinterpret_expression_as_id env expr in
+    (* let left = reinterpret_expression_as_id env expr in *)
     let right = parse_assignment_expression env in
     let spec = Expression.Assign(op, left, right) in
     {
@@ -886,7 +886,7 @@ and parse_assignment_expression env : Expression.t =
       attributes = [];
     }
   ) else
-    expr
+    left
 
 and parse_maybe_arrow_function env : Expression.t =
   let relaxed_arrow = parse_relaxed_arrow env in
