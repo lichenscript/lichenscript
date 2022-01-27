@@ -917,7 +917,7 @@ and transform_expression ?(is_move=false) env expr =
             init_elements
           in
           match elm with
-          | InitEntry { init_entry_value; _} -> Option.value_exn init_entry_value
+          | InitEntry { init_entry_value; _} -> init_entry_value
           | _ -> failwith "unreachable"
         )
         logical_names

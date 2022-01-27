@@ -32,7 +32,7 @@ module%gen rec Expression : sig
   and init_entry = {
     init_entry_loc: Loc.t;
     init_entry_key: Identifier.t;
-    init_entry_value: t option;
+    init_entry_value: t;
   }
 
   and init_element =

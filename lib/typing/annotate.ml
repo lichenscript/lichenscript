@@ -448,13 +448,34 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         )
         | InitEntry { init_entry_loc; init_entry_key; init_entry_value } -> (
           let init_entry_value =
-            Option.map
-            ~f:(fun expr ->
+            match init_entry_value with
+            | Some expr ->
               let expr' = annotate_expression ~prev_deps env expr in
               deps := expr'.ty_var::!deps;
               expr'
+
+            (* no value of key, find variable in current scope *)
+            | None -> (
+              let key_name = init_entry_key.pident_name in
+              let ty_var_opt = (Env.peek_scope env)#find_var_symbol key_name in
+              match ty_var_opt with
+              | Some variable -> (
+                Env.capture_variable env ~name:key_name;
+                deps := variable.var_id::!deps;
+                { T.Expression.
+                  spec = Identifier (key_name, variable.var_id);
+                  loc = init_entry_key.pident_loc;
+                  ty_var = variable.var_id;
+                  attributes = [];
+                }
+              )
+
+              | _ ->
+                let err_spec = Type_error.CannotFindName key_name in
+                let err = Type_error.make_error (Env.ctx env) init_entry_key.pident_loc err_spec in
+                raise (Type_error.Error err)
+
             )
-            init_entry_value
           in
           T.Expression.InitEntry {
             init_entry_loc;
