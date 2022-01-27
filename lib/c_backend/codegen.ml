@@ -358,7 +358,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
 
   | NewString value -> (
     let len = String.length value in
-    let value = Format.sprintf "%s(rt, (const unsigned char*)\"%s\", %d);" Primitives.Value.new_string_len value len in
+    let value = Format.sprintf "%s(rt, (const unsigned char*)\"%s\", %d)" Primitives.Value.new_string_len value len in
     ps env value
   )
 
@@ -476,77 +476,6 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env "t[";
     ps env (Int.to_string id);
     ps env "]"
-
-  (* | Call call -> (
-    let { callee; call_params; _ } = call in
-    match callee.spec with
-    | Expression.Identifier (sym_name, sym_id) -> (
-      let ext_name_opt = Type_context.find_external_symbol env.env.ctx sym_id in
-      let fun_name = match ext_name_opt with
-      | Some ext_method_name -> ext_method_name
-      (* it's a local function *)
-      | _ -> (
-        let ctor_of = Check_helper.find_construct_of env.env.ctx callee.ty_var in
-        let ctor_of, _ = Option.value_exn ctor_of in
-        let open Core_type.TypeDef in
-        match ctor_of.spec with
-        | Function _ -> failwith "function not implemented"
-        | EnumCtor enum_ctor -> (
-          let ctor_name = enum_ctor.enum_ctor_name ^ "_ctor" in
-          ctor_name
-        )
-        | _ ->
-          failwith (Format.sprintf "type %s: %s %d is not callable\n" sym_name ctor_of.name sym_id)
-      )
-      in
-      pss env fun_name;
-      let params_len = List.length call_params in
-      let params_len_m1 = params_len - 1 in
-      pss env ("(rt, MK_NULL(), " ^ (Int.to_string params_len) ^ ", (LCValue[]){ ");
-      List.iteri
-        ~f:(fun index item ->
-          codegen_expression env item;
-          if index <> params_len_m1 then (
-            pss env ", "
-          )
-        )
-        call_params;
-      pss env "})"
-    )
-    | Expression.Member (expr, name) -> (
-      (* let ty_node = Type_context.get_node env.env.ctx expr.ty_var in *)
-      let ctor = Check_helper.find_construct_of env.env.ctx expr.ty_var in
-      match ctor with
-      | Some (def, _) -> (
-        (* let open Core_type.TypeExpr in *)
-        match def.spec with
-        | Class cls -> (
-          let cls_name = cls.tcls_name in
-          let static_method =
-            List.find ~f:(fun (m_name, _) -> String.equal m_name name.pident_name) cls.tcls_static_elements
-          in
-          match static_method with
-          (* static method *)
-          | Some _ -> (
-            let method_name = cls_name ^ "__" ^ name.pident_name in
-            pss env (Format.sprintf "%s(rt, MK_NULL(), 0, NULL);" method_name)
-          )
-          | None -> (
-            pss env (Format.sprintf "LCInvokeStr(rt, child, \"%s\", 0, NULL);\n" name.pident_name)
-          )
-        )
-        
-        | _ ->
-          pss env "MK_NULL()"
-      )
-      | _ ->
-        pss env (Format.sprintf "LCInvokeStr(rt, child, \"%s\", 0, NULL);\n" name.pident_name)
-    )
-
-    | _ ->
-      pss env "MK_NULL()"
-
-  ) *)
 
   | I32Binary(op, left, right) -> (
     let name = Primitives.Bin.prim op in

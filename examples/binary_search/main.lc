@@ -22,12 +22,12 @@ function main() {
 	const data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 	const result = binarySearch(data, 3);
 	match result {
-		case Some(_) => print("found")
-		case None => print("not found")
+		case Some(_) => print("1: found")
+		case None => print("1: not found")
 	}
 	const result2 = binarySearch(data, 11);
 	match result2 {
-		case Some(_) => print("found")
-		case None => print("not found")
+		case Some(_) => print("2: found")
+		case None => print("2: not found")
 	}
 }

@@ -299,15 +299,19 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
 
   let cleanup =
     if (List.length local_vars) > 0 then (
-      List.map
-        ~f:(fun (name, _) ->
-          { C_op.Stmt.
+      List.filter_map
+        ~f:(fun (name, _var) ->
+          (* let node_type = Type_context.deref_node_type env.ctx var.var_id in
+          if Check_helper.type_should_not_release env.ctx node_type then
+            None
+          else *)
+          Some ({ C_op.Stmt.
             spec = Release {
               spec = Ident (C_op.SymLocal name);
               loc = Loc.none;
             };
             loc = Loc.none;
-          }
+          })
         )
         local_vars
     ) else [] in
@@ -359,7 +363,7 @@ and transform_statement ?ret env stmt =
   let open Statement in
   let { spec; loc; _ } = stmt in
   let transform_return_expr ?ret expr =
-    let tmp = transform_expression env expr in
+    let tmp = transform_expression ~is_move:true env expr in
     let ret = Option.value ~default:"ret" ret in
     let assign = {
       C_op.Expr.
@@ -515,34 +519,32 @@ and gen_release_temp id =
     loc = Loc.none;
   }
 
-and auto_release_expr env ?(is_move=false) ~prepend_stmts ~append_stmts expr =
+and auto_release_expr env ?(is_move=false) ~append_stmts ty_var expr =
   let tmp_id = env.tmp_vars_count in
   env.tmp_vars_count <- env.tmp_vars_count + 1;
 
-  let assign_expr = {
-    C_op.Expr.
-    spec = Assign({
-      spec = Ident (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"));
-      loc = Loc.none;
-    }, expr);
-    loc = Loc.none;
-  } in
+  let node_type = Type_context.deref_node_type env.ctx ty_var in
+  if Check_helper.type_should_not_release env.ctx node_type then (
+    expr
+  ) else (
+    let assign_expr = C_op.Expr.Assign(
+      {
+        spec = Ident (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"));
+        loc = Loc.none;
+      },
+      {
+        spec = expr;
+        loc = Loc.none;
+      })
+    in
 
-  let prepend_stmt = {
-    C_op.Stmt.
-    spec = Expr assign_expr;
-    loc = Loc.none;
-  } in
+    if not is_move then (
+      append_stmts := (gen_release_temp tmp_id)::!append_stmts
+    );
 
-  prepend_stmts := List.append !prepend_stmts [prepend_stmt];
+    assign_expr
+  )
 
-  let result = C_op.Expr.Temp tmp_id in
-
-  if not is_move then (
-    append_stmts := (gen_release_temp tmp_id)::!append_stmts
-  );
-
-  result
 
 and transform_expression ?(is_move=false) env expr =
   let open Expression in
@@ -555,11 +557,7 @@ and transform_expression ?(is_move=false) env expr =
       let open Literal in
       match literal with
       | String(content, _, _) -> 
-        auto_release_expr env ~is_move ~prepend_stmts ~append_stmts ({
-          C_op.Expr.
-          spec = NewString content;
-          loc = Loc.none;
-        })
+        auto_release_expr env ~is_move ~append_stmts ty_var (C_op.Expr.NewString content)
 
       | Integer(content, _) ->
         C_op.Expr.NewInt content
@@ -615,12 +613,7 @@ and transform_expression ?(is_move=false) env expr =
 
       env.lambdas <- lambda::env.lambdas;
 
-      let tmp = {
-        C_op.Expr.
-        spec = NewLambda(lambda_fun_name, capturing_names);
-        loc;
-      } in
-      auto_release_expr env ~prepend_stmts ~append_stmts tmp
+      auto_release_expr env ~append_stmts ty_var (C_op.Expr.NewLambda(lambda_fun_name, capturing_names))
     )
 
     | If if_desc ->
@@ -707,91 +700,94 @@ and transform_expression ?(is_move=false) env expr =
       prepend_stmts := List.append !prepend_stmts (List.concat prepend);
       append_stmts := List.append !append_stmts (List.concat append);
 
-      match callee with
-      | { spec = Identifier (_, id); _ } -> (
-        match Type_context.find_external_symbol env.ctx id with
+      let call_expr =
+        match callee with
+        | { spec = Identifier (_, id); _ } -> (
+          match Type_context.find_external_symbol env.ctx id with
 
-        | Some ext_name -> (
-
-          (* external method *)
-          C_op.Expr.ExternalCall((C_op.SymLocal ext_name), None, params)
-        )
-
-        (* it's a local function *)
-        | None -> (
-          let deref_type = Type_context.deref_node_type env.ctx callee.ty_var in
-          match deref_type with
-          | Core_type.TypeExpr.Lambda _ -> (
-            let transformed_callee = transform_expression env callee in
-            prepend_stmts := List.append !prepend_stmts (List.append !prepend_stmts transformed_callee.prepend_stmts);
-            append_stmts := List.append !append_stmts (List.append !append_stmts transformed_callee.append_stmts);
-            C_op.Expr.CallLambda(transformed_callee.expr, params)
-          )
-
-          (* it's a contructor *)
-          | _ ->
-            let node = Type_context.get_node env.ctx id in
-            let ctor_opt = Check_helper.find_typedef_of env.ctx node.value in
-            let ctor_name, _ctor_ty_id = Option.value_exn ctor_opt in
-            let name = find_variable env ctor_name.name in
-            C_op.Expr.ExternalCall(name, None, params)
-        )
-
-      )
-
-      | { spec = Member(expr, id); _ } -> (
-        let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
-        let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) expr_type id.pident_name in
-        match member with
-        | Some (TypeDef ({ spec = ClassMethod { method_is_virtual = true; _ }; _ }, _), _) -> (
-          let this_expr = transform_expression env expr in
-
-          prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
-          append_stmts := List.append !append_stmts this_expr.append_stmts;
-
-          C_op.Expr.Invoke(this_expr.expr, id.pident_name, params);
-        )
-
-        | Some (TypeDef ({ spec = ClassMethod { method_get_set = None; _ }; _ }, method_id), _) -> (
-          (* only class method needs a this_expr, this is useless for a static function *)
-          let this_expr = transform_expression env expr in
-
-          prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
-          append_stmts := List.append !append_stmts this_expr.append_stmts;
-
-          match Type_context.find_external_symbol env.ctx method_id with
           | Some ext_name -> (
+
             (* external method *)
-            C_op.Expr.ExternalCall((C_op.SymLocal ext_name), Some this_expr.expr, params)
+            C_op.Expr.ExternalCall((C_op.SymLocal ext_name), None, params)
           )
-          (* TODO: check if it's a virtual function *)
-          | _ ->
-            let callee_node = Type_context.get_node env.ctx callee.ty_var in
+
+          (* it's a local function *)
+          | None -> (
+            let deref_type = Type_context.deref_node_type env.ctx callee.ty_var in
+            match deref_type with
+            | Core_type.TypeExpr.Lambda _ -> (
+              let transformed_callee = transform_expression env callee in
+              prepend_stmts := List.append !prepend_stmts (List.append !prepend_stmts transformed_callee.prepend_stmts);
+              append_stmts := List.append !append_stmts (List.append !append_stmts transformed_callee.append_stmts);
+              C_op.Expr.CallLambda(transformed_callee.expr, params)
+            )
+
+            (* it's a contructor *)
+            | _ ->
+              let node = Type_context.get_node env.ctx id in
+              let ctor_opt = Check_helper.find_typedef_of env.ctx node.value in
+              let ctor_name, _ctor_ty_id = Option.value_exn ctor_opt in
+              let name = find_variable env ctor_name.name in
+              C_op.Expr.ExternalCall(name, None, params)
+          )
+
+        )
+
+        | { spec = Member(expr, id); _ } -> (
+          let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
+          let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) expr_type id.pident_name in
+          match member with
+          | Some (TypeDef ({ spec = ClassMethod { method_is_virtual = true; _ }; _ }, _), _) -> (
+            let this_expr = transform_expression env expr in
+
+            prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
+            append_stmts := List.append !append_stmts this_expr.append_stmts;
+
+            C_op.Expr.Invoke(this_expr.expr, id.pident_name, params);
+          )
+
+          | Some (TypeDef ({ spec = ClassMethod { method_get_set = None; _ }; _ }, method_id), _) -> (
+            (* only class method needs a this_expr, this is useless for a static function *)
+            let this_expr = transform_expression env expr in
+
+            prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
+            append_stmts := List.append !append_stmts this_expr.append_stmts;
+
+            match Type_context.find_external_symbol env.ctx method_id with
+            | Some ext_name -> (
+              (* external method *)
+              C_op.Expr.ExternalCall((C_op.SymLocal ext_name), Some this_expr.expr, params)
+            )
+            (* TODO: check if it's a virtual function *)
+            | _ ->
+              let callee_node = Type_context.get_node env.ctx callee.ty_var in
+              let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
+              let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
+              let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
+              C_op.Expr.ExternalCall(global_name, None, params)
+          )
+
+          (* it's a static function *)
+          | Some (TypeDef ({ spec = Function _; _ }, fun_id), _) -> (
+            let callee_node = Type_context.get_node env.ctx fun_id in
             let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
             let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
             let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
             C_op.Expr.ExternalCall(global_name, None, params)
+          )
+
+          | _ -> failwith (Format.sprintf "2 member %s is not callable" id.pident_name)
         )
 
-        (* it's a static function *)
-        | Some (TypeDef ({ spec = Function _; _ }, fun_id), _) -> (
-          let callee_node = Type_context.get_node env.ctx fun_id in
+        | _ -> (
+          let callee_node = Type_context.get_node env.ctx callee.ty_var in
           let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
           let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
           let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
           C_op.Expr.ExternalCall(global_name, None, params)
         )
-
-        | _ -> failwith (Format.sprintf "2 member %s is not callable" id.pident_name)
-      )
-
-      | _ -> (
-        let callee_node = Type_context.get_node env.ctx callee.ty_var in
-        let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
-        let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
-        let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
-        C_op.Expr.ExternalCall(global_name, None, params)
-      )
+      in
+      auto_release_expr ~is_move env ~append_stmts ty_var call_expr
     )
 
     | Member(expr, id) -> (
@@ -842,11 +838,9 @@ and transform_expression ?(is_move=false) env expr =
       let open Core_type in
       match (left_type, op) with
       | (TypeExpr.String, BinaryOp.Plus) ->
-        let spec = auto_release_expr env ~prepend_stmts ~append_stmts {
-          C_op.Expr.
-          spec = ExternalCall(SymLocal "lc_std_string_concat", None, [left'.expr; right'.expr]);
-          loc = Loc.none;
-        } in
+        let spec = auto_release_expr env ~append_stmts ty_var
+          (C_op.Expr. ExternalCall(SymLocal "lc_std_string_concat", None, [left'.expr; right'.expr]))
+        in
         spec
 
       | (TypeExpr.String, BinaryOp.Equal)
@@ -856,11 +850,7 @@ and transform_expression ?(is_move=false) env expr =
       | (TypeExpr.String, BinaryOp.GreaterThan)
       | (TypeExpr.String, BinaryOp.GreaterThanEqual)
         ->
-        let spec = auto_release_expr env ~prepend_stmts ~append_stmts {
-          C_op.Expr.
-          spec = StringCmp(op, left'.expr, right'.expr);
-          loc = Loc.none;
-        } in
+        let spec = auto_release_expr env ~append_stmts ty_var (C_op.Expr.StringCmp(op, left'.expr, right'.expr)) in
         spec
 
       | _ ->
