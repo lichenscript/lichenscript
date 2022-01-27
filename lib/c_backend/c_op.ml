@@ -142,6 +142,7 @@ and Expr : sig
   | Assign of t * t
   | Update of Asttypes.AssignOp.t * t * t
   | ExternalCall of symbol * t option * t list
+  | InitCall of symbol
   | Ident of symbol
   | TagEqual of t * int
   | Temp of int

@@ -529,13 +529,13 @@ and gen_release_temp id =
   }
 
 and auto_release_expr env ?(is_move=false) ~append_stmts ty_var expr =
-  let tmp_id = env.tmp_vars_count in
-  env.tmp_vars_count <- env.tmp_vars_count + 1;
-
   let node_type = Type_context.deref_node_type env.ctx ty_var in
-  if Check_helper.type_should_not_release env.ctx node_type then (
+  if is_move || Check_helper.type_should_not_release env.ctx node_type then (
     expr
   ) else (
+    let tmp_id = env.tmp_vars_count in
+    env.tmp_vars_count <- env.tmp_vars_count + 1;
+
     let assign_expr = C_op.Expr.Assign(
       {
         spec = Ident (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"));
@@ -547,9 +547,7 @@ and auto_release_expr env ?(is_move=false) ~append_stmts ty_var expr =
       })
     in
 
-    if not is_move then (
-      append_stmts := (gen_release_temp tmp_id)::!append_stmts
-    );
+    append_stmts := (gen_release_temp tmp_id)::!append_stmts;
 
     assign_expr
   )
@@ -909,55 +907,59 @@ and transform_expression ?(is_move=false) env expr =
     )
 
     | Init { init_name; init_elements; _ } -> (
+      let tmp_id = env.tmp_vars_count in
+      env.tmp_vars_count <- env.tmp_vars_count + 1;
+
       let init_name, init_name_id = init_name in
 
       let cls_meta = Hashtbl.find_exn env.cls_meta_map init_name_id in
 
       (* logical name -> real name *)
-      let init_fiels_tuples = Hashtbl.to_alist cls_meta.cls_fields_map in
-
-      let logical_names =
-        List.map
-          ~f:(fun real_name ->
-            let logical_name, _ = List.find_exn ~f:(fun (_, real_name') -> String.equal real_name real_name') init_fiels_tuples in
-            logical_name
-          )
-          cls_meta.cls_fields
-      in
-
-      let init_params =
-        List.map
-        ~f:(fun name ->
-          let elm =
-            List.find_exn
-            ~f:(fun elm ->
-              match elm with
-              | InitEntry { init_entry_key; _} ->
-                String.equal name init_entry_key.pident_name
-              | _ -> false
-            )
-            init_elements
-          in
-          match elm with
-          | InitEntry { init_entry_value; _} -> init_entry_value
-          | _ -> failwith "unreachable"
-        )
-        logical_names
-      in
-
-      let params =
-        List.map
-        ~f:(fun p ->
-          let tmp = transform_expression env p in
-          prepend_stmts := List.append !prepend_stmts tmp.prepend_stmts;
-          append_stmts := List.append tmp.append_stmts !append_stmts;
-          tmp.expr
-        )
-        init_params
-      in
 
       let fun_name = find_variable env init_name in
-      C_op.Expr.ExternalCall((C_op.map_symbol ~f:(fun fun_name -> fun_name ^ "_init") fun_name), None, params)
+      let init_call = C_op.Expr.InitCall((C_op.map_symbol ~f:(fun fun_name -> fun_name ^ "_init") fun_name)) in
+      let init_cls_stmt = { C_op.Stmt.
+        spec = Expr { C_op.Expr.
+          spec = Assign({ spec = Temp tmp_id; loc = Loc.none }, { spec = init_call; loc = Loc.none });
+          loc = Loc.none;
+        };
+        loc = Loc.none;
+      } in
+
+      let init_stmts =
+        List.filter_map
+        ~f:(fun elm ->
+          match elm with
+          | InitEntry { init_entry_key; init_entry_value; init_entry_loc; _ } ->
+            let actual_name = Hashtbl.find_exn cls_meta.cls_fields_map init_entry_key.pident_name in
+            let transformed_value = transform_expression ~is_move:true env init_entry_value in
+            let unwrap_name =
+              match fun_name with
+              | C_op.SymLocal name -> name
+              | _ -> failwith "unrechable"
+            in
+            let left_value = { C_op.Expr.
+              spec = GetField({ spec = Temp tmp_id; loc = Loc.none }, unwrap_name, actual_name);
+              loc = Loc.none;
+            } in
+            Some { C_op.Stmt.
+              spec = Expr {
+                spec = Assign(
+                  left_value,
+                  transformed_value.expr
+                );
+                loc = init_entry_loc;
+              };
+              loc = init_entry_loc;
+            }
+          | _ -> None
+        )
+        init_elements
+      in
+
+      prepend_stmts := List.append !prepend_stmts (init_cls_stmt::init_stmts);
+
+      C_op.Expr.Temp tmp_id
     )
 
     | Block block ->

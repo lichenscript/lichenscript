@@ -249,24 +249,12 @@ and codegen_declaration env decl =
     );
     ps env "};\n";
 
-    ps env (Format.sprintf "LCValue %s_init(LCRuntime* rt, LCValue this, int argv, LCValue* args) {\n" name);
+    ps env (Format.sprintf "LCValue %s_init(LCRuntime* rt) {\n" name);
     with_indent env (fun () ->
       print_indents env;
       ps env (Format.sprintf "%s* obj = lc_mallocz(rt, sizeof(%s));\n" name name);
       print_indents env;
       ps env (Format.sprintf "lc_init_object(rt, %s_class_id, (LCObject*)obj);\n" name);
-
-      List.iteri
-        ~f:(fun index prop -> 
-          print_indents env;
-          ps env (Format.sprintf "LCRetain(args[%d]);" index);
-          endl env;
-          print_indents env;
-          ps env (Format.sprintf "obj->%s = args[%d];" prop index);
-          endl env;
-        )
-        properties;
-
       print_indents env;
       ps env "return MK_CLASS_OBJ(obj);\n";
     );
@@ -464,6 +452,11 @@ and codegen_expression (env: t) (expr: Expr.t) =
     )
   )
 
+  | InitCall sym -> (
+    codegen_symbol env sym;
+    ps env "(rt)"
+  )
+
   | Call _ -> failwith "call"
 
   | CallLambda (callee, _params) -> (
@@ -514,9 +507,10 @@ and codegen_expression (env: t) (expr: Expr.t) =
     );
   )
 
-  | Assign(_, _) ->
-    Format.eprintf "Unexpected assigning to %a" C_op.Expr.pp expr;
-    failwith "unrechable"
+  | Assign(left, right) ->
+    codegen_expression env left;
+    ps env " = ";
+    codegen_expression env right
 
   | Update (op, { C_op.Expr. spec = Ident symbol; _ }, expr) -> (
     ps env "LCUpdateValue(";
