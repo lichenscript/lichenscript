@@ -28,6 +28,7 @@ typedef enum LCObjectType {
     LC_TY_SYMBOL,
     LC_TY_REFCELL,
     LC_TY_LAMBDA,
+    LC_TY_WEAK_REF,
     LC_TY_CLASS_OBJECT_META,
     LC_TY_ARRAY,
     LC_TY_CLASS_OBJECT,
@@ -229,7 +230,7 @@ void LCLambdaSetRefValue(LCRuntime* rt, LCValue lambda, int index, LCValue value
 LCValue LCNewArray(LCRuntime* rt);
 LCValue LCNewArrayLen(LCRuntime* rt, size_t size);
 LCValue LCArrayGetValue(LCRuntime* rt, LCValue this, int index);
-void LCArraySetValue(LCRuntime* rt, LCValue this, int index, LCValue value);
+void LCArraySetValue(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
 LCValue LCNewSymbolLen(LCRuntime* rt, const char* content, uint32_t len);
 LCValue LCNewSymbol(LCRuntime* rt, const char* content);

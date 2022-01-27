@@ -1003,15 +1003,16 @@ LCValue LCArrayGetValue(LCRuntime* rt, LCValue this, int index) {
     return arr->data[index];
 }
 
-void LCArraySetValue(LCRuntime* rt, LCValue this, int index, LCValue value) {
+void LCArraySetValue(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    int index = args[0].int_val;
     LCArray* arr = (LCArray*)this.ptr_val;
     if (unlikely(index >= arr->len)) {
         fprintf(stderr, "[LichenScript] index %d out of range, size: %d\n", index, arr->len);
         abort();
     }
     LCRelease(rt, arr->data[index]);
-    LCRetain(value);
-    arr->data[index] = value;
+    LCRetain(args[1]);
+    arr->data[index] = args[1];
 }
 
 LCValue LCNewSymbol(LCRuntime* rt, const char* content) {

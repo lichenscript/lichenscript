@@ -15,6 +15,8 @@ and spec =
   | CannotGetIndex of TypeExpr.t
   | CannotContructParamOfType of string * TypeExpr.t
   | InvalidAssign
+  | OnlyAssignArrayIndexAlpha
+  | OnlyI32InIndexAlpha
   | Redefinition of string
   | NotCallable of TypeExpr.t
   | ParamsMismatch of TypeExpr.t
@@ -79,6 +81,12 @@ module PP = struct
 
     | InvalidAssign ->
       Format.fprintf formatter "The left-hand side of an assignment expression must be a variable or a property access."
+
+    | OnlyAssignArrayIndexAlpha ->
+      Format.fprintf formatter "Currently you can only assign index to an array."
+
+    | OnlyI32InIndexAlpha ->
+      Format.fprintf formatter "Currently you can only use i32 as index."
 
     | Redefinition name ->
       Format.fprintf formatter "Redefinition of '%s'" name

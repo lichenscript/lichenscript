@@ -35,4 +35,7 @@ class Child extends Base {
 function main() {
     const child = Child.new();
     child.printName();
+
+    child.setName("new name");
+    child.printName();
 }

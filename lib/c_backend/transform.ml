@@ -315,10 +315,7 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
             None
           else *)
           Some ({ C_op.Stmt.
-            spec = Release {
-              spec = Ident (C_op.SymLocal name);
-              loc = Loc.none;
-            };
+            spec = Release (Ident (C_op.SymLocal name));
             loc = Loc.none;
           })
         )
@@ -374,11 +371,7 @@ and transform_statement ?ret env stmt =
   let transform_return_expr ?ret expr =
     let tmp = transform_expression ~is_move:true env expr in
     let ret = Option.value ~default:"ret" ret in
-    let assign = {
-      C_op.Expr.
-      spec = Assign({ spec = Ident (C_op.SymLocal ret); loc = Loc.none }, tmp.expr);
-      loc;
-    } in
+    let assign = C_op.Expr.Assign(Ident (C_op.SymLocal ret), tmp.expr) in
     (*
      * It's returning the function directly, it's not need to retain,
      * because it's directly assining to "ret" variable.
@@ -390,7 +383,7 @@ and transform_statement ?ret env stmt =
       else
         [{
           C_op.Stmt.
-          spec = Retain { C_op.Expr. spec = Ident (C_op.SymLocal ret); loc;};
+          spec = Retain (C_op.Expr.Ident (C_op.SymLocal ret));
           loc;
         }]
     in
@@ -455,25 +448,10 @@ and transform_statement ?ret env stmt =
 
     let assign_expr =
       if should_var_captured variable then (
-        let init_expr = {  C_op.Expr.
-          spec = NewRef init_expr.expr;
-          loc = Loc.none;
-        } in
-        { C_op.Expr.
-          spec = Assign({
-            spec = Ident name;
-            loc = Loc.none;
-          }, init_expr);
-          loc = Loc.none;
-        }
+        let init_expr = C_op.Expr.NewRef init_expr.expr in
+        C_op.Expr.Assign((Ident name), init_expr)
       ) else
-        { C_op.Expr.
-          spec = Assign({
-            spec = Ident name;
-            loc = Loc.none;
-          }, init_expr.expr);
-          loc = Loc.none;
-        }
+        C_op.Expr.Assign((Ident name), init_expr.expr);
     in
 
     List.concat [
@@ -520,11 +498,7 @@ and transform_statement ?ret env stmt =
 
 and gen_release_temp id =
   { C_op.Stmt.
-    spec = Release {
-      C_op.Expr.
-      spec = Temp id;
-      loc = Loc.none;
-    };
+    spec = Release (C_op.Expr.Temp id);
     loc = Loc.none;
   }
 
@@ -537,14 +511,7 @@ and auto_release_expr env ?(is_move=false) ~append_stmts ty_var expr =
     env.tmp_vars_count <- env.tmp_vars_count + 1;
 
     let assign_expr = C_op.Expr.Assign(
-      {
-        spec = Ident (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"));
-        loc = Loc.none;
-      },
-      {
-        spec = expr;
-        loc = Loc.none;
-      })
+      (Ident (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"))), expr)
     in
 
     append_stmts := (gen_release_temp tmp_id)::!append_stmts;
@@ -552,21 +519,16 @@ and auto_release_expr env ?(is_move=false) ~append_stmts ty_var expr =
     assign_expr
   )
 
-and prepend_expr env ~prepend_stmts ~append_stmts expr =
-  match expr with
-  | { C_op.Expr. spec = Ident C_op.SymThis; _ } -> expr.spec
-  | _ ->
+and _prepend_expr env ~is_borrow ~prepend_stmts ~append_stmts expr =
+  if is_borrow then expr
+  else begin
     let tmp_id = env.tmp_vars_count in
     env.tmp_vars_count <- env.tmp_vars_count + 1;
 
-    let assign_expr = {
-      C_op.Expr.
-      spec = Assign({
-        spec = Ident (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"));
-        loc = Loc.none;
-      }, expr);
-      loc = Loc.none;
-    } in
+    let assign_expr = C_op.Expr.Assign(
+      (Ident (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"))),
+      expr
+    ) in
 
     let prepend_stmt = {
       C_op.Stmt.
@@ -581,8 +543,9 @@ and prepend_expr env ~prepend_stmts ~append_stmts expr =
     append_stmts := (gen_release_temp tmp_id)::!append_stmts;
 
     result
+  end
 
-and transform_expression ?(is_move=false) env expr =
+and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
   let open Expression in
   let { spec; loc; ty_var; _ } = expr in
   let prepend_stmts = ref [] in
@@ -621,10 +584,21 @@ and transform_expression ?(is_move=false) env expr =
         let variable_opt = (Option.value_exn env.scope.raw)#find_var_symbol name in
         let variable = Option.value_exn variable_opt in
         let sym = find_variable env name in
-        if should_var_captured variable then (
-          C_op.Expr.GetRef sym
+        let id_expr =
+          if should_var_captured variable then
+            C_op.Expr.GetRef sym
+          else
+            C_op.Expr.Ident sym
+        in
+
+        let node_type = Type_context.deref_node_type env.ctx variable.var_id in
+        let need_release = not (Check_helper.type_should_not_release env.ctx node_type) in
+
+        if (not is_borrow) && (not is_move) && need_release then  (
+          let id_expr = id_expr in
+          C_op.Expr.Retaining id_expr
         ) else
-          C_op.Expr.Ident sym
+          id_expr
       )
     )
 
@@ -675,18 +649,12 @@ and transform_expression ?(is_move=false) env expr =
 
       let init_stmt = {
         C_op.Stmt.
-        spec = Expr {
-          C_op.Expr.
-          spec = Assign({
-            spec = Ident tmp_sym;
-            loc = Loc.none;
-          }, {
-            C_op.Expr.
-            spec = NewArray arr_len;
-            loc = Loc.none;
-          });
-          loc = Loc.none;
-        };
+        spec = Expr (
+          C_op.Expr.Assign(
+            (Ident tmp_sym),
+            (C_op.Expr.NewArray arr_len)
+          )
+        );
         loc = Loc.none;
       } in
 
@@ -699,10 +667,16 @@ and transform_expression ?(is_move=false) env expr =
         List.mapi
         ~f:(fun index expr ->
           { C_op.Stmt.
-            spec = Expr { C_op.Expr.
-              spec = ArraySetValue(tmp_sym, index, expr.expr);
-              loc = Loc.none;
-            };
+            spec = Expr (
+              C_op.Expr.ExternalCall(
+                SymLocal "LCArraySetValue",
+                Some (Ident tmp_sym),
+                [
+                  (NewInt (Int.to_string index));
+                  expr.expr
+                ]
+              );
+            );
             loc = Loc.none;
           }
         )
@@ -729,7 +703,7 @@ and transform_expression ?(is_move=false) env expr =
       let open Expression in
       (* let current_scope = env.scope in *)
       let { callee; call_params; _ } = call in
-      let params_struct = List.map ~f:(transform_expression env) call_params in
+      let params_struct = List.map ~f:(transform_expression ~is_borrow:true env) call_params in
 
       let prepend, params, append = List.map ~f:(fun expr -> expr.prepend_stmts, expr.expr, expr.append_stmts) params_struct |> List.unzip3 in
 
@@ -752,7 +726,7 @@ and transform_expression ?(is_move=false) env expr =
             let deref_type = Type_context.deref_node_type env.ctx callee.ty_var in
             match deref_type with
             | Core_type.TypeExpr.Lambda _ -> (
-              let transformed_callee = transform_expression env callee in
+              let transformed_callee = transform_expression ~is_borrow:true env callee in
               prepend_stmts := List.append !prepend_stmts (List.append !prepend_stmts transformed_callee.prepend_stmts);
               append_stmts := List.append !append_stmts (List.append !append_stmts transformed_callee.append_stmts);
               C_op.Expr.CallLambda(transformed_callee.expr, params)
@@ -774,7 +748,7 @@ and transform_expression ?(is_move=false) env expr =
           let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) expr_type id.pident_name in
           match member with
           | Some (TypeDef ({ spec = ClassMethod { method_is_virtual = true; _ }; _ }, _), _) -> (
-            let this_expr = transform_expression env expr in
+            let this_expr = transform_expression ~is_borrow:true env expr in
 
             prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
             append_stmts := List.append !append_stmts this_expr.append_stmts;
@@ -784,7 +758,7 @@ and transform_expression ?(is_move=false) env expr =
 
           | Some (TypeDef ({ spec = ClassMethod { method_get_set = None; _ }; _ }, method_id), _) -> (
             (* only class method needs a this_expr, this is useless for a static function *)
-            let this_expr = transform_expression env expr in
+            let this_expr = transform_expression ~is_borrow:true env expr in
 
             prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
             append_stmts := List.append !append_stmts this_expr.append_stmts;
@@ -827,7 +801,7 @@ and transform_expression ?(is_move=false) env expr =
     )
 
     | Member(expr, id) -> (
-      let expr_result = transform_expression env expr in
+      let expr_result = transform_expression ~is_borrow:true env expr in
       prepend_stmts := List.append !prepend_stmts expr_result.prepend_stmts;
       append_stmts := List.append expr_result.append_stmts !append_stmts;
 
@@ -863,8 +837,8 @@ and transform_expression ?(is_move=false) env expr =
     | Unary _ -> failwith "n"
 
     | Binary (op, left, right) -> (
-      let left' = transform_expression env left in
-      let right' = transform_expression env right in
+      let left' = transform_expression ~is_borrow:true env left in
+      let right' = transform_expression ~is_borrow:true env right in
 
       prepend_stmts := List.concat [!prepend_stmts; left'.prepend_stmts; right'.prepend_stmts];
       append_stmts := List.concat [!append_stmts; left'.append_stmts; right'.append_stmts];
@@ -914,27 +888,40 @@ and transform_expression ?(is_move=false) env expr =
       prepend_stmts := List.concat [ !prepend_stmts; expr'.prepend_stmts ];
       append_stmts := List.concat [ !append_stmts; expr'.append_stmts ];
 
-      match (left_expr, op_opt) with
-      (* transform_expression env left_expr *)
-      | ({ spec = Typedtree.Expression.Identifier (name, _); loc; _ }, _) -> (
-        let name = find_variable env name in
-        let left_expr' = { C_op.Expr. spec = Ident name; loc; } in
+      let assign_or_update main_expr ty_id =
+        let node_type = Type_context.deref_node_type env.ctx ty_id in
+        let need_release = not (Check_helper.type_should_not_release env.ctx node_type) in
         match op_opt with
-        | None ->
-          C_op.Expr.Assign(left_expr', expr'.expr)
+        | None -> (
+          if need_release then (
+            let release_stmt = { C_op.Stmt.
+              spec = Release main_expr;
+              loc = Loc.none;
+            } in
+            prepend_stmts := List.append !prepend_stmts [release_stmt]
+          );
+          C_op.Expr.Assign(main_expr, expr'.expr)
+        )
 
         | Some op ->
-          C_op.Expr.Update(op, left_expr', expr'.expr)
+          C_op.Expr.Update(op, main_expr, expr'.expr)
+      in
+
+      match (left_expr, op_opt) with
+      (* transform_expression env left_expr *)
+      | ({ spec = Typedtree.Expression.Identifier (name, name_id); _ }, _) -> (
+        let name = find_variable env name in
+        assign_or_update (C_op.Expr.Ident name) name_id
       )
 
       (* TODO: maybe it's a setter? *)
       | ({ spec = Typedtree.Expression.Member (main_expr, id); _ }, None) -> (
-        let transform_main_expr = transform_expression env main_expr in
+        let transform_main_expr = transform_expression ~is_borrow:true env main_expr in
 
         prepend_stmts := List.concat [ !prepend_stmts; transform_main_expr.prepend_stmts ];
         append_stmts := List.concat [ !append_stmts; transform_main_expr.append_stmts ];
 
-        let boxed_main_expr = prepend_expr env ~prepend_stmts ~append_stmts transform_main_expr.expr in
+        (* let boxed_main_expr = prepend_expr ~is_borrow env ~prepend_stmts ~append_stmts transform_main_expr.expr in *)
 
         let main_expr_ty = Type_context.deref_node_type env.ctx main_expr.ty_var in
         let classname_opt = Check_helper.find_classname_of_type env.ctx main_expr_ty in
@@ -946,12 +933,25 @@ and transform_expression ?(is_move=false) env expr =
           | _ -> failwith "unrechable"
         in
 
-        let left_expr = { C_op.Expr.
-          spec = GetField({ spec = boxed_main_expr; loc = Loc.none }, unwrap_name, id.pident_name);
-          loc = Loc.none;
-        } in
+        assign_or_update
+          (C_op.Expr.GetField(
+            transform_main_expr.expr,
+            unwrap_name,
+            id.pident_name)
+          )
+          main_expr.ty_var
+      )
 
-        C_op.Expr.Assign(left_expr, expr'.expr)
+      | ({ spec = Typedtree.Expression.Index (main_expr, value); _ }, None) -> (
+        let transform_main_expr = transform_expression ~is_borrow:true env main_expr in
+
+        (* let boxed_main_expr = prepend_expr env ~prepend_stmts ~append_stmts transform_main_expr.expr in *)
+        let value_expr = transform_expression env value in
+
+        prepend_stmts := List.concat [ !prepend_stmts; value_expr.prepend_stmts; transform_main_expr.prepend_stmts ];
+        append_stmts := List.concat [ transform_main_expr.append_stmts; value_expr.append_stmts; !append_stmts; ];
+
+        C_op.Expr.ExternalCall(SymLocal "LCArraySetValue", Some transform_main_expr.expr, [value_expr.expr; expr'.expr])
       )
 
       | _ ->
@@ -972,10 +972,12 @@ and transform_expression ?(is_move=false) env expr =
       let fun_name = find_variable env init_name in
       let init_call = C_op.Expr.InitCall((C_op.map_symbol ~f:(fun fun_name -> fun_name ^ "_init") fun_name)) in
       let init_cls_stmt = { C_op.Stmt.
-        spec = Expr { C_op.Expr.
-          spec = Assign({ spec = Temp tmp_id; loc = Loc.none }, { spec = init_call; loc = Loc.none });
-          loc = Loc.none;
-        };
+        spec = Expr (
+          C_op.Expr.Assign(
+            (Temp tmp_id),
+            init_call
+          )
+        );
         loc = Loc.none;
       } in
 
@@ -991,18 +993,20 @@ and transform_expression ?(is_move=false) env expr =
               | C_op.SymLocal name -> name
               | _ -> failwith "unrechable"
             in
-            let left_value = { C_op.Expr.
-              spec = GetField({ spec = Temp tmp_id; loc = Loc.none }, unwrap_name, actual_name);
-              loc = Loc.none;
-            } in
+            let left_value = (
+              C_op.Expr.GetField(
+                (Temp tmp_id),
+                unwrap_name,
+                actual_name
+              )
+            ) in
             Some { C_op.Stmt.
-              spec = Expr {
-                spec = Assign(
+              spec = Expr (
+                Assign(
                   left_value,
                   transformed_value.expr
-                );
-                loc = init_entry_loc;
-              };
+                )
+              );
               loc = init_entry_loc;
             }
           | _ -> None
@@ -1021,17 +1025,12 @@ and transform_expression ?(is_move=false) env expr =
       let tmp_var = "t[" ^ (Int.to_string tmp_id) ^ "]" in
 
       let init = { C_op.Stmt.
-        spec = Expr {
-          C_op.Expr.
-          spec = Assign ({
-            spec = Ident (C_op.SymLocal tmp_var);
-            loc = Loc.none;
-          }, {
-            spec = Null;
-            loc = Loc.none;
-          });
-          loc = Loc.none;
-        };
+        spec = Expr (
+          C_op.Expr.Assign (
+            (Ident (C_op.SymLocal tmp_var)),
+            Null
+          )
+        );
         loc = Loc.none;
       } in
 
@@ -1043,24 +1042,19 @@ and transform_expression ?(is_move=false) env expr =
 
     | Match _match -> (
       let { match_expr; match_clauses; _ } = _match in
-      let match_expr = transform_expression env match_expr in
+      let match_expr = transform_expression ~is_borrow:true env match_expr in
       let result_tmp = env.tmp_vars_count in
       env.tmp_vars_count <- env.tmp_vars_count + 1;
 
       prepend_stmts := List.append !prepend_stmts
         [{
           C_op.Stmt.
-          spec = Expr {
-            C_op.Expr.
-            spec = Assign ({
-              spec = Ident (C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"));
-              loc = Loc.none;
-            }, {
-              spec = Null;
-              loc = Loc.none;
-            });
-            loc = Loc.none;
-          };
+          spec = Expr (
+            C_op.Expr.Assign (
+              (Ident (C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"))),
+              Null
+            );
+          );
           loc = Loc.none;
         }];
 
@@ -1083,13 +1077,12 @@ and transform_expression ?(is_move=false) env expr =
                   List.concat [
                     body.prepend_stmts;
                     [{ C_op.Stmt.
-                      spec = Expr {
-                        spec = Assign({
-                          spec = Ident (C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"));
-                          loc = Loc.none;
-                        }, body.expr);
-                        loc = Loc.none;
-                      };
+                      spec = Expr (
+                        Assign(
+                          (Ident (C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"))),
+                          body.expr
+                        )
+                      );
                       loc = Loc.none;
                     }];
                     body.append_stmts;
@@ -1116,22 +1109,19 @@ and transform_expression ?(is_move=false) env expr =
     | Super -> failwith "not implemented: super"
 
     | Index(expr, index) -> (
-      let expr = transform_expression env expr in
+      let expr = transform_expression ~is_borrow:true env expr in
       let index = transform_expression env index in
 
       prepend_stmts := List.concat [ !prepend_stmts; index.prepend_stmts; expr.prepend_stmts ];
       append_stmts := List.concat [ expr.append_stmts; index.append_stmts; !append_stmts ];
 
-      C_op.Expr.ArrayGetValue(expr.expr, { C_op.Expr. spec = IntValue index.expr; loc = Loc.none})
+      C_op.Expr.ArrayGetValue(expr.expr, (C_op.Expr.IntValue index.expr))
     )
 
   in
   {
     prepend_stmts = !prepend_stmts;
-    expr = {
-      spec = expr_spec;
-      loc;
-    };
+    expr = expr_spec;
     append_stmts = !append_stmts;
   }
 
@@ -1140,7 +1130,7 @@ and transform_expression_if env ?ret ~prepend_stmts ~append_stmts loc if_desc =
 
   let test = transform_expression env if_desc.if_test in
 
-  let if_test = { C_op.Expr. spec = IntValue test.expr; loc = Loc.none; } in
+  let if_test = C_op.Expr.IntValue test.expr in
   let consequent = transform_block ?ret env if_desc.if_consequent in
   let if_alternate =
     Option.map
@@ -1178,10 +1168,7 @@ and transform_block env ?ret (block: Typedtree.Block.t): C_op.Stmt.t list =
           ~f:(fun (name, _) ->
             let sym = TScope.find_variable block_scope name in
             { C_op.Stmt.
-              spec = Release {
-                spec = Ident sym;
-                loc = Loc.none;
-              };
+              spec = Release (Ident sym);
               loc = Loc.none;
             }
           )
@@ -1193,7 +1180,7 @@ and transform_block env ?ret (block: Typedtree.Block.t): C_op.Stmt.t list =
 
 and transform_pattern_to_test env match_expr pat =
   let open Pattern in
-  let { spec; loc } = pat in
+  let { spec; _ } = pat in
   match spec with
   | Symbol (name, name_id) -> (
     let name_node = Type_context.get_node env.ctx name_id in
@@ -1204,10 +1191,7 @@ and transform_pattern_to_test env match_expr pat =
       | EnumCtor v -> v
       | _ -> failwith "n"
     ) in
-    { C_op.Expr.
-      spec = TagEqual(match_expr, enum_ctor.enum_ctor_tag_id);
-      loc;
-    }
+    C_op.Expr.TagEqual(match_expr, enum_ctor.enum_ctor_tag_id)
   )
   | EnumCtor ((_name, name_id), _child) -> (
     let name_node = Type_context.get_node env.ctx name_id in
@@ -1218,10 +1202,7 @@ and transform_pattern_to_test env match_expr pat =
       | EnumCtor v -> v
       | _ -> failwith "n"
     ) in
-    { C_op.Expr.
-      spec = TagEqual(match_expr, enum_ctor.enum_ctor_tag_id);
-      loc;
-    }
+    TagEqual(match_expr, enum_ctor.enum_ctor_tag_id)
   )
 
 and generate_cls_meta cls gen_name =
@@ -1274,6 +1255,7 @@ and transform_class env cls: C_op.Decl.spec list =
           let { cls_method_name; cls_method_params; cls_method_body; cls_method_scope; _ } = _method in
 
           env.tmp_vars_count <- 0;
+          env.has_early_return <- false;
 
           (* let fun_name = distribute_name env cls_method_name in *)
           let origin_method_name, method_id = cls_method_name in
@@ -1337,19 +1319,12 @@ and transform_class env cls: C_op.Decl.spec list =
   List.append [ (C_op.Decl.Class cls) ] methods
 
 and generate_finalizer name class_meta =
-  let this_expr = {
-    C_op.Expr.
-    spec = Ident SymThis;
-    loc = Loc.none;
-  } in
+  let this_expr = C_op.Expr.Ident SymThis in
   let finalizer_content =
     List.map
     ~f:(fun field_name -> {
       C_op.Stmt.
-      spec = Release { C_op.Expr.
-        spec = GetField (this_expr, class_meta.cls_gen_name, field_name);
-        loc = Loc.none;
-      };
+      spec = Release (C_op.Expr.GetField(this_expr, class_meta.cls_gen_name, field_name));
       loc = Loc.none;
     })
     class_meta.cls_fields

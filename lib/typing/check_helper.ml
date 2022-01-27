@@ -156,6 +156,23 @@ let find_classname_of_type ctx type_expr =
 
   | _ -> None
 
+let is_array ctx type_expr =
+  let type_expr = Type_context.deref_type ctx type_expr in
+  match type_expr with
+  | Array _ -> true
+  | _ -> false
+
+let is_i32 ctx type_expr =
+  let type_expr = Type_context.deref_type ctx type_expr in
+  let expr_def_opt = find_construct_of ctx type_expr in
+  (match expr_def_opt with
+    | Some (def, _) -> (
+      let open TypeDef in
+      def.builtin &&
+      String.equal def.name "i32"
+    )
+    | _ -> false
+  )
 
 (*
   * TODO: namespace

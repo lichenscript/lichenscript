@@ -122,7 +122,7 @@ end
 
 and Expr : sig
 
-  type spec =
+  type t =
   | Null
   | NewString of string
   | NewInt of string
@@ -134,7 +134,6 @@ and Expr : sig
   | GetRef of symbol
   | NewArray of int
   | ArrayGetValue of (t * t)
-  | ArraySetValue of (symbol * int * t)
   | I32Binary of Asttypes.BinaryOp.t * t * t
   | CallLambda of t * t list
   | Call of int * t list
@@ -149,11 +148,7 @@ and Expr : sig
   | IntValue of t
   | GetField of t * string * string (* expr classname fieldname *)
   | StringCmp of Asttypes.BinaryOp.t * t * t
-
-  and t = {
-    loc: Loc.t;
-    spec: spec;
-  }
+  | Retaining of Expr.t
   [@@deriving show]
 
 end

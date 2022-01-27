@@ -326,8 +326,7 @@ and codegen_symbol env sym =
 
 and codegen_expression (env: t) (expr: Expr.t) =
   let open Expr in
-  let { spec; _ } = expr in
-  match spec with
+  match expr with
   | Null ->
     ps env "MK_NULL()"
 
@@ -401,16 +400,6 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env (Int.to_string len);
     ps env ")"
 
-  | ArraySetValue (sym, index, value) -> (
-    ps env "LCArraySetValue(rt, ";
-    codegen_symbol env sym;
-    ps env ", ";
-    ps env (Int.to_string index);
-    ps env ", ";
-    codegen_expression env value;
-    ps env ")";
-  )
-
   | ArrayGetValue (sym, index) -> (
     ps env "LCArrayGetValue(rt, ";
     codegen_expression env sym;
@@ -480,10 +469,9 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ")"
   )
 
-  | Assign({ C_op.Expr. spec = Ident name; _ }, right) -> (
+  | Assign(Expr.Ident name, right) -> (
     (* TODO: release the left, retain the right *)
-    (let open C_op in
-    match name with
+    (match name with
     | SymLocal name ->
       ps env name;
       ps env " = ";
@@ -512,7 +500,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env " = ";
     codegen_expression env right
 
-  | Update (op, { C_op.Expr. spec = Ident symbol; _ }, expr) -> (
+  | Update (op, C_op.Expr.Ident symbol, expr) -> (
     ps env "LCUpdateValue(";
     ps env (Primitives.Assign.to_arithmetic_op op);
     ps env ", ";
@@ -570,6 +558,14 @@ and codegen_expression (env: t) (expr: Expr.t) =
     codegen_expression env left;
     ps env ", ";
     codegen_expression env right;
+    ps env ")"
+  )
+
+  | Retaining expr -> (
+    ps env "(LCRetain(";
+    codegen_expression env expr;
+    ps env "), ";
+    codegen_expression env expr;
     ps env ")"
   )
 

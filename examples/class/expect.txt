@@ -1,1 +1,2 @@
 name: Hello World
+name: new name

@@ -457,19 +457,28 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
             | _ -> ());
           )
 
-          | { spec = Member(left_expr, name) ; _ } -> (
-            let left_type = Type_context.deref_node_type ctx left_expr.ty_var in
-            let member_opt = Check_helper.find_member_of_type ctx ~scope:(Env.peek_scope env) left_type name.pident_name in
+          | { spec = Member(main_expr, name) ; _ } -> (
+            let main_expr_type = Type_context.deref_node_type ctx main_expr.ty_var in
+            let member_opt = Check_helper.find_member_of_type ctx ~scope:(Env.peek_scope env) main_expr_type name.pident_name in
             match member_opt with
             | Some _ -> ()
             | None -> (
-              let err = Type_error.(make_error ctx loc (CannotReadMember(name.pident_name, left_type))) in
+              let err = Type_error.(make_error ctx loc (CannotReadMember(name.pident_name, main_expr_type))) in
               raise (Type_error.Error err)
             )
           )
 
-          | { spec = Index _ ; _ } -> (
-            failwith "unimplemented: assigning to index"
+          | { spec = Index(main_expr, value_expr) ; _ } -> (
+            let main_expr_type = Type_context.deref_node_type ctx main_expr.ty_var in
+            let value_type = Type_context.deref_node_type ctx value_expr.ty_var in
+            if not (Check_helper.is_array ctx main_expr_type) then (
+              let err = Type_error.(make_error ctx main_expr.loc OnlyAssignArrayIndexAlpha) in
+              raise (Type_error.Error err)
+            );
+            if not (Check_helper.is_i32 ctx value_type) then (
+              let err = Type_error.(make_error ctx value_expr.loc OnlyI32InIndexAlpha) in
+              raise (Type_error.Error err)
+            )
           )
 
           | _ -> ()
