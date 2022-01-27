@@ -1,5 +1,11 @@
 (*
- * Convert TypedTree to C-op
+ * This file is part of LichenScript Compiler.
+ *
+ * LichenScript Compiler is free software: you can redistribute it and/or modify it under the terms of the GNU General Public License as published by the Free Software Foundation, either version 3 of the License, or (at your option) any later version.
+ *
+ * LichenScript Compiler is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License along with LichenScript Compiler. If not, see <https://www.gnu.org/licenses/>.
  *)
 open Core_kernel
 open Lichenscript_parsing.Asttypes
@@ -7,6 +13,9 @@ open Lichenscript_parsing.Ast
 open Lichenscript_typing
 open Lichenscript_typing.Scope
 open Lichenscript_typing.Typedtree
+(*
+ * Convert TypedTree to C-op
+ *)
 
 module TScope = struct
   (* Why name_map?

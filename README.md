@@ -78,6 +78,6 @@ Exception mechanism depends on a heavy runtime.
 Two cases:
 
 1. The compiler of LichenScript(written in OCaml)
-   is under GPL license.
+   is under GPLv3 license.
 2. The standard library(written in LichenScript)
    is under MIT license.
