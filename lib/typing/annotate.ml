@@ -428,11 +428,9 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           )
         )
 
-        | { spec = Member _ ; _ } ->
-          failwith "assigning to member"
-
+        | { spec = Member _ ; _ }
         | { spec = Index _ ; _ } ->
-          failwith "assigning to index"
+          annotate_expression ~prev_deps:[expr.ty_var] env left
 
         | _ -> (
           let err = Type_error.(make_error ctx loc InvalidAssign) in
@@ -446,7 +444,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         deps = [ expr.ty_var; left'.ty_var ];
         loc;
         check = (fun _ ->
-
           (match left' with
           | { T.Expression. spec = Identifier (name, _); _ } -> (
             let variable = Option.value_exn (scope#find_var_symbol name) in
