@@ -178,10 +178,10 @@ let print ctx =
     let item = get_node ctx i in
     let deps = Buffer.create 64 in
     List.iter ~f:(fun item -> Buffer.add_string deps (Int.to_string item); Buffer.add_string deps " ") item.deps ;
-    Format.printf "%d: %s %s\n" i (Buffer.contents deps)
+    Format.eprintf "%d: %s %s\n" i (Buffer.contents deps)
       (Option.value ~default:"None"
         (Option.map ~f:(fun key -> Format.asprintf "\"%a\" %d:%d" Lichenscript_lex.File_key.pp key item.loc.start.line item.loc.start.column) item.loc.source));
-    Format.printf "\t%s\n\n" (print_type_by_id ctx i);
+    Format.eprintf "\t%s\n\n" (print_type_by_id ctx i);
   done
 
 let root_scope ctx = ctx.root_scope

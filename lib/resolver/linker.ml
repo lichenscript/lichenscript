@@ -22,6 +22,7 @@ module ModuleMap = Hashtbl.Make(String)
 type t = {
   ctx: Type_context.t;
   module_map: Module.t ModuleMap.t;
+  mutable modules_in_order: Module.t list;
   top_level_deps: (int list) Array.t;
 }
 
@@ -31,6 +32,7 @@ let create ~ctx () =
   {
     ctx;
     module_map = ModuleMap.create ();
+    modules_in_order = [];
     top_level_deps;
   }
 
@@ -84,6 +86,7 @@ let link_from_entry env ~debug entry =
   declarations
 
 let set_module env key _mod =
+  env.modules_in_order <- _mod::env.modules_in_order;
   ModuleMap.set env.module_map ~key ~data:_mod
 
 let get_module env key =
@@ -93,5 +96,6 @@ let has_module env key =
   ModuleMap.mem env.module_map key
 
 let iter_modules env ~f =
-  ModuleMap.iter
-    ~f env.module_map
+  env.modules_in_order
+  |> List.rev
+  |> List.iter ~f
