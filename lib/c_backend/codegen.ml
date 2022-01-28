@@ -647,7 +647,11 @@ let codegen_program ?indent ~ctx (declarations: Typedtree.Declaration.t list) =
   List.iter ~f:(codegen_declaration env) c_decls.declarations;
 
   (* if user has a main function *)
-  let main_name = Option.value_exn c_decls.main_function_name in
+  let main_name =
+    Option.value_exn
+      ~message:"can not find main function"
+      c_decls.main_function_name
+  in
   ps env (main_snippet ?init_name:c_decls.global_class_init main_name);
 
   env

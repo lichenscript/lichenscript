@@ -86,10 +86,6 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       Type_context.update_node ctx sym_id {
         node with
         deps = List.concat [node.deps; [binding_init.ty_var]; prev_deps ];
-        check = (fun id ->
-          let expr_node = Type_context.get_node ctx binding_init.ty_var in
-          Type_context.update_node_type ctx id expr_node.value
-        )
       };
 
       [sym_id], T.Statement.Binding { T.Statement.
@@ -244,17 +240,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         value = TypeExpr.Unknown;
         loc;
         deps;
-        (* TODO: check expression *)
-        check = (fun id ->
-          if List.is_empty arr_list then (
-            Type_context.update_node_type (Env.ctx env) id TypeExpr.(Array Unknown)
-          ) else (
-            let first = List.hd_exn a_list in
-            let first_type = T.Expression.(first.ty_var) in
-            let first_node = Type_context.get_node (Env.ctx env) first_type in
-            Type_context.update_node_type (Env.ctx env) id TypeExpr.(Array first_node.value)
-          )
-        );
+        check = none;
       } in
 
       ty_var, (T.Expression.Array a_list)
@@ -267,29 +253,11 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     | Member (expr, name) -> (
       let expr = annotate_expression ~prev_deps env expr in
       let ctx = Env.ctx env in
-      let scope = Env.peek_scope env in
-      let member_name = name.pident_name in
       let node = {
         value = TypeExpr.Unknown;
         loc;
         deps = List.append prev_deps [expr.ty_var];
-        check = (fun id ->
-          let expr_node = Type_context.get_node ctx expr.ty_var in
-          let member_type_opt = Check_helper.find_member_of_type ctx ~scope expr_node.value member_name in
-          match member_type_opt with
-          (* maybe it's a getter *)
-          | Some (TypeDef { spec = ClassMethod { method_get_set = Some Getter; method_return; _ }; _ }, _) -> (
-            Type_context.update_node_type ctx id method_return
-          )
-
-          | Some (ty_expr, _) ->
-            Type_context.update_node_type ctx id ty_expr
-
-          | None ->
-            let err = Type_error.(make_error ctx loc (CannotReadMember(member_name, expr_node.value))) in
-            raise (Type_error.Error err)
-
-        );
+        check = none;
       } in
       let id = Type_context.new_id ctx node in
       id, T.Expression.Member(expr, name)
@@ -302,18 +270,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         value = TypeExpr.Unknown;
         deps = [ expr.ty_var; index_expr.ty_var ];
         loc;
-        check = (fun id ->
-          let ctx = Env.ctx env in
-          let node = Type_context.get_node ctx expr.ty_var in
-          match (Check_helper.try_unwrap_array ctx node.value) with
-          | Some t ->
-            Type_context.update_node_type ctx id t
-
-          | None -> (
-            let err = Type_error.(make_error ctx loc (CannotGetIndex node.value)) in
-            raise (Type_error.Error err)
-          )
-        );
+        check = none;
       } in
 
       let id = Type_context.new_id (Env.ctx env) node in
@@ -331,65 +288,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         value = TypeExpr.Unknown;
         deps = [left.ty_var; right.ty_var];
         loc;
-        check = (fun id ->
-          let ctx = Env.ctx env in
-          let left_node = Type_context.get_node ctx left.ty_var in
-          let right_node = Type_context.get_node ctx right.ty_var in
-          let open Asttypes in
-          match op with
-          | BinaryOp.Plus -> (
-            if not (Check_helper.type_addable ctx left_node.value right_node.value) then (
-              let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-              raise (Type_error.Error err)
-            );
-            Type_context.update_node_type ctx id left_node.value;
-          )
-
-          | BinaryOp.Minus
-          | BinaryOp.Mult
-          | BinaryOp.Div
-            -> (
-            if not (Check_helper.type_arithmetic ctx left_node.value right_node.value) then (
-              let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-              raise (Type_error.Error err)
-            );
-            Type_context.update_node_type ctx id left_node.value;
-          )
-
-          | BinaryOp.Mod
-          | BinaryOp.BitAnd
-          | BinaryOp.Xor
-          | BinaryOp.BitOr
-            -> (
-            if not (Check_helper.type_arithmetic_integer ctx left_node.value right_node.value) then (
-              let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-              raise (Type_error.Error err)
-            );
-            Type_context.update_node_type ctx id left_node.value;
-          )
-
-          | BinaryOp.Equal
-          | BinaryOp.NotEqual
-          | BinaryOp.LessThan
-          | BinaryOp.LessThanEqual
-          | BinaryOp.GreaterThan
-          | BinaryOp.GreaterThanEqual
-            -> (
-              if not (Check_helper.type_logic_compareable ctx left_node.value right_node.value) then (
-                let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-                raise (Type_error.Error err)
-              );
-              let bool_ty = Env.ty_boolean env in
-              Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
-            )
-
-          | _ -> (
-              if not (Check_helper.type_logic_compareable ctx left_node.value right_node.value) then (
-                let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-                raise (Type_error.Error err)
-              );
-          )
-        );
+        check = none;
       } in
       let id = Type_context.new_id (Env.ctx env) node in
 
@@ -443,54 +342,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         value;
         deps = [ expr.ty_var; left'.ty_var ];
         loc;
-        check = (fun _ ->
-          let ctx = Env.ctx env in
-          (match left' with
-          | { T.Expression. spec = Identifier (name, _); _ } -> (
-            let variable = Option.value_exn (scope#find_var_symbol name) in
-
-            (match variable.var_kind with
-            | Ast.Pvar_const -> (
-              let err = Type_error.(make_error ctx loc CannotAssignToConstVar) in
-              raise (Type_error.Error err)
-            )
-            | _ -> ());
-          )
-
-          | { spec = Member(main_expr, name) ; _ } -> (
-            let main_expr_type = Type_context.deref_node_type ctx main_expr.ty_var in
-            let member_opt = Check_helper.find_member_of_type ctx ~scope:(Env.peek_scope env) main_expr_type name.pident_name in
-            match member_opt with
-            | Some _ -> ()
-            | None -> (
-              let err = Type_error.(make_error ctx loc (CannotReadMember(name.pident_name, main_expr_type))) in
-              raise (Type_error.Error err)
-            )
-          )
-
-          | { spec = Index(main_expr, value_expr) ; _ } -> (
-            let main_expr_type = Type_context.deref_node_type ctx main_expr.ty_var in
-            let value_type = Type_context.deref_node_type ctx value_expr.ty_var in
-            if not (Check_helper.is_array ctx main_expr_type) then (
-              let err = Type_error.(make_error ctx main_expr.loc OnlyAssignArrayIndexAlpha) in
-              raise (Type_error.Error err)
-            );
-            if not (Check_helper.is_i32 ctx value_type) then (
-              let err = Type_error.(make_error ctx value_expr.loc OnlyI32InIndexAlpha) in
-              raise (Type_error.Error err)
-            )
-          )
-
-          | _ -> ()
-          );
-
-          let sym_node = Type_context.get_node ctx left'.ty_var in
-          let expr_node = Type_context.get_node ctx expr.ty_var in
-          if not (Check_helper.type_assinable ctx sym_node.value expr_node.value) then (
-            let err = Type_error.(make_error ctx loc (NotAssignable(sym_node.value, expr_node.value))) in
-            raise (Type_error.Error err)
-          )
-        );
+        check = none;
       } in
       next_id, Assign(op, left', expr)
     )
@@ -598,49 +450,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         Core_type.
         value = Unknown;
         deps = List.append [match_expr.ty_var] clauses_deps;
-        check = (fun id ->
-          let ty =
-            if List.is_empty match_clauses then (
-              let ty_unit = Env.ty_unit env in
-              TypeExpr.Ctor(Ref ty_unit, [])
-            ) else (
-              (* TODO: better way to check every clauses *)
-              List.fold
-                ~init:TypeExpr.Unknown
-                ~f:(fun acc item ->
-                  let ctx = Env.ctx env in
-                  let node_expr = Type_context.deref_node_type ctx item in
-                  match (acc, node_expr) with
-                  | TypeExpr.Unknown, _ ->
-                    node_expr
-
-                  | (TypeExpr.Ctor(c1, [])), (TypeExpr.Ctor (c2, [])) ->  (
-                    let c1_def = Type_context.deref_type ctx c1 in
-                    let c2_def = Type_context.deref_type ctx c2 in
-                    (match (c1_def, c2_def) with
-                    | (TypeExpr.TypeDef left_sym, TypeExpr.TypeDef right_sym) -> (
-                      if TypeDef.(left_sym == right_sym) then ()
-                      else
-                        let err = Type_error.(make_error (Env.ctx env) match_loc (NotAllTheCasesReturnSameType(c1_def, c2_def))) in
-                        raise (Type_error.Error err)
-                    )
-                    | _ -> (
-                      let err = Type_error.(make_error (Env.ctx env) match_loc (NotAllTheCasesReturnSameType(c2_def, c2_def))) in
-                      raise (Type_error.Error err)
-                    ));
-
-                    acc
-                  )
-
-                  | _ -> (
-                    acc
-                  )
-                )
-                clauses_deps
-            )
-          in
-          Type_context.update_node_type (Env.ctx env) id ty
-        );
+        check = none;
         loc = match_loc;
       } in
 
@@ -691,38 +501,7 @@ and annotate_expression_call ~prev_deps env loc call =
     value = TypeExpr.Unknown;
     loc;
     deps = List.append [ T.Expression.(callee.ty_var) ] params_deps;
-    check = (fun id ->
-      let ctx = Env.ctx env in
-      let ty_int = callee.ty_var in
-      let deref_type_expr = Type_context.deref_node_type ctx ty_int  in
-      match deref_type_expr with
-      | TypeExpr.Lambda(_params, ret) -> (
-        (* TODO: check call params *)
-        Type_context.update_node_type ctx id ret
-      )
-      | _ ->
-        begin
-          let _ty_def = Check_helper.find_construct_of ctx deref_type_expr in
-          match deref_type_expr with
-          | TypeExpr.TypeDef { TypeDef. spec = Function _fun; _ } ->
-            (* TODO: check call params *)
-            Type_context.update_node_type ctx id _fun.fun_return
-
-          | TypeExpr.TypeDef { TypeDef. spec = ClassMethod _method; _ } ->
-            (* TODO: check call params *)
-            Type_context.update_node_type ctx id _method.method_return
-
-          | TypeExpr.TypeDef { TypeDef. spec = EnumCtor enum_ctor; _} -> (
-            let super_id = enum_ctor.enum_ctor_super_id in
-            Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref super_id, []))
-          )
-
-          | _ -> (
-            let err = Type_error.(make_error ctx call_loc (NotCallable deref_type_expr)) in
-            raise (Type_error.Error err)
-          )
-        end
-    );
+    check = none;
   } in
 
   ty_var, { T.Expression. callee; call_params; call_loc }
@@ -782,20 +561,7 @@ and annotate_block_impl ~prev_deps env block : T.Block.t =
     value = TypeExpr.Unknown;
     deps = body_dep;
     loc;
-    check = (fun id ->
-      let ctx = Env.ctx env in
-      let last_opt = List.last body_stmts in
-      match last_opt with
-      | Some { Typedtree.Statement. spec = Expr expr ; _ } -> (
-        let ty_var = Typedtree.Expression.(expr.ty_var) in
-        Type_context.update_node_type ctx id (TypeExpr.Ref ty_var)
-      )
-
-      | _ -> (
-        let unit_type = Env.ty_unit env in
-        Type_context.update_node_type ctx id (TypeExpr.Ctor(Ref unit_type, []))
-      )
-    );
+    check = none;
   } in
   let return_ty = Type_context.new_id (Env.ctx env) node in
   { T.Block.
@@ -1518,12 +1284,21 @@ and annotate_function env fun_ =
     fun_deps := body.return_ty::(!fun_deps);
     fun_deps := List.append !fun_deps collected_returns;
 
+    let type_def = { Core_type.TypeDef.
+      id = fun_id;
+      builtin = false;
+      name = fun_.header.id.pident_name;
+      spec = Function {
+        fun_params = [];
+        fun_return = return_ty;
+      };
+    } in
     Type_context.update_node (Env.ctx env) fun_id {
       name_node with
-      value = TypeExpr.Unknown;  (* it's an typedef *)
+      value = TypeExpr.TypeDef type_def;
       (* deps = return_id::params_types; *)
       deps = !fun_deps;
-      check = (fun id ->
+      check = (fun _ ->
         let ctx = Env.ctx env in
         let block_node = Type_context.get_node ctx body.return_ty in
         (* if no return statements, use last statement of block *)
@@ -1549,16 +1324,6 @@ and annotate_function env fun_ =
             )
             collected_returns
         );
-        let type_def = { TypeDef.
-          id;
-          builtin = false;
-          name = fun_.header.id.pident_name;
-          spec = Function {
-            fun_params = [];
-            fun_return = return_ty;
-          };
-        } in
-        Type_context.update_node_type ctx id (TypeExpr.TypeDef type_def)
       );
     };
     { T.Function.
@@ -1606,27 +1371,25 @@ and annotate_enum env enum =
         raise (Type_error.Error err)
       );
 
+      let ty_def = {
+        TypeDef.
+        enum_ctor_tag_id = index;
+        enum_ctor_name = case_name.pident_name;
+        enum_ctor_super_id = variable.var_id;
+        enum_ctor_params = [];
+      } in
       Type_context.map_node
         ctx
         ~f:(fun node -> {
           node with
           deps = List.concat ([variable.var_id]::deps);
           loc = case_loc;
-          check = (fun id ->
-            let ty_def = {
-              TypeDef.
-              enum_ctor_tag_id = index;
-              enum_ctor_name = case_name.pident_name;
-              enum_ctor_super_id = variable.var_id;
-              enum_ctor_params = [];
-            } in
-            Type_context.update_node_type ctx id (TypeExpr.TypeDef {
-              id;
-              builtin = false;
-              name = case_name.pident_name;
-              spec = EnumCtor ty_def;
-            })
-          )
+          value = (TypeExpr.TypeDef {
+            id = member_var.var_id;
+            builtin = false;
+            name = case_name.pident_name;
+            spec = EnumCtor ty_def;
+          });
         })
         member_var.var_id
       ;

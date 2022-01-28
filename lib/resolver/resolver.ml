@@ -253,10 +253,19 @@ let annotate_all_modules env =
 
 let typecheck_all_modules ~ctx ~debug env =
   annotate_all_modules env;
-  let errors = Typecheck.type_check ctx ~debug () in
-  if (List.length errors) > 0 then (
-    raise (TypeCheckError errors)
-  )
+  Linker.iter_modules
+    ~f:(fun m ->
+      let files = Module.files m in
+      List.iter
+      ~f:(fun file ->
+        let open Module in
+        let tree = Option.value_exn file.typed_tree in
+        Typecheck.typecheck_module ~debug ctx tree
+      )
+      files;
+      (* Typecheck.typecheck_module ctx m. *)
+    )
+    env.linker
 
 (*
  * 1. parse all in the entry dir

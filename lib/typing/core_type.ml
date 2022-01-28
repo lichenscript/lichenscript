@@ -97,7 +97,7 @@ end = struct
   (* only used internally *)
   let rec pp formatter t =
     match t with
-    | Unknown -> Format.fprintf formatter "unkown"
+    | Unknown -> Format.fprintf formatter "unknown"
     | Any -> Format.fprintf formatter "any"
     | Ctor _ -> Format.fprintf formatter "ctor"
     | Ref i -> Format.fprintf formatter "ref '%d" i

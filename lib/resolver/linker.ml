@@ -97,5 +97,4 @@ let has_module env key =
 
 let iter_modules env ~f =
   env.modules_in_order
-  |> List.rev
   |> List.iter ~f
