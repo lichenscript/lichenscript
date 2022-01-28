@@ -64,7 +64,7 @@ module rec TypeExpr : sig
 
     | String
 
-    | TypeDef of (TypeDef.t * int)
+    | TypeDef of TypeDef.t
 
     (* used for generic *)
     | TypeSymbol of string
@@ -86,7 +86,7 @@ end = struct
     | Lambda of t list * t
     | Array of t
     | String
-    | TypeDef of (TypeDef.t * int)
+    | TypeDef of TypeDef.t
     | TypeSymbol of string
 
   and function_type = {
@@ -131,7 +131,7 @@ and TypeDef : sig
 
   and class_type = {
     tcls_name:            string;
-    tcls_extends:         t option;
+    tcls_extends:         TypeExpr.t option;
     tcls_elements:        (string * int) list;
     tcls_static_elements: (string * int) list;
   }
@@ -166,6 +166,7 @@ and TypeDef : sig
     | EnumCtor of enum_ctor
 
   and t = {
+    id: int;
     builtin: bool;
     name: string;
     spec: spec;
@@ -175,7 +176,7 @@ and TypeDef : sig
 
   val builtin: t -> bool
 
-  val create: ?builtin:bool -> string -> spec -> t
+  val create: ?builtin:bool -> int -> string -> spec -> t
 
   val create_module: unit -> module_type
 
@@ -205,7 +206,7 @@ end = struct
 
   and class_type = {
     tcls_name:            string;
-    tcls_extends:         t option;
+    tcls_extends:         TypeExpr.t option;
     tcls_elements:        (string * int) list;
     tcls_static_elements: (string * int) list;
   }
@@ -240,6 +241,7 @@ end = struct
     | EnumCtor of enum_ctor
 
   and t = {
+    id: int;
     builtin: bool;
     name: string;
     spec: spec;
@@ -249,8 +251,9 @@ end = struct
 
   let builtin sym = sym.builtin
 
-  let create ?(builtin=false)  name spec =
+  let create ?(builtin=false) id name spec =
     {
+      id;
       builtin;
       name;
       spec;

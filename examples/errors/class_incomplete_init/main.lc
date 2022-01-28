@@ -1,0 +1,10 @@
+
+class A {
+
+    name: string
+
+}
+
+function main () {
+    let a = A {};
+}

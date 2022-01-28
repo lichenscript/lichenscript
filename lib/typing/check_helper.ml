@@ -43,7 +43,7 @@ let type_assinable ctx left right =
     let c1_def = find_construct_of ctx left in
     let c2_def = find_construct_of ctx right in
     match (c1_def, c2_def) with
-    | (Some (left_sym, _), Some (right_sym, _)) ->
+    | (Some left_sym, Some right_sym) ->
       if TypeDef.(left_sym == right_sym) then
         true
       else
@@ -59,7 +59,7 @@ let check_is_primitive_type ~group ctx (left: TypeExpr.t) (right: TypeExpr.t) =
   let left_def_opt = find_construct_of ctx left in
   let right_def_opt = find_construct_of ctx right in
   (match (left_def_opt, right_def_opt) with
-    | (Some (left, _), Some (right, _)) -> (
+    | (Some left, Some right) -> (
       let open TypeDef in
       left.builtin && right.builtin && (String.equal left.name right.name) &&
       (Array.mem group ~equal:String.equal left.name)
@@ -72,7 +72,7 @@ let type_should_not_release ctx expr =
   let expr = Type_context.deref_type ctx expr in
   let expr_def_opt = find_construct_of ctx expr in
   (match expr_def_opt with
-    | Some (def, _) -> (
+    | Some def -> (
       let open TypeDef in
       def.builtin &&
       (Array.mem group ~equal:String.equal def.name)
@@ -148,7 +148,7 @@ let find_classname_of_type ctx type_expr =
     let type_expr = Type_context.deref_type ctx type_expr in
     let open TypeDef in
     match type_expr with
-    | TypeDef ({ spec = Class cls; _ }, _) -> (
+    | TypeDef { spec = Class cls; _ } -> (
       Some cls.tcls_name
     )
     | _ -> None
@@ -166,7 +166,7 @@ let is_i32 ctx type_expr =
   let type_expr = Type_context.deref_type ctx type_expr in
   let expr_def_opt = find_construct_of ctx type_expr in
   (match expr_def_opt with
-    | Some (def, _) -> (
+    | Some def -> (
       let open TypeDef in
       def.builtin &&
       String.equal def.name "i32"
@@ -191,7 +191,7 @@ let rec find_member_of_type ctx ~scope type_expr member_name =
     let type_expr = Type_context.deref_type ctx type_expr in
     let open TypeDef in
     match type_expr with
-    | TypeDef ({ spec = Class cls; _ }, _) -> (
+    | TypeDef { spec = Class cls; _ } -> (
       let result =
         List.find ~f:(fun (elm_name, _) -> String.equal elm_name member_name)
         cls.tcls_elements
@@ -207,7 +207,7 @@ let rec find_member_of_type ctx ~scope type_expr member_name =
   )
 
   (* it's type def itself, find the static member *)
-  | TypeDef ({ spec = Class { tcls_static_elements; _ }; _ }, _) -> (
+  | TypeDef { spec = Class { tcls_static_elements; _ }; _ } -> (
     let result =
       List.find ~f:(fun (static_memeber_name, _) -> String.equal static_memeber_name member_name)
       tcls_static_elements

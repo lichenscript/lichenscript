@@ -265,7 +265,7 @@ and Declaration : sig
 
   and _class = {
     cls_id:         Identifier.t;
-    cls_extends:    Identifier.t option;
+    cls_extends:    Type.t option;
     cls_visibility: Asttypes.visibility option;
     cls_type_vars:  Identifier.t list;
     cls_loc:        Loc.t;

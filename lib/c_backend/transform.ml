@@ -575,7 +575,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         let node_type = Type_context.deref_node_type env.ctx name_id in
         let open Core_type in
         match node_type with
-        | TypeExpr.TypeDef({ TypeDef. spec = EnumCtor _; _ }, _) ->
+        | TypeExpr.TypeDef { TypeDef. spec = EnumCtor _; _ } ->
           let sym = find_variable env name in
           C_op.Expr.ExternalCall(sym, None, [])
 
@@ -736,7 +736,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
             | _ ->
               let node = Type_context.get_node env.ctx id in
               let ctor_opt = Check_helper.find_typedef_of env.ctx node.value in
-              let ctor_name, _ctor_ty_id = Option.value_exn ctor_opt in
+              let ctor_name = Option.value_exn ctor_opt in
               let name = find_variable env ctor_name.name in
               C_op.Expr.ExternalCall(name, None, params)
           )
@@ -747,7 +747,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
           let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) expr_type id.pident_name in
           match member with
-          | Some (TypeDef ({ spec = ClassMethod { method_is_virtual = true; _ }; _ }, _), _) -> (
+          | Some (TypeDef { spec = ClassMethod { method_is_virtual = true; _ }; _ }, _) -> (
             let this_expr = transform_expression ~is_borrow:true env expr in
 
             prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
@@ -756,7 +756,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
             C_op.Expr.Invoke(this_expr.expr, id.pident_name, params);
           )
 
-          | Some (TypeDef ({ spec = ClassMethod { method_get_set = None; _ }; _ }, method_id), _) -> (
+          | Some (TypeDef { id = method_id; spec = ClassMethod { method_get_set = None; _ }; _ }, _) -> (
             (* only class method needs a this_expr, this is useless for a static function *)
             let this_expr = transform_expression ~is_borrow:true env expr in
 
@@ -772,16 +772,18 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
             | _ ->
               let callee_node = Type_context.get_node env.ctx callee.ty_var in
               let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
-              let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
+              let ctor = Option.value_exn ctor_opt in
+              let ctor_ty_id = ctor.id in
               let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
               C_op.Expr.ExternalCall(global_name, None, params)
           )
 
           (* it's a static function *)
-          | Some (TypeDef ({ spec = Function _; _ }, fun_id), _) -> (
+          | Some (TypeDef { id = fun_id; spec = Function _; _ }, _) -> (
             let callee_node = Type_context.get_node env.ctx fun_id in
             let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
-            let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
+            let ctor = Option.value_exn ctor_opt in
+            let ctor_ty_id = ctor.id in
             let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
             C_op.Expr.ExternalCall(global_name, None, params)
           )
@@ -792,7 +794,8 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         | _ -> (
           let callee_node = Type_context.get_node env.ctx callee.ty_var in
           let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
-          let _ctor_name, ctor_ty_id = Option.value_exn ctor_opt in
+          let ctor = Option.value_exn ctor_opt in
+          let ctor_ty_id = ctor.id in
           let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
           C_op.Expr.ExternalCall(global_name, None, params)
         )
@@ -811,7 +814,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       (* could be a property of a getter *)
       let open Core_type.TypeDef in
       match member with
-      | Some (Core_type.TypeExpr.TypeDef ({ spec = ClassMethod { method_get_set = Some Getter; _ }; _ }, method_id), _) -> (
+      | Some (Core_type.TypeExpr.TypeDef { id = method_id; spec = ClassMethod { method_get_set = Some Getter; _ }; _ }, _) -> (
         let ext_sym_opt = Type_context.find_external_symbol env.ctx method_id in
         let ext_sym = Option.value_exn ext_sym_opt in
         C_op.Expr.ExternalCall(SymLocal ext_sym, Some expr_result.expr, [])
@@ -822,7 +825,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
         let expr_ctor_opt = Check_helper.find_construct_of env.ctx expr_type in
         match expr_ctor_opt with
-        | Some (_, expr_id) -> (
+        | Some { id = expr_id; _ }-> (
           let cls_meta = Hashtbl.find_exn env.cls_meta_map expr_id in
           let prop_name = Hashtbl.find_exn cls_meta.cls_fields_map id.pident_name in
           C_op.Expr.GetField(expr_result.expr, cls_meta.cls_gen_name, prop_name)
@@ -1135,7 +1138,8 @@ and transform_spreading_init env tmp_id spread_ty_var spread_expr =
   let expr_node_type = Type_context.deref_node_type env.ctx spread_ty_var in
 
   let ctor_opt = Check_helper.find_construct_of env.ctx expr_node_type in
-  let _ctor, cls_id = Option.value_exn ~message:"Can not find ctor of spreading init" ctor_opt in
+  let ctor = Option.value_exn ~message:"Can not find ctor of spreading init" ctor_opt in
+  let cls_id = ctor.id in
 
   let cls_meta = Hashtbl.find_exn env.cls_meta_map cls_id in
 
@@ -1226,7 +1230,7 @@ and transform_pattern_to_test env match_expr pat =
   | Symbol (name, name_id) -> (
     let name_node = Type_context.get_node env.ctx name_id in
     let ctor_opt = Check_helper.find_typedef_of env.ctx name_node.value in
-    let ctor, _ = Option.value_exn ~message:(Format.sprintf "find enum ctor failed: %s %d" name name_id) ctor_opt in
+    let ctor = Option.value_exn ~message:(Format.sprintf "find enum ctor failed: %s %d" name name_id) ctor_opt in
     let enum_ctor = Core_type.TypeDef.(
       match ctor.spec with
       | EnumCtor v -> v
@@ -1237,7 +1241,7 @@ and transform_pattern_to_test env match_expr pat =
   | EnumCtor ((_name, name_id), _child) -> (
     let name_node = Type_context.get_node env.ctx name_id in
     let ctor_opt = Check_helper.find_typedef_of env.ctx name_node.value in
-    let ctor, _ = Option.value_exn ctor_opt in
+    let ctor = Option.value_exn ctor_opt in
     let enum_ctor = Core_type.TypeDef.(
       match ctor.spec with
       | EnumCtor v -> v
@@ -1246,29 +1250,52 @@ and transform_pattern_to_test env match_expr pat =
     TagEqual(match_expr, enum_ctor.enum_ctor_tag_id)
   )
 
-and generate_cls_meta cls gen_name =
-  let open Declaration in
-  let { cls_id; cls_body; _ } = cls in
-  let properties =
-    List.filter_map
-      ~f:(fun elm ->
-        match elm with
-        | Cls_method _ -> None
-        | Cls_property prop -> Some prop
-        | Cls_declare _ -> None
-      )
-      cls_body.cls_body_elements;
+and generate_cls_meta env cls_id gen_name =
+  let node = Type_context.get_node env.ctx cls_id in
+  let ctor_opt = Check_helper.find_typedef_of env.ctx node.value in
+  let ctor = Option.value_exn ctor_opt in
+
+  let rec generate_properties_including_ancester child (cls_def: Core_type.TypeDef.t) =
+    let cls_def =
+      match cls_def with
+      | { spec = Class cls; _ } -> cls
+      | _ -> failwith "unexpected: not a class"
+    in
+    let properties =
+      List.filter_map
+        ~f:(fun (elm, elm_id) ->
+          let elm_type = Type_context.deref_node_type env.ctx elm_id in
+          let open Core_type.TypeDef in
+          match elm_type with
+          | TypeDef { spec = ClassMethod _ ; _ }
+          | TypeDef { spec = Function _ ; _ }
+            -> None
+          | _ -> 
+            Some elm
+        )
+        cls_def.tcls_elements;
+    in
+
+    let result = List.append properties child in
+    match cls_def.tcls_extends with
+    | Some ancester -> (
+      let ctor_opt = Check_helper.find_construct_of env.ctx ancester in
+      let ctor = Option.value_exn ctor_opt in
+      generate_properties_including_ancester result ctor
+    )
+
+    | _ -> result
+
   in
-  let prop_names =
-    List.map
-    ~f:(fun prop -> prop.cls_property_name.pident_name)
-    properties
-  in
-  let _, cls_name_id = cls_id in
-  let result = create_cls_meta cls_name_id gen_name prop_names in
+
+  let prop_names = generate_properties_including_ancester [] ctor in
+
+  let result = create_cls_meta cls_id gen_name prop_names in
+
   List.iter
     ~f:(fun field_name -> Hashtbl.set result.cls_fields_map ~key:field_name ~data:field_name)
     result.cls_fields;
+
   result
 
 and transform_class env cls: C_op.Decl.spec list =
@@ -1282,7 +1309,8 @@ and transform_class env cls: C_op.Decl.spec list =
 
   Hashtbl.set env.global_name_map ~key:cls_name_id ~data:(SymLocal fun_name);
 
-  let cls_meta = generate_cls_meta cls fun_name in
+  let _, cls_id' = cls_id in
+  let cls_meta = generate_cls_meta env cls_id' fun_name in
   Hashtbl.set env.cls_meta_map ~key:cls_meta.cls_id ~data:cls_meta;
 
   let class_methods = ref [] in
@@ -1309,7 +1337,7 @@ and transform_class env cls: C_op.Decl.spec list =
           let node_type = Type_context.deref_node_type env.ctx method_id in
           let is_virtual =
             match node_type with
-            | TypeExpr.TypeDef ({ spec = TypeDef.ClassMethod { method_is_virtual = true; _ }; _ }, _) ->
+            | TypeExpr.TypeDef { spec = TypeDef.ClassMethod { method_is_virtual = true; _ }; _ } ->
               true
             | _ -> false
           in
@@ -1347,7 +1375,10 @@ and transform_class env cls: C_op.Decl.spec list =
     class_methods = List.rev !class_methods;
   }::env.class_inits;
 
-  let finalizer = generate_finalizer finalizer_name cls_meta in
+  let _, cls_id' = cls_id in
+  let cls_type = Type_context.deref_node_type env.ctx cls_id' in
+  let cls_typedef = Check_helper.find_typedef_of env.ctx cls_type in
+  let finalizer = generate_finalizer env finalizer_name (Option.value_exn cls_typedef) in
 
   let cls = {
     C_op.Decl.
@@ -1359,17 +1390,27 @@ and transform_class env cls: C_op.Decl.spec list =
 
   List.append [ (C_op.Decl.Class cls) ] methods
 
-and generate_finalizer name class_meta =
+(*
+ * Generate finalizer statements for a class:
+ * If a class has ancesters, generate the ancesters's statements first.
+ *)
+and generate_finalizer env name (type_def: Core_type.TypeDef.t) =
   let this_expr = C_op.Expr.Ident SymThis in
-  let finalizer_content =
+
+  let generate_release_statements_by_cls_meta type_def =
+    let open Core_type.TypeDef in
+    let cls_meta = Hashtbl.find_exn env.cls_meta_map type_def.id in
     List.map
-    ~f:(fun field_name -> {
-      C_op.Stmt.
-      spec = Release (C_op.Expr.GetField(this_expr, class_meta.cls_gen_name, field_name));
-      loc = Loc.none;
-    })
-    class_meta.cls_fields
+      ~f:(fun field_name -> {
+        C_op.Stmt.
+        spec = Release (C_op.Expr.GetField(this_expr, cls_meta.cls_gen_name, field_name));
+        loc = Loc.none;
+      })
+      cls_meta.cls_fields
   in
+
+  let finalizer_content = generate_release_statements_by_cls_meta type_def in
+
   {
     finalizer_name = name;
     finalizer_content;

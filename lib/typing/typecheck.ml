@@ -77,6 +77,9 @@ let type_check ctx ?(debug=false) () =
 
   (try
     List.iter ~f:iterate_node !no_deps;
+    if debug then (
+      Type_context.print ctx
+    )
   with
   | e -> (
     if debug then

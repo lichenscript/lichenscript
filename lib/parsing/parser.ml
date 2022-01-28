@@ -638,8 +638,8 @@ and parse_class ~visibility env : Declaration._class =
   let cls_extends =
     if Peek.token env = Token.T_EXTENDS then (
       Eat.token env;
-      let ext_id = parse_identifier env in
-      Some ext_id
+      let ext_ty = parse_type env in
+      Some ext_ty
     ) else
       None
   in

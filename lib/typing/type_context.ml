@@ -38,10 +38,10 @@ let make_default_type_sym ctx scope =
   |] in
   Array.iter
     ~f:(fun (name, spec) ->
-      let sym = TypeDef.create ~builtin:true  name spec in
       let id = size ctx in
+      let sym = TypeDef.create ~builtin:true id name spec in
       let node = {
-        value = TypeExpr.TypeDef (sym, id);
+        value = TypeExpr.TypeDef sym;
         loc = Lichenscript_lex.Loc.none;
         deps = [];
         check = none;
@@ -112,7 +112,7 @@ and print_type_value ctx ty_value =
   | Ctor (var, []) -> (
     let var = deref_type ctx var in
     match deref_type ctx var with
-    | TypeDef (type_sym, _) ->
+    | TypeDef type_sym ->
       (Format.asprintf "%a" Core_type.TypeDef.pp type_sym)
 
     | _ ->
@@ -124,7 +124,7 @@ and print_type_value ctx ty_value =
     let var = deref_type ctx var in
     let super =
       match var with
-      | TypeDef (type_sym, _) ->
+      | TypeDef type_sym ->
         (Format.asprintf "%a" Core_type.TypeDef.pp type_sym)
 
       | _ ->
@@ -153,7 +153,7 @@ and print_type_value ctx ty_value =
   | Lambda _ -> "lambda"
   | Array _ -> "array"
   | String -> "string"
-  | TypeDef (type_sym, _) -> (
+  | TypeDef type_sym -> (
     let open Core_type.TypeDef in
     match type_sym.spec with
     | Function _fun -> (

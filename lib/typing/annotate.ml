@@ -278,7 +278,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           let member_type_opt = Check_helper.find_member_of_type ctx ~scope expr_node.value member_name in
           match member_type_opt with
           (* maybe it's a getter *)
-          | Some (TypeDef ({ spec = ClassMethod { method_get_set = Some Getter; method_return; _ }; _ }, _), _) -> (
+          | Some (TypeDef { spec = ClassMethod { method_get_set = Some Getter; method_return; _ }; _ }, _) -> (
             Type_context.update_node_type ctx id method_return
           )
 
@@ -557,7 +557,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         let node = {
           value = TypeExpr.Ctor(Ref v, []);
           loc = init_loc;
-          deps = List.rev !deps;
+          deps = v::(List.rev !deps);
           (* TODO: check props and expressions *)
           check = none;
         } in
@@ -618,7 +618,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
                     let c1_def = Type_context.deref_type ctx c1 in
                     let c2_def = Type_context.deref_type ctx c2 in
                     (match (c1_def, c2_def) with
-                    | (TypeExpr.TypeDef (left_sym, _), TypeExpr.TypeDef (right_sym, _)) -> (
+                    | (TypeExpr.TypeDef left_sym, TypeExpr.TypeDef right_sym) -> (
                       if TypeDef.(left_sym == right_sym) then ()
                       else
                         let err = Type_error.(make_error (Env.ctx env) match_loc (NotAllTheCasesReturnSameType(c1_def, c2_def))) in
@@ -704,15 +704,15 @@ and annotate_expression_call ~prev_deps env loc call =
         begin
           let _ty_def = Check_helper.find_construct_of ctx deref_type_expr in
           match deref_type_expr with
-          | TypeExpr.TypeDef ({ TypeDef. spec = Function _fun; _ }, _) ->
+          | TypeExpr.TypeDef { TypeDef. spec = Function _fun; _ } ->
             (* TODO: check call params *)
             Type_context.update_node_type ctx id _fun.fun_return
 
-          | TypeExpr.TypeDef ({ TypeDef. spec = ClassMethod _method; _ }, _) ->
+          | TypeExpr.TypeDef { TypeDef. spec = ClassMethod _method; _ } ->
             (* TODO: check call params *)
             Type_context.update_node_type ctx id _method.method_return
 
-          | TypeExpr.TypeDef ({ TypeDef. spec = EnumCtor enum_ctor; _}, _) -> (
+          | TypeExpr.TypeDef { TypeDef. spec = EnumCtor enum_ctor; _} -> (
             let super_id = enum_ctor.enum_ctor_super_id in
             Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref super_id, []))
           )
@@ -860,6 +860,7 @@ and annotate_declaration env decl : T.Declaration.t =
 
         let ty_def = {
           TypeDef.
+          id = ty_id;
           builtin = false;
           name = id.pident_name;
           spec = Function {
@@ -869,7 +870,7 @@ and annotate_declaration env decl : T.Declaration.t =
         } in
 
         Type_context.update_node (Env.ctx env) ty_id {
-          value = TypeExpr.TypeDef(ty_def, ty_id);
+          value = TypeExpr.TypeDef ty_def;
           deps = List.append params_types fun_return_deps;
           loc = decl_loc;
           check = none;
@@ -1056,10 +1057,16 @@ and annotate_class env cls =
     )
     cls.cls_body.cls_body_elements;
 
+  let base_deps = ref None in
+
   (* depend on the base class *)
-  Option.iter
+  let tcls_extends =
+    Option. map
     ~f:(fun extend ->
-      let var = (Env.peek_scope env)#find_var_symbol extend.pident_name in
+      let ext_type, deps = annotate_type env extend in
+      base_deps := Some deps;
+      ext_type
+      (* let var = (Env.peek_scope env)#find_var_symbol extend.pident_name in
       match var with
       | Some var ->
         props_deps := (var.var_id)::!props_deps;
@@ -1067,9 +1074,10 @@ and annotate_class env cls =
       | None -> (
         let err = Type_error.(make_error (Env.ctx env) extend.pident_loc (CannotFindName extend.pident_name)) in
         raise (Type_error.Error err)
-      )
+      ) *)
     )
     cls.cls_extends;
+  in
 
   let annotate_class_body body =
     let { cls_body_elements; cls_body_loc; } = body in
@@ -1127,6 +1135,7 @@ and annotate_class env cls =
             let new_type =
               match _method.cls_method_modifier with
               | Some Cls_modifier_static -> { TypeDef.
+                id = method_id;
                 builtin = false;
                 name = cls_method_name.pident_name;
                 spec = Function {
@@ -1135,6 +1144,7 @@ and annotate_class env cls =
                 };
               }
               | _ -> { TypeDef.
+                id = method_id;
                 builtin = false;
                 name = cls_method_name.pident_name;
                 spec = ClassMethod {
@@ -1159,7 +1169,7 @@ and annotate_class env cls =
                 |> List.filter
                   ~f:(fun id -> id <> cls_var.var_id)
                 ;
-                value = (TypeExpr.TypeDef(new_type, method_id));
+                value = (TypeExpr.TypeDef new_type);
               })
               method_id
               ;
@@ -1225,6 +1235,7 @@ and annotate_class env cls =
 
           let new_type =
             { TypeDef.
+              id = declare_id;
               builtin = false;
               name = cls_decl_method_name.pident_name;
               spec = ClassMethod {
@@ -1244,7 +1255,7 @@ and annotate_class env cls =
               |> List.filter
                 ~f:(fun id -> id <> cls_var.var_id)
               ;
-              value = (TypeExpr.TypeDef(new_type, declare_id));
+              value = (TypeExpr.TypeDef new_type);
             })
             declare_id
             ;
@@ -1272,25 +1283,26 @@ and annotate_class env cls =
     Type_context.map_node ctx 
       ~f:(fun node -> {
         node with
-        value = TypeExpr.TypeDef (
-          { TypeDef.
-            builtin = false;
-            name = cls.cls_id.pident_name;
-            spec = Class {
-              tcls_name;
-              tcls_extends = None;
-              tcls_elements = List.rev !tcls_elements;
-              tcls_static_elements = List.rev !tcls_static_elements;
-            };
-          },
-          cls_var.var_id
-        );
+        value = TypeExpr.TypeDef { TypeDef.
+          id = cls_var.var_id;
+          builtin = false;
+          name = cls.cls_id.pident_name;
+          spec = Class {
+            tcls_name;
+            tcls_extends;
+            tcls_elements = List.rev !tcls_elements;
+            tcls_static_elements = List.rev !tcls_static_elements;
+          };
+        };
         loc = cls.cls_loc;
         deps = 
           (* remove self-reference *)
-          List.filter
-          ~f:(fun id -> id <> cls_var.var_id)
-          (if List.is_empty !method_deps then List.rev !props_deps else List.rev !method_deps);
+          List.concat [
+            List.filter
+            ~f:(fun id -> id <> cls_var.var_id)
+            (if List.is_empty !method_deps then List.rev !props_deps else List.rev !method_deps);
+            Option.to_list !base_deps |> List.concat;
+          ]
       })
       cls_var.var_id;
 
@@ -1532,6 +1544,7 @@ and annotate_function env fun_ =
             collected_returns
         );
         let type_def = { TypeDef.
+          id;
           builtin = false;
           name = fun_.header.id.pident_name;
           spec = Function {
@@ -1539,7 +1552,7 @@ and annotate_function env fun_ =
             fun_return = return_ty;
           };
         } in
-        Type_context.update_node_type ctx id (TypeExpr.TypeDef(type_def, id))
+        Type_context.update_node_type ctx id (TypeExpr.TypeDef type_def)
       );
     };
     { T.Function.
@@ -1601,11 +1614,12 @@ and annotate_enum env enum =
               enum_ctor_super_id = variable.var_id;
               enum_ctor_params = [];
             } in
-            Type_context.update_node_type ctx id (TypeExpr.TypeDef({
+            Type_context.update_node_type ctx id (TypeExpr.TypeDef {
+              id;
               builtin = false;
               name = case_name.pident_name;
               spec = EnumCtor ty_def;
-            }, id))
+            })
           )
         })
         member_var.var_id
@@ -1638,11 +1652,12 @@ and annotate_enum env enum =
               enum_members = [];
               enum_params;
             } in
-            Type_context.update_node_type ctx id (TypeExpr.TypeDef({
+            Type_context.update_node_type ctx id (TypeExpr.TypeDef {
+              id;
               builtin = false;
               name = name.pident_name;
               spec = Enum ty_def;
-            }, id))
+            })
           )
         }
       )
