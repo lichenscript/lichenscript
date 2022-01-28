@@ -519,7 +519,7 @@ and auto_release_expr env ?(is_move=false) ~append_stmts ty_var expr =
     assign_expr
   )
 
-and _prepend_expr env ~is_borrow ~prepend_stmts ~append_stmts expr =
+and prepend_expr env ~is_borrow ~prepend_stmts ~append_stmts expr =
   if is_borrow then expr
   else begin
     let tmp_id = env.tmp_vars_count in
@@ -982,36 +982,42 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       } in
 
       let init_stmts =
-        List.filter_map
-        ~f:(fun elm ->
-          match elm with
-          | InitEntry { init_entry_key; init_entry_value; init_entry_loc; _ } ->
-            let actual_name = Hashtbl.find_exn cls_meta.cls_fields_map init_entry_key.pident_name in
-            let transformed_value = transform_expression ~is_move:true env init_entry_value in
-            let unwrap_name =
-              match fun_name with
-              | C_op.SymLocal name -> name
-              | _ -> failwith "unrechable"
-            in
-            let left_value = (
-              C_op.Expr.GetField(
-                (Temp tmp_id),
-                unwrap_name,
-                actual_name
-              )
-            ) in
-            Some { C_op.Stmt.
-              spec = Expr (
-                Assign(
-                  left_value,
-                  transformed_value.expr
-                )
-              );
-              loc = init_entry_loc;
-            }
-          | _ -> None
-        )
         init_elements
+        |> List.map
+          ~f:(fun elm ->
+            match elm with
+            | InitEntry { init_entry_key; init_entry_value; init_entry_loc; _ } ->
+              let actual_name = Hashtbl.find_exn cls_meta.cls_fields_map init_entry_key.pident_name in
+              let transformed_value = transform_expression ~is_move:true env init_entry_value in
+              let unwrap_name =
+                match fun_name with
+                | C_op.SymLocal name -> name
+                | _ -> failwith "unrechable"
+              in
+              let left_value = (
+                C_op.Expr.GetField(
+                  (Temp tmp_id),
+                  unwrap_name,
+                  actual_name
+                )
+              ) in
+              [{ C_op.Stmt.
+                spec = Expr (
+                  Assign(
+                    left_value,
+                    transformed_value.expr
+                  )
+                );
+                loc = init_entry_loc;
+              }]
+            | InitSpread spread_expr -> (
+              let transformed_spread = transform_expression env spread_expr in
+              let spread_expr' = prepend_expr env ~is_borrow:false ~prepend_stmts ~append_stmts transformed_spread.expr in
+              transform_spreading_init env tmp_id spread_expr.ty_var spread_expr'
+            )
+
+          )
+        |> List.concat
       in
 
       prepend_stmts := List.append !prepend_stmts (init_cls_stmt::init_stmts);
@@ -1124,6 +1130,41 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     expr = expr_spec;
     append_stmts = !append_stmts;
   }
+
+and transform_spreading_init env tmp_id spread_ty_var spread_expr =
+  let expr_node_type = Type_context.deref_node_type env.ctx spread_ty_var in
+
+  let ctor_opt = Check_helper.find_construct_of env.ctx expr_node_type in
+  let _ctor, cls_id = Option.value_exn ~message:"Can not find ctor of spreading init" ctor_opt in
+
+  let cls_meta = Hashtbl.find_exn env.cls_meta_map cls_id in
+
+  cls_meta.cls_fields
+  |> List.map
+    ~f:(fun field_name ->
+    let left_value = (
+      C_op.Expr.GetField(
+        (Temp tmp_id),
+        cls_meta.cls_gen_name,
+        field_name
+      )
+    ) in
+    let get_field = C_op.Expr.GetField(spread_expr, cls_meta.cls_gen_name, field_name) in
+    [{ C_op.Stmt.
+      spec = Retain get_field;
+      loc = Loc.none;
+    };
+    { C_op.Stmt.
+      spec = Expr (
+        Assign(
+          left_value,
+          get_field
+        )
+      );
+      loc = Loc.none;
+    }]
+  )
+  |> List.concat
 
 and transform_expression_if env ?ret ~prepend_stmts ~append_stmts loc if_desc =
   let open Typedtree.Expression in
