@@ -926,6 +926,13 @@ and annotate_declaration env decl : T.Declaration.t =
  * class annotation is done in two phase
  * 1. scan all methods and properties, infer `this`
  * 2. annotate all methods and collect dependencies
+ * 
+ *
+ * What should a class depends?
+ * - Everything in property/method's sigature(not including the body).
+ *
+ * What depends on a class?
+ * - Everything in the method body
  *
  *)
 and annotate_class env cls =
@@ -1114,7 +1121,7 @@ and annotate_class env cls =
 
             add_all_params_into_scope env method_scope cls_method_params;
 
-            let cls_method_body = annotate_block_impl ~prev_deps:cls_method_params_deps env cls_method_body in
+            let cls_method_body = annotate_block_impl ~prev_deps:[cls_var.var_id] env cls_method_body in
 
             let this_deps = ref !props_deps in
 
@@ -1165,7 +1172,7 @@ and annotate_class env cls =
             Type_context.map_node ctx
               ~f:(fun node -> {
                 node with
-                deps = List.rev !this_deps
+                deps = List.concat [ List.rev !this_deps; cls_method_params_deps ]
                 |> List.filter
                   ~f:(fun id -> id <> cls_var.var_id)
                 ;
@@ -1298,10 +1305,9 @@ and annotate_class env cls =
         deps = 
           (* remove self-reference *)
           List.concat [
-            List.filter
-            ~f:(fun id -> id <> cls_var.var_id)
-            (if List.is_empty !method_deps then List.rev !props_deps else List.rev !method_deps);
-            Option.to_list !base_deps |> List.concat;
+            [ List.rev !method_deps; List.rev !props_deps; Option.to_list !base_deps |> List.concat ]
+            |> List.concat
+            |> List.filter ~f:(fun id -> id <> cls_var.var_id)
           ]
       })
       cls_var.var_id;

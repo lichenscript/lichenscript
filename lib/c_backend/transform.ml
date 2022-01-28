@@ -1138,7 +1138,10 @@ and transform_spreading_init env tmp_id spread_ty_var spread_expr =
   let expr_node_type = Type_context.deref_node_type env.ctx spread_ty_var in
 
   let ctor_opt = Check_helper.find_construct_of env.ctx expr_node_type in
-  let ctor = Option.value_exn ~message:"Can not find ctor of spreading init" ctor_opt in
+  let ctor = Option.value_exn
+    ~message:(Format.asprintf "Can not find ctor of spreading init: %d %a" spread_ty_var Core_type.TypeExpr.pp expr_node_type)
+    ctor_opt
+  in
   let cls_id = ctor.id in
 
   let cls_meta = Hashtbl.find_exn env.cls_meta_map cls_id in
