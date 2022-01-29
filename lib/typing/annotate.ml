@@ -1038,7 +1038,7 @@ and annotate_class env cls =
   in
 
   Env.with_new_scope env class_scope (fun _env ->
-    let { cls_id; cls_visibility; cls_type_vars = _; cls_loc; cls_body; cls_comments; _ } = cls in
+    let { cls_id; cls_visibility; cls_type_vars; cls_loc; cls_body; cls_comments; _ } = cls in
     let tcls_name = cls_id.pident_name in
     let cls_id = tcls_name, cls_var.var_id in
     let cls_body = annotate_class_body cls_body in
@@ -1052,6 +1052,7 @@ and annotate_class env cls =
           name = cls.cls_id.pident_name;
           spec = Class {
             tcls_name;
+            tcls_vars = List.map ~f:(fun id -> Identifier.(id.pident_name)) cls_type_vars;
             tcls_extends;
             tcls_elements = List.rev !tcls_elements;
             tcls_static_elements = List.rev !tcls_static_elements;

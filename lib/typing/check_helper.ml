@@ -10,6 +10,8 @@
 open Core_kernel
 open Core_type
 
+module TypeVarMap = Map.Make(String)
+
 (* recursive find type *)
 let find_construct_of ctx type_expr =
   let open TypeExpr in
@@ -239,6 +241,60 @@ let is_i32 ctx type_expr =
     | _ -> false
   )
 
+let rec replace_type_vars_with_maps ctx type_map type_expr =
+  let open Core_type.TypeExpr in
+  match type_expr with
+  | TypeSymbol sym_name -> (
+    Format.eprintf "replace %s\n" sym_name;
+    match TypeVarMap.find type_map sym_name with
+    | Some v -> v
+    | None -> type_expr
+  )
+
+  | Unknown
+  | Any
+  | Ctor _ -> type_expr
+
+  | Ref ref_id -> (
+    let node = Type_context.get_node ctx ref_id in
+    replace_type_vars_with_maps ctx type_map node.value
+  )
+
+  | Lambda _ -> type_expr
+
+  | Array arr ->
+    Array (replace_type_vars_with_maps ctx type_map arr)
+
+  | String -> type_expr
+  | TypeDef typedef -> (
+    let replace_params params =
+      let { params_content; params_rest } = params in
+      let params_content =
+        List.map
+        ~f:(fun (name, expr) -> (name, replace_type_vars_with_maps ctx type_map expr))
+        params_content
+      in
+      let params_rest =
+        Option.map
+        ~f:(fun (name, expr) -> (name, replace_type_vars_with_maps ctx type_map expr))
+        params_rest
+      in
+      { params_content; params_rest }
+    in
+
+    let open TypeDef in
+    match typedef.spec with
+    | ClassMethod _method -> (
+      Format.eprintf "replace method: %d\n" typedef.id;
+      let { method_params; method_return; _ } = _method in
+      let method_params = replace_params method_params in
+      let method_return = replace_type_vars_with_maps ctx type_map method_return in
+      TypeDef { typedef with spec = ClassMethod { _method with method_params; method_return }}
+    )
+
+    | _ -> type_expr
+  )
+
 (*
   * TODO: namespace
   * class/enum static function
@@ -255,7 +311,7 @@ let is_i32 ctx type_expr =
 let rec find_member_of_type ctx ~scope type_expr member_name =
   let type_expr = Type_context.deref_type ctx type_expr in
   match type_expr with
-  | Ctor(type_expr, _) -> (
+  | Ctor(type_expr, type_vars) -> (
     let type_expr = Type_context.deref_type ctx type_expr in
     let open TypeDef in
     match type_expr with
@@ -264,10 +320,23 @@ let rec find_member_of_type ctx ~scope type_expr member_name =
         List.find ~f:(fun (elm_name, _) -> String.equal elm_name member_name)
         cls.tcls_elements
       in
+
+      let types_map =
+        List.fold2_exn
+          ~init:TypeVarMap.empty
+          ~f:(fun acc def_var given_var ->
+            TypeVarMap.set acc ~key:def_var ~data:given_var
+          )
+          cls.tcls_vars type_vars
+      in
+
       match result with
       | Some (_, member_id) ->
         let node = Type_context.get_node ctx member_id in
-        Some (node.value, member_id)
+        Some (
+          replace_type_vars_with_maps ctx types_map node.value,
+          member_id
+        )
 
       | _ -> None
     )

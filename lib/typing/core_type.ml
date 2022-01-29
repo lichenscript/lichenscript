@@ -131,6 +131,7 @@ and TypeDef : sig
 
   and class_type = {
     tcls_name:            string;
+    tcls_vars:            string list;
     tcls_extends:         TypeExpr.t option;
     tcls_elements:        (string * int) list;
     tcls_static_elements: (string * int) list;
@@ -206,6 +207,7 @@ end = struct
 
   and class_type = {
     tcls_name:            string;
+    tcls_vars:            string list;
     tcls_extends:         TypeExpr.t option;
     tcls_elements:        (string * int) list;
     tcls_static_elements: (string * int) list;
