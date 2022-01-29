@@ -248,6 +248,9 @@ let is_i32 ctx type_expr =
   * 1. for array: T[]
   *    share the member of Array<T>
   *
+  * 2. for string
+  *    share the member of String
+  *
   *)
 let rec find_member_of_type ctx ~scope type_expr member_name =
   let type_expr = Type_context.deref_type ctx type_expr in

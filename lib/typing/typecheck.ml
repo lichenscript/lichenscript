@@ -568,8 +568,8 @@ and check_expression env expr =
   | Super -> ()
   | _ -> failwith "unexpected"
 
-and check_lambda _env _lambda =
-  ()
+and check_lambda env lambda =
+  check_expression env lambda.lambda_body
 
 and check_class env cls =
   let open T.Declaration in

@@ -694,10 +694,13 @@ and parse_class_body env: Declaration.class_body =
         | "set" -> Some Cls_setter
         | _ -> None
       in
+      (*
+       * if next is identifier, the first one is get/set
+       *)
       let cls_decl_method_name =
-        match cls_decl_method_get_set with
-        | Some _ -> parse_identifier env
-        | None -> first_id
+        match (Peek.token env) with
+        | Token.T_IDENTIFIER _ -> parse_identifier env
+        | _ -> first_id
       in
       let params = parse_params env in
       let cls_decl_method_return_ty =
