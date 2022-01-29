@@ -140,7 +140,7 @@ and TypeDef : sig
     enum_ctor_name: string;
     enum_ctor_tag_id: int;
     enum_ctor_super_id: int;
-    enum_ctor_params: int list;
+    enum_ctor_params: TypeExpr.t list;
   }
 
   and method_get_set =
@@ -215,7 +215,7 @@ end = struct
     enum_ctor_name: string;
     enum_ctor_tag_id: int;
     enum_ctor_super_id: int;
-    enum_ctor_params: int list;
+    enum_ctor_params: TypeExpr.t list;
   }
 
   and method_get_set =
@@ -279,18 +279,14 @@ end = struct
   
 end
 
-let none _ = ()
-
 type node = {
   loc: Lichenscript_lex.Loc.t;
   value: TypeExpr.t;
   deps: int list;
-  check: int -> unit;
 }
 
 let unknown = {
   loc = Lichenscript_lex.Loc.none;
   value = TypeExpr.Unknown;
   deps = [];
-  check = none;
 }

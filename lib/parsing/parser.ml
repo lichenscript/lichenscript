@@ -414,6 +414,7 @@ and parse_statement env : Statement.t =
       else
         begin
           let expr = parse_expression env in
+          ignore (Eat.maybe env Token.T_SEMICOLON);
           Return(Some expr)
         end
 

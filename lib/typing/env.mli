@@ -24,10 +24,6 @@ val errors: t -> Type_error.t list
 
 val with_new_scope: t -> scope -> (t -> 'a) -> 'a
 
-val add_return_type: t -> int -> unit
-
-val take_return_types: t -> int list
-
 val ty_u32: t -> int
 
 val ty_i32: t -> int

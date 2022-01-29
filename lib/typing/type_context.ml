@@ -44,7 +44,6 @@ let make_default_type_sym ctx scope =
         value = TypeExpr.TypeDef sym;
         loc = Lichenscript_lex.Loc.none;
         deps = [];
-        check = none;
       } in
       ignore (new_id ctx node);
       scope#insert_type_symbol name id;

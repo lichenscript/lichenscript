@@ -9,12 +9,6 @@ type t = {
   mutable current_scope: scope;
   mutable errors: Type_error.t list;
   mutable scope_counter: int;
-
-  (*
-   * collect all the return types
-   * a function can have multiple return
-   *)
-  mutable return_types: int list;
   mutable in_lambda: bool;
 }
 
@@ -26,7 +20,6 @@ let create ?(open_domains=[]) ~module_scope ctx =
     current_scope = module_scope;
     errors = [];
     scope_counter = 1;
-    return_types = [];
     in_lambda = false;
   }
 
@@ -59,14 +52,6 @@ let with_new_scope env scope callback =
   env.current_scope <- scope;
   let result = callback env in
   env.current_scope <- prev_scope;
-  result
-
-let add_return_type env return_type =
-  env.return_types <- return_type::env.return_types
-
-let take_return_types env = 
-  let result = env.return_types in
-  env.return_types <- [];
   result
 
 let get_global_type_val env =

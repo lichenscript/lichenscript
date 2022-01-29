@@ -44,7 +44,6 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
         value = TypeExpr.Ctor(Ref (Env.ty_unit env), []);
         loc;
         deps = List.append prev_deps [ty_var];
-        check = none;  (* TODO: check expr is empty *)
       } in
 
       let id = Type_context.new_id (Env.ctx env) node in
@@ -113,8 +112,6 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
         let expr = annotate_expression ~prev_deps env expr in
         let ty_var = expr.ty_var in
 
-        Env.add_return_type env ty_var;
-
         [ty_var], (T.Statement.Return (Some expr))
       )
 
@@ -161,7 +158,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let node = {
         value;
         loc = loc;
-        check = none;
         deps;
       } in
 
@@ -174,8 +170,22 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let ty_var_opt = (Env.peek_scope env)#find_var_symbol id.pident_name in
       match ty_var_opt with
       | Some variable -> (
-        Env.capture_variable env ~name:id.pident_name;
-        variable.var_id, (T.Expression.Identifier (id.pident_name, variable.var_id))
+        (*
+         * it's class or enum, create a ref to it,
+         * for example, a None identifer, actually represents a constructor of None
+         *)
+        if is_name_enum_or_class id.pident_name then (
+          let node = {
+            value = TypeExpr.Ref variable.var_id;
+            loc = loc;
+            deps = [variable.var_id];
+          } in
+          let ty_id = Type_context.new_id (Env.ctx env) node in
+          ty_id, (T.Expression.Identifier (id.pident_name, ty_id))
+        ) else (
+          Env.capture_variable env ~name:id.pident_name;
+          variable.var_id, (T.Expression.Identifier (id.pident_name, variable.var_id))
+        )
       )
 
       | _ ->
@@ -210,7 +220,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         let node = {
           value = TypeExpr.Unknown;
           loc = loc;
-          check = none;
           deps = [lambda_body.ty_var];
         } in
 
@@ -240,7 +249,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         value = TypeExpr.Unknown;
         loc;
         deps;
-        check = none;
       } in
 
       ty_var, (T.Expression.Array a_list)
@@ -257,7 +265,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         value = TypeExpr.Unknown;
         loc;
         deps = List.append prev_deps [expr.ty_var];
-        check = none;
       } in
       let id = Type_context.new_id ctx node in
       id, T.Expression.Member(expr, name)
@@ -270,7 +277,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         value = TypeExpr.Unknown;
         deps = [ expr.ty_var; index_expr.ty_var ];
         loc;
-        check = none;
       } in
 
       let id = Type_context.new_id (Env.ctx env) node in
@@ -288,7 +294,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         value = TypeExpr.Unknown;
         deps = [left.ty_var; right.ty_var];
         loc;
-        check = none;
       } in
       let id = Type_context.new_id (Env.ctx env) node in
 
@@ -342,7 +347,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         value;
         deps = [ expr.ty_var; left'.ty_var ];
         loc;
-        check = none;
       } in
       next_id, Assign(op, left', expr)
     )
@@ -411,7 +415,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           loc = init_loc;
           deps = v::(List.rev !deps);
           (* TODO: check props and expressions *)
-          check = none;
         } in
         let node_id = Type_context.new_id ctx node in
         node_id, T.Expression.Init{
@@ -450,7 +453,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         Core_type.
         value = Unknown;
         deps = List.append [match_expr.ty_var] clauses_deps;
-        check = none;
         loc = match_loc;
       } in
 
@@ -470,7 +472,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let node = {
         value = this_expr;
         loc;
-        check = none;
         deps = [];
       } in
 
@@ -501,7 +502,6 @@ and annotate_expression_call ~prev_deps env loc call =
     value = TypeExpr.Unknown;
     loc;
     deps = List.append [ T.Expression.(callee.ty_var) ] params_deps;
-    check = none;
   } in
 
   ty_var, { T.Expression. callee; call_params; call_loc }
@@ -534,7 +534,6 @@ and annotate_expression_if ~prev_deps env _if =
   let node = {
     value = TypeExpr.Unknown;
     loc = if_loc;
-    check = none;
     deps = List.append [if_consequent.return_ty] !alt_deps;
   } in
 
@@ -561,7 +560,6 @@ and annotate_block_impl ~prev_deps env block : T.Block.t =
     value = TypeExpr.Unknown;
     deps = body_dep;
     loc;
-    check = none;
   } in
   let return_ty = Type_context.new_id (Env.ctx env) node in
   { T.Block.
@@ -639,7 +637,6 @@ and annotate_declaration env decl : T.Declaration.t =
           value = TypeExpr.TypeDef ty_def;
           deps = List.append params_types fun_return_deps;
           loc = decl_loc;
-          check = none;
         };
 
         (match List.last attributes with
@@ -733,7 +730,6 @@ and annotate_class env cls =
           value = TypeExpr.Unknown;
           deps = [];
           loc = cls_method_loc;
-          check = none;
         } in
         let node_id = Type_context.new_id ctx node in
         match cls_method_modifier with
@@ -758,7 +754,6 @@ and annotate_class env cls =
           value = property_ty;
           deps;
           loc = cls_property_loc;
-          check = none;
         } in
         let node_id = Type_context.new_id ctx node in
         tcls_elements := ((cls_property_name.pident_name, node_id)::!tcls_elements);
@@ -783,7 +778,6 @@ and annotate_class env cls =
           value = TypeExpr.Unknown;
           deps = [];
           loc = cls_decl_method_loc;
-          check = none;
         } in
         let node_id = Type_context.new_id ctx node in
 
@@ -892,9 +886,6 @@ and annotate_class env cls =
             let this_deps = ref !props_deps in
 
             this_deps := Typedtree.Block.(cls_method_body.return_ty)::(!this_deps);
-
-            (* check return *)
-            let _collected_returns = Env.take_return_types env in
 
             let method_return, return_ty_deps =
               match cls_method_return_ty with
@@ -1054,8 +1045,7 @@ and annotate_class env cls =
 
     (* reduced all method and elements here *)
     Type_context.map_node ctx 
-      ~f:(fun node -> {
-        node with
+      ~f:(fun _ -> {
         value = TypeExpr.TypeDef { TypeDef.
           id = cls_var.var_id;
           builtin = false;
@@ -1088,11 +1078,14 @@ and annotate_an_def_identifer env ident =
     Core_type.
     loc = pident_loc;
     value = TypeExpr.Unknown;
-    check = none;
     deps = [];
   } in
   let id = Type_context.new_id (Env.ctx env) node in
   pident_name, id
+
+and is_name_enum_or_class name =
+  let first_char = String.get name 0 in
+  Char.is_uppercase first_char
 
 and annotate_pattern env pat =
   let open Ast.Pattern in
@@ -1101,9 +1094,8 @@ and annotate_pattern env pat =
   let id, spec =
     match spec with
     | Identifier ident -> (
-      let first_char = String.get ident.pident_name 0 in
       (* It's a enum contructor *)
-      if Char.is_uppercase first_char then (
+      if is_name_enum_or_class ident.pident_name then (
         Env.capture_variable env ~name:ident.pident_name;
 
         let ctor_var = scope#find_var_symbol ident.pident_name in
@@ -1205,7 +1197,6 @@ and annotate_function_params env params =
       loc = param_loc;
       value = !value;
       deps = !deps;
-      check = none;  (* check init *)
     } in
     Type_context.update_node (Env.ctx env) param_id node;
     { T.Function.
@@ -1262,7 +1253,7 @@ and annotate_function env fun_ =
      * if no return type is defined, use 'unit' type
      * do not try to infer from block, that's too complicated
      *)
-    let return_ty, return_ty_Deps =
+    let return_ty, return_ty_deps =
       match header.return_ty with
       | Some type_expr ->
         annotate_type env type_expr
@@ -1271,18 +1262,16 @@ and annotate_function env fun_ =
         TypeExpr.Ctor(Ref unit_type, []), []
     in
 
-    fun_deps := List.append !fun_deps return_ty_Deps;
+    fun_deps := List.append !fun_deps return_ty_deps;
 
     let params, params_types = annotate_function_params env header.params in
 
     add_all_params_into_scope env fun_scope params;
 
     let body = annotate_block_impl ~prev_deps:params_types env body in
-    let collected_returns = Env.take_return_types env in
 
     (* defined return *)
     fun_deps := body.return_ty::(!fun_deps);
-    fun_deps := List.append !fun_deps collected_returns;
 
     let type_def = { Core_type.TypeDef.
       id = fun_id;
@@ -1298,33 +1287,6 @@ and annotate_function env fun_ =
       value = TypeExpr.TypeDef type_def;
       (* deps = return_id::params_types; *)
       deps = !fun_deps;
-      check = (fun _ ->
-        let ctx = Env.ctx env in
-        let block_node = Type_context.get_node ctx body.return_ty in
-        (* if no return statements, use last statement of block *)
-        if List.is_empty collected_returns then (
-          if not (Check_helper.type_assinable ctx return_ty block_node.value) then (
-            let open Type_error in
-            let spec = CannotReturn(return_ty, block_node.value) in
-            let err = make_error ctx block_node.loc spec in
-            raise (Error err)
-          );
-          (* Type_context.update_node_type ctx id return_ty *)
-        ) else (
-          (* there are return statements, check every statments *)
-          List.iter
-            ~f:(fun return_ty_var ->
-              let return_ty_node = Type_context.get_node ctx return_ty_var in
-              if not (Check_helper.type_assinable ctx return_ty return_ty_node.value) then (
-                let open Type_error in
-                let spec = CannotReturn(return_ty, return_ty_node.value) in
-                let err = make_error ctx return_ty_node.loc spec in
-                raise (Error err)
-              )
-            )
-            collected_returns
-        );
-      );
     };
     { T.Function.
       header = {
@@ -1376,12 +1338,11 @@ and annotate_enum env enum =
         enum_ctor_tag_id = index;
         enum_ctor_name = case_name.pident_name;
         enum_ctor_super_id = variable.var_id;
-        enum_ctor_params = [];
+        enum_ctor_params = fields_types;
       } in
       Type_context.map_node
         ctx
-        ~f:(fun node -> {
-          node with
+        ~f:(fun _ -> {
           deps = List.concat ([variable.var_id]::deps);
           loc = case_loc;
           value = (TypeExpr.TypeDef {
@@ -1428,7 +1389,6 @@ and annotate_enum env enum =
             name = name.pident_name;
             spec = Enum ty_def;
           });
-          check = none;
         }
       )
       variable.var_id;
@@ -1487,7 +1447,6 @@ let annotate_program env (program: Ast.program) =
       value = TypeExpr.Unknown;
       loc = pprogram_loc;
       deps;
-      check = none;
     }
   in
   let ty_var = Type_context.new_id (Env.ctx env) val_ in

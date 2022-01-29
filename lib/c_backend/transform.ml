@@ -573,13 +573,16 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       let first_char = String.get name 0 in
       if Char.is_uppercase first_char then (
         let node_type = Type_context.deref_node_type env.ctx name_id in
+        let ctor = Check_helper.find_construct_of env.ctx node_type in
         let open Core_type in
-        match node_type with
-        | TypeExpr.TypeDef { TypeDef. spec = EnumCtor _; _ } ->
+        match ctor with
+        | Some { TypeDef. spec = EnumCtor _; _ } ->
           let sym = find_variable env name in
           C_op.Expr.ExternalCall(sym, None, [])
 
-        | _ -> failwith (Format.sprintf "unknown identifier: %s" name)
+        | _ ->
+          let id_ty = Type_context.print_type_value env.ctx node_type in
+          failwith (Format.sprintf "unknown identifier: %s" id_ty)
       ) else (
         let variable_opt = (Option.value_exn env.scope.raw)#find_var_symbol name in
         let variable = Option.value_exn variable_opt in

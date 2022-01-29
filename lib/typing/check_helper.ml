@@ -43,11 +43,15 @@ let type_assinable ctx left right =
     let c1_def = find_construct_of ctx left in
     let c2_def = find_construct_of ctx right in
     match (c1_def, c2_def) with
+    | (Some { id = enum_id; spec = Enum _; _ }, Some { spec = EnumCtor { enum_ctor_super_id; _ }; _}) ->
+      enum_id = enum_ctor_super_id
+
     | (Some left_sym, Some right_sym) ->
       if TypeDef.(left_sym == right_sym) then
         true
       else
         false
+    
     | _ ->
       false
   )

@@ -9,6 +9,7 @@
  *)
 open Core_kernel
 open Core_type
+open Lichenscript_lex
 open Lichenscript_parsing
 
 module IntHash = Hashtbl.Make(Int)
@@ -20,7 +21,20 @@ module T = Typedtree
 type env = {
   ctx: Type_context.t;
   mutable scope: Scope.scope;
+
+  (*
+   * collect all the return types
+   * a function can have multiple return
+   *)
+  mutable return_types: (TypeExpr.t * Loc.t) list;
 }
+
+let add_return_type env ret = env.return_types <- ret::env.return_types
+
+let take_return_type env =
+  let types = env.return_types in
+  env.return_types <- [];
+  types
 
 let get_global_type_val env =
   let root_scope = Type_context.root_scope env.ctx in
@@ -60,6 +74,7 @@ let rec typecheck_module ctx ~debug (typedtree: T.program) =
     let env = {
       ctx;
       scope = tprogram_scope;
+      return_types = [];
     } in
     List.iter ~f:(check_declaration env) tprogram_declarations;
     if debug then (
@@ -82,10 +97,52 @@ and check_declaration env decl =
 
 and check_function env _fun =
   let open T.Function in
-  let { scope; body; _ } = _fun in
+  let { header; scope; body; _ } = _fun in
+  let _, name_id = header.name in
   with_scope env scope (fun env ->
-    check_block env body
+    check_block env body;
+
+    let type_node = Type_context.get_node env.ctx name_id in
+    let typedef = Option.value_exn (Check_helper.find_typedef_of env.ctx type_node.value) in
+    let unwrap_function =
+      match typedef with
+      | { TypeDef. spec = Function _fun; _ } -> _fun
+      | _ -> failwith "unwrap function failed"
+    in
+
+    check_function_return_type env unwrap_function.fun_return body
   )
+
+and check_function_return_type env fun_return_ty (block: T.Block.t) =
+  let block_return_type = Type_context.deref_node_type env.ctx block.return_ty in
+
+  let is_last_stmt_return (block: T.Block.t) =
+    let last_stmt = List.last block.body in
+    match last_stmt with
+    | Some { T.Statement. spec = Return _; _ } -> true
+    | _ -> false
+  in
+
+  if not (is_last_stmt_return block) && not (Check_helper.type_assinable env.ctx fun_return_ty block_return_type) then (
+    let open Type_error in
+    let spec = CannotReturn(fun_return_ty, block_return_type) in
+    let err = make_error env.ctx block.loc spec in
+    raise (Error err)
+  );
+
+  let return_types = take_return_type env in
+
+  (* there are return statements, check every statments *)
+  List.iter
+    ~f:(fun (return_ty, return_loc) ->
+      if not (Check_helper.type_assinable env.ctx fun_return_ty return_ty) then (
+        let open Type_error in
+        let spec = CannotReturn(fun_return_ty, return_ty) in
+        let err = make_error env.ctx return_loc spec in
+        raise (Error err)
+      )
+    )
+    return_types
 
 and check_block env blk =
   let open T.Block in
@@ -133,8 +190,15 @@ and check_statement env stmt =
 
   | Debugger -> ()
 
-  | Return expr -> (
-    Option.iter ~f:(check_expression env) expr
+  | Return None -> (
+    let unit_ty = ty_unit env in
+    add_return_type env (TypeExpr.Ctor(Ref unit_ty, []), stmt.loc)
+  )
+
+  | Return (Some expr) -> (
+    check_expression env expr;
+    let node_type = Type_context.deref_node_type env.ctx expr.ty_var in
+    add_return_type env (node_type, expr.loc)
   )
 
   | Empty -> ()
@@ -164,7 +228,22 @@ and check_expression env expr =
   match expr.spec with
   | Constant _ -> ()
 
-  | Identifier _ -> ()
+  (*
+   * if it's a enum constructor, auto construct it
+   *)
+  | Identifier (_, name_id) -> (
+    let node = Type_context.get_node env.ctx name_id in
+    let test_typedef = Check_helper.find_typedef_of env.ctx node.value in
+    Option.iter
+      ~f:(fun typedef ->
+        match typedef with
+        | { id; spec = EnumCtor { enum_ctor_params = []; _ }; _ } -> (
+          Type_context.update_node_type env.ctx name_id (TypeExpr.Ctor(Ref id, []))
+        )
+        | _ -> ()
+      )
+      test_typedef
+  )
 
   | Lambda lambda -> check_lambda env lambda
 
@@ -452,9 +531,37 @@ and check_class env cls =
       match elm with
       | Cls_property _ -> ()
 
-      | Cls_method { cls_method_scope; cls_method_body; _ } -> (
+      | Cls_method { cls_method_name = _, name_id; cls_method_scope; cls_method_body; cls_method_modifier; _ } -> (
         with_scope env (Option.value_exn cls_method_scope) (fun env ->
-          check_block env cls_method_body
+          check_block env cls_method_body;
+
+          let is_static =
+            match cls_method_modifier with
+            | (Some Cls_modifier_static) -> true
+            | _ -> false
+          in
+
+          if is_static then (
+            let type_node = Type_context.get_node env.ctx name_id in
+            let typedef = Option.value_exn (Check_helper.find_typedef_of env.ctx type_node.value) in
+            let unwrap_function =
+              match typedef with
+              | { TypeDef. spec = Function _fun; _ } -> _fun
+              | _ -> failwith "unwrap class method failed"
+            in
+
+            check_function_return_type env unwrap_function.fun_return cls_method_body
+          ) else (
+            let type_node = Type_context.get_node env.ctx name_id in
+            let typedef = Option.value_exn (Check_helper.find_typedef_of env.ctx type_node.value) in
+            let unwrap_method =
+              match typedef with
+              | { TypeDef. spec = ClassMethod _method; _ } -> _method
+              | _ -> failwith "unwrap class method failed"
+            in
+
+            check_function_return_type env unwrap_method.method_return cls_method_body
+          )
         )
       )
 

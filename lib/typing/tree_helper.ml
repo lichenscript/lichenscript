@@ -10,7 +10,6 @@ let add_top_level_symbols_to_typed_env typed_env tree =
         value = TypeExpr.Unknown;
         loc = Lichenscript_lex.Loc.none;
         deps = [];
-        check = none;
       } in
       let new_id = Type_context.new_id (Env.ctx typed_env) node in
       let module_scope = (Env.peek_scope typed_env) in
