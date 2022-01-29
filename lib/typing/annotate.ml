@@ -1139,6 +1139,7 @@ and annotate_type env ty : (TypeExpr.t * int list) =
   match spec with
   | Ty_any -> TypeExpr.Any, []
   | Ty_ctor({ pident_name = "string"; _ }, []) -> TypeExpr.String, []
+  | Ty_ctor({ pident_name = "any"; _ }, []) -> TypeExpr.Any, []
   | Ty_ctor(ctor, params) -> (
     let { Identifier. pident_name; pident_loc } = ctor in
 
@@ -1199,31 +1200,40 @@ and annotate_function_params env params : T.Function.params * TypeExpr.params * 
       deps = !deps;
     } in
     Type_context.update_node (Env.ctx env) param_id node;
+    let param_name', _ = param_name in
     { T.Function.
       param_name;
       param_ty = param_id;
       param_loc;
       param_rest;
-    }, param_id
+    }, (param_name', !value), param_id
   in
+
+  let params_rest = ref None in
 
   let { params_content; params_loc } = params in
   let params_len = List.length params_content in
-  let params, params_deps =
+  let params, params_content, params_deps =
     params_content
     |> List.mapi ~f:(fun index param ->
       if param.param_rest && (index <> params_len - 1) then (
         let err = Type_error.(make_error (Env.ctx env) param.param_loc RestParamsMustAtLast) in
         raise Type_error.(Error err)
       );
-      annoate_param param
+
+      let t, type_tuple, dep_id = annoate_param param in
+      if param.param_rest then (
+        params_rest := Some type_tuple;
+        t, None, dep_id
+      ) else
+        t, Some type_tuple, dep_id
     )
-    |> List.unzip
+    |> List.unzip3
   in
 
   let param_type = { Core_type.TypeExpr.
-    params_content = [];
-    params_rest = None;
+    params_content = List.filter_opt params_content;
+    params_rest = !params_rest;
   } in
 
   { T.Function. params_content = params; params_loc }, param_type, params_deps

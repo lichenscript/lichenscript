@@ -30,6 +30,8 @@ and spec =
   | NotAEnumConstructor of string
   | RestParamsMustAtLast
   | ParamDoesNotProvided of string
+  | UnexpectedParams of int * int
+  | RestShouldBeArray
 
 let make_error ctx loc spec =
   { loc; spec; ctx }
@@ -139,6 +141,12 @@ module PP = struct
 
     | ParamDoesNotProvided param_name ->
       Format.fprintf formatter "The parameter %s is missing." param_name
+
+    | UnexpectedParams(expected, actual) ->
+      Format.fprintf formatter "Expected %d arguments, but got %d." expected actual
+
+    | RestShouldBeArray ->
+      Format.fprintf formatter "A rest parameter must be of an array type."
 
   let error ~ctx formatter err =
     let { spec; loc; _ } = err in

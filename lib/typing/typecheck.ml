@@ -270,7 +270,7 @@ and check_expression env expr =
     let deref_type_expr = Type_context.deref_node_type ctx ty_int  in
 
     let check_params (expected_params: TypeExpr.params) =
-      let { TypeExpr. params_content; _ } = expected_params in
+      let { TypeExpr. params_content; params_rest } = expected_params in
       let pass_params = List.to_array call_params in
       let expected_params = List.to_array params_content in
       for i = 0 to ((Array.length expected_params) - 1) do
@@ -285,7 +285,35 @@ and check_expression env expr =
           let err = Type_error.(make_error env.ctx expr_loc (CannotPassParam(expect_param_name, expect_param, pass_param_type))) in
           raise (Type_error.Error err)
         )
-      done
+      done;
+      if (Array.length pass_params) > (Array.length expected_params) then (
+        match params_rest with
+        | Some (rest_name, rest_ty) -> (
+          let array_content = match Check_helper.try_unwrap_array env.ctx rest_ty with
+            | Some v -> v
+            | None -> (
+              let err = Type_error.(make_error env.ctx expr_loc RestShouldBeArray) in
+              raise (Type_error.Error err)
+            )
+          in
+          let pass_rest = Array.slice pass_params (Array.length expected_params) (Array.length pass_params) in
+          Array.iter
+            ~f:(fun param ->
+              let pass_param_type = Type_context.deref_node_type env.ctx param.ty_var in
+              if not (Check_helper.type_assinable env.ctx array_content pass_param_type) then (
+                let err = Type_error.(make_error env.ctx expr_loc (CannotPassParam(rest_name, array_content, pass_param_type))) in
+                raise (Type_error.Error err)
+              )
+            )
+            pass_rest
+        )
+
+        | _ ->
+          let expected = Array.length expected_params in
+          let actual = Array.length pass_params in
+          let err = Type_error.(make_error env.ctx expr_loc (UnexpectedParams(expected, actual))) in
+          raise (Type_error.Error err)
+      )
     in
 
     match deref_type_expr with

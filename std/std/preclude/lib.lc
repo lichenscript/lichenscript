@@ -3,7 +3,7 @@
  */
 
 @external("lc_std_print")
-public declare function print(content: string);
+public declare function print(...content: any[]);
 
 public class Object {
 

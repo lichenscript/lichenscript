@@ -150,7 +150,10 @@ and print_type_value ctx ty_value =
     print_type_value ctx node.value
   )
   | Lambda _ -> "lambda"
-  | Array _ -> "array"
+
+  | Array arr ->
+    (print_type_value ctx arr) ^ "[]"
+
   | String -> "string"
   | TypeDef type_sym -> (
     let open Core_type.TypeDef in
