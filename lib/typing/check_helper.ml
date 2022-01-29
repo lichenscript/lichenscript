@@ -40,8 +40,8 @@ let rec type_assinable ctx left right =
   match (left, right) with
   | (Any, _) -> true
   | (_, Any) -> false
-  | (Callable _, _)
-  | (_, Callable _) -> false
+  | (Method _, _)
+  | (_, Method _) -> false
   | (String, String) -> true
 
   | (Array left_arr, Array right_arr) ->
@@ -268,7 +268,7 @@ let rec replace_type_vars_with_maps ctx type_map type_expr =
 
   | Lambda _ -> type_expr
 
-  | Callable _ -> type_expr
+  | Method _ -> type_expr
 
   | Array arr ->
     Array (replace_type_vars_with_maps ctx type_map arr)
@@ -330,10 +330,10 @@ let rec find_member_of_type ctx ~scope type_expr member_name =
       result >>= fun (_, member_id) ->
       let node = Type_context.get_node ctx member_id in
       match node.value with
-      | TypeDef { TypeDef. id; spec = ClassMethod { method_params; method_return; _ }; _ } -> (
+      | TypeDef ({ TypeDef. spec = ClassMethod { method_params; method_return; _ }; _ } as def) -> (
         let params = replace_params_with_type ctx types_map method_params in
         let rt = replace_type_vars_with_maps ctx types_map method_return in
-        let expr = TypeExpr.Callable(id, params, rt) in
+        let expr = TypeExpr.Method(def, params, rt) in
         Some (expr, member_id)
       )
       | _ ->

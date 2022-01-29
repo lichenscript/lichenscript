@@ -323,7 +323,7 @@ and check_expression env expr =
       Type_context.update_node_type ctx expr.ty_var ret
     )
 
-    | TypeExpr.Callable(_, params, ret) -> (
+    | TypeExpr.Method(_, params, ret) -> (
       check_params params;
       Type_context.update_node_type ctx expr.ty_var ret
     )
@@ -356,22 +356,13 @@ and check_expression env expr =
       Check_helper.find_member_of_type env.ctx ~scope:env.scope expr_node.value name.pident_name
     in
     match member_type_opt with
-    | Some (Callable (def_int, _params, _rt), _) -> (
-      let def_type = Type_context.deref_node_type env.ctx def_int in
-      let unwrap_typedef =
-        match def_type with
-        | TypeDef d -> d
-        | _ -> failwith "unreachable"
-      in
-      match unwrap_typedef with
-      | { TypeDef. spec = ClassMethod { method_get_set = Some _; method_return; _ }; _ } -> (
-        Type_context.update_node_type env.ctx expr.ty_var method_return
-      )
+    | Some (Method({ TypeDef. spec = ClassMethod { method_get_set = Some _; method_return; _ }; _ }, _params, _rt), _) -> (
+      Type_context.update_node_type env.ctx expr.ty_var method_return
+    )
 
-      | _ -> (
-        let ty, _ = Option.value_exn member_type_opt in
-        Type_context.update_node_type env.ctx expr.ty_var ty
-      )
+    | Some (Method({ TypeDef. spec = ClassMethod { method_get_set = None; _ }; _ }, _params, _rt), _) -> (
+      let ty, _ = Option.value_exn member_type_opt in
+      Type_context.update_node_type env.ctx expr.ty_var ty
     )
 
     (* it's a property *) 

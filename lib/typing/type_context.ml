@@ -169,7 +169,7 @@ and print_type_value ctx ty_value =
     prefix ^ ") => " ^ (print_type_value ctx rt)
   )
 
-  | Callable (_, params, rt) ->
+  | Method (_method, params, rt) ->
     let content_len = List.length params.params_content in
     let prefix =
       List.foldi
@@ -185,7 +185,7 @@ and print_type_value ctx ty_value =
         params.params_content
     in
 
-    "function " ^ prefix ^ "): " ^ (print_type_value ctx rt)
+    "::" ^ _method.name ^ prefix ^ "): " ^ (print_type_value ctx rt)
 
   | Array arr ->
     (print_type_value ctx arr) ^ "[]"

@@ -746,28 +746,20 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
         )
 
-        | { spec = Member(expr, id); _ } -> (
-          let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
-          let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) expr_type id.pident_name in
-          match member with
-          | Some ((Callable (def_int, _, _)), _) -> (
-            let def_node = Type_context.deref_node_type env.ctx def_int in
-            let unwrap_typedef =
-              match def_node with
-              | TypeDef d -> d
-              | _ -> failwith "unreachable"
-            in
-            match unwrap_typedef with
-            | { spec = ClassMethod { method_is_virtual = true; _ }; _ } -> (
-              let this_expr = transform_expression ~is_borrow:true env expr in
+        | { spec = Member(expr, id); _ } ->
+          begin
+            let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
+            let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) expr_type id.pident_name in
+            match member with
+            | Some ((Method ({ spec = ClassMethod { method_is_virtual = true; _ }; _ }, _, _)), _) -> (
+                let this_expr = transform_expression ~is_borrow:true env expr in
 
-              prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
-              append_stmts := List.append !append_stmts this_expr.append_stmts;
+                prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
+                append_stmts := List.append !append_stmts this_expr.append_stmts;
 
-              C_op.Expr.Invoke(this_expr.expr, id.pident_name, params)
+                C_op.Expr.Invoke(this_expr.expr, id.pident_name, params)
             )
-
-            | { id = method_id; spec = ClassMethod { method_get_set = None; _ }; _ } -> (
+            | Some ((Method ({ id = method_id; spec = ClassMethod { method_get_set = None; _ }; _ }, _, _)), _) -> (
               (* only class method needs a this_expr, this is useless for a static function *)
               let this_expr = transform_expression ~is_borrow:true env expr in
 
@@ -789,22 +781,18 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
                 C_op.Expr.ExternalCall(global_name, None, params)
             )
 
+            (* it's a static function *)
+            | Some (TypeDef { id = fun_id; spec = Function _; _ }, _) -> (
+              let callee_node = Type_context.get_node env.ctx fun_id in
+              let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
+              let ctor = Option.value_exn ctor_opt in
+              let ctor_ty_id = ctor.id in
+              let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
+              C_op.Expr.ExternalCall(global_name, None, params)
+            )
             | _ -> failwith "unrechable"
 
-          )
-
-          (* it's a static function *)
-          | Some (TypeDef { id = fun_id; spec = Function _; _ }, _) -> (
-            let callee_node = Type_context.get_node env.ctx fun_id in
-            let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
-            let ctor = Option.value_exn ctor_opt in
-            let ctor_ty_id = ctor.id in
-            let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
-            C_op.Expr.ExternalCall(global_name, None, params)
-          )
-
-          | _ -> failwith (Format.sprintf "2 member %s is not callable" id.pident_name)
-        )
+          end
 
         | _ -> (
           let callee_node = Type_context.get_node env.ctx callee.ty_var in
@@ -829,23 +817,10 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       (* could be a property of a getter *)
       let open Core_type.TypeDef in
       match member with
-      | Some (Callable (def_int, _params, _rt), _) -> (
-        let def_type = Type_context.deref_node_type env.ctx def_int in
-        let unwrap_typedef =
-          match def_type with
-          | TypeDef d -> d
-          | _ -> failwith "unreachable"
-        in
-        match unwrap_typedef with
-        | { Core_type.TypeDef. spec = ClassMethod { method_get_set = Some _; _ }; _ } -> (
-          let ext_sym_opt = Type_context.find_external_symbol env.ctx def_int in
-          let ext_sym = Option.value_exn ext_sym_opt in
-          C_op.Expr.ExternalCall(SymLocal ext_sym, Some expr_result.expr, [])
-        )
-
-        | _ -> (
-          failwith "can not find ctor of expr, maybe it's a getter"
-        )
+      | Some (Method ({ Core_type.TypeDef. id = def_int; spec = ClassMethod { method_get_set = Some _; _ }; _ }, _params, _rt), _) -> (
+        let ext_sym_opt = Type_context.find_external_symbol env.ctx def_int in
+        let ext_sym = Option.value_exn ext_sym_opt in
+        C_op.Expr.ExternalCall(SymLocal ext_sym, Some expr_result.expr, [])
       )
 
       | Some (Core_type.TypeExpr.TypeDef { id = method_id; spec = ClassMethod { method_get_set = Some Getter; _ }; _ }, _) -> (
