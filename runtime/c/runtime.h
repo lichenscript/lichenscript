@@ -1,3 +1,6 @@
+/**
+ * Copyright (c) 2022 Vincent Chan
+ */
 
 #include <stdint.h>
 #include <stdlib.h>

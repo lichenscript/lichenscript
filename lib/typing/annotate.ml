@@ -1403,31 +1403,32 @@ and annotate_enum env enum =
 
     let cases, _cases_deps = List.mapi ~f:annotate_case cases |> List.unzip in
 
+    let enum_params =
+      List.map
+      ~f:(fun id -> Identifier.(id.pident_name))
+      type_vars
+    in
+
+    let ty_def = {
+      TypeDef.
+      enum_members = [];
+      enum_params;
+    } in
+
     Type_context.map_node
       ctx
-      ~f:(fun node ->
-        let enum_params =
-          List.map
-          ~f:(fun id -> Identifier.(id.pident_name))
-          type_vars
-        in
-        { node with
+      ~f:(fun _ ->
+        {
           (* deps = cases_deps; *)
           deps = [];
           loc;
-          check = (fun id ->
-            let ty_def = {
-              TypeDef.
-              enum_members = [];
-              enum_params;
-            } in
-            Type_context.update_node_type ctx id (TypeExpr.TypeDef {
-              id;
-              builtin = false;
-              name = name.pident_name;
-              spec = Enum ty_def;
-            })
-          )
+          value = (TypeExpr.TypeDef {
+            id = variable.var_id;
+            builtin = false;
+            name = name.pident_name;
+            spec = Enum ty_def;
+          });
+          check = none;
         }
       )
       variable.var_id;

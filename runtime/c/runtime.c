@@ -1,3 +1,6 @@
+/**
+ * Copyright (c) 2022 Vincent Chan
+ */
 
 #include "runtime.h"
 #include "string.h"

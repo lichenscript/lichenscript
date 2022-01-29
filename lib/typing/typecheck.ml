@@ -240,11 +240,11 @@ and check_expression env expr =
 
   )
 
-  | Index (expr, index_expr) -> (
+  | Index (main_expr, index_expr) -> (
     check_expression env index_expr;
-    check_expression env expr;
+    check_expression env main_expr;
 
-    let node = Type_context.get_node env.ctx expr.ty_var in
+    let node = Type_context.get_node env.ctx main_expr.ty_var in
     match (Check_helper.try_unwrap_array env.ctx node.value) with
     | Some t ->
       Type_context.update_node_type env.ctx expr.ty_var t
