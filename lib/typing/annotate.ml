@@ -202,7 +202,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         Env.set_in_lambda env true;
         let { lambda_params; lambda_return_ty; lambda_body } = lambda in
 
-        let params, deps = annotate_function_params env lambda_params in
+        let params, params_type, deps = annotate_function_params env lambda_params in
 
         let lambda_return_ty, ret_deps =
           match lambda_return_ty with
@@ -218,7 +218,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         let lambda_body = annotate_expression ~prev_deps:(List.append deps ret_deps) env lambda_body in
 
         let node = {
-          value = TypeExpr.Unknown;
+          value = TypeExpr.Lambda(params_type, lambda_return_ty);
           loc = loc;
           deps = [lambda_body.ty_var];
         } in
@@ -602,7 +602,7 @@ and annotate_declaration env decl : T.Declaration.t =
       | DeclFunction declare_fun -> (
         let { Ast.Function. id; params; return_ty; _ } = declare_fun in
 
-        let params, params_types = annotate_function_params env params in
+        let params, params_type, params_deps = annotate_function_params env params in
 
         let scope = Env.peek_scope env in
         let ty_id =
@@ -628,14 +628,14 @@ and annotate_declaration env decl : T.Declaration.t =
           builtin = false;
           name = id.pident_name;
           spec = Function {
-            fun_params = [];
+            fun_params = params_type;
             fun_return;
           }
         } in
 
         Type_context.update_node (Env.ctx env) ty_id {
           value = TypeExpr.TypeDef ty_def;
-          deps = List.append params_types fun_return_deps;
+          deps = List.append params_deps fun_return_deps;
           loc = decl_loc;
         };
 
@@ -877,7 +877,7 @@ and annotate_class env cls =
             | _ -> false
           in
           Env.with_new_scope env method_scope (fun env ->
-            let cls_method_params, cls_method_params_deps = annotate_function_params env cls_method_params in
+            let cls_method_params, method_params, cls_method_params_deps = annotate_function_params env cls_method_params in
 
             add_all_params_into_scope env method_scope cls_method_params;
 
@@ -903,7 +903,7 @@ and annotate_class env cls =
                 builtin = false;
                 name = cls_method_name.pident_name;
                 spec = Function {
-                  fun_params = [];
+                  fun_params = method_params;
                   fun_return = method_return;
                 };
               }
@@ -915,7 +915,7 @@ and annotate_class env cls =
                   method_cls_id = cls_var.var_id;
                   method_get_set = None;
                   method_is_virtual;
-                  method_params = [];
+                  method_params = method_params;
                   method_return;
                 };
               }
@@ -976,7 +976,7 @@ and annotate_class env cls =
             | None -> failwith (Format.sprintf "unexpected: can not find class method %s" cls_decl_method_name.pident_name)
           in
 
-          let cls_decl_method_params, cls_method_params_deps = annotate_function_params env cls_decl_method_params in
+          let cls_decl_method_params, method_params, cls_method_params_deps = annotate_function_params env cls_decl_method_params in
 
           let method_return, return_ty_deps =
             match cls_decl_method_return_ty with
@@ -1006,7 +1006,7 @@ and annotate_class env cls =
                 method_cls_id = cls_var.var_id;
                 method_get_set;
                 method_is_virtual = false;
-                method_params = [];
+                method_params = method_params;
                 method_return;
               };
             }
@@ -1171,13 +1171,13 @@ and annotate_type env ty : (TypeExpr.t * int list) =
   )
 
   | Ty_arrow (params, result) -> (
-    let params, params_types_deps = List.map ~f:(annotate_type env) params |> List.unzip in
+    let _params, params_type, params_deps = annotate_function_params env params in
     let return_type, return_type_deps = annotate_type env result in
-    deps := List.concat ((!deps)::return_type_deps::params_types_deps);
-    TypeExpr.Lambda(params, return_type), !deps
+    deps := List.concat [ !deps; return_type_deps; params_deps ];
+    TypeExpr.Lambda(params_type, return_type), !deps
   )
 
-and annotate_function_params env params = 
+and annotate_function_params env params : T.Function.params * TypeExpr.params * int list = 
   let open Ast.Function in
   let annoate_param param =
     let { param_name; param_ty; param_loc; param_rest } = param in
@@ -1208,8 +1208,25 @@ and annotate_function_params env params =
   in
 
   let { params_content; params_loc } = params in
-  let params, params_types = List.map ~f:annoate_param params_content |> List.unzip in
-  { T.Function. params_content = params; params_loc }, params_types
+  let params_len = List.length params_content in
+  let params, params_deps =
+    params_content
+    |> List.mapi ~f:(fun index param ->
+      if param.param_rest && (index <> params_len - 1) then (
+        let err = Type_error.(make_error (Env.ctx env) param.param_loc RestParamsMustAtLast) in
+        raise Type_error.(Error err)
+      );
+      annoate_param param
+    )
+    |> List.unzip
+  in
+
+  let param_type = { Core_type.TypeExpr.
+    params_content = [];
+    params_rest = None;
+  } in
+
+  { T.Function. params_content = params; params_loc }, param_type, params_deps
 
 and add_all_params_into_scope env scope params =
   let open T.Function in
@@ -1264,11 +1281,11 @@ and annotate_function env fun_ =
 
     fun_deps := List.append !fun_deps return_ty_deps;
 
-    let params, params_types = annotate_function_params env header.params in
+    let params, params_type, params_deps = annotate_function_params env header.params in
 
     add_all_params_into_scope env fun_scope params;
 
-    let body = annotate_block_impl ~prev_deps:params_types env body in
+    let body = annotate_block_impl ~prev_deps:params_deps env body in
 
     (* defined return *)
     fun_deps := body.return_ty::(!fun_deps);
@@ -1278,7 +1295,7 @@ and annotate_function env fun_ =
       builtin = false;
       name = fun_.header.id.pident_name;
       spec = Function {
-        fun_params = [];
+        fun_params = params_type;
         fun_return = return_ty;
       };
     } in

@@ -55,7 +55,7 @@ module rec TypeExpr : sig
     (*
      * (a: string) => i32
      *)
-    | Lambda of t list * t
+    | Lambda of params * t
 
     (*
      * Alias of Array<T>
@@ -69,9 +69,9 @@ module rec TypeExpr : sig
     (* used for generic *)
     | TypeSymbol of string
 
-  and function_type = {
-    tfun_params: (string * t) list;
-    tfun_ret: t;
+  and params = {
+    params_content: (string * TypeExpr.t) list;
+    params_rest: (string * TypeExpr.t) option;
   }
 
   val pp: Format.formatter -> t -> unit
@@ -83,15 +83,15 @@ end = struct
     | Any
     | Ctor of t * (t list)
     | Ref of int
-    | Lambda of t list * t
+    | Lambda of params * t
     | Array of t
     | String
     | TypeDef of TypeDef.t
     | TypeSymbol of string
 
-  and function_type = {
-    tfun_params: (string * t) list;
-    tfun_ret: t;
+  and params = {
+    params_content: (string * TypeExpr.t) list;
+    params_rest: (string * TypeExpr.t) option;
   }
 
   (* only used internally *)
@@ -125,7 +125,7 @@ and TypeDef : sig
   }
 
   and _function = {
-    fun_params: TypeExpr.t list;
+    fun_params: TypeExpr.params;
     fun_return: TypeExpr.t;
   }
 
@@ -151,7 +151,7 @@ and TypeDef : sig
     method_cls_id: int;
     method_get_set: method_get_set option;
     method_is_virtual: bool;
-    method_params: TypeExpr.t list;
+    method_params: TypeExpr.params;
     method_return: TypeExpr.t;
   }
 
@@ -200,7 +200,7 @@ end = struct
   }
 
   and _function = {
-    fun_params: TypeExpr.t list;
+    fun_params: TypeExpr.params;
     fun_return: TypeExpr.t;
   }
 
@@ -226,7 +226,7 @@ end = struct
     method_cls_id: int;
     method_get_set: method_get_set option;
     method_is_virtual: bool;
-    method_params: TypeExpr.t list;
+    method_params: TypeExpr.params;
     method_return: TypeExpr.t;
   }
 

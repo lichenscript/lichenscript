@@ -224,7 +224,7 @@ and Type : sig
     | Ty_array of t
 
     | Ty_arrow of
-      t list *  (* params*)
+      Function.params *  (* params*)
       t         (* result *)
   [@@deriving show]
 

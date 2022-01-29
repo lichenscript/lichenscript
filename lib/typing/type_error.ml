@@ -28,6 +28,8 @@ and spec =
   | NotAllTheCasesReturnSameType of (TypeExpr.t * TypeExpr.t)
   | CapitalizedEnumMemeber of string
   | NotAEnumConstructor of string
+  | RestParamsMustAtLast
+  | ParamDoesNotProvided of string
 
 let make_error ctx loc spec =
   { loc; spec; ctx }
@@ -131,6 +133,12 @@ module PP = struct
     | NotAEnumConstructor name -> (
       Format.fprintf formatter "'%s' is not an enum constructor" name
     )
+
+    | RestParamsMustAtLast ->
+      Format.fprintf formatter "A rest parameter must be last in a parameter list."
+
+    | ParamDoesNotProvided param_name ->
+      Format.fprintf formatter "The parameter %s is missing." param_name
 
   let error ~ctx formatter err =
     let { spec; loc; _ } = err in

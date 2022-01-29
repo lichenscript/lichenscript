@@ -268,9 +268,30 @@ and check_expression env expr =
     let ctx = env.ctx in
     let ty_int = callee.ty_var in
     let deref_type_expr = Type_context.deref_node_type ctx ty_int  in
+
+    let check_params (expected_params: TypeExpr.params) =
+      let { TypeExpr. params_content; _ } = expected_params in
+      let pass_params = List.to_array call_params in
+      let expected_params = List.to_array params_content in
+      for i = 0 to ((Array.length expected_params) - 1) do
+        let expect_param_name, expect_param = Array.get expected_params i in
+        if i >= (Array.length pass_params) then (
+          let err = Type_error.(make_error env.ctx expr_loc (ParamDoesNotProvided expect_param_name)) in
+          raise (Type_error.Error err)
+        );
+        let pass_param = Array.get pass_params i in
+        let pass_param_type = Type_context.deref_node_type env.ctx pass_param.ty_var in
+        if not (Check_helper.type_assinable env.ctx expect_param pass_param_type) then (
+          let err = Type_error.(make_error env.ctx expr_loc (CannotPassParam(expect_param_name, expect_param, pass_param_type))) in
+          raise (Type_error.Error err)
+        )
+      done
+    in
+
     match deref_type_expr with
-    | TypeExpr.Lambda(_params, ret) -> (
+    | TypeExpr.Lambda(params, ret) -> (
       (* TODO: check call params *)
+      check_params params;
       Type_context.update_node_type ctx expr.ty_var ret
     )
     | _ ->
@@ -278,11 +299,11 @@ and check_expression env expr =
         let _ty_def = Check_helper.find_construct_of ctx deref_type_expr in
         match deref_type_expr with
         | TypeExpr.TypeDef { TypeDef. spec = Function _fun; _ } ->
-          (* TODO: check call params *)
+          check_params _fun.fun_params;
           Type_context.update_node_type ctx expr.ty_var _fun.fun_return
 
         | TypeExpr.TypeDef { TypeDef. spec = ClassMethod _method; _ } ->
-          (* TODO: check call params *)
+          check_params _method.method_params;
           Type_context.update_node_type ctx expr.ty_var _method.method_return
 
         | TypeExpr.TypeDef { TypeDef. spec = EnumCtor enum_ctor; _} -> (

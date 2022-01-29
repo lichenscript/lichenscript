@@ -1504,26 +1504,14 @@ and parse_primary_type env =
   let start_loc = Peek.loc env in
   match (Peek.token env) with
   | Token.T_LPAREN -> (
-    let params = ref [] in
-    Eat.token env;
-
-    while (Peek.token env) <> Token.T_RPAREN do
-      let param = parse_type env in
-      params := param::!params;
-
-      if (Peek.token env) <> Token.T_RPAREN then (
-        Expect.token env Token.T_COMMA
-      )
-    done;
-
-    Expect.token env Token.T_RPAREN;
+    let params = parse_params env in
 
     Expect.token env Token.T_ARROW;
 
     let return_ty = parse_type env in
 
     {
-      spec = Ty_arrow (List.rev !params, return_ty);
+      spec = Ty_arrow (params, return_ty);
       loc = with_start_loc env start_loc;
     }
   )
