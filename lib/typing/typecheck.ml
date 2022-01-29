@@ -511,18 +511,61 @@ and check_expression env expr =
 
   | Block blk -> check_block env blk
 
-  | Init { init_elements; _ } -> (
+  | Init { init_name = cls_name, name_id;  init_elements; _ } -> (
+    let node = Type_context.deref_node_type env.ctx name_id in
+    let def = Option.value_exn (Check_helper.find_typedef_of env.ctx node) in
+    let unwrap_class =
+      match def.spec with
+      | Class cls -> cls
+      | _ -> failwith "unrechable"
+    in
+
+    let module PropMap = Map.Make (String) in
+
+    let type_map, init_map =
+      List.fold
+        ~init:(PropMap.empty, PropMap.empty)
+        ~f:(fun (type_map, init_map) (prop_name, id) ->
+          let elm_node = Type_context.deref_node_type env.ctx id in
+          let def = (Check_helper.find_typedef_of env.ctx elm_node) in
+          match def with
+          | Some { TypeDef. spec = ClassMethod _; _ } -> (type_map, init_map)
+          | _ ->
+            PropMap.set type_map ~key:prop_name ~data:elm_node,
+            PropMap.set init_map ~key:prop_name ~data:(ref false)
+        )
+        unwrap_class.tcls_elements
+    in
+
     List.iter
       ~f:(fun elm ->
         match elm with
-        | InitEntry { init_entry_value; _ } ->
-          check_expression env init_entry_value
+        | InitEntry { init_entry_key; init_entry_value; _ } -> (
+          check_expression env init_entry_value;
+          let expected_type = PropMap.find_exn type_map init_entry_key.pident_name in
+          let actual_type = Type_context.deref_node_type env.ctx init_entry_value.ty_var in
+          if not (Check_helper.type_assinable env.ctx expected_type actual_type) then (
+            let err = Type_error.(make_error env.ctx expr_loc (ClassInitNotAssignable(cls_name, init_entry_key.pident_name, expected_type, actual_type))) in
+            raise Type_error.(Error err)
+          );
+          let init_flag = PropMap.find_exn init_map init_entry_key.pident_name in
+          init_flag := true
+        )
 
         | InitSpread spread ->
           check_expression env spread
 
       )
-      init_elements
+      init_elements;
+
+    PropMap.iteri
+      ~f:(fun ~key ~data ->
+        if not !data then (
+          let err = Type_error.(make_error env.ctx expr_loc (ClassPropNotInit(cls_name, key))) in
+          raise Type_error.(Error err)
+        )
+      )
+      init_map
   )
 
   | Match _match -> (

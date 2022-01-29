@@ -33,6 +33,8 @@ and spec =
   | ParamDoesNotProvided of string
   | UnexpectedParams of int * int
   | RestShouldBeArray
+  | ClassPropNotInit of string * string
+  | ClassInitNotAssignable of string * string * TypeExpr.t * TypeExpr.t
 
 let make_error ctx loc spec =
   { loc; spec; ctx }
@@ -151,6 +153,14 @@ module PP = struct
 
     | RestShouldBeArray ->
       Format.fprintf formatter "A rest parameter must be of an array type."
+
+    | ClassPropNotInit(cls_name, prop_name) ->
+      Format.fprintf formatter "The property '%s' of class %s is not initialized." prop_name cls_name
+
+    | ClassInitNotAssignable (cls_name, prop_name, be_assigned, assign) ->
+      Format.fprintf formatter "Init propperty '%s' of class '%s' failed, type '%s' is not assignable to type '%s'"
+        prop_name cls_name
+        (pp_ty assign) (pp_ty be_assigned)
 
   let error ~ctx formatter err =
     let { spec; loc; _ } = err in
