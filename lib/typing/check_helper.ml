@@ -40,6 +40,8 @@ let rec type_assinable ctx left right =
   match (left, right) with
   | (Any, _) -> true
   | (_, Any) -> false
+  | (Callable _, _)
+  | (_, Callable _) -> false
   | (String, String) -> true
 
   | (Array left_arr, Array right_arr) ->
@@ -245,15 +247,19 @@ let rec replace_type_vars_with_maps ctx type_map type_expr =
   let open Core_type.TypeExpr in
   match type_expr with
   | TypeSymbol sym_name -> (
-    Format.eprintf "replace %s\n" sym_name;
     match TypeVarMap.find type_map sym_name with
     | Some v -> v
     | None -> type_expr
   )
 
   | Unknown
-  | Any
-  | Ctor _ -> type_expr
+  | Any -> type_expr
+
+  | Ctor (m, list) -> (
+    let m = replace_type_vars_with_maps ctx type_map m in
+    let list = List.map ~f:(replace_type_vars_with_maps ctx type_map) list in
+    Ctor(m, list)
+  )
 
   | Ref ref_id -> (
     let node = Type_context.get_node ctx ref_id in
@@ -262,38 +268,28 @@ let rec replace_type_vars_with_maps ctx type_map type_expr =
 
   | Lambda _ -> type_expr
 
+  | Callable _ -> type_expr
+
   | Array arr ->
     Array (replace_type_vars_with_maps ctx type_map arr)
 
   | String -> type_expr
-  | TypeDef typedef -> (
-    let replace_params params =
-      let { params_content; params_rest } = params in
-      let params_content =
-        List.map
-        ~f:(fun (name, expr) -> (name, replace_type_vars_with_maps ctx type_map expr))
-        params_content
-      in
-      let params_rest =
-        Option.map
-        ~f:(fun (name, expr) -> (name, replace_type_vars_with_maps ctx type_map expr))
-        params_rest
-      in
-      { params_content; params_rest }
-    in
+  | TypeDef _ -> type_expr
 
-    let open TypeDef in
-    match typedef.spec with
-    | ClassMethod _method -> (
-      Format.eprintf "replace method: %d\n" typedef.id;
-      let { method_params; method_return; _ } = _method in
-      let method_params = replace_params method_params in
-      let method_return = replace_type_vars_with_maps ctx type_map method_return in
-      TypeDef { typedef with spec = ClassMethod { _method with method_params; method_return }}
-    )
-
-    | _ -> type_expr
-  )
+and replace_params_with_type ctx type_map params =
+  let open TypeExpr in
+  let { params_content; params_rest } = params in
+  let params_content =
+    List.map
+    ~f:(fun (name, expr) -> (name, replace_type_vars_with_maps ctx type_map expr))
+    params_content
+  in
+  let params_rest =
+    Option.map
+    ~f:(fun (name, expr) -> (name, replace_type_vars_with_maps ctx type_map expr))
+    params_rest
+  in
+  { params_content; params_rest }
 
 (*
   * TODO: namespace
@@ -330,15 +326,19 @@ let rec find_member_of_type ctx ~scope type_expr member_name =
           cls.tcls_vars type_vars
       in
 
-      match result with
-      | Some (_, member_id) ->
-        let node = Type_context.get_node ctx member_id in
-        Some (
-          replace_type_vars_with_maps ctx types_map node.value,
-          member_id
-        )
+      let open Option in
+      result >>= fun (_, member_id) ->
+      let node = Type_context.get_node ctx member_id in
+      match node.value with
+      | TypeDef { TypeDef. id; spec = ClassMethod { method_params; method_return; _ }; _ } -> (
+        let params = replace_params_with_type ctx types_map method_params in
+        let rt = replace_type_vars_with_maps ctx types_map method_return in
+        let expr = TypeExpr.Callable(id, params, rt) in
+        Some (expr, member_id)
+      )
+      | _ ->
+        Some (replace_type_vars_with_maps ctx types_map node.value, member_id)
 
-      | _ -> None
     )
     | _ -> None
   )

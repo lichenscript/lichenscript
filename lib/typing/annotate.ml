@@ -1134,7 +1134,7 @@ and annotate_pattern env pat =
 (* only collect deps, construct value in type check *)
 and annotate_type env ty : (TypeExpr.t * int list) =
   let open Ast.Type in
-  let { spec; _ } = ty in
+  let { spec; loc } = ty in
   let deps = ref [] in
   let scope = Env.peek_scope env in
   match spec with
@@ -1147,9 +1147,13 @@ and annotate_type env ty : (TypeExpr.t * int list) =
     let params, params_deps = List.map ~f:(annotate_type env) params |> List.unzip in
     deps := List.concat (!deps::params_deps);
 
-    if scope#is_generic_type_symbol pident_name then
-      TypeExpr.Ctor (TypeSymbol pident_name, params), !deps
-    else (
+    if scope#is_generic_type_symbol pident_name then (
+      if not (List.is_empty params) then (
+        let err = Type_error.(make_error (Env.ctx env) loc (IsNotGeneric pident_name)) in
+        raise (Type_error.Error err)
+      );
+      TypeExpr.TypeSymbol pident_name, !deps
+    ) else (
       let ty_var_opt = (Env.peek_scope env)#find_type_symbol pident_name in
       match ty_var_opt with
       | Some ty_var -> (

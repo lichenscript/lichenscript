@@ -322,6 +322,12 @@ and check_expression env expr =
       check_params params;
       Type_context.update_node_type ctx expr.ty_var ret
     )
+
+    | TypeExpr.Callable(_, params, ret) -> (
+      check_params params;
+      Type_context.update_node_type ctx expr.ty_var ret
+    )
+
     | _ ->
       begin
         let _ty_def = Check_helper.find_construct_of ctx deref_type_expr in
@@ -329,10 +335,6 @@ and check_expression env expr =
         | TypeExpr.TypeDef { TypeDef. spec = Function _fun; _ } ->
           check_params _fun.fun_params;
           Type_context.update_node_type ctx expr.ty_var _fun.fun_return
-
-        | TypeExpr.TypeDef { TypeDef. spec = ClassMethod _method; _ } ->
-          check_params _method.method_params;
-          Type_context.update_node_type ctx expr.ty_var _method.method_return
 
         | TypeExpr.TypeDef { TypeDef. spec = EnumCtor enum_ctor; _} -> (
           let super_id = enum_ctor.enum_ctor_super_id in
@@ -354,11 +356,25 @@ and check_expression env expr =
       Check_helper.find_member_of_type env.ctx ~scope:env.scope expr_node.value name.pident_name
     in
     match member_type_opt with
-    (* maybe it's a getter *)
-    | Some (TypeDef { spec = ClassMethod { method_get_set = Some Getter; method_return; _ }; _ }, _) -> (
-      Type_context.update_node_type env.ctx expr.ty_var method_return
+    | Some (Callable (def_int, _params, _rt), _) -> (
+      let def_type = Type_context.deref_node_type env.ctx def_int in
+      let unwrap_typedef =
+        match def_type with
+        | TypeDef d -> d
+        | _ -> failwith "unreachable"
+      in
+      match unwrap_typedef with
+      | { TypeDef. spec = ClassMethod { method_get_set = Some _; method_return; _ }; _ } -> (
+        Type_context.update_node_type env.ctx expr.ty_var method_return
+      )
+
+      | _ -> (
+        let ty, _ = Option.value_exn member_type_opt in
+        Type_context.update_node_type env.ctx expr.ty_var ty
+      )
     )
 
+    (* it's a property *) 
     | Some (ty_expr, _) ->
       Type_context.update_node_type env.ctx expr.ty_var ty_expr
 

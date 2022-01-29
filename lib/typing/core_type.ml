@@ -58,6 +58,18 @@ module rec TypeExpr : sig
     | Lambda of params * t
 
     (*
+     * Anything callable with a def, such as
+     * 1. method of a class
+     * 2. constructor of a enum
+     * 
+     * What's different from a lambda?
+     * Callable can not be assign/pass
+     * Type equal is dependent of typedef
+     *
+     *)
+    | Callable of int * params * t
+
+    (*
      * Alias of Array<T>
      *)
     | Array of t
@@ -84,6 +96,7 @@ end = struct
     | Ctor of t * (t list)
     | Ref of int
     | Lambda of params * t
+    | Callable of int * params * t
     | Array of t
     | String
     | TypeDef of TypeDef.t
@@ -99,12 +112,16 @@ end = struct
     match t with
     | Unknown -> Format.fprintf formatter "unknown"
     | Any -> Format.fprintf formatter "any"
-    | Ctor _ -> Format.fprintf formatter "ctor"
+
+    | Ctor(t, vars) ->
+      Format.fprintf formatter "%a<%d>" pp t (List.length vars)
+
     | Ref i -> Format.fprintf formatter "ref '%d" i
     | Lambda _ -> Format.fprintf formatter "lambda"
+    | Callable _ -> Format.fprintf formatter "function"
     | Array t -> Format.fprintf formatter "%a[]" pp t
     | String -> Format.fprintf formatter "string"
-    | TypeDef _ -> Format.fprintf formatter "typedef"
+    | TypeDef def -> Format.fprintf formatter "typedef(%a)" TypeDef.pp def
     | TypeSymbol sym -> Format.pp_print_string formatter sym
 
 end

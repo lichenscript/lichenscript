@@ -17,6 +17,7 @@ and spec =
   | InvalidAssign
   | OnlyAssignArrayIndexAlpha
   | OnlyI32InIndexAlpha
+  | IsNotGeneric of string
   | Redefinition of string
   | NotCallable of TypeExpr.t
   | ParamsMismatch of TypeExpr.t
@@ -91,6 +92,9 @@ module PP = struct
 
     | OnlyI32InIndexAlpha ->
       Format.fprintf formatter "Currently you can only use i32 as index."
+
+    | IsNotGeneric name ->
+      Format.fprintf formatter "%s is not generic." name
 
     | Redefinition name ->
       Format.fprintf formatter "Redefinition of '%s'" name
