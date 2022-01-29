@@ -1,0 +1,9 @@
+
+
+function funA(name: string) {
+    print(name);
+}
+
+function main() {
+    funA(1);
+}

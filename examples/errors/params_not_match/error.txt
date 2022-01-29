@@ -1,0 +1,1 @@
+8:8 Can not pass 'i32' as param 'name', because 'string' is expected

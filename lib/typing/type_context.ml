@@ -149,7 +149,25 @@ and print_type_value ctx ty_value =
     let node = get_node ctx id in
     print_type_value ctx node.value
   )
-  | Lambda _ -> "lambda"
+
+  | Lambda (params, rt) -> (
+    let content_len = List.length params.params_content in
+    let prefix =
+      List.foldi
+        ~init:"("
+        ~f:(fun index acc (name, item) ->
+          let item_content = print_type_value ctx item in
+          let a = acc ^ name ^ ": " ^ item_content in
+          if index = (content_len - 1) then
+            a
+          else
+            a ^ ", "
+        )
+        params.params_content
+    in
+
+    prefix ^ ") => " ^ (print_type_value ctx rt)
+  )
 
   | Array arr ->
     (print_type_value ctx arr) ^ "[]"

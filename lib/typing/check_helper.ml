@@ -31,7 +31,7 @@ let find_typedef_of ctx type_expr =
   | TypeDef sym -> Some sym
   | _ -> None
 
-let type_assinable ctx left right =
+let rec type_assinable ctx left right =
   let open TypeExpr in
   let left = Type_context.deref_type ctx left in
   let right = Type_context.deref_type ctx right in
@@ -39,6 +39,42 @@ let type_assinable ctx left right =
   | (Any, _) -> true
   | (_, Any) -> false
   | (String, String) -> true
+
+  | (Array left_arr, Array right_arr) ->
+    type_equal ctx left_arr right_arr
+
+  | (Lambda (params1, rt1), Lambda (params2, rt2)) -> (
+    let test_params =
+      List.fold2_exn
+        ~init:true
+        ~f:(fun acc (_, item1) (_, item2) ->
+          if not acc then acc
+          else
+            type_assinable ctx item2 item1
+        )
+        params1.params_content
+        params2.params_content
+    in
+
+    let test_rest =
+      match (params1.params_rest, params2.params_rest) with
+      | Some (_, r1), Some (_, r2) ->
+        type_assinable ctx r2 r1
+
+      | None, None -> true
+
+      | _, _ -> false
+    in
+
+    let test_rt =
+      if not (type_assinable ctx rt1 rt2) then (
+        false
+      ) else 
+        true
+    in
+    test_params && test_rest && test_rt
+  )
+
   | _ -> (
     let c1_def = find_construct_of ctx left in
     let c2_def = find_construct_of ctx right in
@@ -56,6 +92,31 @@ let type_assinable ctx left right =
       false
   )
 
+and type_equal ctx left right =
+  let open TypeExpr in
+  let left = Type_context.deref_type ctx left in
+  let right = Type_context.deref_type ctx right in
+  match (left, right) with
+  | (Any, Any) -> true
+  | (String, String) -> true
+  | (Array left_arr, Array right_arr) ->
+    type_equal ctx left_arr right_arr
+  | _, _ -> (
+    let c1_def = find_construct_of ctx left in
+    let c2_def = find_construct_of ctx right in
+    match (c1_def, c2_def) with
+    | (Some { id = enum_id; spec = Enum _; _ }, Some { spec = EnumCtor { enum_ctor_super_id; _ }; _}) ->
+      enum_id = enum_ctor_super_id
+
+    | (Some left_sym, Some right_sym) ->
+      if TypeDef.(left_sym == right_sym) then
+        true
+      else
+        false
+    
+    | _ ->
+      false
+  )
 
 let check_is_primitive_type ~group ctx (left: TypeExpr.t) (right: TypeExpr.t) =
   let left = Type_context.deref_type ctx left in
