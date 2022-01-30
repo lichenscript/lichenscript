@@ -262,7 +262,20 @@ and Declaration : sig
     | Cls_property of class_property
     | Cls_method of class_method
     | Cls_declare of class_declare_method
-    [@@deriving show]
+
+  and intf_method = {
+    intf_name: (string * int);
+    intf_params: Function.params;
+    intf_loc: Loc.t;
+  }
+
+  and intf = {
+    intf_visibility: Asttypes.visibility option;
+    intf_id:         Identifier.t;
+    intf_type_vars:  Identifier.t list;
+    intf_methods:    intf_method list;
+  }
+  [@@deriving show]
 
   type spec =
     | Class of _class

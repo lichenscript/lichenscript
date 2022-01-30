@@ -1,0 +1,19 @@
+
+interface Animal {
+
+    printName();
+
+}
+
+class Tiger implements Animal {
+
+    override printName() {
+        print("Tiger");
+    }
+
+}
+
+function main() {
+    const tiger = Tiger{};
+    tiger.printName();
+}

@@ -243,6 +243,11 @@ and parse_declaration env : Declaration.t =
         Function_ _fun
       )
 
+      | Token.T_INTERFACE -> (
+        let intf = parse_interface env ~visibility in
+        Interface intf
+      )
+
       | Token.T_DECLARE ->
         begin
           Eat.token env;
@@ -341,6 +346,78 @@ and parse_declaration env : Declaration.t =
     spec;
     loc = with_start_loc env start_loc;
     attributes;
+  }
+
+and parse_interface env ~visibility : Declaration.intf =
+  Expect.token env Token.T_INTERFACE;
+  let name = parse_identifier env in
+
+  let intf_type_vars =
+    if (Peek.token env) = Token.T_LESS_THAN then
+      parse_type_vars env
+    else []
+  in
+
+  let parse_method env =
+    let start_loc = Peek.loc env in
+    let first_id = parse_identifier env in
+    let open Declaration in
+    let intf_method_get_set =
+      match first_id.pident_name with
+      | "get" -> Some Cls_getter
+      | "set" -> Some Cls_setter
+      | _ -> None
+    in
+    (*
+      * if next is identifier, the first one is get/set
+      *)
+    let intf_method_name =
+      match (Peek.token env) with
+      | Token.T_IDENTIFIER _ -> parse_identifier env
+      | _ -> first_id
+    in
+
+    let intf_method_params = parse_params env in
+
+    let intf_method_return_ty =
+      match (Peek.token env) with
+      | Token.T_COLON ->
+        begin
+          Eat.token env;
+          let ty = parse_type env in
+          Some ty
+        end
+
+      | _ -> None
+    in
+
+    {
+      intf_method_get_set;
+      intf_method_name;
+      intf_method_params;
+      intf_method_loc = with_start_loc env start_loc;
+      intf_method_return_ty;
+    }
+  in
+
+  let methods = ref [] in
+  Expect.token env Token.T_LCURLY;
+
+  while (Peek.token env) <> Token.T_RCURLY do
+    let _method = parse_method env in
+    if (Peek.token env) = Token.T_SEMICOLON then (
+      Eat.token env
+    );
+    methods := _method::(!methods)
+  done;
+
+  Expect.token env Token.T_RCURLY;
+
+  {
+    intf_visibility = visibility;
+    intf_name = name;
+    intf_type_vars;
+    intf_methods = List.rev !methods;
   }
 
 and parse_statement env : Statement.t =
@@ -645,10 +722,27 @@ and parse_class ~visibility env : Declaration._class =
       None
   in
 
+  let cls_implements =
+    if Peek.token env = Token.T_IMPLEMENTS then (
+      Eat.token env;
+      let first_intf = parse_type env in
+      let tys = ref [ first_intf ] in
+
+      while (Peek.token env) = Token.T_COMMA do
+        Eat.token env;
+        let next = parse_type env in
+        tys := next::(!tys)
+      done;
+
+      List.rev !tys
+    ) else []
+  in
+
   let body = parse_class_body env in
   {
     cls_visibility = visibility;
     cls_extends;
+    cls_implements;
     cls_id = id;
     cls_type_vars;
     cls_loc = with_start_loc env start_loc;

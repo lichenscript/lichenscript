@@ -266,6 +266,7 @@ and Declaration : sig
   and _class = {
     cls_id:         Identifier.t;
     cls_extends:    Type.t option;
+    cls_implements: Type.t list;
     cls_visibility: Asttypes.visibility option;
     cls_type_vars:  Identifier.t list;
     cls_loc:        Loc.t;
@@ -319,6 +320,21 @@ and Declaration : sig
     | Cls_property of class_property
     | Cls_method of class_method
     | Cls_declare of class_declare_method
+
+  and intf_method = {
+    intf_method_get_set: class_get_set option;
+    intf_method_name: Identifier.t;
+    intf_method_params: Function.params;
+    intf_method_loc: Loc.t;
+    intf_method_return_ty: Type.t option;
+  }
+
+  and intf = {
+    intf_visibility: Asttypes.visibility option;
+    intf_name:       Identifier.t;
+    intf_type_vars:  Identifier.t list;
+    intf_methods:    intf_method list;
+  }
   [@@deriving show]
 
   type import = {
@@ -329,6 +345,7 @@ and Declaration : sig
 
   type spec =
     | Class of _class
+    | Interface of intf
     | Function_ of Function.t
     | Declare of declare
     | Enum of Enum.t

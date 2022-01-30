@@ -590,6 +590,10 @@ and annotate_declaration env decl : T.Declaration.t =
       ty_int, T.Declaration.Class _class
     )
 
+    | Interface _intf -> (
+      failwith "intf"
+    )
+
     | Function_ _fun -> (
       let open Typedtree.Function in
       let _fun = annotate_function env _fun in
