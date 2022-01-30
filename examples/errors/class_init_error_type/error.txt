@@ -1,0 +1,1 @@
+10:10 Init propperty 'name' of class 'A' failed, type 'i32' is not assignable to type 'string'

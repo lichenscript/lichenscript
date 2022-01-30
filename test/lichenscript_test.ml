@@ -194,6 +194,7 @@ and handle_negative_exit env suite code =
     ) else (
       Format.printf "%s[ERROR]%s %s\n" TermColor.red TermColor.reset suite.test_file;
       Format.printf "Expected error: %s\n" error_content;
+      env.error_files <- env.error_files + 1
     )
   ) else (
     Format.printf "%sFailed Test:%s %s, code: %d: \n" TermColor.red TermColor.reset suite.test_file code;

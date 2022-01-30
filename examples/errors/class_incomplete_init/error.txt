@@ -1,1 +1,1 @@
-9:12 The property 'name' of class A is not initialized.
+9:10 The property 'name' of class A is not initialized.
