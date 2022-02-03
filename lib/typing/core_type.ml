@@ -146,12 +146,17 @@ and TypeDef : sig
     fun_return: TypeExpr.t;
   }
 
+  and class_elm =
+    | Cls_elm_prop of int * TypeExpr.t
+    | Cls_elm_method of t
+    | Cls_elm_get_set of t option * t option
+
   and class_type = {
     tcls_name:            string;
     tcls_vars:            string list;
     tcls_extends:         TypeExpr.t option;
-    tcls_elements:        (string * int) list;
-    tcls_static_elements: (string * int) list;
+    tcls_elements:        (string * class_elm) list;
+    tcls_static_elements: (string * class_elm) list;
   }
 
   and enum_ctor = {
@@ -222,12 +227,17 @@ end = struct
     fun_return: TypeExpr.t;
   }
 
+  and class_elm =
+    | Cls_elm_prop of int * TypeExpr.t
+    | Cls_elm_method of t
+    | Cls_elm_get_set of t option * t option
+
   and class_type = {
     tcls_name:            string;
     tcls_vars:            string list;
     tcls_extends:         TypeExpr.t option;
-    tcls_elements:        (string * int) list;
-    tcls_static_elements: (string * int) list;
+    tcls_elements:        (string * class_elm) list;
+    tcls_static_elements: (string * class_elm) list;
   }
 
   and enum_ctor = {

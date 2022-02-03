@@ -327,17 +327,27 @@ let rec find_member_of_type ctx ~scope type_expr member_name =
       in
 
       let open Option in
-      result >>= fun (_, member_id) ->
-      let node = Type_context.get_node ctx member_id in
-      match node.value with
-      | TypeDef ({ TypeDef. spec = ClassMethod { method_params; method_return; _ }; _ } as def) -> (
+      let open Core_type in
+      result >>= fun (_, cls_elm) ->
+      match cls_elm with
+      | Cls_elm_method ({ TypeDef. id = member_id; spec = ClassMethod { method_params; method_return; _ }; _ } as def) -> (
         let params = replace_params_with_type ctx types_map method_params in
         let rt = replace_type_vars_with_maps ctx types_map method_return in
         let expr = TypeExpr.Method(def, params, rt) in
         Some (expr, member_id)
       )
-      | _ ->
-        Some (replace_type_vars_with_maps ctx types_map node.value, member_id)
+
+      | Cls_elm_get_set(Some ({ TypeDef. id = member_id; spec = ClassMethod { method_params; method_return; _ }; _ } as def), _) -> (
+        let params = replace_params_with_type ctx types_map method_params in
+        let rt = replace_type_vars_with_maps ctx types_map method_return in
+        let expr = TypeExpr.Method(def, params, rt) in
+        Some (expr, member_id)
+      )
+
+      | Cls_elm_prop (member_id, value) ->
+        Some (replace_type_vars_with_maps ctx types_map value, member_id)
+
+      | _ -> failwith "unrechable"
 
     )
     | _ -> None
@@ -350,10 +360,15 @@ let rec find_member_of_type ctx ~scope type_expr member_name =
       tcls_static_elements
     in
 
+    let open Core_type.TypeDef in
     match result with
-    | Some (_, member_id) ->
+    | Some (_, Cls_elm_method _method) ->
+      let member_id = _method.id in
       let node = Type_context.get_node ctx member_id in
       Some (node.value, member_id)
+
+    | Some (_, Cls_elm_prop (id, prop)) ->
+      Some (prop, id)
 
     | _ -> None
   )

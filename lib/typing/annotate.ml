@@ -724,109 +724,6 @@ and annotate_class env cls =
   let method_deps = ref [] in
 
   let ctx = Env.ctx env in
-  (* prescan class property and method *)
-  List.iter
-    ~f:(fun item ->
-      match item with
-      | Cls_method _method -> (
-        let { cls_method_name; cls_method_visibility; cls_method_loc; cls_method_modifier; _ } = _method in
-        let node = {
-          value = TypeExpr.Unknown;
-          deps = [];
-          loc = cls_method_loc;
-        } in
-        let node_id = Type_context.new_id ctx node in
-        match cls_method_modifier with
-        | (Some Cls_modifier_static) -> (
-          tcls_static_elements := (cls_method_name.pident_name, node_id)::!tcls_static_elements;
-        )
-
-        | _ -> (
-          tcls_elements := ((cls_method_name.pident_name, node_id)::!tcls_elements);
-          class_scope#insert_cls_element
-            { Scope.ClsElm.
-              name = (cls_method_name.pident_name, node_id);
-              spec = Method;
-              visibility = cls_method_visibility;
-            }
-        )
-      )
-      | Cls_property property -> (
-        let { cls_property_name; cls_property_type; cls_property_loc; cls_property_visibility; _  } = property in
-        let property_ty, deps = annotate_type env cls_property_type in
-        let node = {
-          value = property_ty;
-          deps;
-          loc = cls_property_loc;
-        } in
-        let node_id = Type_context.new_id ctx node in
-        tcls_elements := ((cls_property_name.pident_name, node_id)::!tcls_elements);
-
-        (*
-         * the class itself depends on all the properties
-         * all the method depends on the class
-         *)
-         props_deps := node_id::(!props_deps);
-
-        class_scope#insert_cls_element
-          { Scope.ClsElm.
-            name = (cls_property_name.pident_name, node_id);
-            spec = Property;
-            visibility = cls_property_visibility;
-          }
-      )
-
-      | Cls_declare declare -> (
-        let { cls_decl_method_name; cls_decl_method_loc; cls_decl_method_get_set; cls_decl_method_attributes; _ } = declare in
-        let node = {
-          value = TypeExpr.Unknown;
-          deps = [];
-          loc = cls_decl_method_loc;
-        } in
-        let node_id = Type_context.new_id ctx node in
-
-        (match List.last cls_decl_method_attributes with
-        | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; _ } ->
-          Type_context.set_external_symbol (Env.ctx env) node_id ext_name
-
-        | _ ->
-          let open Type_error in
-          let err = make_error (Env.ctx env) cls_decl_method_loc DeclareFunctionShouldSpecificExternal in
-          raise (Error err)
-        );
-
-        tcls_elements := ((cls_decl_method_name.pident_name, node_id)::!tcls_elements);
-        match cls_decl_method_get_set with
-        | Some Cls_getter -> 
-          class_scope#insert_cls_element
-            { Scope.ClsElm.
-              name = (cls_decl_method_name.pident_name, node_id);
-              spec = Getter;
-              (* temporary use public here *)
-              visibility = Some Asttypes.Pvisibility_public;
-            }
-
-        | Some Cls_setter ->
-          class_scope#insert_cls_element
-            { Scope.ClsElm.
-              name = cls_decl_method_name.pident_name, node_id;
-              spec = Setter;
-              (* temporary use public here *)
-              visibility = Some Asttypes.Pvisibility_public;
-            }
-
-        | None ->
-          class_scope#insert_cls_element
-            { Scope.ClsElm.
-              name = cls_decl_method_name.pident_name, node_id;
-              spec = Method;
-              (* temporary use public here *)
-              visibility = Some Asttypes.Pvisibility_public;
-            }
-      )
-
-    )
-    cls.cls_body.cls_body_elements;
 
   let base_deps = ref None in
 
@@ -858,21 +755,10 @@ and annotate_class env cls =
         | Cls_method _method -> (
           let method_scope = new scope ~prev:(Env.peek_scope env) () in
           let { cls_method_attributes; cls_method_visibility; cls_method_modifier; cls_method_name; cls_method_params; cls_method_loc; cls_method_body; cls_method_return_ty; _ } = _method in
-          let method_id =
+          let is_static =
             match cls_method_modifier with
-            | Some Ast.Declaration.Cls_modifier_static -> (
-              let result = List.find ~f:(fun (name, _) -> String.equal name cls_method_name.pident_name) !tcls_static_elements in
-              match result with
-              | Some (_, id) -> id
-              | None ->
-                failwith (Format.sprintf "unexpected: can not find static class method %s" cls_method_name.pident_name)
-            )
-
-            | _ -> (
-              match (class_scope#find_cls_element cls_method_name.pident_name ClsElm.Method) with
-              | Some ({ name = _, method_id; _ }) -> method_id
-              | None -> failwith (Format.sprintf "unexpected: can not find class method %s" cls_method_name.pident_name)
-            )
+            | Some Cls_modifier_static -> true
+            | _ -> false
           in
           let method_is_virtual =
             match cls_method_modifier with
@@ -900,6 +786,7 @@ and annotate_class env cls =
               )
             in
 
+            let method_id = Type_context.size (Env.ctx env) in
             let new_type =
               match _method.cls_method_modifier with
               | Some Cls_modifier_static -> { TypeDef.
@@ -930,17 +817,29 @@ and annotate_class env cls =
 
             this_deps := List.append !this_deps return_ty_deps;
 
-            Type_context.map_node ctx
-              ~f:(fun node -> {
-                node with
+            let typedef = TypeExpr.TypeDef new_type in
+            ignore (Type_context.new_id ctx
+              { Core_type.
                 deps = List.concat [ List.rev !this_deps; cls_method_params_deps ]
                 |> List.filter
                   ~f:(fun id -> id <> cls_var.var_id)
                 ;
-                value = (TypeExpr.TypeDef new_type);
-              })
-              method_id
-              ;
+                loc = _method.cls_method_loc;
+                value = typedef;
+              }
+            );
+            let ty_elm = Core_type.TypeDef.Cls_elm_method new_type  in
+            if is_static then
+              tcls_static_elements := (cls_method_name.pident_name, ty_elm)::!tcls_static_elements
+            else (
+              tcls_elements := ((cls_method_name.pident_name, ty_elm)::!tcls_elements);
+              class_scope#insert_cls_element
+                { Scope.ClsElm.
+                  name = (cls_method_name.pident_name, method_id);
+                  spec = Method;
+                  visibility = cls_method_visibility;
+                }
+            );
             T.Declaration.Cls_method {
               T.Declaration.
               cls_method_attributes;
@@ -955,7 +854,30 @@ and annotate_class env cls =
           )
         )
         | Cls_property prop -> (
-          let { cls_property_visibility; cls_property_loc; cls_property_name; _ } = prop in
+          let { cls_property_visibility; cls_property_loc; cls_property_name; cls_property_type; _ } = prop in
+          let property_ty, deps = annotate_type env cls_property_type in
+          let node = {
+            value = property_ty;
+            deps;
+            loc = cls_property_loc;
+          } in
+          let node_id = Type_context.new_id ctx node in
+          let ty_elm = Core_type.TypeDef.Cls_elm_prop (node_id, property_ty) in
+          tcls_elements := ((cls_property_name.pident_name, ty_elm)::!tcls_elements);
+
+          (*
+          * the class itself depends on all the properties
+          * all the method depends on the class
+          *)
+          props_deps := node_id::(!props_deps);
+
+          class_scope#insert_cls_element
+            { Scope.ClsElm.
+              name = (cls_property_name.pident_name, node_id);
+              spec = Property;
+              visibility = cls_property_visibility;
+            };
+
           T.Declaration.Cls_property {
             T.Declaration.
             cls_property_loc;
@@ -967,18 +889,17 @@ and annotate_class env cls =
         | Cls_declare declare -> (
           let { cls_decl_method_attributes; cls_decl_method_name; cls_decl_method_params; cls_decl_method_loc; cls_decl_method_return_ty; cls_decl_method_get_set; _ } = declare in
 
-          let find_flag =
-            match cls_decl_method_get_set with
-            | Some Ast.Declaration.Cls_getter -> ClsElm.Getter
-            | Some Ast.Declaration.Cls_setter -> ClsElm.Setter
-            | None -> ClsElm.Method
-          in
+          let declare_id = Type_context.size ctx in
 
-          let declare_id =
-            match (class_scope#find_cls_element cls_decl_method_name.pident_name find_flag) with
-            | Some ({ name = _, id; _ }) -> id
-            | None -> failwith (Format.sprintf "unexpected: can not find class method %s" cls_decl_method_name.pident_name)
-          in
+          (match List.last cls_decl_method_attributes with
+          | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; _ } ->
+            Type_context.set_external_symbol (Env.ctx env) declare_id ext_name
+
+          | _ ->
+            let open Type_error in
+            let err = make_error (Env.ctx env) cls_decl_method_loc DeclareFunctionShouldSpecificExternal in
+            raise (Error err)
+          );
 
           let cls_decl_method_params, method_params, cls_method_params_deps = annotate_function_params env cls_decl_method_params in
 
@@ -1016,17 +937,59 @@ and annotate_class env cls =
             }
           in
 
-          Type_context.map_node ctx
-            ~f:(fun node -> {
-              node with
+          let cls_elm = 
+            match cls_decl_method_get_set with
+            | Some Ast.Declaration.Cls_getter ->
+              Core_type.TypeDef.Cls_elm_get_set(Some new_type, None)
+
+            | Some Ast.Declaration.Cls_setter ->
+              Core_type.TypeDef.Cls_elm_get_set(None, Some new_type)
+
+            | None ->
+              Core_type.TypeDef.Cls_elm_method new_type
+
+          in
+
+          tcls_elements := ((cls_decl_method_name.pident_name, cls_elm)::!tcls_elements);
+
+          ignore (Type_context.new_id ctx
+            { Core_type.
               deps = (List.append cls_method_params_deps return_ty_deps)
               |> List.filter
                 ~f:(fun id -> id <> cls_var.var_id)
               ;
               value = (TypeExpr.TypeDef new_type);
-            })
-            declare_id
-            ;
+              loc = cls_decl_method_loc;
+            });
+
+          (match cls_decl_method_get_set with
+          | Some Cls_getter -> 
+            class_scope#insert_cls_element
+              { Scope.ClsElm.
+                name = (cls_decl_method_name.pident_name, declare_id);
+                spec = Getter;
+                (* temporary use public here *)
+                visibility = Some Asttypes.Pvisibility_public;
+              }
+
+          | Some Cls_setter ->
+            class_scope#insert_cls_element
+              { Scope.ClsElm.
+                name = cls_decl_method_name.pident_name, declare_id;
+                spec = Setter;
+                (* temporary use public here *)
+                visibility = Some Asttypes.Pvisibility_public;
+              }
+
+          | None ->
+            class_scope#insert_cls_element
+              { Scope.ClsElm.
+                name = cls_decl_method_name.pident_name, declare_id;
+                spec = Method;
+                (* temporary use public here *)
+                visibility = Some Asttypes.Pvisibility_public;
+              }
+          );
 
           T.Declaration.Cls_declare {
             cls_decl_method_attributes;

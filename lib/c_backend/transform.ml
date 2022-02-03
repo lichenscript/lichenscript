@@ -1277,15 +1277,11 @@ and generate_cls_meta env cls_id gen_name =
     in
     let properties =
       List.filter_map
-        ~f:(fun (elm, elm_id) ->
-          let elm_type = Type_context.deref_node_type env.ctx elm_id in
-          let open Core_type.TypeDef in
-          match elm_type with
-          | TypeDef { spec = ClassMethod _ ; _ }
-          | TypeDef { spec = Function _ ; _ }
-            -> None
-          | _ -> 
-            Some elm
+        ~f:(fun (elm_name, elm) ->
+          match elm with
+          | Cls_elm_prop _ -> 
+            Some elm_name
+          | _ -> None
         )
         cls_def.tcls_elements;
     in

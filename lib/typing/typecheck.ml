@@ -525,14 +525,13 @@ and check_expression env expr =
     let type_map, init_map =
       List.fold
         ~init:(PropMap.empty, PropMap.empty)
-        ~f:(fun (type_map, init_map) (prop_name, id) ->
-          let elm_node = Type_context.deref_node_type env.ctx id in
-          let def = (Check_helper.find_typedef_of env.ctx elm_node) in
-          match def with
-          | Some { TypeDef. spec = ClassMethod _; _ } -> (type_map, init_map)
-          | _ ->
+        ~f:(fun (type_map, init_map) (prop_name, elm) ->
+          match elm with
+          | Cls_elm_prop (_id, elm_node) ->
             PropMap.set type_map ~key:prop_name ~data:elm_node,
             PropMap.set init_map ~key:prop_name ~data:(ref false)
+
+          | _ -> (type_map, init_map)
         )
         unwrap_class.tcls_elements
     in
