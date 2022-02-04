@@ -731,22 +731,22 @@ and annotate_class env cls =
 
   (* depend on the base class *)
   let tcls_extends =
-    Option. map
+    Option.map
     ~f:(fun extend ->
       let ext_type, deps = annotate_type env extend in
       base_deps := Some deps;
       ext_type
-      (* let var = (Env.peek_scope env)#find_var_symbol extend.pident_name in
-      match var with
-      | Some var ->
-        props_deps := (var.var_id)::!props_deps;
-
-      | None -> (
-        let err = Type_error.(make_error (Env.ctx env) extend.pident_loc (CannotFindName extend.pident_name)) in
-        raise (Type_error.Error err)
-      ) *)
     )
     cls.cls_extends;
+  in
+
+  let tcls_implements =
+    List.map
+    ~f:(fun impl ->
+      let impl_type, _deps = annotate_type env impl in
+      impl_type
+    )
+    cls.cls_implements
   in
 
   let annotate_class_body body =
@@ -1023,6 +1023,7 @@ and annotate_class env cls =
             tcls_name;
             tcls_vars = List.map ~f:(fun id -> Identifier.(id.pident_name)) cls_type_vars;
             tcls_extends;
+            tcls_implements;
             tcls_elements = List.rev !tcls_elements;
             tcls_static_elements = List.rev !tcls_static_elements;
           };

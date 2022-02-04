@@ -155,6 +155,7 @@ and TypeDef : sig
     tcls_name:            string;
     tcls_vars:            string list;
     tcls_extends:         TypeExpr.t option;
+    tcls_implements:      TypeExpr.t list;
     tcls_elements:        (string * class_elm) list;
     tcls_static_elements: (string * class_elm) list;
   }
@@ -241,6 +242,7 @@ end = struct
     tcls_name:            string;
     tcls_vars:            string list;
     tcls_extends:         TypeExpr.t option;
+    tcls_implements:      TypeExpr.t list;
     tcls_elements:        (string * class_elm) list;
     tcls_static_elements: (string * class_elm) list;
   }

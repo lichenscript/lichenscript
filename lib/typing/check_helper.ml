@@ -86,8 +86,22 @@ let rec type_assinable ctx left right =
     | (Some { id = enum_id; spec = Enum _; _ }, Some { spec = EnumCtor { enum_ctor_super_id; _ }; _}) ->
       enum_id = enum_ctor_super_id
 
-    | (Some left_sym, Some right_sym) ->
-      if TypeDef.(left_sym == right_sym) then
+    (* assigning class to interface *)
+    | (Some { id = intf_id; spec = Interface _ ; _ }, Some { spec = Class { tcls_implements; _ }; _ }) -> (
+      let test =
+        List.find
+        ~f:(fun impl ->
+          let ctor_id = find_construct_of ctx impl in
+          match ctor_id with
+          | Some { TypeDef. id; _ } -> id = intf_id
+          | None -> false
+        )
+        tcls_implements in
+      Option.is_some test
+    )
+
+    | (Some left_def, Some right_def) ->
+      if TypeDef.(left_def == right_def) then
         true
       else
         false
