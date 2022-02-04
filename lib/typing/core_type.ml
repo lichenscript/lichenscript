@@ -8,6 +8,7 @@
  * You should have received a copy of the GNU General Public License along with LichenScript Compiler. If not, see <https://www.gnu.org/licenses/>.
  *)
 open Core_kernel
+open Lichenscript_lex
 
 module PropsMap = Hashtbl.Make(String)
 
@@ -155,7 +156,7 @@ and TypeDef : sig
     tcls_name:            string;
     tcls_vars:            string list;
     tcls_extends:         TypeExpr.t option;
-    tcls_implements:      TypeExpr.t list;
+    tcls_implements:      (TypeExpr.t * Loc.t) list;
     tcls_elements:        (string * class_elm) list;
     tcls_static_elements: (string * class_elm) list;
   }
@@ -242,7 +243,7 @@ end = struct
     tcls_name:            string;
     tcls_vars:            string list;
     tcls_extends:         TypeExpr.t option;
-    tcls_implements:      TypeExpr.t list;
+    tcls_implements:      (TypeExpr.t * Loc.t) list;
     tcls_elements:        (string * class_elm) list;
     tcls_static_elements: (string * class_elm) list;
   }

@@ -744,7 +744,7 @@ and annotate_class env cls =
     List.map
     ~f:(fun impl ->
       let impl_type, _deps = annotate_type env impl in
-      impl_type
+      (impl_type, impl.loc)
     )
     cls.cls_implements
   in

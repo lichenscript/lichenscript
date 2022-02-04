@@ -1,0 +1,16 @@
+
+
+interface Animal {
+
+    printName(prefix: string);
+
+}
+
+class Tiger implements Animal {
+
+
+}
+
+function main() {
+    const tiger = Tiger{};
+}

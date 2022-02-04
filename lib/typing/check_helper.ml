@@ -90,7 +90,7 @@ let rec type_assinable ctx left right =
     | (Some { id = intf_id; spec = Interface _ ; _ }, Some { spec = Class { tcls_implements; _ }; _ }) -> (
       let test =
         List.find
-        ~f:(fun impl ->
+        ~f:(fun (impl, _) ->
           let ctor_id = find_construct_of ctx impl in
           match ctor_id with
           | Some { TypeDef. id; _ } -> id = intf_id

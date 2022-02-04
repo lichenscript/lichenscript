@@ -627,8 +627,52 @@ and check_lambda env lambda =
 
 and check_class env cls =
   let open T.Declaration in
-  let { cls_body; _ } = cls in
+  let { cls_id = _, cls_id; cls_body; _ } = cls in
   let { cls_body_elements; _ } = cls_body in
+
+  let node = Type_context.get_node env.ctx cls_id in
+  let cls_node = Check_helper.find_typedef_of env.ctx node.value in
+  let unwrap_class =
+    match cls_node with
+    | Some { Core_type.TypeDef. spec = Class cls; _ } -> cls
+    | _ -> failwith "unrechable"
+  in
+
+  let check_class_implements (impl_expr, loc) =
+    let typedef = Check_helper.find_construct_of env.ctx impl_expr in
+    match typedef with
+    | Some { TypeDef. name = intf_name; spec = Interface { intf_methods } ; _ } -> (
+      List.iter
+        ~f:(fun (method_name, elm) -> 
+          match elm with
+          | Cls_elm_method _method -> (
+            let test_method =
+              List.find
+              ~f:(fun (test_name, elm) ->
+                match elm with
+                | Cls_elm_method _ -> String.equal test_name method_name
+                | _ -> false
+              )
+              unwrap_class.tcls_elements
+            in
+            if Option.is_none test_method then (
+              let err = Type_error.(make_error env.ctx loc (MissingMethodForInterface(intf_name, method_name))) in
+              raise (Type_error.Error err)
+            )
+          )
+          | _ -> ()
+        )
+        intf_methods
+    )
+    | _ ->
+      let open Type_error in
+      let spec = CannotImplement impl_expr in
+      let err = make_error env.ctx loc spec in
+      raise (Error err)
+  in
+
+  List.iter ~f:check_class_implements unwrap_class.tcls_implements;
+
   List.iter
     ~f:(fun elm ->
       match elm with
