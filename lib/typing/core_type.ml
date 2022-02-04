@@ -179,7 +179,7 @@ and TypeDef : sig
   }
 
   and interface = {
-    intf_methods: (string * class_method) list;
+    intf_methods: (string * class_elm) list;
   }
 
   and spec =
@@ -265,7 +265,7 @@ end = struct
   }
 
   and interface = {
-    intf_methods: (string * class_method) list;
+    intf_methods: (string * class_elm) list;
   }
 
   and spec =

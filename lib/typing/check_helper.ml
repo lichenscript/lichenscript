@@ -304,7 +304,7 @@ and replace_params_with_type ctx type_map params =
   *    share the member of String
   *
   *)
-let rec find_member_of_type ctx ~scope type_expr member_name =
+let rec find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) option =
   let type_expr = Type_context.deref_type ctx type_expr in
   match type_expr with
   | Ctor(type_expr, type_vars) -> (
@@ -347,9 +347,28 @@ let rec find_member_of_type ctx ~scope type_expr member_name =
       | Cls_elm_prop (member_id, value) ->
         Some (replace_type_vars_with_maps ctx types_map value, member_id)
 
-      | _ -> failwith "unrechable"
+      | _ -> None
 
     )
+
+    | TypeDef { spec = Interface intf; _ } -> (
+      let find_method =
+        List.find intf.intf_methods
+        ~f:(fun (method_name, _) -> String.equal method_name member_name)
+      in
+      let open Option in
+      find_method >>= (fun (_, intf_elm) ->
+        match intf_elm with
+        | Cls_elm_method ({ TypeDef. id = member_id; spec = ClassMethod { method_params; method_return; _ }; _ } as def) -> (
+          (* let params = replace_params_with_type ctx types_map method_params in
+          let rt = replace_type_vars_with_maps ctx types_map method_return in *)
+          let expr = TypeExpr.Method(def, method_params, method_return) in
+          Some (expr, member_id)
+        )
+        | _ -> None
+      )
+    )
+
     | _ -> None
   )
 

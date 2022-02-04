@@ -1440,14 +1440,15 @@ and annotate_interface env intf: T.Declaration.intf =
       method_return = intf_method_return_ty;
     } in
 
-    intf_method_tuples := (intf_method_name.pident_name, cls_method)::(!intf_method_tuples);
-
     let typedef = { Core_type.TypeDef.
       id = node_id;
       builtin = false;
       name = intf_method_name.pident_name;
       spec = ClassMethod cls_method;
     } in
+
+    intf_method_tuples :=
+      (intf_method_name.pident_name, Core_type.TypeDef.Cls_elm_method typedef)::(!intf_method_tuples);
 
     let node = { Core_type.
       value = TypeExpr.TypeDef typedef;

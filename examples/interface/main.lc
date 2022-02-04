@@ -13,7 +13,12 @@ class Tiger implements Animal {
 
 }
 
+function acceptAnimal(animal: Animal) {
+    animal.printName();
+}
+
 function main() {
     const tiger = Tiger{};
     tiger.printName();
+    acceptAnimal(tiger);
 }
