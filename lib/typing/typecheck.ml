@@ -91,9 +91,14 @@ and check_declaration env decl =
   match decl.spec with
   | Class cls -> check_class env cls
   | Function_ _fun -> check_function env _fun
+  | Interface intf -> check_interface env intf
   | Declare _ -> ()
   | Enum _ ->  ()
   | Import _ -> ()
+
+and check_interface _env _intf =
+  (* failwith "intf" *)
+  ()
 
 and check_function env _fun =
   let open T.Function in

@@ -590,8 +590,10 @@ and annotate_declaration env decl : T.Declaration.t =
       ty_int, T.Declaration.Class _class
     )
 
-    | Interface _intf -> (
-      failwith "intf"
+    | Interface intf -> (
+      let intf = annotate_interface env intf in
+      let _, ty_int = intf.intf_name in
+      ty_int, T.Declaration.Interface intf
     )
 
     | Function_ _fun -> (
@@ -1401,6 +1403,95 @@ and annotate_enum env enum =
     }
   )
 
+and annotate_interface env intf: T.Declaration.intf =
+  let { Ast.Declaration. intf_visibility; intf_name; intf_type_vars; intf_methods; _ } = intf in
+  let scope = Env.peek_scope env in
+
+  let intf_id_opt = scope#find_var_symbol intf_name.pident_name in
+  if Option.is_none intf_id_opt then (
+    failwith (Format.sprintf "unexpected: interface %s is not added in parsing stage" intf_name.pident_name)
+  );
+  let intf_id = (Option.value_exn intf_id_opt).var_id in
+  let intf_name_tuple = intf_name.pident_name, intf_id in
+  let deps = ref [] in
+  let intf_method_tuples = ref [] in
+
+  let annotate_method (_method: Ast.Declaration.intf_method) =
+    let { Ast.Declaration. intf_method_name; intf_method_loc; intf_method_params; intf_method_return_ty; _ } = _method in
+    let intf_method_params, type_params, params_deps = annotate_function_params env intf_method_params in
+    let intf_method_return_ty, ret_deps =
+      match intf_method_return_ty with
+      | Some t ->
+        let t, deps = annotate_type env t in
+        t, deps
+      | None -> (
+        let none_type = Env.ty_unit env in
+        TypeExpr.Ctor(Ref none_type, []), []
+      )
+    in
+
+    let node_id = Type_context.size (Env.ctx env) in
+
+    let cls_method = { Core_type.TypeDef.
+      method_cls_id = intf_id;
+      method_get_set = None;
+      method_is_virtual = true;
+      method_params = type_params;
+      method_return = intf_method_return_ty;
+    } in
+
+    intf_method_tuples := (intf_method_name.pident_name, cls_method)::(!intf_method_tuples);
+
+    let typedef = { Core_type.TypeDef.
+      id = node_id;
+      builtin = false;
+      name = intf_method_name.pident_name;
+      spec = ClassMethod cls_method;
+    } in
+
+    let node = { Core_type.
+      value = TypeExpr.TypeDef typedef;
+      loc = intf_method_loc;
+      deps = List.append params_deps  ret_deps;
+    } in
+
+    let node_id = Type_context.new_id (Env.ctx env) node in
+    deps := node_id::!deps;
+
+    { T.Declaration.
+      intf_method_name = intf_method_name.pident_name, node_id;
+      intf_method_params;
+      intf_method_loc;
+    }
+  in
+
+  let intf_methods = List.map ~f:annotate_method intf_methods in
+
+  let typedef = { Core_type.TypeDef.
+    id = intf_id;
+    builtin = false;
+    name = intf_name.pident_name;
+    spec = Interface {
+      intf_methods = List.rev !intf_method_tuples;
+    };
+  } in
+
+  Type_context.map_node
+    (Env.ctx env)
+    ~f:(fun _ -> {
+      deps = List.rev !deps;
+      loc = intf_name.pident_loc;
+      value = TypeExpr.TypeDef typedef;
+    })
+    intf_id;
+
+  { T.Declaration.
+    intf_visibility;
+    intf_name = intf_name_tuple;
+    intf_type_vars;
+    intf_methods;
+  }
+
 let annotate_program env (program: Ast.program) =
   let { Ast. pprogram_declarations; pprogram_top_level = _; pprogram_loc; _; } = program in
 
@@ -1415,6 +1506,11 @@ let annotate_program env (program: Ast.program) =
         match spec with
         | Class cls -> (
           let { cls_id = (_, ty_var); _} = cls in
+          ty_var::acc
+        )
+
+        | Interface intf -> (
+          let _, ty_var = intf.intf_name in
           ty_var::acc
         )
 

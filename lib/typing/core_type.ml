@@ -178,10 +178,15 @@ and TypeDef : sig
     method_return: TypeExpr.t;
   }
 
+  and interface = {
+    intf_methods: (string * class_method) list;
+  }
+
   and spec =
     | Primitive
     | Class of class_type 
     | ClassMethod of class_method
+    | Interface of interface
     | Alias of TypeExpr.t
     | Module_ of module_type
     | Function of _function
@@ -259,10 +264,15 @@ end = struct
     method_return: TypeExpr.t;
   }
 
+  and interface = {
+    intf_methods: (string * class_method) list;
+  }
+
   and spec =
     | Primitive
     | Class of class_type 
     | ClassMethod of class_method
+    | Interface of interface
     | Alias of TypeExpr.t
     | Module_ of module_type
     | Function of _function

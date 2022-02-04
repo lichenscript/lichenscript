@@ -193,6 +193,7 @@ let rec transform_declaration env decl =
     let specs = transform_enum env enum in
     List.map ~f:(fun spec -> { C_op.Decl. spec; loc }) specs
   )
+  | Interface _
   | Declare _
   | Import _ -> []
 

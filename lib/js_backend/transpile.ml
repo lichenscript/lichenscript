@@ -53,6 +53,7 @@ let rec tranpile_declaration env delcaration =
   | Function_ _fun ->
     transpile_function env _fun
 
+  | Interface _
   | Declare _
   | Enum _
   | Import _ -> ()

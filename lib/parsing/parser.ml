@@ -245,6 +245,10 @@ and parse_declaration env : Declaration.t =
 
       | Token.T_INTERFACE -> (
         let intf = parse_interface env ~visibility in
+
+        let name = intf.intf_name.pident_name in
+        Parser_env.add_top_level env ~name ~visibility;
+
         Interface intf
       )
 

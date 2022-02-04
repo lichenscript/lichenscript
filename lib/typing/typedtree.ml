@@ -264,14 +264,14 @@ and Declaration : sig
     | Cls_declare of class_declare_method
 
   and intf_method = {
-    intf_name: (string * int);
-    intf_params: Function.params;
-    intf_loc: Loc.t;
+    intf_method_name: (string * int);
+    intf_method_params: Function.params;
+    intf_method_loc: Loc.t;
   }
 
   and intf = {
     intf_visibility: Asttypes.visibility option;
-    intf_id:         Identifier.t;
+    intf_name:       (string * int);
     intf_type_vars:  Identifier.t list;
     intf_methods:    intf_method list;
   }
@@ -279,6 +279,7 @@ and Declaration : sig
 
   type spec =
     | Class of _class
+    | Interface of intf
     | Function_ of Function.t
     | Declare of declare
     | Enum of Enum.t
