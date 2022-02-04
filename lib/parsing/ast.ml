@@ -86,12 +86,19 @@ and Expression : sig
     lambda_body: t;
   }
 
+  and map_entry = {
+    map_entry_key: Literal.t;
+    map_entry_value: t;
+    map_entry_loc: Loc.t;
+  }
+
   and spec =
     | Constant of Literal.t
     | Identifier of Identifier.t
     | Lambda of lambda
     | If of if_desc
     | Array of t list
+    | Map of map_entry list
     | Call of call
     | Member of t * Identifier.t
     | Index of t * t

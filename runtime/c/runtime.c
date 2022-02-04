@@ -265,6 +265,8 @@ static inline void LCFreeUnionObject(LCRuntime* rt, LCValue val) {
     lc_free(rt, union_obj);
 }
 
+void lc_std_map_free(LCRuntime* rt, LCValue val);
+
 static void LCFreeObject(LCRuntime* rt, LCValue val) {
     switch (val.tag) {
     case LC_TY_UNION_OBJECT:
@@ -285,6 +287,10 @@ static void LCFreeObject(LCRuntime* rt, LCValue val) {
 
     case LC_TY_ARRAY:
         LCFreeArray(rt, val);
+        break;
+
+    case LC_TY_MAP:
+        lc_std_map_free(rt, val);
         break;
         
     case LC_TY_STRING:
@@ -1327,4 +1333,112 @@ LCValue lc_std_string_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* a
     result->hash = 0;
 
     return MK_STRING(result);
+}
+
+typedef struct LCMapTuple {
+    LCMapTuple* prev;
+    LCMapTuple* next;
+    LCValue key;
+    LCValue value;
+} LCMapTuple;
+
+typedef struct LCMapBucket {
+    struct LCMapBucket* next;
+    LCMapTuple* data;
+} LCMapBucket;
+
+LCValue lc_std_map_new(LCRuntime* rt, int key_ty, int init_size) {
+    LCMap* map = (LCMap*)lc_mallocz(rt, sizeof (LCMap));
+    map->header.count = 1;
+    map->key_ty = key_ty;
+    if (init_size >= 0 && init_size < 8) {
+        map->is_small = 1;
+    } else {
+        map->is_small = 0;
+    }
+
+    if (key_ty == LC_TY_BOOL) {
+        map->is_small = 1;
+    }
+
+    map->buckets = NULL;
+
+    return (LCValue){ { .ptr_val = (LCObject*)map }, LC_TY_MAP };
+}
+
+static inline LCMapTuple* lc_std_map_find_tuple(LCMap* map, LCValue key) {
+    return NULL;
+}
+
+LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCMap* map = (LCMap*)this.ptr_val;
+    LCMapTuple* found_tuple = lc_std_map_find_tuple(map, args[0]);
+    LCMapTuple* tuple;
+    if (found_tuple == NULL) {
+        LCRetain(args[0]);
+        LCRetain(args[1]);
+
+        tuple = (LCMapTuple*)lc_malloc(rt, sizeof(LCMapTuple));
+        tuple->key = args[0];
+        tuple->value = args[1];
+        tuple->prev = map->last;
+        tuple->next = NULL;
+
+        map->size++;
+        map->last = tuple;
+
+        return MK_NULL();
+    } else {
+        LCRelease(rt, tuple->value);
+        LCRetain(args[1]);
+        tuple->value = args[1];
+    }
+    return MK_NULL();
+}
+
+static inline void lc_free_map_tuple(LCRuntime* rt, LCMapTuple* tuple) {
+    LCRelease(rt, tuple->key);
+    LCRelease(rt, tuple->value);
+    lc_free(rt, tuple);
+}
+
+void lc_std_map_free(LCRuntime* rt, LCValue val) {
+    LCMap* map = (LCMap*)val.ptr_val;
+    LCMapTuple* ptr;
+    LCMapTuple* tmp;
+    LCMapBucket* bucket;
+    LCMapBucket* bp;
+
+    if (likely(map->size > 0)) {
+        if (map->is_small) {
+            ptr = map->head;
+
+            while (ptr != map->last) {
+                tmp = ptr->next;
+
+                lc_free_map_tuple(rt, ptr);
+
+                ptr = tmp;
+            }
+
+            goto clean;
+        }
+
+        for (int i = 0; i < map->bucket_size; i++) {
+            bucket = map->buckets[i];
+
+            while (bucket != NULL) {
+                bp = bucket->next;
+
+                lc_free_map_tuple(rt, bucket->data);
+
+                lc_free(rt, bucket);
+
+                bucket = bp;
+            }
+        }
+    }
+
+clean:
+    lc_free(rt, map);
 }

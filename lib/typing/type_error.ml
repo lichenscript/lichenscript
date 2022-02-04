@@ -15,6 +15,7 @@ and spec =
   | CannotGetIndex of TypeExpr.t
   | CannotContructParamOfType of string * TypeExpr.t
   | CannotImplement of TypeExpr.t
+  | CannotUsedAsKeyOfMap of TypeExpr.t
   | MissingMethodForInterface of string * string  (* interface_name, method_name *)
   | InvalidAssign
   | OnlyAssignArrayIndexAlpha
@@ -88,6 +89,10 @@ module PP = struct
     | CannotImplement ty ->
       let left_type = Type_context.print_type_value ctx ty in
       Format.fprintf formatter "'%s' is not an interface, can not implement" left_type
+
+    | CannotUsedAsKeyOfMap ty ->
+      let left_type = Type_context.print_type_value ctx ty in
+      Format.fprintf formatter "Type '%s' can not be used ad key of Map." left_type
 
     | MissingMethodForInterface(intf_name, method_name) ->
       Format.fprintf formatter "Missing method '%s' for interface '%s'." method_name intf_name

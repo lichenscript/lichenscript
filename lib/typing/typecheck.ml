@@ -256,7 +256,7 @@ and check_expression env expr =
 
   | Array arr_list -> (
     if List.is_empty arr_list then (
-      Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Array Any)
+      Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Array Unknown)
     ) else (
       (* TODO: check every expressions are the same *)
       List.iter ~f:(check_expression env) arr_list;
@@ -264,6 +264,36 @@ and check_expression env expr =
       let first_type = T.Expression.(first.ty_var) in
       let first_node = Type_context.get_node env.ctx first_type in
       Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Array first_node.value)
+    )
+  )
+
+  | Map map_entries -> (
+    let map_opt = env.scope#find_type_symbol "Map" in
+    let map_ty = Option.value_exn ~message:"Cannot found Map in the current scope" map_opt in
+    if List.is_empty map_entries then (
+      Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Array Unknown)
+    ) else (
+      (* TODO: check every expressions are the same *)
+    List.iter
+      ~f:(fun { map_entry_value; _ } ->
+        check_expression env map_entry_value;
+      )
+      map_entries;
+      let first = List.hd_exn map_entries in
+      let first_type = T.Expression.(first.map_entry_value.ty_var) in
+      let first_key_type =
+        match first.map_entry_key with
+        | Ast.Literal.Integer _ -> TypeExpr.Ref(ty_i32 env)
+        | Ast.Literal.Char _ -> TypeExpr.Ref(ty_char env)
+        | Ast.Literal.String _ -> TypeExpr.String
+        | Ast.Literal.Boolean _ -> TypeExpr.Ref(ty_boolean env)
+        | Ast.Literal.Float _ -> 
+          let ty = TypeExpr.Ref(ty_f32 env) in
+          let err = Type_error.(make_error env.ctx first.map_entry_loc (CannotUsedAsKeyOfMap ty)) in
+          raise (Type_error.Error err)
+      in
+      let first_node = Type_context.get_node env.ctx first_type in
+      Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Ctor (Ref map_ty, [first_key_type; first_node.value]))
     )
   )
 

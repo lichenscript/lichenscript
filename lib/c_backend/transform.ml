@@ -703,6 +703,8 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       C_op.Expr.Temp tmp_id
     )
 
+    | Map _ -> failwith "unimplement"
+
     | Call call -> (
       let open Expression in
       (* let current_scope = env.scope in *)

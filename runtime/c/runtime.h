@@ -34,6 +34,7 @@ typedef enum LCObjectType {
     LC_TY_WEAK_REF,
     LC_TY_CLASS_OBJECT_META,
     LC_TY_ARRAY,
+    LC_TY_MAP,
     LC_TY_CLASS_OBJECT,
     LC_TY_BOXED_I64,
     LC_TY_BOXED_U64,
@@ -269,3 +270,21 @@ LCValue lc_std_string_concat(LCRuntime* rt, LCValue this, int arg_len, LCValue* 
 LCValue lc_std_string_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 LCValue lc_std_string_cmp(LCRuntime* rt, LCCmpType cmp_type, LCValue left, LCValue right);
 LCValue lc_std_string_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
+
+typedef struct LCMapTuple LCMapTuple;
+typedef struct LCMapBucket LCMapBucket;
+
+typedef struct LCMap {
+    LC_OBJ_HEADER
+    int key_ty;
+    int size: 31;
+    int is_small: 1;
+    // keep the order of key/value pairs
+    LCMapTuple* head;
+    LCMapTuple* last;
+    LCMapBucket** buckets;
+    int bucket_size;
+} LCMap;
+
+LCValue lc_std_map_new(LCRuntime* rt, int key_ty, int init_size);
+LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args);

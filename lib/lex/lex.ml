@@ -912,6 +912,7 @@ let token (env : Lex_env.t) lexbuf : result =
   | "/=" -> Token (env, T_DIV_ASSIGN)
   | "/" -> Token (env, T_DIV)
   | "@" -> Token (env, T_AT)
+  | "#" -> Token (env, T_POUND)
   (* Others *)
   | eof ->
     let env =

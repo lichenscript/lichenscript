@@ -1359,6 +1359,34 @@ and parse_left_handside_expression_allow_call env : Expression.t =
   let expr = parse_primary_expression env in
   loop env expr
 
+and parse_literal env =
+  let start_loc = Peek.loc env in
+  let next = Peek.token env in
+  match next with
+  | Token.T_NUMBER { raw; _ } ->
+    Eat.token env;
+    Literal.Integer (raw, None)
+
+  | Token.T_STRING (loc, value, _, _) ->
+    Eat.token env;
+    Literal.String (value, loc, None)
+
+  | Token.T_TRUE ->
+    Eat.token env;
+    Literal.Boolean true
+
+  | Token.T_FALSE ->
+    Eat.token env;
+    Literal.Boolean false
+
+  | _ ->
+    let perr_spec = Parser_env.get_unexpected_error (Peek.token env) in
+    let err = Parse_error.error {
+      perr_spec;
+      perr_loc = with_start_loc env start_loc;
+    } in
+    Parse_error.error err
+
 and parse_primary_expression env : Expression.t =
   let start_loc = Peek.loc env in
   let next = Peek.token env in
@@ -1373,21 +1401,11 @@ and parse_primary_expression env : Expression.t =
           Identifier ident
       )
 
-      | Token.T_NUMBER { raw; _ } ->
-        Eat.token env;
-        Constant (Literal.Integer (raw, None))
-
-      | Token.T_STRING (loc, value, _, _) ->
-        Eat.token env;
-        Constant (Literal.String (value, loc, None))
-
-      | Token.T_TRUE ->
-        Eat.token env;
-        Constant (Literal.Boolean true)
-
-      | Token.T_FALSE ->
-        Eat.token env;
-        Constant (Literal.Boolean false)
+      | Token.T_NUMBER _
+      | Token.T_STRING _
+      | Token.T_TRUE
+      | Token.T_FALSE
+        -> Constant(parse_literal env)
 
       | Token.T_IF -> If (parse_expression_if env)
 
@@ -1408,6 +1426,32 @@ and parse_primary_expression env : Expression.t =
 
           Expect.token env Token.T_RBRACKET;
           Array (List.rev !result)
+        end
+
+      | Token.T_POUND ->
+        begin
+          Eat.token env;
+          Expect.token env Token.T_LCURLY;
+          let map_entries = ref [] in
+
+          while (Peek.token env) <> Token.T_RCURLY do
+            let start_loc = Peek.loc env in
+            let key = parse_literal env in
+            Expect.token env Token.T_COLON;
+            let value = parse_expression env in
+            let entry = { Ast.Expression.
+              map_entry_key = key;
+              map_entry_value = value;
+              map_entry_loc = with_start_loc env start_loc;
+            } in
+            map_entries := entry::(!map_entries);
+            if (Peek.token env) = Token.T_COMMA then (
+              Eat.token env
+            )
+          done;
+
+          Expect.token env Token.T_RCURLY;
+          Map (List.rev !map_entries)
         end
 
       | Token.T_LCURLY ->

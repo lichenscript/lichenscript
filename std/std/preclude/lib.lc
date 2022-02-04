@@ -46,12 +46,12 @@ public enum Result<A, B> {
     case Error(B)
 }
 
-public class HashMap<V> {
+public class Map<K, V> {
 
-    @external("lc_std_hashmap_set")
-    declare set(key: string, value: V);
+    @external("lc_std_map_set")
+    declare set(key: K, value: V);
 
-    @external("lc_std_hashmap_get")
-    declare get(key: string): Option<V>;
+    @external("lc_std_map_get")
+    declare get(key: K): Option<V>;
 
 }

@@ -29,6 +29,7 @@ type t =
   | T_ARROW
   | T_ELLIPSIS
   | T_AT
+  | T_POUND
   (* Keywords *)
   | T_FUNCTION
   | T_IF
@@ -244,6 +245,7 @@ let token_to_string = function
   | T_ARROW -> "T_ARROW"
   | T_ELLIPSIS -> "T_ELLIPSIS"
   | T_AT -> "T_AT"
+  | T_POUND -> "T_POUND"
   | T_RSHIFT_ASSIGN -> "T_RSHIFT_ASSIGN"
   | T_LSHIFT_ASSIGN -> "T_LSHIFT_ASSIGN"
   | T_BIT_XOR_ASSIGN -> "T_BIT_XOR_ASSIGN"
@@ -320,6 +322,7 @@ let value_of_token = function
   | T_ARROW -> "=>"
   | T_ELLIPSIS -> "..."
   | T_AT -> "@"
+  | T_POUND -> "#"
   | T_FUNCTION -> "function"
   | T_IF -> "if"
   | T_IN -> "in"

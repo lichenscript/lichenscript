@@ -254,6 +254,30 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       ty_var, (T.Expression.Array a_list)
     )
 
+    | Map entries -> (
+      let entries, deps =
+        entries
+        |> List.map ~f:(fun { map_entry_key; map_entry_value; map_entry_loc } ->
+          let map_entry_value = annotate_expression ~prev_deps env map_entry_value in
+          let dep = map_entry_value.ty_var in
+          { T.Expression.
+            map_entry_key;
+            map_entry_value;
+            map_entry_loc
+          }, dep
+        )
+        |> List.unzip
+      in
+
+      let ty_var = Type_context.new_id (Env.ctx env) {
+        value = TypeExpr.Unknown;
+        loc;
+        deps;
+      } in
+
+      ty_var, T.Expression.Map entries
+    )
+
     | Call call ->
       let ty_var, spec = annotate_expression_call ~prev_deps env loc call in
       ty_var, (T.Expression.Call spec)
