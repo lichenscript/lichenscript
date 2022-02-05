@@ -801,10 +801,14 @@ and parse_class_body env: Declaration.class_body =
       (*
        * if next is identifier, the first one is get/set
        *)
-      let cls_decl_method_name =
+      let cls_decl_method_name, cls_decl_method_get_set =
         match (Peek.token env) with
-        | Token.T_IDENTIFIER _ -> parse_identifier env
-        | _ -> first_id
+        (* is a getter *)
+        | Token.T_IDENTIFIER _ ->
+          (parse_identifier env), cls_decl_method_get_set
+
+        (* is a method called get *)
+        | _ -> first_id, None
       in
       let params = parse_params env in
       let cls_decl_method_return_ty =

@@ -1460,7 +1460,7 @@ static no_inline LCMapTuple* lc_std_map_find_tuple(LCRuntime*rt, LCMap* map, LCV
         return NULL;
     }
 
-    while (t != map->last) {
+    while (t != NULL) {
         tmp = t->next;
 
         if (LCMapKeyEq(rt, t->key, key)) {

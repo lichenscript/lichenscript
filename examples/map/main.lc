@@ -3,4 +3,9 @@ function main() {
     let a = #{
         "name": "Vincent Chan"
     };
+    let test = a.get("name");
+    match test {
+        case Some(name) => print("found")
+        case None => print("not found")
+    }
 }
