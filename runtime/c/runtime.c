@@ -178,6 +178,10 @@ typedef struct LCArray {
     LCValue* data;
 } LCArray;
 
+static inline uint32_t hash_int(int i, uint32_t seed) {
+    return seed * 263 + i;
+}
+
 static inline uint32_t hash_string8(const uint8_t *str, size_t len, uint32_t h)
 {
     size_t i;
@@ -1355,6 +1359,7 @@ typedef struct LCMapTuple {
 } LCMapTuple;
 
 typedef struct LCMapBucket {
+    uint32_t hash;
     struct LCMapBucket* next;
     LCMapTuple* data;
 } LCMapBucket;
@@ -1378,13 +1383,135 @@ LCValue lc_std_map_new(LCRuntime* rt, int key_ty, int init_size) {
     return (LCValue){ { .ptr_val = (LCObject*)map }, LC_TY_MAP };
 }
 
-static inline LCMapTuple* lc_std_map_find_tuple(LCMap* map, LCValue key) {
+static uint32_t LCGetStringHash(LCRuntime*rt, LCValue val) {
+    LCString* str = (LCString*)val.ptr_val;
+    if (str->hash != 0) {
+        return str->hash;
+    }
+
+    if (str->is_wide_char) {
+        str->hash = hash_string16(str->u.str16, str->length, rt->seed);
+    } else {
+        str->hash = hash_string8(str->u.str8, str->length, rt->seed);
+    }
+
+    return str->hash;
+}
+
+static inline uint32_t LCValueHash(LCRuntime* rt, LCValue val) {
+    switch (val.tag) {
+    case LC_TY_I32:
+    case LC_TY_BOOL:
+    case LC_TY_CHAR:
+        return hash_int(val.int_val, rt->seed);
+
+    case LC_TY_STRING:
+        return LCGetStringHash(rt, val);
+    
+    default:
+        return 0;
+    }
+}
+
+static inline int LCMapKeyEq(LCRuntime* rt, LCValue a, LCValue b) {
+    switch (a.tag) {
+    case LC_TY_I32:
+    case LC_TY_BOOL:
+    case LC_TY_CHAR:
+        if (a.int_val == b.int_val) {
+            return 1;
+        }
+        break;
+
+    case LC_TY_STRING:
+        if (lc_std_string_cmp(rt, LC_CMP_EQ, a, b).int_val != 0) {
+            return 1;
+        }
+
+        break;
+    
+    default:
+        break;
+    }
+    return 0;
+}
+
+static no_inline LCMapTuple* lc_std_map_find_tuple(LCRuntime*rt, LCMap* map, LCValue key) {
+    LCMapTuple* t = map->head;
+    LCMapTuple* tmp;
+    LCMapBucket *b, *bt;
+    uint32_t hash;
+
+    if (!map->is_small) {
+        hash = LCValueHash(rt, key);
+        uint32_t bucket_index = hash % (uint32_t)map->bucket_size;
+        b = map->buckets[bucket_index];
+
+        while (b != NULL) {
+            bt = b->next;
+
+            if (b->hash == hash && LCMapKeyEq(rt, b->data->key, key)) {
+                return b->data;
+            }
+
+            b = bt;
+        }
+
+        return NULL;
+    }
+
+    while (t != map->last) {
+        tmp = t->next;
+
+        if (LCMapKeyEq(rt, t->key, key)) {
+            return t;
+        }
+
+        t = tmp;
+    }
+
     return NULL;
+}
+
+#define LC_MAP_DEFAULT_BUCKET_SIZE 16
+
+static void lc_std_map_construct_hashtable(LCRuntime* rt, LCMap* map) {
+    LCMapTuple *t, *tmp;
+    uint32_t hash;
+    LCMapBucket* bucket;
+    int bucket_index;
+    t = map->head;
+
+    int bucket_size = LC_MAP_DEFAULT_BUCKET_SIZE;
+    LCMapBucket** buckets = lc_mallocz(rt, sizeof(LCMapBucket*) * bucket_size);
+
+    while (t != map->last) {
+        tmp = t->next;
+
+        hash = LCValueHash(rt, t->key);
+        bucket_index = hash % bucket_size;
+
+        bucket = lc_malloc(rt, sizeof(LCMapBucket));
+        bucket->data = t;
+        bucket->hash = hash;
+        bucket->next = NULL;
+
+        if (buckets[bucket_index]) {
+            bucket->next = buckets[bucket_index];
+        }
+        buckets[bucket_index] = bucket;
+
+        t = tmp;
+    }
+
+    map->bucket_size = bucket_size;
+    map->buckets = buckets;
+    map->is_small = 0;
 }
 
 LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     LCMap* map = (LCMap*)this.ptr_val;
-    LCMapTuple* found_tuple = lc_std_map_find_tuple(map, args[0]);
+    LCMapTuple* found_tuple = lc_std_map_find_tuple(rt, map, args[0]);
     LCMapTuple* tuple;
     if (found_tuple == NULL) {
         LCRetain(args[0]);
@@ -1405,6 +1532,13 @@ LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
         LCRetain(args[1]);
         tuple->value = args[1];
     }
+
+    if (map->is_small && map->size >= 8 && (
+        map->key_ty == LC_TY_STRING || map->key_ty == LC_TY_I32 || map->key_ty == LC_TY_CHAR)) {
+
+        lc_std_map_construct_hashtable(rt, map);
+    }
+
     return MK_NULL();
 }
 

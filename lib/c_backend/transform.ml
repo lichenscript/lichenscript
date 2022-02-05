@@ -709,7 +709,21 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       C_op.Expr.Temp tmp_id
     )
 
-    | Map _ -> failwith "unimplement"
+    | Map entries -> (
+      let tmp_id = env.tmp_vars_count in
+      env.tmp_vars_count <- env.tmp_vars_count + 1;
+
+      let init_size = List.length entries in
+
+      let init_stmt = { C_op.Stmt.
+        spec = Expr (C_op.Expr.Assign(C_op.Expr.Temp tmp_id, C_op.Expr.NewMap init_size));
+        loc = expr.loc;
+      } in
+
+      prepend_stmts := List.concat [!prepend_stmts; [init_stmt]];
+
+      C_op.Expr.Temp tmp_id
+    )
 
     | Call call -> (
       let open Expression in

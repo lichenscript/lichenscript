@@ -415,6 +415,11 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env (Int.to_string len);
     ps env ")"
 
+  | NewMap init_size ->
+    ps env "lc_std_map_new(rt, LC_TY_STRING, ";
+    ps env (Int.to_string init_size);
+    ps env ")"
+
   | ArrayGetValue (sym, index) -> (
     ps env "LCArrayGetValue(rt, ";
     codegen_expression env sym;
