@@ -1494,11 +1494,8 @@ static void lc_std_map_construct_hashtable(LCRuntime* rt, LCMap* map) {
         bucket = lc_malloc(rt, sizeof(LCMapBucket));
         bucket->data = t;
         bucket->hash = hash;
-        bucket->next = NULL;
+        bucket->next = buckets[bucket_index];
 
-        if (buckets[bucket_index]) {
-            bucket->next = buckets[bucket_index];
-        }
         buckets[bucket_index] = bucket;
 
         t = tmp;
@@ -1510,30 +1507,51 @@ static void lc_std_map_construct_hashtable(LCRuntime* rt, LCMap* map) {
 }
 
 LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCMapTuple *found_tuple, *tuple;
+    LCMapBucket *bucket;
+    uint32_t hash;
+    int index;
     LCMap* map = (LCMap*)this.ptr_val;
-    LCMapTuple* found_tuple = lc_std_map_find_tuple(rt, map, args[0]);
-    LCMapTuple* tuple;
-    if (found_tuple == NULL) {
+
+    found_tuple = lc_std_map_find_tuple(rt, map, args[0]);
+    if (found_tuple == NULL) { // not found, add to the linked list
         LCRetain(args[0]);
         LCRetain(args[1]);
 
         tuple = (LCMapTuple*)lc_malloc(rt, sizeof(LCMapTuple));
         tuple->key = args[0];
         tuple->value = args[1];
+
         tuple->prev = map->last;
         tuple->next = NULL;
 
         map->size++;
         map->last = tuple;
+        if (map->head == NULL) {
+            map->head = tuple;
+        }
 
-        return MK_NULL();
-    } else {
+        if (!map->is_small) {
+            hash = LCValueHash(rt, args[0]);
+            index = hash % map->bucket_size;
+
+            bucket = (LCMapBucket*)lc_malloc(rt, sizeof(LCMapBucket));
+            bucket->data = tuple;
+            bucket->hash = hash;
+            bucket->next = map->buckets[index];
+
+            map->buckets[index] = bucket;
+
+            return MK_NULL();
+        }
+    } else {  // found in hashmap, replace exist value
         LCRelease(rt, tuple->value);
         LCRetain(args[1]);
         tuple->value = args[1];
+        return MK_NULL();
     }
 
-    if (map->is_small && map->size >= 8 && (
+    if (map->size >= 8 && (
         map->key_ty == LC_TY_STRING || map->key_ty == LC_TY_I32 || map->key_ty == LC_TY_CHAR)) {
 
         lc_std_map_construct_hashtable(rt, map);
@@ -1550,16 +1568,14 @@ static inline void lc_free_map_tuple(LCRuntime* rt, LCMapTuple* tuple) {
 
 void lc_std_map_free(LCRuntime* rt, LCValue val) {
     LCMap* map = (LCMap*)val.ptr_val;
-    LCMapTuple* ptr;
-    LCMapTuple* tmp;
-    LCMapBucket* bucket;
-    LCMapBucket* bp;
+    LCMapTuple *ptr, *tmp;
+    LCMapBucket *bucket, *bp;
 
     if (likely(map->size > 0)) {
         if (map->is_small) {
             ptr = map->head;
 
-            while (ptr != map->last) {
+            while (ptr != NULL) {
                 tmp = ptr->next;
 
                 lc_free_map_tuple(rt, ptr);
@@ -1587,4 +1603,20 @@ void lc_std_map_free(LCRuntime* rt, LCValue val) {
 
 clean:
     lc_free(rt, map);
+}
+
+LCValue lc_std_map_get(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCMapTuple *t, *tmp;
+    LCMap* map = (LCMap*)this.ptr_val;
+
+    t = lc_std_map_find_tuple(rt, map, args[0]);
+    if (t == NULL) {
+        return /* None */MK_UNION(1);
+    }
+
+    return /* Some(result) */LCNewUnionObject(rt, 0, 1, (LCValue[]) { t->value });
+}
+
+LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    return  /* None */MK_UNION(1);
 }

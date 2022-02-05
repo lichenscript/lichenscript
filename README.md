@@ -6,24 +6,18 @@ Easy to integrated with the Web Ecosystem.
 
 ## Why
 
-Webassembly(AKA WASM) provides excellent performance approching native speed, but it's hard for front-end ecosystem to use it.
+LichenScript is designed to write untrustworthy plugins for a exist system.
+For example, LichenScript can be used to write third-party plugins for your website/mobile app, which is isolated.
+It has modern syntax such as pattern matching/discriminated union.
+It's designed to be lightweight, easy to compile to target platform with very small overhead.
 
-## Roadmap
+# Feature
 
-| Syntax | Status |
-| ------- | ------ |
-| Lambda Expression | ✅ |
-| Pattern matching | ✅ |
-| Object inheritance | ✅ |
-| For Iterator | 🔨 |
-| Operator overloading | 🔨 |
-| Customize getter/setter | 🔨 |
-| Async/await | 🔨 |
-
-| Target | Status |
-| ------ | ------ |
-| Compiled to C | ✅ |
-| Compiled to JavaScript | ✅ |
+- Modern syntax, close to TypeScript/JavaScript
+- Static typing
+- Running on almost all platform through C/JavaScript
+- Isolate environment
+- Very lightweight runtime and very small overhead
 
 ## Senerios
 
@@ -31,6 +25,33 @@ Webassembly(AKA WASM) provides excellent performance approching native speed, bu
 - Sanbox environment in Web
 - Plugin engine for your Web App
 - Mini-program environment
+
+# Roadmap
+
+✅ Done
+🔨 Work in progress
+📖 Planning
+
+| Syntax | Status |
+| ------- | ------ |
+| Lambda Expression | ✅ |
+| Pattern matching | ✅ |
+| Object inheritance | ✅ |
+| Tuple | 🔨 |
+| For Iterator | 🔨 |
+| Customize getter/setter | 🔨 |
+| Operator overloading | 📖 |
+| Async/await | 📖 |
+
+| Stdlib | Status |
+| Array | ✅ |
+| Map | ✅ |
+
+| Target | Status |
+| ------ | ------ |
+| Compiled to C (macOS/Linux) | ✅ |
+| Compiled to C (Emscripten/WASM) | ✅ |
+| Compiled to JavaScript | 🔨 |
 
 # FAQ
 

@@ -720,7 +720,50 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         loc = expr.loc;
       } in
 
-      prepend_stmts := List.concat [!prepend_stmts; [init_stmt]];
+      let pre, set_stmts, app =
+        entries
+        |> List.map
+          ~f:(fun entry ->
+            let open Literal in
+            let key_expr =
+              match entry.map_entry_key with
+              | String(content, _, _) -> 
+                auto_release_expr env ~is_move:false ~append_stmts ty_var (C_op.Expr.NewString content)
+
+              | Integer(content, _) ->
+                C_op.Expr.NewInt content
+
+              | _ ->
+                failwith "unimplemented"
+            in
+            let expr = transform_expression env entry.map_entry_value in
+            let set_expr = C_op.Expr.ExternalCall(
+              C_op.SymLocal "lc_std_map_set",
+              Some (C_op.Expr.Temp tmp_id),
+              [key_expr; expr.expr]
+              )
+            in
+            expr.prepend_stmts,
+            { C_op.Stmt.
+              spec = Expr set_expr;
+              loc = entry.map_entry_loc;
+            },
+            expr.append_stmts
+          )
+        |> List.unzip3
+      in
+
+      prepend_stmts := List.concat [
+        !prepend_stmts;
+        List.concat pre;
+        [init_stmt];
+        set_stmts
+      ];
+
+      append_stmts := List.concat [
+        List.concat app;
+        !append_stmts;
+      ];
 
       C_op.Expr.Temp tmp_id
     )
