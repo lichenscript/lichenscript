@@ -1617,6 +1617,84 @@ LCValue lc_std_map_get(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     return /* Some(result) */LCNewUnionObject(rt, 0, 1, (LCValue[]) { t->value });
 }
 
-LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+static inline LCValue lc_std_map_remove_complex(LCRuntime* rt, LCMap* map, LCValue key) {
+    LCMapTuple* t;
+    LCMapBucket **bucket_ref;
+    uint32_t hash = LCValueHash(rt, key);
+    int index = hash % map->bucket_size;
+    LCValue result;
+
+    bucket_ref = &map->buckets[index];
+
+    while ((*bucket_ref) != NULL) {
+
+        if ((*bucket_ref)->hash == hash && LCMapKeyEq(rt, (*bucket_ref)->data->key, key)) {
+            result = LCNewUnionObject(rt, 0, 1, (LCValue[]){ t->value });
+
+            t = (*bucket_ref)->data;
+
+            if (t->prev) {
+                t->prev->next = t->next;
+            } else {  // is first
+                map->head = t->next;
+            }
+
+            if (t->next) {
+                t->next->prev = t->prev;
+            } else {  // is last
+                map->last = t->prev;
+            }
+
+            lc_free_map_tuple(rt, t);
+
+            (*bucket_ref) = (*bucket_ref)->next;
+
+            return result;
+        }
+
+        bucket_ref = &((*bucket_ref)->next);
+    }
+
     return  /* None */MK_UNION(1);
+}
+
+LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCMapTuple *t, *tmp;
+    LCMap* map = (LCMap*)this.ptr_val;
+    LCValue result;
+
+    if (map->is_small) {
+        t = map->head;
+
+        while (t != NULL) {
+            tmp = t->next;
+
+            if (LCMapKeyEq(rt, t->key, args[0])) {
+                result = LCNewUnionObject(rt, 0, 1, (LCValue[]){ t->value });
+
+                if (t->prev) {
+                    t->prev->next = t->next;
+                } else {  // is first
+                    map->head = t->next;
+                }
+
+                if (t->next) {
+                    t->next->prev = t->prev;
+                } else {  // is last
+                    map->last = t->prev;
+                }
+
+                lc_free_map_tuple(rt, t);
+                map->size++;
+
+                return result;
+            }
+
+            t = tmp;
+        }
+
+        return  /* None */MK_UNION(1);
+    }
+
+    return  lc_std_map_remove_complex(rt, map, args[0]);
 }
