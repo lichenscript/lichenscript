@@ -51,7 +51,13 @@ class scope ?prev () = object(self)
     Hash_set.add generic_type_symbol name
 
   method is_generic_type_symbol (name: string) =
-    Hash_set.mem generic_type_symbol name
+    let test = Hash_set.mem generic_type_symbol name in
+    if test then test
+    else (
+      match prev with
+      | Some prev -> prev#is_generic_type_symbol name
+      | None -> false
+    )
 
   method find_local_var_symbol (name: string): variable option =
     SymbolTable.find var_symbols name

@@ -80,15 +80,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
           binding_loc;
         }
       )
-      | Symbol (name, sym_id) -> (
-        let scope = Env.peek_scope env in
-        (match scope#new_var_symbol name ~id:sym_id ~kind:binding_kind with
-        | `Duplicate -> (
-          let err = Type_error.(make_error (Env.ctx env) binding_loc (Redefinition name)) in
-          raise Type_error.(Error err)
-        )
-        | _ -> ());
-
+      | Symbol (_, sym_id) -> (
         let ctx = Env.ctx env in
         let node = Type_context.get_node ctx sym_id in
         Type_context.update_node ctx sym_id {
@@ -497,6 +489,7 @@ and annotate_expression_match ~prev_deps env _match =
   let annotate_clause clause =
     let open Ast.Expression in
     let scope = new scope ~prev:parent_scope () in
+    parent_scope#add_child scope;
     Env.with_new_scope env scope (fun env ->
       let { clause_pat; clause_consequent; clause_loc } = clause in
       let clause_pat, clause_deps = annotate_pattern ~kind:Ast.Pvar_const env clause_pat in

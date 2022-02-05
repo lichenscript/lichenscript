@@ -90,6 +90,12 @@ type current_fun_meta = {
   mutable def_local_names: string list;
 }
 
+(* pattern matching meta *)
+type pm_meta = {
+  pm_test: C_op.Expr.t;
+  pm_binding_stmts: C_op.Stmt.t list;
+}
+
 let preserved_name = [ "ret"; "rt"; "this"; "argc"; "argv"; "t" ]
 
 let create_current_fun_meta fun_name = {
@@ -1174,44 +1180,46 @@ and transform_pattern_matching env ~prepend_stmts ~loc ~ty_var _match =
   let label_name = "done_" ^ (Int.to_string ty_var) in
 
   let transform_clause clause =
-    let saved_tmp_count = env.tmp_vars_count in
-    let test_expr = transform_pattern_to_test env match_expr.expr clause.clause_pat in
+    let scope = create_scope_and_distribute_vars env clause.clause_scope in
+    with_scope env scope (fun env ->
+      let saved_tmp_count = env.tmp_vars_count in
+      let { pm_test; _ } = transform_pattern_to_test env match_expr.expr clause.clause_pat in
 
-    let body = transform_expression env clause.clause_consequent in
+      let body = transform_expression env clause.clause_consequent in
 
-    let done_stmt = { C_op.Stmt.
-      spec = Goto label_name;
-      loc = clause.clause_loc;
-    } in
+      let done_stmt = { C_op.Stmt.
+        spec = Goto label_name;
+        loc = clause.clause_loc;
+      } in
 
-    prepend_stmts := List.append
-      !prepend_stmts
-      [{
-        C_op.Stmt.
-        spec = If {
-          if_test = test_expr;
-          if_consequent =
-            List.concat [
-              body.prepend_stmts;
-              [{ C_op.Stmt.
-                spec = Expr (
-                  Assign(
-                    (Ident (C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"))),
-                    body.expr
-                  )
-                );
-                loc = Loc.none;
-              }];
-              body.append_stmts;
-              [done_stmt];
-            ];
-          if_alternate = None;
-        };
-        loc = Loc.none;
-      }];
-
-    tmp_counter := env.tmp_vars_count::(!tmp_counter);
-    env.tmp_vars_count <- saved_tmp_count;
+      prepend_stmts := List.append
+        !prepend_stmts
+        [{
+          C_op.Stmt.
+          spec = If {
+            if_test = pm_test;
+            if_consequent =
+              List.concat [
+                body.prepend_stmts;
+                [{ C_op.Stmt.
+                  spec = Expr (
+                    Assign(
+                      (Ident (C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"))),
+                      body.expr
+                    )
+                  );
+                  loc = Loc.none;
+                }];
+                body.append_stmts;
+                [done_stmt];
+              ];
+            if_alternate = None;
+          };
+          loc = Loc.none;
+        }];
+      tmp_counter := env.tmp_vars_count::(!tmp_counter);
+      env.tmp_vars_count <- saved_tmp_count;
+    )
   in
 
   List.iter ~f:transform_clause match_clauses;
@@ -1319,21 +1327,40 @@ and transform_block env ?ret (block: Typedtree.Block.t): C_op.Stmt.t list =
     List.append stmts cleanup
   )
 
-and transform_pattern_to_test env match_expr pat =
+and transform_pattern_to_test env match_expr pat : pm_meta =
   let open Pattern in
   let { spec; _ } = pat in
   match spec with
-  | Underscore -> NewBoolean true
+  | Underscore -> {
+    pm_test = NewBoolean true;
+    pm_binding_stmts = [];
+  }
+
   | Symbol (name, name_id) -> (
-    let name_node = Type_context.get_node env.ctx name_id in
-    let ctor_opt = Check_helper.find_typedef_of env.ctx name_node.value in
-    let ctor = Option.value_exn ~message:(Format.sprintf "find enum ctor failed: %s %d" name name_id) ctor_opt in
-    let enum_ctor = Core_type.TypeDef.(
-      match ctor.spec with
-      | EnumCtor v -> v
-      | _ -> failwith "unrechable"
-    ) in
-    TagEqual(match_expr, enum_ctor.enum_ctor_tag_id)
+    let first_char = String.get name 0 in
+    if Char.is_uppercase first_char then (
+      let name_node = Type_context.get_node env.ctx name_id in
+      let ctor_opt = Check_helper.find_typedef_of env.ctx name_node.value in
+      let ctor = Option.value_exn ~message:(Format.sprintf "find enum ctor failed: %s %d" name name_id) ctor_opt in
+      let enum_ctor = Core_type.TypeDef.(
+        match ctor.spec with
+        | EnumCtor v -> v
+        | _ -> failwith "unrechable"
+      ) in
+      {
+        pm_test = TagEqual(match_expr, enum_ctor.enum_ctor_tag_id);
+        pm_binding_stmts = [];
+      }
+    ) else ( (* binding local var *)
+      let assign_stmt = { C_op.Stmt.
+        spec = Expr(Assign(Ident (SymLocal name), match_expr));
+        loc = Loc.none;
+      } in
+      {
+        pm_test = NewBoolean true;
+        pm_binding_stmts = [ assign_stmt ];
+      }
+    )
   )
   | EnumCtor ((_name, name_id), _child) -> (
     let name_node = Type_context.get_node env.ctx name_id in
@@ -1344,7 +1371,10 @@ and transform_pattern_to_test env match_expr pat =
       | EnumCtor v -> v
       | _ -> failwith "n"
     ) in
-    TagEqual(match_expr, enum_ctor.enum_ctor_tag_id)
+    {
+      pm_test = TagEqual(match_expr, enum_ctor.enum_ctor_tag_id);
+      pm_binding_stmts = [];
+    }
   )
 
 and generate_cls_meta env cls_id gen_name =
