@@ -620,7 +620,9 @@ and codegen_function_block (env: t) block =
   let { body; _ } = block in
   List.iter
     ~f:(fun stmt ->
-      print_indents env;
+      (match stmt.spec with
+      | Label _ -> ()
+      | _ -> print_indents env);
       codegen_statement env stmt;
       endl env;
     )

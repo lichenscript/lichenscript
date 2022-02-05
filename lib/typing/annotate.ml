@@ -67,46 +67,48 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
     | Binding binding -> (
       let { binding_kind; binding_pat; binding_init; binding_loc; _ } = binding in
 
-      let binding_pat, sym_id = annotate_pattern env binding_pat in
-      let name =
-        let open T.Pattern in
-        match binding_pat.spec with
-        | Symbol (name, _) -> name
-        | EnumCtor _ -> failwith "unimplemented"
-      in
-
-      let scope = Env.peek_scope env in
-      (* TODO: check redefinition? *)
-      (match scope#new_var_symbol name ~id:sym_id ~kind:binding_kind with
-      | `Duplicate -> (
-        let err = Type_error.(make_error (Env.ctx env) binding_loc (Redefinition name)) in
-        raise Type_error.(Error err)
-      )
-      | _ -> ());
-
       let binding_init = annotate_expression ~prev_deps env binding_init in
 
-      let ctx = Env.ctx env in
-      let node = Type_context.get_node ctx sym_id in
-      Type_context.update_node ctx sym_id {
-        node with
-        deps = List.concat [node.deps; [binding_init.ty_var]; prev_deps ];
-      };
+      let binding_pat, pat_deps = annotate_pattern ~kind:binding_kind env binding_pat in
+      let open T.Pattern in
+      match binding_pat.spec with
+      | Underscore -> (
+        [], T.Statement.Binding { T.Statement.
+          binding_kind;
+          binding_pat;
+          binding_init;
+          binding_loc;
+        }
+      )
+      | Symbol (name, sym_id) -> (
+        let scope = Env.peek_scope env in
+        (match scope#new_var_symbol name ~id:sym_id ~kind:binding_kind with
+        | `Duplicate -> (
+          let err = Type_error.(make_error (Env.ctx env) binding_loc (Redefinition name)) in
+          raise Type_error.(Error err)
+        )
+        | _ -> ());
 
-      [sym_id], T.Statement.Binding { T.Statement.
-        binding_kind;
-        binding_pat;
-        binding_init;
-        binding_ty_var = sym_id;
-        binding_loc;
-      }
+        let ctx = Env.ctx env in
+        let node = Type_context.get_node ctx sym_id in
+        Type_context.update_node ctx sym_id {
+          node with
+          deps = List.concat [node.deps; [binding_init.ty_var]; prev_deps ];
+        };
+
+        let deps = List.append pat_deps [sym_id] in
+        deps, T.Statement.Binding { T.Statement.
+          binding_kind;
+          binding_pat;
+          binding_init;
+          binding_loc;
+        }
+      )
+      | EnumCtor _ -> (
+        let err = Type_error.(make_error (Env.ctx env) binding_loc (CannotBindingOfPattern "enum")) in
+        raise (Type_error.Error err)
+      )
     )
-
-    (* | Block block -> (
-      let block = annotate_block ~prev_deps env block in
-      let dep = block.return_ty in
-      [dep], (T.Statement.Block block)
-    ) *)
 
     | Break _
     | Continue _
@@ -460,40 +462,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
     )
 
-    | Match _match -> (
-      let { match_expr; match_clauses; match_loc } = _match in
-      let match_expr = annotate_expression ~prev_deps env match_expr in
-
-      let annotate_clause clause =
-        let open Ast.Expression in
-        let { clause_pat; clause_consequent; clause_loc } = clause in
-        let clause_pat, clause_deps = annotate_pattern env clause_pat in
-        let clause_consequent = annotate_expression ~prev_deps:[clause_deps] env clause_consequent in
-        { T.Expression.
-          clause_pat;
-          clause_consequent;
-          clause_loc;
-        }
-      in
-
-      let match_clauses = List.map ~f:annotate_clause match_clauses in
-      let clauses_deps = List.map ~f:(fun clause -> T.Expression.(clause.clause_consequent.ty_var)) match_clauses in
-
-      let node = {
-        Core_type.
-        value = Unknown;
-        deps = List.append [match_expr.ty_var] clauses_deps;
-        loc = match_loc;
-      } in
-
-      let id = Type_context.new_id (Env.ctx env) node in
-
-      id, (T.Expression.Match { T.Expression.
-        match_expr;
-        match_clauses;
-        match_loc;
-      })
-    )
+    | Match _match -> annotate_expression_match ~prev_deps env _match
 
     | This -> (
       let scope = Env.peek_scope env in
@@ -518,6 +487,46 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     attributes;
     ty_var;
   }
+
+and annotate_expression_match ~prev_deps env _match =
+  let open Ast.Expression in
+  let { match_expr; match_clauses; match_loc } = _match in
+  let match_expr = annotate_expression ~prev_deps env match_expr in
+  let parent_scope = Env.peek_scope env in
+
+  let annotate_clause clause =
+    let open Ast.Expression in
+    let scope = new scope ~prev:parent_scope () in
+    Env.with_new_scope env scope (fun env ->
+      let { clause_pat; clause_consequent; clause_loc } = clause in
+      let clause_pat, clause_deps = annotate_pattern ~kind:Ast.Pvar_const env clause_pat in
+      let clause_consequent = annotate_expression ~prev_deps:clause_deps env clause_consequent in
+      { T.Expression.
+        clause_pat;
+        clause_consequent;
+        clause_loc;
+        clause_scope = scope;
+      }
+    )
+  in
+
+  let match_clauses = List.map ~f:annotate_clause match_clauses in
+  let clauses_deps = List.map ~f:(fun clause -> T.Expression.(clause.clause_consequent.ty_var)) match_clauses in
+
+  let node = {
+    Core_type.
+    value = Unknown;
+    deps = List.append [match_expr.ty_var] clauses_deps;
+    loc = match_loc;
+  } in
+
+  let id = Type_context.new_id (Env.ctx env) node in
+
+  id, (T.Expression.Match { T.Expression.
+    match_expr;
+    match_clauses;
+    match_loc;
+  })
 
 and annotate_expression_call ~prev_deps env loc call =
   let open Ast.Expression in
@@ -637,15 +646,18 @@ and annotate_declaration env decl : T.Declaration.t =
       match decl_spec with
       | DeclFunction declare_fun -> (
         let { Ast.Function. id; params; return_ty; _ } = declare_fun in
-
-        let params, params_type, params_deps = annotate_function_params env params in
-
-        let scope = Env.peek_scope env in
+        let parent_scope = Env.peek_scope env in
         let ty_id =
-          match scope#find_var_symbol id.pident_name with
+          match parent_scope#find_var_symbol id.pident_name with
           | Some v -> v.var_id
           | None -> failwith (Format.sprintf "unexpected: %s is not added to scope\n" id.pident_name)
         in
+
+        let scope = new scope ~prev:parent_scope () in
+
+        let params, params_type, params_deps = Env.with_new_scope env scope (fun env ->
+          annotate_function_params env params
+        ) in
 
         let fun_return, fun_return_deps =
           match return_ty with
@@ -801,8 +813,6 @@ and annotate_class env cls =
           Env.with_new_scope env method_scope (fun env ->
             let cls_method_params, method_params, cls_method_params_deps = annotate_function_params env cls_method_params in
 
-            add_all_params_into_scope env method_scope cls_method_params;
-
             let cls_method_body = annotate_block_impl ~prev_deps:[cls_var.var_id] env cls_method_body in
 
             let this_deps = ref !props_deps in
@@ -933,7 +943,14 @@ and annotate_class env cls =
             raise (Error err)
           );
 
-          let cls_decl_method_params, method_params, cls_method_params_deps = annotate_function_params env cls_decl_method_params in
+          let parent_scope = Env.peek_scope env in
+          let scope = new scope ~prev:parent_scope () in
+
+          let cls_decl_method_params, method_params, cls_method_params_deps =
+            Env.with_new_scope env scope (fun env ->
+              annotate_function_params env cls_decl_method_params
+            )
+          in
 
           let method_return, return_ty_deps =
             match cls_decl_method_return_ty with
@@ -1072,7 +1089,7 @@ and annotate_class env cls =
     { T.Declaration. cls_id; cls_visibility; cls_body; cls_loc; cls_comments; }
   )
 
-and annotate_an_def_identifer env ident =
+and annotate_an_def_identifer ~kind env ident =
   let open Identifier in
   let { pident_name; pident_loc } = ident in
   let node = {
@@ -1082,21 +1099,31 @@ and annotate_an_def_identifer env ident =
     deps = [];
   } in
   let id = Type_context.new_id (Env.ctx env) node in
+  let scope = Env.peek_scope env in
+  (match scope#new_var_symbol pident_name ~id ~kind with
+  | `Duplicate -> (
+    let err = Type_error.(make_error (Env.ctx env) pident_loc (Redefinition pident_name)) in
+    raise Type_error.(Error err)
+  )
+  | _ -> ());
   pident_name, id
 
 and is_name_enum_or_class name =
   let first_char = String.get name 0 in
   Char.is_uppercase first_char
 
-and annotate_pattern env pat =
+and annotate_pattern ~kind env pat : (T.Pattern.t * int list) =
   let open Ast.Pattern in
   let { spec; loc } = pat in
   let scope = Env.peek_scope env in
-  let id, spec =
+  let deps = ref [] in
+  let spec =
     match spec with
     | Identifier ident -> (
       (* It's a enum contructor *)
-      if is_name_enum_or_class ident.pident_name then (
+      if String.equal ident.pident_name "_" then (
+        T.Pattern.Underscore
+      ) else if is_name_enum_or_class ident.pident_name then (
         Env.capture_variable env ~name:ident.pident_name;
 
         let ctor_var = scope#find_var_symbol ident.pident_name in
@@ -1105,10 +1132,13 @@ and annotate_pattern env pat =
           raise (Type_error.Error err)
         );
         let ctor = Option.value_exn ctor_var in
-        ctor.var_id, (T.Pattern.Symbol (ident.pident_name, ctor.var_id))
+        deps := List.append !deps [ctor.var_id];
+        (T.Pattern.Symbol (ident.pident_name, ctor.var_id))
       ) else (
-        let name, id = annotate_an_def_identifer env ident in
-        id, (T.Pattern.Symbol (name, id))
+        (* local var *)
+        let name, id = annotate_an_def_identifer ~kind env ident in
+        deps := List.append !deps [id];
+        (T.Pattern.Symbol (name, id))
       )
     )
 
@@ -1120,16 +1150,17 @@ and annotate_pattern env pat =
       );
       let ctor_var = Option.value_exn ctor_var in
 
-      let param_pat, pat_id = annotate_pattern env pat in
+      let param_pat, param_deps = annotate_pattern ~kind env pat in
+      deps := List.concat [ param_deps; !deps; [ctor_var.var_id]];
 
-      pat_id, (T.Pattern.EnumCtor (
+      (T.Pattern.EnumCtor (
         (id.pident_name, ctor_var.var_id),
         param_pat
       ))
     )
 
   in
-  { T.Pattern. spec; loc }, id
+  { T.Pattern. spec; loc }, List.rev !deps
 
 (* only collect deps, construct value in type check *)
 and annotate_type env ty : (TypeExpr.t * int list) =
@@ -1187,7 +1218,7 @@ and annotate_function_params env params : T.Function.params * TypeExpr.params * 
   let open Ast.Function in
   let annoate_param param =
     let { param_name; param_ty; param_loc; param_rest } = param in
-    let param_name = annotate_an_def_identifer env param_name in
+    let param_name = annotate_an_def_identifer ~kind:Ast.Pvar_const env param_name in
     let _, param_id = param_name in
     let deps = ref [] in
     let value = ref TypeExpr.Unknown in
@@ -1243,20 +1274,6 @@ and annotate_function_params env params : T.Function.params * TypeExpr.params * 
 
   { T.Function. params_content = params; params_loc }, param_type, params_deps
 
-and add_all_params_into_scope env scope params =
-  let open T.Function in
-  List.iter
-    ~f:(fun (param: T.Function.param) -> 
-      let name, _ = param.param_name in
-      match scope#new_var_symbol name ~id:param.param_ty ~kind:Ast.Pvar_const with
-      | `Duplicate -> (
-        let err = Type_error.(make_error (Env.ctx env) param.param_loc (Redefinition name)) in
-        raise Type_error.(Error err)
-      )
-      | _ -> ()
-    )
-    params.params_content;
-
 and annotate_function env fun_ =
   let open Ast.Function in
 
@@ -1297,8 +1314,6 @@ and annotate_function env fun_ =
     fun_deps := List.append !fun_deps return_ty_deps;
 
     let params, params_type, params_deps = annotate_function_params env header.params in
-
-    add_all_params_into_scope env fun_scope params;
 
     let body = annotate_block_impl ~prev_deps:params_deps env body in
 

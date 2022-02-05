@@ -5,7 +5,7 @@ function main() {
     };
     let test = a.get("name");
     match test {
-        case Some(name) => print("found")
+        case Some(name) => print("found: ", name)
         case None => print("not found")
     }
 }

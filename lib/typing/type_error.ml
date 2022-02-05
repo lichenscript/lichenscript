@@ -38,6 +38,7 @@ and spec =
   | RestShouldBeArray
   | ClassPropNotInit of string * string
   | ClassInitNotAssignable of string * string * TypeExpr.t * TypeExpr.t
+  | CannotBindingOfPattern of string
 
 let make_error ctx loc spec =
   { loc; spec; ctx }
@@ -175,6 +176,9 @@ module PP = struct
       Format.fprintf formatter "Init propperty '%s' of class '%s' failed, type '%s' is not assignable to type '%s'"
         prop_name cls_name
         (pp_ty assign) (pp_ty be_assigned)
+
+    | CannotBindingOfPattern pattern_name ->
+      Format.fprintf formatter "Currently can not bind '%s', will support in the future." pattern_name
 
   let error ~ctx formatter err =
     let { spec; loc; _ } = err in

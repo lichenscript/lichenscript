@@ -189,10 +189,15 @@ and check_statement env stmt =
   )
 
   | Binding binding -> (
-    let { binding_ty_var; binding_init; _ } = binding in
+    let { binding_pat; binding_init; _ } = binding in
     check_expression env binding_init;
-    let expr_node = Type_context.get_node env.ctx binding_init.ty_var in
-    Type_context.update_node_type env.ctx binding_ty_var expr_node.value
+    match binding_pat.spec with
+    | T.Pattern.Underscore -> ()
+    | T.Pattern.Symbol(_, ty_var) -> (
+      let expr_node = Type_context.get_node env.ctx binding_init.ty_var in
+      Type_context.update_node_type env.ctx ty_var expr_node.value
+    )
+    | _ -> failwith "unreachable"
   )
 
   | Break _ -> ()

@@ -2,6 +2,9 @@ open Lichenscript_lex
 open Lichenscript_parsing
 open Scope
 
+type identifier = (string * int)
+[@@deriving show]
+
 module Pattern = struct
 
   type t = {
@@ -10,8 +13,9 @@ module Pattern = struct
   }
 
   and spec =
-  | Symbol of (string * int)
-  | EnumCtor of ((string * int) * t)
+  | Underscore
+  | Symbol of identifier
+  | EnumCtor of (identifier * t)
   [@@deriving show]
 
 end
@@ -41,7 +45,7 @@ module%gen rec Expression : sig
 
   and init = {
     init_loc: Loc.t;
-    init_name: (string * int);
+    init_name: identifier;
     init_elements: init_element list;
   }
 
@@ -55,6 +59,7 @@ module%gen rec Expression : sig
     clause_pat: Pattern.t;
     clause_consequent: t;
     clause_loc: Loc.t;
+    clause_scope: scope;
   }
 
   and lambda = {
@@ -72,7 +77,7 @@ module%gen rec Expression : sig
 
   and spec =
     | Constant of Ast.Literal.t
-    | Identifier of (string * int)
+    | Identifier of identifier
     | Lambda of lambda
     | If of if_desc
     | Array of t list
@@ -136,7 +141,6 @@ and Statement : sig
   and var_binding = {
     binding_kind: Ast.var_kind;
     binding_loc: Loc.t;
-    binding_ty_var: int; 
     binding_pat: Pattern.t;
     binding_init: Expression.t;
   }
@@ -166,13 +170,13 @@ and Function : sig
   }
 
   and header = {
-    name: (string * int);
+    name: identifier;
     name_loc: Loc.t;  (* used for sourcemap *)
     params: params;
   }
 
   and param = {
-    param_name: (string * int);
+    param_name: identifier;
     param_ty: int;
     param_loc: Loc.t;
     param_rest: bool;
@@ -198,7 +202,7 @@ end
 and Enum : sig
 
   type case  = {
-    case_name: (string * int);
+    case_name: identifier;
     case_fields: Core_type.TypeExpr.t list;
     case_loc: Loc.t;
   }
@@ -206,7 +210,7 @@ and Enum : sig
 
   type t = {
     visibility: Asttypes.visibility option;
-    name: (string * int);
+    name: identifier;
     type_vars: string list;  (* generic vars *)
     cases: case list;
     loc: Loc.t;
@@ -229,7 +233,7 @@ and Declaration : sig
   }
 
   and _class = {
-    cls_id: (string * int);
+    cls_id: identifier;
     cls_visibility: Asttypes.visibility option;
     cls_loc: Loc.t;
     cls_body: class_body;
@@ -251,7 +255,7 @@ and Declaration : sig
     cls_method_attributes: Ast.attributes;
     cls_method_visibility: Asttypes.visibility option;
     cls_method_modifier: Ast.Declaration.class_modifier option;
-    cls_method_name: (string * int);
+    cls_method_name: identifier;
     cls_method_params: Function.params;
     cls_method_body: Block.t;
     cls_method_scope: scope option;
@@ -260,7 +264,7 @@ and Declaration : sig
 
   and class_declare_method = {
     cls_decl_method_attributes: Ast.attributes;
-    cls_decl_method_name: (string * int);
+    cls_decl_method_name: identifier;
     cls_decl_method_params: Function.params;
     cls_decl_method_loc: Loc.t;
   }
@@ -271,14 +275,14 @@ and Declaration : sig
     | Cls_declare of class_declare_method
 
   and intf_method = {
-    intf_method_name: (string * int);
+    intf_method_name: identifier;
     intf_method_params: Function.params;
     intf_method_loc: Loc.t;
   }
 
   and intf = {
     intf_visibility: Asttypes.visibility option;
-    intf_name:       (string * int);
+    intf_name:       identifier;
     intf_type_vars:  Identifier.t list;
     intf_methods:    intf_method list;
   }
