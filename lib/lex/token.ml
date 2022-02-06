@@ -56,7 +56,6 @@ type t =
   | T_ELSE
   | T_VIRTUAL
   | T_OVERRIDE
-  | T_DELETE
   | T_VOID
   | T_ENUM
   | T_MATCH
@@ -210,7 +209,6 @@ let token_to_string = function
   | T_ELSE -> "T_ELSE"
   | T_VIRTUAL -> "T_VIRTUAL"
   | T_OVERRIDE -> "T_OVERRIDE"
-  | T_DELETE -> "T_DELETE"
   | T_VOID -> "T_VOID"
   | T_ENUM -> "T_ENUM"
   | T_MATCH -> "T_MATCH"
@@ -348,7 +346,6 @@ let value_of_token = function
   | T_ELSE -> "else"
   | T_VIRTUAL -> "virtual"
   | T_OVERRIDE -> "override"
-  | T_DELETE -> "delete"
   | T_VOID -> "void"
   | T_ENUM -> "enum"
   | T_MATCH -> "match"
@@ -484,7 +481,6 @@ let is_keyword = function
   | T_EXTENDS
   | T_STATIC
   | T_ELSE
-  | T_DELETE
   | T_VOID
   | T_ENUM
   | T_EXPORT

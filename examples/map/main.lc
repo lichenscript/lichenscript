@@ -13,4 +13,10 @@ function main() {
         case Some(name) => print("found: ", name)
         case None => print("not found")
     }
+    a.delete("name");
+    test = a.get("name");
+    match test {
+        case Some(name) => print("found: ", name)
+        case None => print("not found")
+    }
 }

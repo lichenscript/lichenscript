@@ -812,7 +812,6 @@ let token (env : Lex_env.t) lexbuf : result =
   | "debugger" -> Token (env, T_DEBUGGER)
   | "declare" -> Token (env, T_DECLARE)
   | "default" -> Token (env, T_DEFAULT)
-  | "delete" -> Token (env, T_DELETE)
   | "do" -> Token (env, T_DO)
   | "else" -> Token (env, T_ELSE)
   | "enum" -> Token (env, T_ENUM)

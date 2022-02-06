@@ -54,4 +54,7 @@ public class Map<K, V> {
     @external("lc_std_map_get")
     declare get(key: K): Option<V>;
 
+    @external("lc_std_map_remove")
+    declare delete(key: K): Option<V>;
+
 }
