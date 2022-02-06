@@ -556,6 +556,14 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env (Int.to_string tag)
   )
 
+  | UnionGet (expr, index) -> (
+    ps env "LCUnionObjectGet(rt, ";
+    codegen_expression env expr;
+    ps env ", ";
+    ps env (Int.to_string index);
+    ps env ")"
+  )
+
   | IntValue e ->
     ps env "(";
     codegen_expression env e;

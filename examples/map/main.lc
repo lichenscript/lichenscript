@@ -8,4 +8,9 @@ function main() {
         case Some(name) => print("found: ", name)
         case None => print("not found")
     }
+    test = a.get("name1");
+    match test {
+        case Some(name) => print("found: ", name)
+        case None => print("not found")
+    }
 }

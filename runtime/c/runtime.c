@@ -879,6 +879,13 @@ LCValue LCNewUnionObject(LCRuntime* rt, int tag, int size, LCValue* args) {
     return (LCValue){ { .ptr_val = (LCObject*)union_obj }, LC_TY_UNION_OBJECT };
 }
 
+LCValue LCUnionObjectGet(LCRuntime* rt, LCValue this, int index) {
+    LCUnionObject* obj = (LCUnionObject*)this.ptr_val;
+    LCValue result = obj->value[index];
+    LCRetain(result);
+    return result;
+}
+
 int LCUnionGetType(LCValue val) {
     if (val.tag == LC_TY_UNION) {
         return val.int_val;

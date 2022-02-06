@@ -233,6 +233,7 @@ void LCRefCellSetValue(LCRuntime* rt, LCValue cell, LCValue value);
 LCValue LCRefCellGetValue(LCValue cell);
 
 LCValue LCNewUnionObject(LCRuntime* rt, int tag, int size, LCValue* args);
+LCValue LCUnionObjectGet(LCRuntime* rt, LCValue this, int index);
 int LCUnionGetType(LCValue);
 
 LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, int argc, LCValue* args);

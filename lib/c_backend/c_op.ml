@@ -145,6 +145,7 @@ and Expr : sig
   | InitCall of symbol
   | Ident of symbol
   | TagEqual of t * int
+  | UnionGet of t * int
   | Temp of int
   | IntValue of t
   | GetField of t * string * string (* expr classname fieldname *)

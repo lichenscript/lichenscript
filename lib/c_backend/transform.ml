@@ -63,6 +63,29 @@ module TScope = struct
   
 end
 
+(*
+ * It's a monad, represent the `continuation` of pattern test
+ * if (test) {
+ *   (* continuation here *)
+ * }
+ *)
+module PMMeta = struct
+
+  type generateor = (finalizers:C_op.Stmt.t list -> unit -> C_op.Stmt.t list)
+  type t = (generateor -> C_op.Stmt.t list)
+
+  let (>>=) (left: t) (right: t) = 
+    (fun generateor ->
+      left (fun ~finalizers:left_finalizers () ->
+        right (fun ~finalizers:right_finalizers () ->
+          let merged_finalizers = List.append left_finalizers right_finalizers in
+          generateor ~finalizers:merged_finalizers ()
+        )
+      ) 
+    )
+  
+end
+
 type cls_meta = {
   cls_id: int;
   cls_gen_name: string;
@@ -88,12 +111,6 @@ type current_fun_meta = {
   fun_name: string;
   used_name: string Hash_set.t;
   mutable def_local_names: string list;
-}
-
-(* pattern matching meta *)
-type pm_meta = {
-  pm_test: C_op.Expr.t;
-  pm_binding_stmts: C_op.Stmt.t list;
 }
 
 let preserved_name = [ "ret"; "rt"; "this"; "argc"; "argv"; "t" ]
@@ -1179,12 +1196,115 @@ and transform_pattern_matching env ~prepend_stmts ~loc ~ty_var _match =
   let tmp_counter = ref [] in
   let label_name = "done_" ^ (Int.to_string ty_var) in
 
+  let rec transform_pattern_to_test match_expr pat : PMMeta.t =
+    let open Pattern in
+    let { spec; _ } = pat in
+    match spec with
+    | Underscore ->
+      (fun genereator -> genereator ~finalizers:[] ())
+
+    | Symbol (name, name_id) -> (
+      let first_char = String.get name 0 in
+      if Char.is_uppercase first_char then (
+        let name_node = Type_context.get_node env.ctx name_id in
+        let ctor_opt = Check_helper.find_typedef_of env.ctx name_node.value in
+        let ctor = Option.value_exn ~message:(Format.sprintf "find enum ctor failed: %s %d" name name_id) ctor_opt in
+        let enum_ctor = Core_type.TypeDef.(
+          match ctor.spec with
+          | EnumCtor v -> v
+          | _ -> failwith "unrechable"
+        ) in
+        let if_test = C_op.Expr.TagEqual(match_expr, enum_ctor.enum_ctor_tag_id) in
+        (fun genereator ->
+          let if_stmt = { C_op.Stmt.
+            spec = If {
+              if_test;
+              if_consequent= genereator ~finalizers:[] ();
+              if_alternate = None;
+            };
+            loc = Loc.none;
+          } in
+          [if_stmt]
+        )
+      ) else ( (* binding local var *)
+        let assign_stmt = { C_op.Stmt.
+          spec = Expr(Assign(Ident (SymLocal name), match_expr));
+          loc = Loc.none;
+        } in
+        (fun genereator ->
+          let acc = genereator ~finalizers:[] () in
+          assign_stmt::acc
+        )
+      )
+    )
+    | EnumCtor ((_name, name_id), child) -> (
+      let name_node = Type_context.get_node env.ctx name_id in
+      let ctor_opt = Check_helper.find_typedef_of env.ctx name_node.value in
+      let ctor = Option.value_exn ctor_opt in
+      let enum_ctor = Core_type.TypeDef.(
+        match ctor.spec with
+        | EnumCtor v -> v
+        | _ -> failwith "n"
+      ) in
+      let if_test = C_op.Expr.TagEqual(match_expr, enum_ctor.enum_ctor_tag_id) in
+
+      let match_tmp = env.tmp_vars_count in
+      env.tmp_vars_count <- env.tmp_vars_count + 1;
+
+      let open C_op.Expr in
+
+      let assign_stmt = { C_op.Stmt.
+        spec = Expr(Assign(Temp match_tmp, UnionGet(match_expr, 0)));
+        loc = Loc.none;
+      } in
+
+      let release_stmt = { C_op.Stmt.
+        spec = Release(C_op.Expr.Temp match_tmp);
+        loc = Loc.none;
+      } in
+
+      let is_last_goto stmts =
+        let last_opt = List.last stmts in
+        match last_opt with
+        | Some { C_op.Stmt. spec = Goto _; _ } -> true
+        | _ -> false
+      in
+      
+      let open PMMeta in
+      let this_pm: t = fun generator ->
+        let acc = generator ~finalizers:[release_stmt] () in
+        let if_consequent=
+          if is_last_goto acc then
+            List.concat [
+              [assign_stmt];
+              acc;
+            ]
+          else
+            List.concat [
+              [assign_stmt];
+              acc;
+              [release_stmt];
+            ]
+        in
+        let if_stmt = { C_op.Stmt.
+          spec = If {
+            if_test;
+            if_consequent;
+            if_alternate = None;
+          };
+          loc = Loc.none;
+        } in
+        [if_stmt]
+      in
+      let child_pm = transform_pattern_to_test (Temp match_tmp) child in
+      this_pm >>= child_pm
+    )
+  in
+
   let transform_clause clause =
     let scope = create_scope_and_distribute_vars env clause.clause_scope in
     with_scope env scope (fun env ->
       let saved_tmp_count = env.tmp_vars_count in
-      let { pm_test; _ } = transform_pattern_to_test env match_expr.expr clause.clause_pat in
-
       let body = transform_expression env clause.clause_consequent in
 
       let done_stmt = { C_op.Stmt.
@@ -1192,31 +1312,28 @@ and transform_pattern_matching env ~prepend_stmts ~loc ~ty_var _match =
         loc = clause.clause_loc;
       } in
 
-      prepend_stmts := List.append
-        !prepend_stmts
-        [{
-          C_op.Stmt.
-          spec = If {
-            if_test = pm_test;
-            if_consequent =
-              List.concat [
-                body.prepend_stmts;
-                [{ C_op.Stmt.
-                  spec = Expr (
-                    Assign(
-                      (Ident (C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"))),
-                      body.expr
-                    )
-                  );
-                  loc = Loc.none;
-                }];
-                body.append_stmts;
-                [done_stmt];
-              ];
-            if_alternate = None;
-          };
+      let consequent ~finalizers () : C_op.Stmt.t list = List.concat [
+        body.prepend_stmts;
+        [{ C_op.Stmt.
+          spec = Expr (
+            Assign(
+              (Ident (C_op.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"))),
+              body.expr
+            )
+          );
           loc = Loc.none;
         }];
+        body.append_stmts;
+        finalizers;
+        [done_stmt];
+      ] in
+
+      let pm_meta = transform_pattern_to_test match_expr.expr clause.clause_pat in
+      let pm_stmts = pm_meta consequent in
+
+      prepend_stmts := List.append
+        !prepend_stmts
+        pm_stmts;
       tmp_counter := env.tmp_vars_count::(!tmp_counter);
       env.tmp_vars_count <- saved_tmp_count;
     )
@@ -1325,56 +1442,6 @@ and transform_block env ?ret (block: Typedtree.Block.t): C_op.Stmt.t list =
       ) else [] in
 
     List.append stmts cleanup
-  )
-
-and transform_pattern_to_test env match_expr pat : pm_meta =
-  let open Pattern in
-  let { spec; _ } = pat in
-  match spec with
-  | Underscore -> {
-    pm_test = NewBoolean true;
-    pm_binding_stmts = [];
-  }
-
-  | Symbol (name, name_id) -> (
-    let first_char = String.get name 0 in
-    if Char.is_uppercase first_char then (
-      let name_node = Type_context.get_node env.ctx name_id in
-      let ctor_opt = Check_helper.find_typedef_of env.ctx name_node.value in
-      let ctor = Option.value_exn ~message:(Format.sprintf "find enum ctor failed: %s %d" name name_id) ctor_opt in
-      let enum_ctor = Core_type.TypeDef.(
-        match ctor.spec with
-        | EnumCtor v -> v
-        | _ -> failwith "unrechable"
-      ) in
-      {
-        pm_test = TagEqual(match_expr, enum_ctor.enum_ctor_tag_id);
-        pm_binding_stmts = [];
-      }
-    ) else ( (* binding local var *)
-      let assign_stmt = { C_op.Stmt.
-        spec = Expr(Assign(Ident (SymLocal name), match_expr));
-        loc = Loc.none;
-      } in
-      {
-        pm_test = NewBoolean true;
-        pm_binding_stmts = [ assign_stmt ];
-      }
-    )
-  )
-  | EnumCtor ((_name, name_id), _child) -> (
-    let name_node = Type_context.get_node env.ctx name_id in
-    let ctor_opt = Check_helper.find_typedef_of env.ctx name_node.value in
-    let ctor = Option.value_exn ctor_opt in
-    let enum_ctor = Core_type.TypeDef.(
-      match ctor.spec with
-      | EnumCtor v -> v
-      | _ -> failwith "n"
-    ) in
-    {
-      pm_test = TagEqual(match_expr, enum_ctor.enum_ctor_tag_id);
-      pm_binding_stmts = [];
-    }
   )
 
 and generate_cls_meta env cls_id gen_name =
