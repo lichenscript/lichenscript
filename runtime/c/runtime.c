@@ -1018,7 +1018,9 @@ LCValue LCNewArray(LCRuntime* rt) {
 
 LCValue LCNewArrayLen(LCRuntime* rt, size_t size) {
     size_t cap = size;
-    if (cap > 2 &&  cap % 2 != 0) {
+    if (size == 0) {
+        cap = 2;
+    } else if (cap > 2 &&  cap % 2 != 0) {
         cap += 1;
     }
     LCArray* arr = LCNewArrayWithCap(rt, cap);
@@ -1159,6 +1161,59 @@ LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
 LCValue lc_std_array_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
     LCArray* arr = (LCArray*)this.ptr_val;
     return MK_I32(arr->len);
+}
+
+LCValue lc_std_array_resize(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    LCArray* arr = (LCArray*)this.ptr_val;
+    int new_len = args[0].int_val;
+    int i;
+    size_t new_cap;
+
+    if (new_len == arr->len) {
+        return MK_NULL();
+    }
+
+    if (new_len == 0) {
+        for (i = 0; i < arr->len; i++) {
+            LCRelease(rt, arr->data[i]);
+            arr->data[i] = MK_NULL();
+        }
+        arr->len = 0;
+
+        new_cap = 2;
+        arr->data = lc_realloc(rt, arr->data, sizeof(LCValue) * new_cap);
+        arr->capacity = new_cap;
+
+        return MK_NULL();
+    }
+
+    if (new_len < arr->len) {
+        for (i = new_len; i < arr->len; i++) {
+            LCRelease(rt, arr->data[i]);
+            arr->data[i] = MK_NULL();
+        }
+        arr->len = new_len;
+        return MK_NULL();
+    }
+
+    // assert(new_len > arr->len)
+    new_cap = arr->capacity;
+    while (new_cap < new_len) {
+        new_cap *= 2;
+    }
+
+    if (new_cap != arr->capacity) {
+        arr->data = lc_realloc(rt, arr->data, new_cap * sizeof(LCValue));
+        arr->capacity = new_cap;
+    }
+
+    for (i = arr->len; i < new_len; i++) {
+        LCRetain(args[1]);
+        arr->data[i] = args[1];
+    }
+
+    arr->len = new_len;
+    return MK_NULL();
 }
 
 LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {

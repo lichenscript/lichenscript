@@ -13,4 +13,16 @@ function main() {
 
     a[0] = 3;
     print("a[0]: ", a[0]);
+
+    a.resize(0, 0);
+    print("length: ", a.length);
+
+    a.resize(10, 6);
+    print("length: ", a.length);
+
+    i = 0;
+    while i < a.length {
+        print("index: ", i, " item: ", a[i]);
+        i += 1;
+    }
 }
