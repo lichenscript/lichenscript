@@ -14,6 +14,7 @@
  * limitations under the License.
  *)
 open Core_kernel
+open Lichenscript_lex
 open Lichenscript_typing
 
 (*
@@ -24,6 +25,7 @@ open Lichenscript_typing
  *)
 
 module ModuleMap = Hashtbl.Make(String)
+module VisitPathSet = Set.Make(Int)
 
 type t = {
   ctx: Type_context.t;
@@ -42,31 +44,62 @@ let create ~ctx () =
     top_level_deps;
   }
 
+let make_declare_of_decl id (decl: Typedtree.Declaration.t) =
+  let open Typedtree in
+  match decl.spec with
+  | Declaration.Function_ _fun -> (
+    let decl_spec = Declaration.Declare {
+      decl_visibility = None;
+      decl_spec = Declaration.DeclFunction _fun.header;
+      decl_loc = Loc.none;
+      decl_ty_var = id;
+    } in
+    Some { decl with
+      spec = decl_spec
+    }
+  )
+
+  | _ -> None
+
 let link_from_entry env ~debug entry =
   let reach_nodes = Array.create ~len:(ResizableArray.size env.ctx.ty_map) false in
+  let needs_decl = Array.create ~len:(ResizableArray.size env.ctx.ty_map) false in
 
-  let orders = ref [] in
-
-  let rec iterate_node id =
-    if Array.get reach_nodes id then ()
+  let rec iterate_node path id =
+    if VisitPathSet.mem path id then (
+      (* it's a cyclic reference *)
+      Array.set needs_decl id true
+    );
+    if Array.get reach_nodes id then
+      []
     else (
       let open Type_context in
       Array.set reach_nodes id true;
       let node = ResizableArray.get env.ctx.ty_map id in
+      let next_path = VisitPathSet.add path id in
 
-      let deps = node.deps in
-      List.iter ~f:iterate_node deps;
+      let children_orders =
+        node.deps
+        |> List.map ~f:(iterate_node next_path)
+        |> List.concat
+      in
 
-      (* after children *)
+      (* add this declaration to order after children *)
       let open Core_type.TypeExpr in
-      (match node.value with
-      | TypeDef _ -> orders := id::!orders;
-      | _ -> ()
-      )
+      let result = 
+        match node.value with
+        | TypeDef _ -> id::children_orders;
+        | _ -> children_orders
+      in
+
+      if Array.get needs_decl id then
+        List.append result [id * (-1)]
+      else
+        result
     )
   in
 
-  iterate_node entry;
+  let orders = (iterate_node VisitPathSet.empty entry) in
 
   if debug then (
     Format.eprintf "- entry %d\n" entry;
@@ -74,20 +107,32 @@ let link_from_entry env ~debug entry =
       ~f:(fun index id ->
         Format.printf "- %d: %d\n" index id
       )
-      (List.rev !orders)
+      (List.rev orders)
   );
 
   let declarations =
     List.fold
     ~init:[]
     ~f:(fun acc id->
-      let open Type_context in
-      match Hashtbl.find env.ctx.declarations id with
-      | None -> acc
-      | Some decl ->
-        decl::acc
+      if id >= 0 then (
+        let open Type_context in
+        match Hashtbl.find env.ctx.declarations id with
+        | None -> acc
+        | Some decl ->
+          decl::acc
+      ) else (
+        let positive = id * (-1) in
+        let open Type_context in
+        match Hashtbl.find env.ctx.declarations positive with
+        | None -> acc
+        | Some decl -> (
+          match make_declare_of_decl positive decl with
+          | Some d -> d::acc
+          | None -> acc
+        )
+      )
     )
-    (!orders)
+    orders
   in
   declarations
 

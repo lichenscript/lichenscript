@@ -219,24 +219,27 @@ and check_statement env stmt =
 
   | Empty -> ()
 
-and check_expression_if env if_spec =
+and check_expression_if env if_spec ty_var =
   let open T.Expression in
   let { if_test; if_consequent; if_alternative; _ } = if_spec in
   check_expression env if_test;
-  List.iter ~f:(check_statement env) if_consequent.body;
+  check_block env if_consequent;
+  (* List.iter ~f:(check_statement env) if_consequent.body; *)
   (match if_alternative with
   | Some (If_alt_block blk) -> (
     List.iter ~f:(check_statement env) blk.body;
   )
   | Some (If_alt_if desc) -> (
-    check_expression_if env desc
+    check_expression_if env desc ty_var
   )
 
   | None -> ()
   );
 
+  let node = Type_context.get_node env.ctx if_consequent.return_ty in
+
   (* TODO: check return of two branches *)
-  ()
+  Type_context.update_node_type env.ctx ty_var node.value
 
 and check_expression env expr =
   let open T.Expression in
@@ -263,7 +266,7 @@ and check_expression env expr =
 
   | Lambda lambda -> check_lambda env lambda
 
-  | If if_desc -> check_expression_if env if_desc
+  | If if_desc -> check_expression_if env if_desc expr.ty_var
 
   | Array arr_list -> (
     if List.is_empty arr_list then (

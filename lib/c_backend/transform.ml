@@ -204,7 +204,7 @@ let get_local_var_name fun_meta realname ty_int =
 
 let rec transform_declaration env decl =
   let open Declaration in
-  let { spec; loc; _ } = decl in
+  let { spec; loc; attributes } = decl in
   match spec with
   | Class cls -> (
     let specs = transform_class env cls in
@@ -222,12 +222,37 @@ let rec transform_declaration env decl =
     let specs = transform_enum env enum in
     List.map ~f:(fun spec -> { C_op.Decl. spec; loc }) specs
   )
-  | Interface _
-  | Declare _
+  | Interface _ -> []
+
+  | Declare declare -> (
+    if List.is_empty attributes then (
+      match declare.decl_spec with
+      | DeclFunction fun_header -> (
+        let phys_name, _ = fun_header.name in
+        let name = find_or_distribute_name env declare.decl_ty_var phys_name in
+        let decl = { C_op.Decl.
+          spec = FuncDecl name;
+          loc = Loc.none;
+        } in
+        [decl]
+      )
+    ) else
+      []
+  )
+
   | Import _ -> []
 
 and distribute_name env =
   TScope.distribute_name env.scope
+
+and find_or_distribute_name env id name =
+  match Hashtbl.find env.global_name_map id with
+  | Some name -> name
+  | None -> (
+    let new_name = C_op.SymLocal (distribute_name env name) in
+    Hashtbl.set env.global_name_map ~key:id ~data:new_name;
+    new_name
+  )
 
 (*
  * 1. Scan the function firstly, find out all the lambda expression
@@ -237,12 +262,16 @@ and distribute_name env =
 and transform_function env _fun =
   let open Function in
   let { body; comments; header; scope; _ } = _fun in
-  let original_name, _ = header.name in
+  let original_name, original_name_id = header.name in
 
   env.current_fun_name <- Some (create_current_fun_meta original_name);
   env.has_early_return <- false;
 
-  let fun_name = distribute_name env original_name in
+  let fun_name = 
+    match find_or_distribute_name env original_name_id original_name with
+    | C_op.SymLocal l -> l
+    | _ -> failwith "unreachable"
+  in
 
   if String.equal original_name "main" then (
     env.main_function_name <- Some fun_name
@@ -591,8 +620,15 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       | Integer(content, _) ->
         C_op.Expr.NewInt content
 
-      | _ ->
-        failwith "unimplemented"
+      | Boolean bl ->
+        C_op.Expr.NewBoolean bl
+
+      | Float (fl, _) ->
+        C_op.Expr.NewFloat fl
+
+      | Char ch ->
+        C_op.Expr.NewChar ch
+
     )
 
     (*

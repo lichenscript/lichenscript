@@ -13,6 +13,10 @@ val add_include_module_id: env -> string -> unit
 
 val with_scope: env -> Parse_scope.t -> (unit -> 'a) -> 'a
 
+val with_allow_init: env -> bool -> (env -> 'a) -> 'a
+
+val allow_init: env -> bool
+
 val scope: env -> Parse_scope.t
 
 val in_function: env -> bool

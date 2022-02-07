@@ -1,0 +1,20 @@
+
+function A() {
+    B();
+}
+
+function B() {
+    C(false);
+}
+
+function C(callA: boolean) {
+    if callA {
+        A()
+    } else {
+        print("finished")
+    }
+}
+
+function main() {
+    C(true);
+}

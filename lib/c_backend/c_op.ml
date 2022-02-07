@@ -70,6 +70,7 @@ module%gen rec Decl : sig
 
   type spec =
   | Func of Func.t
+  | FuncDecl of symbol 
   | LambdaDef of lambda_def
   | Class of _class
   | EnumCtor of enum_ctor

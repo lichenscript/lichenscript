@@ -201,6 +201,11 @@ and codegen_declaration env decl =
   match spec with
   | Func _fun -> codegen_function env _fun
 
+  | FuncDecl fun_name ->
+    ps env "LCValue ";
+    codegen_symbol env fun_name;
+    ps env "(LCRuntime* rt, LCValue this, int argc, LCValue* args);\n"
+
   | LambdaDef lambda_def -> (
     ps env (Format.sprintf "LCValue %s(LCRuntime* rt, LCValue this, int argc, LCValue* args) {\n" lambda_def.lambda_gen_name);
     ps env "    return MK_NULL();\n";
