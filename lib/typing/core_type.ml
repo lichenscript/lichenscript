@@ -27,6 +27,11 @@ module Visibility = struct
     | Internal
   [@@deriving show]
 
+  let access_in_module = function
+  | Public
+  | Internal -> true
+  | _ -> false
+
 end
 
 (*

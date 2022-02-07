@@ -314,6 +314,13 @@ and replace_params_with_type ctx type_map params =
   in
   { params_content; params_rest }
 
+let get_visibility_of_class_elm class_elm =
+  let open Core_type.TypeDef in
+  match class_elm with
+  | Cls_elm_prop (v, _, _) -> v
+  | Cls_elm_method(v, _) -> v
+  | Cls_elm_get_set(v, _, _) -> v
+
 (*
   * TODO: namespace
   * class/enum static function
@@ -334,11 +341,26 @@ let rec find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int
     let type_expr = Type_context.deref_type ctx type_expr in
     let open TypeDef in
     match type_expr with
-    | TypeDef { spec = Class cls; _ } -> (
-      let result =
-        List.find ~f:(fun (elm_name, _) -> String.equal elm_name member_name)
-        cls.tcls_elements
+    | TypeDef { id = cls_id; spec = Class cls; _ } -> (
+      let test_scope = scope#test_class_scope in
+      let outside_finder = (
+        fun (elm_name, elm) ->
+          let visibility = get_visibility_of_class_elm elm in
+          String.equal elm_name member_name && (Visibility.access_in_module visibility)
+        )
       in
+      let finder =
+        match test_scope with
+        | Some id -> (
+          (* in the current class *)
+          if id = cls_id then
+            (fun (elm_name, _) -> String.equal elm_name member_name)
+          else
+            outside_finder
+        )
+        | None -> outside_finder
+      in
+      let result = List.find ~f:finder cls.tcls_elements in
 
       let types_map =
         List.fold2_exn
