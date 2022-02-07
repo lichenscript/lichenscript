@@ -87,7 +87,10 @@ class scope ?prev () = object(self)
       | Some prev_scope -> (
         if prev_scope#set_variable_captured (level+1) name then (
           let id = CapturingVarMap.length capturing_variables in
-          capturing_variables <- CapturingVarMap.set capturing_variables ~key:name ~data:id;
+          capturing_variables <-
+            (match CapturingVarMap.add capturing_variables ~key:name ~data:id with
+            | `Ok v -> v
+            | `Duplicate -> capturing_variables);
           true
         ) else false
       )

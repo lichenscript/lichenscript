@@ -145,7 +145,7 @@ type t = {
   cls_meta_map: (int, cls_meta) Hashtbl.t;
 
   (* for lambda generation *)
-  mutable current_fun_name: current_fun_meta option;
+  mutable current_fun_meta: current_fun_meta option;
   mutable lambdas: C_op.Decl.t list;
 }
 
@@ -195,7 +195,7 @@ let create ctx =
     has_early_return = false;
     global_name_map;
     cls_meta_map;
-    current_fun_name = None;
+    current_fun_meta = None;
     lambdas = [];
   }
 
@@ -271,7 +271,7 @@ and transform_function env _fun =
   let { body; comments; header; scope; _ } = _fun in
   let original_name, original_name_id = header.name in
 
-  env.current_fun_name <- Some (create_current_fun_meta original_name);
+  env.current_fun_meta <- Some (create_current_fun_meta original_name);
   env.has_early_return <- false;
 
   let fun_name = 
@@ -286,7 +286,7 @@ and transform_function env _fun =
 
   let result = transform_function_impl env ~name:fun_name ~params:header.params ~scope ~body ~comments in
 
-  env.current_fun_name <- None;
+  env.current_fun_meta <- None;
 
   [ result ]
 
@@ -310,7 +310,7 @@ and distribute_name_to_scope scope fun_meta local_vars : unit =
 and transform_function_impl env ~name ~params ~body ~scope ~comments =
   let open Function in
 
-  let fun_meta = Option.value_exn env.current_fun_name in
+  let fun_meta = Option.value_exn env.current_fun_meta in
   let fun_scope = TScope.create (Some scope) in
   push_scope env fun_scope;
 
@@ -397,7 +397,7 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
   in
 
   let def =
-    if (List.length local_vars) > 0 then (
+    if (List.length fun_meta.def_local_names) > 0 then (
       generate_name_def ()
     ) else
       []
@@ -427,7 +427,7 @@ and create_scope_and_distribute_vars env raw_scope =
   let scope = TScope.create (Some raw_scope) in
   let local_vars = raw_scope#vars in
 
-  distribute_name_to_scope scope (Option.value_exn env.current_fun_name) local_vars;
+  distribute_name_to_scope scope (Option.value_exn env.current_fun_meta) local_vars;
 
   scope
 
@@ -674,8 +674,9 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
     | Lambda lambda_content -> (
       let parent_scope = env.scope in
-      let fun_meta = Option.value_exn ~message:"current function name not found" env.current_fun_name in
-      let lambda_fun_name = "LCC_" ^ fun_meta.fun_name ^ "_lambda_" ^ (Int.to_string ty_var) in
+      let fun_meta = Option.value_exn ~message:"current function name not found" env.current_fun_meta in
+      let lambda_name = fun_meta.fun_name ^ "_lambda_" ^ (Int.to_string ty_var) in
+      let lambda_fun_name = "LCC_" ^ lambda_name in
 
       let capturing_variables = lambda_content.lambda_scope#capturing_variables in
 
@@ -689,11 +690,11 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       )
       capturing_variables;
 
-      let lambda = transform_lambda env ~lambda_gen_name:lambda_fun_name lambda_content ty_var in
+      let lambda = transform_lambda env ~lambda_name lambda_content ty_var in
 
       env.lambdas <- lambda::env.lambdas;
 
-      auto_release_expr env ~append_stmts ty_var (C_op.Expr.NewLambda(lambda_fun_name, capturing_names))
+      auto_release_expr env ~is_move ~append_stmts ty_var (C_op.Expr.NewLambda(lambda_fun_name, capturing_names))
     )
 
     | If if_desc ->
@@ -1535,7 +1536,7 @@ and transform_class env cls: C_op.Decl.spec list =
   let fun_name = distribute_name env original_name in
   let finalizer_name = fun_name ^ "_finalizer" in
 
-  env.current_fun_name <- Some (create_current_fun_meta original_name);
+  env.current_fun_meta <- Some (create_current_fun_meta original_name);
 
   Hashtbl.set env.global_name_map ~key:cls_name_id ~data:(SymLocal fun_name);
 
@@ -1661,7 +1662,15 @@ and transform_enum env enum =
     )
     cases
 
-and transform_lambda env ~lambda_gen_name content _ty_var =
+and transform_lambda env ~lambda_name content _ty_var =
+  let prev_fun_meta = env.current_fun_meta in
+  let prev_has_early_return = env.has_early_return in
+
+  env.current_fun_meta <- Some (create_current_fun_meta lambda_name);
+  env.has_early_return <- false;
+
+  let lambda_gen_name = "LCC_" ^ lambda_name in
+
   let fake_block = {
     Block.
     body = [
@@ -1683,12 +1692,18 @@ and transform_lambda env ~lambda_gen_name content _ty_var =
     ~body:fake_block
     ~comments:[]
   in
+  let result =
+    {
+      C_op.Decl.
+      spec = _fun;
+      loc = Loc.none;
+    }
+  in
 
-  {
-    C_op.Decl.
-    spec = _fun;
-    loc = Loc.none;
-  }
+  env.current_fun_meta <- prev_fun_meta;
+  env.has_early_return <- prev_has_early_return;
+
+  result;
 
 type result = {
   main_function_name: string option;

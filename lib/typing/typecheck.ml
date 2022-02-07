@@ -700,7 +700,34 @@ and check_expression env expr =
   | _ -> failwith "unexpected"
 
 and check_lambda env lambda =
-  check_expression env lambda.lambda_body
+  let { T.Expression. lambda_return_ty; lambda_body; _ } = lambda in
+  let prev_return_type = take_return_type env in
+
+  check_expression env lambda_body;
+  let lambda_return_types = take_return_type env in
+
+  let expr_type = Type_context.deref_node_type env.ctx lambda_body.ty_var in
+
+  if not (Check_helper.type_assinable env.ctx lambda_return_ty expr_type) then (
+    let open Type_error in
+    let spec = CannotReturn(lambda_return_ty, expr_type) in
+    let err = make_error env.ctx lambda_body.loc spec in
+    raise (Error err)
+  );
+
+  (* there are return statements, check every statments *)
+  List.iter
+    ~f:(fun (return_ty, return_loc) ->
+      if not (Check_helper.type_assinable env.ctx lambda_return_ty return_ty) then (
+        let open Type_error in
+        let spec = CannotReturn(lambda_return_ty, return_ty) in
+        let err = make_error env.ctx return_loc spec in
+        raise (Error err)
+      )
+    )
+    lambda_return_types;
+
+  env.return_types <- prev_return_type;
 
 and check_class env cls =
   let open T.Declaration in
