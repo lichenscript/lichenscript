@@ -1,0 +1,17 @@
+
+class Base {
+
+    private ty: string
+
+    static new(): Base {
+        return Base {
+            ty: "Base",
+        };
+    }
+
+}
+
+function main() {
+    const base = Base.new();
+		print(base.ty);
+}
