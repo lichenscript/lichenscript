@@ -1,0 +1,6 @@
+
+function main() {
+    print(test);
+    const test = 3;
+    print(test);
+}
