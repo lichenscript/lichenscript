@@ -269,16 +269,29 @@ and check_expression env expr =
   | If if_desc -> check_expression_if env if_desc expr.ty_var
 
   | Array arr_list -> (
-    if List.is_empty arr_list then (
-      Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Array Unknown)
-    ) else (
-      (* TODO: check every expressions are the same *)
-      List.iter ~f:(check_expression env) arr_list;
-      let first = List.hd_exn arr_list in
-      let first_type = T.Expression.(first.ty_var) in
-      let first_node = Type_context.get_node env.ctx first_type in
-      Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Array first_node.value)
-    )
+    let init_sym = TypeExpr.TypeSymbol "T" in
+    let arr_type =
+      List.fold
+        ~init:init_sym
+        ~f:(fun acc expr ->
+          check_expression env expr;
+          let item_type = Type_context.deref_node_type env.ctx expr.ty_var in
+          match acc with
+          | TypeExpr.TypeSymbol _ -> item_type
+          | _ -> (
+            if Check_helper.type_assinable env.ctx acc item_type then
+              acc
+            else if Check_helper.type_assinable env.ctx item_type acc then
+              item_type
+            else (
+              let err = Type_error.(make_error env.ctx expr.loc (NotAssignable(acc, item_type))) in
+              raise (Type_error.Error err)
+            )
+          )
+        )
+        arr_list
+    in
+    Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Array arr_type)
   )
 
   | Map map_entries -> (

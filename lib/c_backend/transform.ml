@@ -31,6 +31,12 @@ module TScope = struct
    *)
   type t = {
     name_map: (string, C_op.symbol) Hashtbl.t;
+
+    (**
+     * if a local varirable is moved,
+     * there is no need to generate release stmts
+     *)
+    moved_local_var: string Hash_set.t;
     raw: scope option;
     prev: t option;
   }
@@ -39,6 +45,7 @@ module TScope = struct
     let name_map = Hashtbl.create (module String) in
     {
       name_map;
+      moved_local_var = Hash_set.create (module String);
       raw = scope;
       prev = None;
     }
@@ -437,21 +444,12 @@ and transform_statement ?ret env stmt =
      *
      * But it should retain if it's a normal block.
      *)
-    let retain_expr =
-      if String.equal ret "ret" then []
-      else
-        [{
-          C_op.Stmt.
-          spec = Retain (C_op.Expr.Ident (C_op.SymLocal ret));
-          loc;
-        }]
-    in
     let expr = {
       C_op.Stmt.
       spec = Expr assign;
       loc;
     } in
-    List.concat [ tmp.prepend_stmts; [ expr ]; retain_expr; tmp.append_stmts ]
+    List.concat [ tmp.prepend_stmts; [ expr ]; tmp.append_stmts ]
   in
   match spec with
   | Expr expr -> transform_return_expr ?ret expr
@@ -663,7 +661,10 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         let node_type = Type_context.deref_node_type env.ctx variable.var_id in
         let need_release = not (Check_helper.type_should_not_release env.ctx node_type) in
 
-        if (not is_borrow) && (not is_move) && need_release then  (
+        if is_move then (
+          Hash_set.add env.scope.moved_local_var name;
+          id_expr
+        ) else if (not is_borrow) && (not is_move) && need_release then  (
           let id_expr = id_expr in
           C_op.Expr.Retaining id_expr
         ) else
@@ -1466,13 +1467,16 @@ and transform_block env ?ret (block: Typedtree.Block.t): C_op.Stmt.t list =
     let local_vars = block.scope#vars in
     let cleanup =
       if (List.length local_vars) > 0 then (
-        List.map
+        List.filter_map
           ~f:(fun (name, _) ->
             let sym = TScope.find_variable block_scope name in
-            { C_op.Stmt.
-              spec = Release (Ident sym);
-              loc = Loc.none;
-            }
+            if Hash_set.mem block_scope.moved_local_var name then
+              None
+            else
+              Some { C_op.Stmt.
+                spec = Release (Ident sym);
+                loc = Loc.none;
+              }
           )
           local_vars
       ) else [] in

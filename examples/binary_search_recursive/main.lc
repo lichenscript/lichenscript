@@ -1,0 +1,31 @@
+
+function binarySearchRecursive(data: i32[], key: i32, low: i32, high: i32): Option<i32> {
+    if low > high {
+        return None;
+    }
+
+    let mid = low + (high - low) / 2;
+
+    if key == data[mid] {
+        Some(mid)
+    } else if key < data[mid] {
+        binarySearchRecursive(data, key, low, mid - 1)
+    } else {
+        binarySearchRecursive(data, key, mid + 1, high)
+    }
+}
+
+function main() {
+    const data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const result = binarySearchRecursive(data, 3, 0, data.length - 1);
+    match result {
+        case Some(_) => print("1: found")
+        case None => print("1: not found")
+    }
+    const result2 = binarySearchRecursive(data, 11, 0, data.length - 1);
+    match result2 {
+        case Some(_) => print("2: found")
+        case None => print("2: not found")
+    }
+}
+

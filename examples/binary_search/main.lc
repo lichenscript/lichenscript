@@ -1,33 +1,33 @@
 
 function binarySearch(data: i32[], key: i32): Option<i32> {
-	let low = 0;
-	let high = data.length - 1;
+    let low = 0;
+    let high = data.length - 1;
 
-	while low <= high {
-		let mid = (low + high) / 2;
-		
-		if key == data[mid] {
-			return Some(mid);
-		} else if key < data[mid] {
-			high = mid - 1;
-		} else {
-			low = mid + 1;
-		}
-	}
+    while low <= high {
+        let mid = (low + high) / 2;
+        
+        if key == data[mid] {
+            return Some(mid);
+        } else if key < data[mid] {
+            high = mid - 1;
+        } else {
+            low = mid + 1;
+        }
+    }
 
-	None
+    None
 }
 
 function main() {
-	const data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
-	const result = binarySearch(data, 3);
-	match result {
-		case Some(_) => print("1: found")
-		case None => print("1: not found")
-	}
-	const result2 = binarySearch(data, 11);
-	match result2 {
-		case Some(_) => print("2: found")
-		case None => print("2: not found")
-	}
+    const data = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    const result = binarySearch(data, 3);
+    match result {
+        case Some(_) => print("1: found")
+        case None => print("1: not found")
+    }
+    const result2 = binarySearch(data, 11);
+    match result2 {
+        case Some(_) => print("2: found")
+        case None => print("2: not found")
+    }
 }

@@ -50,6 +50,9 @@ let rec type_assinable ctx left right =
   | (_, Method _) -> false
   | (String, String) -> true
 
+  (* Array _ <- Array<T> *)
+  | (Array _, Array(TypeSymbol _)) -> true
+
   | (Array left_arr, Array right_arr) ->
     type_equal ctx left_arr right_arr
 
