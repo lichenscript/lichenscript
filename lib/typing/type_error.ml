@@ -37,6 +37,7 @@ and spec =
   | UnexpectedParams of int * int
   | RestShouldBeArray
   | ClassPropNotInit of string * string
+  | ClassPropRedefinition of string * string
   | ClassInitNotAssignable of string * string * TypeExpr.t * TypeExpr.t
   | CannotBindingOfPattern of string
 
@@ -171,6 +172,9 @@ module PP = struct
 
     | ClassPropNotInit(cls_name, prop_name) ->
       Format.fprintf formatter "The property '%s' of class %s is not initialized." prop_name cls_name
+
+    | ClassPropRedefinition(cls_name, prop_name) ->
+      Format.fprintf formatter "Redefine property '%s' of class '%s'." prop_name cls_name
 
     | ClassInitNotAssignable (cls_name, prop_name, be_assigned, assign) ->
       Format.fprintf formatter "Init propperty '%s' of class '%s' failed, type '%s' is not assignable to type '%s'"

@@ -1,0 +1,11 @@
+
+class Base {
+
+    ty: string
+    ty: i32
+
+}
+
+function main() {
+    const base = Base{};
+}

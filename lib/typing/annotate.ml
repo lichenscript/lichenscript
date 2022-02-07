@@ -764,6 +764,58 @@ and annotate_class env cls =
 
   let base_deps = ref None in
 
+  let add_tcls_element elm loc =
+    let name, elm_spec = elm in
+    let exist =
+      match elm_spec with
+      | TypeDef.Cls_elm_get_set (Some _, _) ->
+        !tcls_elements
+        |> List.find ~f:(fun (item_name, item_spec) ->
+          let is_getter = match item_spec with
+            | TypeDef.Cls_elm_get_set (Some _, _) -> true
+            | _ -> false
+          in
+          (String.equal item_name name) && is_getter
+        )
+        |> Option.is_some
+
+      | TypeDef.Cls_elm_get_set (_, Some _) ->
+        !tcls_elements
+        |> List.find ~f:(fun (item_name, item_spec) ->
+          let is_getter = match item_spec with
+            | TypeDef.Cls_elm_get_set (_, Some _) -> true
+            | _ -> false
+          in
+          (String.equal item_name name) && is_getter
+        )
+        |> Option.is_some
+
+      |_ ->
+        !tcls_elements
+        |> List.find ~f:(fun (item_name, _) -> String.equal item_name name)
+        |> Option.is_some
+    in
+    if exist then (
+      let err = Type_error.(make_error (Env.ctx env) loc (ClassPropRedefinition(cls.cls_id.pident_name, name))) in
+      raise (Type_error.Error err)
+    );
+    tcls_elements := elm::(!tcls_elements)
+  in
+
+  let add_tcls_static_element elm loc =
+    let name, _ = elm in
+    let exist =
+      !tcls_static_elements
+      |> List.find ~f:(fun (item_name, _) -> String.equal item_name name)
+      |> Option.is_some
+    in
+    if exist then (
+      let err = Type_error.(make_error (Env.ctx env) loc (ClassPropRedefinition(cls.cls_id.pident_name, name))) in
+      raise (Type_error.Error err)
+    );
+    tcls_static_elements := elm::(!tcls_static_elements)
+  in
+
   (* depend on the base class *)
   let tcls_extends =
     Option.map
@@ -865,9 +917,9 @@ and annotate_class env cls =
             );
             let ty_elm = Core_type.TypeDef.Cls_elm_method new_type  in
             if is_static then
-              tcls_static_elements := (cls_method_name.pident_name, ty_elm)::!tcls_static_elements
+              add_tcls_static_element (cls_method_name.pident_name, ty_elm) cls_method_loc
             else (
-              tcls_elements := ((cls_method_name.pident_name, ty_elm)::!tcls_elements);
+              add_tcls_element (cls_method_name.pident_name, ty_elm) _method.cls_method_loc;
               class_scope#insert_cls_element
                 { Scope.ClsElm.
                   name = (cls_method_name.pident_name, method_id);
@@ -898,7 +950,7 @@ and annotate_class env cls =
           } in
           let node_id = Type_context.new_id ctx node in
           let ty_elm = Core_type.TypeDef.Cls_elm_prop (node_id, property_ty) in
-          tcls_elements := ((cls_property_name.pident_name, ty_elm)::!tcls_elements);
+          add_tcls_element (cls_property_name.pident_name, ty_elm) cls_property_loc;
 
           (*
           * the class itself depends on all the properties
@@ -992,7 +1044,7 @@ and annotate_class env cls =
 
           in
 
-          tcls_elements := ((cls_decl_method_name.pident_name, cls_elm)::!tcls_elements);
+          add_tcls_element (cls_decl_method_name.pident_name, cls_elm) cls_decl_method_loc;
 
           ignore (Type_context.new_id ctx
             { Core_type.
