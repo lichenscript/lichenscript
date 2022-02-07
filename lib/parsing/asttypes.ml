@@ -129,4 +129,5 @@ type visibility =
   | Pvisibility_public
   | Pvisibility_protected
   | Pvisibility_private
+  | Pvisibility_internal
   [@@deriving show]

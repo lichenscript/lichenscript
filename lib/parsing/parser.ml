@@ -167,72 +167,8 @@ and parse_declaration env : Declaration.t =
       )
     )
 
-    (* | Token.T_PUBLIC
-    | Token.T_PROTECTED
-    | Token.T_PRIVATE ->
-      begin
-        let open Asttypes in
-        let visibility =
-          match next with
-          | Token.T_PUBLIC -> Pvisibility_public
-          | Token.T_PROTECTED -> Pvisibility_protected
-          | Token.T_PRIVATE -> Pvisibility_private
-          | _ -> failwith "unreachable"
-        in
-        Eat.token env;
-        if Parse_scope.((scope env).ty = Parse_scope.PScope_Module) then (
-          let next = Peek.token env in
-          match next with
-          | Token.T_FUNCTION -> (
-            let fun_ = parse_function ~visibility env in
-            let { Function. header = { id; _ }; _ } = fun_ in
-            let name = id.pident_name in
-
-            Parser_env.add_top_level env ~name ~visibility;
-
-            Function_ fun_
-          )
-
-          | _ -> (
-            let lex_error = Lichenscript_lex.Lex_error.Unexpected (Token.value_of_token (Peek.token env)) in
-            let parse_error = {
-              Parse_error.
-              perr_spec = Parse_error.LexError lex_error;
-              perr_loc = (Peek.loc env);
-            } in
-
-            Parse_error.error parse_error
-          )
-        ) else (
-          let err =
-            {
-              Parse_error.
-              perr_loc = start_loc;
-              perr_spec = Parse_error.VisibilityNoOnTopLevel;
-            }
-          in
-          Parse_error.error err
-        )
-      end *)
-
     | _ -> (
-      let open Asttypes in
-      let visibility =
-        match next with
-        | Token.T_PUBLIC ->
-          Eat.token env;
-          Some Pvisibility_public
-
-        | Token.T_PROTECTED ->
-          Eat.token env;
-          Some Pvisibility_protected
-
-        | Token.T_PRIVATE ->
-          Eat.token env;
-          Some Pvisibility_private
-
-        | _ -> None
-      in
+      let visibility = parse_visibility env in
       let next = Peek.token env in
       match next with
       | Token.T_CLASS ->
@@ -357,6 +293,26 @@ and parse_declaration env : Declaration.t =
     loc = with_start_loc env start_loc;
     attributes;
   }
+
+and parse_visibility env = 
+  match (Peek.token env) with
+  | Token.T_PUBLIC ->
+    Eat.token env;
+    Some Pvisibility_public
+
+  | Token.T_PROTECTED ->
+    Eat.token env;
+    Some Pvisibility_protected
+
+  | Token.T_PRIVATE ->
+    Eat.token env;
+    Some Pvisibility_private
+
+  | Token.T_INTERNAL ->
+    Eat.token env;
+    Some Pvisibility_internal
+
+  | _ -> None
 
 and parse_interface env ~visibility : Declaration.intf =
   Expect.token env Token.T_INTERFACE;
@@ -760,24 +716,6 @@ and parse_class ~visibility env : Declaration._class =
     cls_comments = [];
   }
 
-and parse_visibility env =
-  let open Asttypes in
-  let next = Peek.token env in
-  match next with
-  | Token.T_PUBLIC ->
-    Eat.token env;
-    Some Pvisibility_public
-
-  | Token.T_PROTECTED ->
-    Eat.token env;
-    Some Pvisibility_protected
-
-  | Token.T_PRIVATE ->
-    Eat.token env;
-    Some Pvisibility_private
-
-  | _ -> None
-
 and parse_class_body env: Declaration.class_body =
   let open Declaration in
   let parse_element env =
@@ -1042,7 +980,7 @@ and parse_maybe_arrow_function env : Expression.t =
     | first::[] -> (
       (match first.param_colon with
       | Some (_, perr_loc) ->
-        let tok = Token.token_to_string Token.T_COLON in
+        let tok = Token.value_of_token Token.T_COLON in
         let lex_error = Lichenscript_lex.Lex_error.Unexpected tok in
         let perr_spec = Parse_error.LexError lex_error in
         let err =
@@ -1060,7 +998,7 @@ and parse_maybe_arrow_function env : Expression.t =
     )
 
     | _ -> (
-      let tok = Token.token_to_string Token.T_LPAREN in
+      let tok = Token.value_of_token Token.T_LPAREN in
       let lex_error = Lichenscript_lex.Lex_error.Unexpected tok in
       let perr_spec = Parse_error.LexError lex_error in
       let err =
@@ -1495,7 +1433,7 @@ and parse_primary_expression env : Expression.t =
         Super
 
       | _ ->
-        let tok = Token.token_to_string next in
+        let tok = Token.value_of_token next in
         let lex_error = Lichenscript_lex.Lex_error.Unexpected tok in
         let perr_spec = Parse_error.LexError lex_error in
         let err =

@@ -18,6 +18,17 @@ open Lichenscript_lex
 
 module PropsMap = Hashtbl.Make(String)
 
+module Visibility = struct
+
+  type t =
+    | Public
+    | Protected
+    | Private
+    | Internal
+  [@@deriving show]
+
+end
+
 (*
  * Type expression is expressing something behind an expression
  * 
@@ -154,9 +165,9 @@ and TypeDef : sig
   }
 
   and class_elm =
-    | Cls_elm_prop of int * TypeExpr.t
-    | Cls_elm_method of t
-    | Cls_elm_get_set of t option * t option
+    | Cls_elm_prop of Visibility.t * int * TypeExpr.t
+    | Cls_elm_method of Visibility.t * t
+    | Cls_elm_get_set of Visibility.t * t option * t option
 
   and class_type = {
     tcls_name:            string;
@@ -241,9 +252,9 @@ end = struct
   }
 
   and class_elm =
-    | Cls_elm_prop of int * TypeExpr.t
-    | Cls_elm_method of t
-    | Cls_elm_get_set of t option * t option
+    | Cls_elm_prop of Visibility.t * int * TypeExpr.t
+    | Cls_elm_method of Visibility.t * t
+    | Cls_elm_get_set of Visibility.t * t option * t option
 
   and class_type = {
     tcls_name:            string;

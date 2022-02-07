@@ -609,7 +609,7 @@ and check_expression env expr =
         ~init:(PropMap.empty, PropMap.empty)
         ~f:(fun (type_map, init_map) (prop_name, elm) ->
           match elm with
-          | Cls_elm_prop (_id, elm_node) ->
+          | Cls_elm_prop (_, _id, elm_node) ->
             PropMap.set type_map ~key:prop_name ~data:elm_node,
             PropMap.set init_map ~key:prop_name ~data:(ref false)
 
@@ -749,7 +749,7 @@ and check_class env cls =
       List.iter
         ~f:(fun (method_name, elm) -> 
           match elm with
-          | Cls_elm_method _method -> (
+          | Cls_elm_method(_, _method) -> (
             let test_method =
               List.find
               ~f:(fun (test_name, elm) ->

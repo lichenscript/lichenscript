@@ -837,6 +837,7 @@ let token (env : Lex_env.t) lexbuf : result =
   | "private" -> Token (env, T_PRIVATE)
   | "protected" -> Token (env, T_PROTECTED)
   | "public" -> Token (env, T_PUBLIC)
+  | "internal" -> Token (env, T_INTERNAL)
   | "module" -> Token (env, T_MODULE)
   | "return" -> Token (env, T_RETURN)
   | "static" -> Token (env, T_STATIC)

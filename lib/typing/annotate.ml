@@ -27,6 +27,16 @@ open Lichenscript_parsing
 
 module T = Typedtree
 
+let annotate_visibility (visibility: Asttypes.visibility option): Core_type.Visibility.t =
+  let open Asttypes in
+  match visibility with
+  | Some Pvisibility_public -> Visibility.Public
+  | Some Pvisibility_protected -> Visibility.Protected
+  | Some Pvisibility_private -> Visibility.Private
+  | Some Pvisibility_internal
+  | None
+    -> Visibility.Internal
+
 let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
   let open Ast.Statement in
   let { spec; loc; attributes; _ } = stmt in
@@ -769,22 +779,22 @@ and annotate_class env cls =
     let name, elm_spec = elm in
     let exist =
       match elm_spec with
-      | TypeDef.Cls_elm_get_set (Some _, _) ->
+      | TypeDef.Cls_elm_get_set (_, Some _, _) ->
         !tcls_elements
         |> List.find ~f:(fun (item_name, item_spec) ->
           let is_getter = match item_spec with
-            | TypeDef.Cls_elm_get_set (Some _, _) -> true
+            | TypeDef.Cls_elm_get_set (_, Some _, _) -> true
             | _ -> false
           in
           (String.equal item_name name) && is_getter
         )
         |> Option.is_some
 
-      | TypeDef.Cls_elm_get_set (_, Some _) ->
+      | TypeDef.Cls_elm_get_set (_, _, Some _) ->
         !tcls_elements
         |> List.find ~f:(fun (item_name, item_spec) ->
           let is_getter = match item_spec with
-            | TypeDef.Cls_elm_get_set (_, Some _) -> true
+            | TypeDef.Cls_elm_get_set (_, _, Some _) -> true
             | _ -> false
           in
           (String.equal item_name name) && is_getter
@@ -845,6 +855,7 @@ and annotate_class env cls =
         | Cls_method _method -> (
           let method_scope = new scope ~prev:(Env.peek_scope env) () in
           let { cls_method_attributes; cls_method_visibility; cls_method_modifier; cls_method_name; cls_method_params; cls_method_loc; cls_method_body; cls_method_return_ty; _ } = _method in
+          let type_visibility = annotate_visibility cls_method_visibility in
           let is_static =
             match cls_method_modifier with
             | Some Cls_modifier_static -> true
@@ -916,7 +927,7 @@ and annotate_class env cls =
                 value = typedef;
               }
             );
-            let ty_elm = Core_type.TypeDef.Cls_elm_method new_type  in
+            let ty_elm = Core_type.TypeDef.Cls_elm_method(type_visibility, new_type) in
             if is_static then
               add_tcls_static_element (cls_method_name.pident_name, ty_elm) cls_method_loc
             else (
@@ -943,6 +954,7 @@ and annotate_class env cls =
         )
         | Cls_property prop -> (
           let { cls_property_visibility; cls_property_loc; cls_property_name; cls_property_type; _ } = prop in
+          let type_visibility = annotate_visibility cls_property_visibility in
           let property_ty, deps = annotate_type env cls_property_type in
           let node = {
             value = property_ty;
@@ -950,7 +962,7 @@ and annotate_class env cls =
             loc = cls_property_loc;
           } in
           let node_id = Type_context.new_id ctx node in
-          let ty_elm = Core_type.TypeDef.Cls_elm_prop (node_id, property_ty) in
+          let ty_elm = Core_type.TypeDef.Cls_elm_prop (type_visibility, node_id, property_ty) in
           add_tcls_element (cls_property_name.pident_name, ty_elm) cls_property_loc;
 
           (*
@@ -976,6 +988,7 @@ and annotate_class env cls =
 
         | Cls_declare declare -> (
           let { cls_decl_method_attributes; cls_decl_method_name; cls_decl_method_params; cls_decl_method_loc; cls_decl_method_return_ty; cls_decl_method_get_set; _ } = declare in
+          let type_visibility = Visibility.Public in
 
           let declare_id = Type_context.size ctx in
 
@@ -1035,13 +1048,13 @@ and annotate_class env cls =
           let cls_elm = 
             match cls_decl_method_get_set with
             | Some Ast.Declaration.Cls_getter ->
-              Core_type.TypeDef.Cls_elm_get_set(Some new_type, None)
+              Core_type.TypeDef.Cls_elm_get_set(type_visibility, Some new_type, None)
 
             | Some Ast.Declaration.Cls_setter ->
-              Core_type.TypeDef.Cls_elm_get_set(None, Some new_type)
+              Core_type.TypeDef.Cls_elm_get_set(type_visibility, None, Some new_type)
 
             | None ->
-              Core_type.TypeDef.Cls_elm_method new_type
+              Core_type.TypeDef.Cls_elm_method(type_visibility, new_type)
 
           in
 
@@ -1497,6 +1510,7 @@ and annotate_enum env enum =
 
 and annotate_interface env intf: T.Declaration.intf =
   let { Ast.Declaration. intf_visibility; intf_name; intf_type_vars; intf_methods; _ } = intf in
+  let type_visibility = annotate_visibility intf_visibility in
   let scope = Env.peek_scope env in
 
   let intf_id_opt = scope#find_var_symbol intf_name.pident_name in
@@ -1540,7 +1554,7 @@ and annotate_interface env intf: T.Declaration.intf =
     } in
 
     intf_method_tuples :=
-      (intf_method_name.pident_name, Core_type.TypeDef.Cls_elm_method typedef)::(!intf_method_tuples);
+      (intf_method_name.pident_name, Core_type.TypeDef.Cls_elm_method(type_visibility, typedef))::(!intf_method_tuples);
 
     let node = { Core_type.
       value = TypeExpr.TypeDef typedef;
