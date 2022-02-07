@@ -9,9 +9,9 @@ function binarySearchRecursive(data: i32[], key: i32, low: i32, high: i32): Opti
     if key == data[mid] {
         Some(mid)
     } else if key < data[mid] {
-        binarySearchRecursive(data, key, low, mid - 1)
+        binarySearchRecursive(data, key, low, mid - 1);
     } else {
-        binarySearchRecursive(data, key, mid + 1, high)
+        binarySearchRecursive(data, key, mid + 1, high);
     }
 }
 

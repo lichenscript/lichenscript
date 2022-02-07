@@ -219,27 +219,47 @@ and check_statement env stmt =
 
   | Empty -> ()
 
-and check_expression_if env if_spec ty_var =
+and check_expression_if env if_spec =
   let open T.Expression in
-  let { if_test; if_consequent; if_alternative; _ } = if_spec in
+  let { if_test; if_consequent; if_alternative; if_ty_var; _ } = if_spec in
   check_expression env if_test;
   check_block env if_consequent;
-  (* List.iter ~f:(check_statement env) if_consequent.body; *)
-  (match if_alternative with
-  | Some (If_alt_block blk) -> (
-    List.iter ~f:(check_statement env) blk.body;
-  )
-  | Some (If_alt_if desc) -> (
-    check_expression_if env desc ty_var
-  )
-
-  | None -> ()
-  );
 
   let node = Type_context.get_node env.ctx if_consequent.return_ty in
 
-  (* TODO: check return of two branches *)
-  Type_context.update_node_type env.ctx ty_var node.value
+  let if_ty =
+    match if_alternative with
+    | Some (If_alt_block blk) -> (
+      check_block env blk;
+
+      let blk_ty = Type_context.deref_node_type env.ctx blk.return_ty in
+      if Check_helper.type_assinable env.ctx node.value blk_ty then
+        node.value
+      else if Check_helper.type_assinable env.ctx node.value blk_ty then
+        blk_ty
+      else (
+        let err = Type_error.(make_error env.ctx blk.loc (NotAssignable(node.value, blk_ty))) in
+        raise (Type_error.Error err)
+      )
+    )
+    | Some (If_alt_if desc) -> (
+      check_expression_if env desc;
+
+      let alt_ty = Type_context.deref_node_type env.ctx desc.if_ty_var in
+      if Check_helper.type_assinable env.ctx node.value alt_ty then
+        node.value
+      else if Check_helper.type_assinable env.ctx node.value alt_ty then
+        alt_ty
+      else (
+        let err = Type_error.(make_error env.ctx desc.if_loc (NotAssignable(node.value, alt_ty))) in
+        raise (Type_error.Error err)
+      )
+    )
+    | None ->
+      node.value
+  in
+
+  Type_context.update_node_type env.ctx if_ty_var if_ty
 
 and check_expression env expr =
   let open T.Expression in
@@ -266,7 +286,7 @@ and check_expression env expr =
 
   | Lambda lambda -> check_lambda env lambda
 
-  | If if_desc -> check_expression_if env if_desc expr.ty_var
+  | If if_desc -> check_expression_if env if_desc
 
   | Array arr_list -> (
     let init_sym = TypeExpr.TypeSymbol "T" in

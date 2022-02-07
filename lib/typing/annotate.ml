@@ -574,6 +574,7 @@ and annotate_expression_if ~prev_deps env _if =
     if_test;
     if_consequent;
     if_alternative;
+    if_ty_var = node_id;
     if_loc;
   }
 

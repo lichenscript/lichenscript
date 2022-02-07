@@ -26,6 +26,7 @@ module%gen rec Expression : sig
     if_test: t;
     if_consequent: Block.t;
     if_alternative: if_alt option;
+    if_ty_var: int;
     if_loc: Loc.t;
   }
 
