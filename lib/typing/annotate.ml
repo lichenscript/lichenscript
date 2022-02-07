@@ -758,7 +758,7 @@ and annotate_class env cls =
   let prev_scope = Env.peek_scope env in
 
   let this_expr = TypeExpr.Ctor(Ref cls_var.var_id, List.map ~f:Identifier.(fun id -> TypeExpr.TypeSymbol id.pident_name) cls.cls_type_vars) in
-  let class_scope = new class_scope ~prev:prev_scope this_expr in
+  let class_scope = new class_scope ~prev:prev_scope cls_var.var_id this_expr in
 
   List.iter
     ~f:(fun ident ->

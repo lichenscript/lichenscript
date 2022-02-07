@@ -152,9 +152,13 @@ class scope ?prev () = object(self)
     | Some prev -> prev#this_expr
     | None -> failwith "only allowed in class scope"
 
+  method test_class_scope: int option =
+    let open Option in
+    prev >>= (fun prev -> prev#test_class_scope)
+
 end
 
-class class_scope ?prev this_expr = object
+class class_scope ?prev cls_id this_expr = object
   inherit scope ?prev ()
 
   val mutable elements = []
@@ -171,6 +175,8 @@ class class_scope ?prev this_expr = object
     elements <- elm::elements
 
   method! this_expr = this_expr
+
+  method! test_class_scope = Some cls_id
 
 end
 
