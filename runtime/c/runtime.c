@@ -226,6 +226,21 @@ static void free_i64_pool(LCRuntime* rt) {
     lc_free(rt, rt->i64_pool);
 }
 
+static force_inline void lc_panic_internal() {
+#if defined(__APPLE__)
+    fprintf(stderr, "[LichenScript] Panic stack:\n");
+    void* callstack[128];
+    int i, frames = backtrace(callstack, 128);
+    char** strs = backtrace_symbols(callstack, frames);
+    for (i = 0; i < frames; ++i) {
+        fprintf(stderr, "%s\n", strs[i]);
+    }
+    free(strs);
+#endif
+
+    exit(2);
+}
+
 static void LCFreeObject(LCRuntime* rt, LCValue val);
 
 static inline void LCFreeLambda(LCRuntime* rt, LCValue val) {
@@ -321,7 +336,7 @@ static void LCFreeObject(LCRuntime* rt, LCValue val) {
     
     default:
         fprintf(stderr, "[LichenScript] internal error, unkown tag: %lld\n", val.tag);
-        abort();
+        lc_panic_internal();
 
     }
 }
@@ -555,7 +570,7 @@ void LCUpdateValue(LCArithmeticType op, LCValue* left, LCValue right) {
 
             default: {
                 fprintf(stderr, "[LichenScript] Can not apply op: %d for type: %d", op, ty);
-                abort();
+                lc_panic_internal();
             }
 
         }
@@ -678,7 +693,7 @@ static no_inline int string_buffer_realloc(StringBuffer *s, int new_len, int c)
 
     if (new_len > LC_STRING_LEN_MAX) {
         fprintf(stderr, "string too long");
-        abort();
+        lc_panic_internal();
     }
     new_size = min_int(max_int(new_len, s->size * 3 / 2), LC_STRING_LEN_MAX);
     if (!s->is_wide_char && c >= 0x100) {
@@ -688,7 +703,7 @@ static no_inline int string_buffer_realloc(StringBuffer *s, int new_len, int c)
     new_str = lc_realloc2(s->rt, s->str, new_size_bytes, &slack);
     if (!new_str) {
         fprintf(stderr, "malloc memory for string failed");
-        abort();
+        lc_panic_internal();
     }
     new_size = min_int(new_size + (slack >> s->is_wide_char), LC_STRING_LEN_MAX);
     s->size = new_size;
@@ -838,7 +853,7 @@ LCValue LCNewStringFromCStringLen(LCRuntime* rt, const unsigned char* buf, uint3
         return lc_new_string8(rt, buf, buf_len);
     }
     if (string_buffer_init(rt, &sb, buf_len)) {
-        abort();
+        lc_panic_internal();
     }
     string_buffer_write8(&sb, buf, len);
     while (p < buf_end) {
@@ -965,7 +980,7 @@ LCValue LCLambdaGetRefValue(LCRuntime* rt, LCValue lambda_val, int index) {
     LCValue ret = lambda->captured_values[index];
     if (ret.tag != LC_TY_REFCELL) {  // TODO: do NOT check in release
         fprintf(stderr, "[LichenScript] value is not a ref\n");
-        abort();
+        lc_panic_internal();
     }
     return LCRefCellGetValue(ret);
 }
@@ -982,7 +997,7 @@ void LCLambdaSetRefValue(LCRuntime* rt, LCValue lambda_val, int index, LCValue v
     LCValue ref = lambda->captured_values[index];
     if (ref.tag != LC_TY_REFCELL) {  // TODO: do NOT check in release
         fprintf(stderr, "[LichenScript] value is not a ref\n");
-        abort();
+        lc_panic_internal();
     }
     LCRefCellSetValue(rt, ref, value);
 }
@@ -1068,9 +1083,9 @@ LCValue LCNewArrayLen(LCRuntime* rt, size_t size) {
 
 LCValue LCArrayGetValue(LCRuntime* rt, LCValue this, int index) {
     LCArray* arr = (LCArray*)this.ptr_val;
-    if (unlikely(index >= arr->len)) {
-        fprintf(stderr, "[LichenScript] index %d out of range, size: %d\n", index, arr->len);
-        abort();
+    if (unlikely(index < 0 || index >= arr->len)) {
+        fprintf(stderr, "[LichenScript] Panic: index %d out of range, size: %d\n", index, arr->len);
+        lc_panic_internal();
     }
     return arr->data[index];
 }
@@ -1080,7 +1095,7 @@ void LCArraySetValue(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     LCArray* arr = (LCArray*)this.ptr_val;
     if (unlikely(index >= arr->len)) {
         fprintf(stderr, "[LichenScript] index %d out of range, size: %d\n", index, arr->len);
-        abort();
+        lc_panic_internal();
     }
     LCRelease(rt, arr->data[index]);
     LCRetain(args[1]);
@@ -1164,7 +1179,7 @@ void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_
 LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_len, LCValue* args) {
     if (this.tag <= 0) {
         fprintf(stderr, "[LichenScript] try to invoke on primitive type\n");
-        abort();
+        lc_panic_internal();
     }
 
     LCObject* obj = (LCObject*)this.ptr_val;
@@ -1181,7 +1196,7 @@ LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_le
     }
 
     fprintf(stderr, "[LichenScript] Can not find method \"%s\" of class, id: %u\n", content, class_id);
-    abort();
+    lc_panic_internal();
     return MK_NULL();
 }
 
@@ -1811,19 +1826,11 @@ LCValue lc_std_exit(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     exit(code);
 }
 
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wreturn-type"
 LCValue lc_std_panic(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     lc_std_print(rt, this, argc, args);
 
-#if defined(__APPLE__)
-    printf("[LichenSciprt] Panic stack:\n");
-    void* callstack[128];
-    int i, frames = backtrace(callstack, 128);
-    char** strs = backtrace_symbols(callstack, frames);
-    for (i = 0; i < frames; ++i) {
-        printf("%s\n", strs[i]);
-    }
-    free(strs);
-#endif
-
-    exit(2);
+    lc_panic_internal();
 }
+#pragma GCC diagnostic pop
