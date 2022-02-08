@@ -135,6 +135,7 @@ and Expr : sig
   | GetRef of symbol
   | NewArray of int
   | NewMap of int
+  | Not of t
   | ArrayGetValue of (t * t)
   | I32Binary of Asttypes.BinaryOp.t * t * t
   | CallLambda of t * t list

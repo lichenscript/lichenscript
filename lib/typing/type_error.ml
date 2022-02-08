@@ -16,6 +16,7 @@ and spec =
   | CannotContructParamOfType of string * TypeExpr.t
   | CannotImplement of TypeExpr.t
   | CannotUsedAsKeyOfMap of TypeExpr.t
+  | CannotApplyUnary of UnaryOp.t * TypeExpr.t
   | MissingMethodForInterface of string * string  (* interface_name, method_name *)
   | InvalidAssign
   | OnlyAssignArrayIndexAlpha
@@ -136,6 +137,10 @@ module PP = struct
       let right_type = Type_context.print_type_value ctx right in
       Format.fprintf formatter "Can not apply '%s' to type '%s' and '%s'"
         (BinaryOp.to_string op) left_type right_type
+
+    | CannotApplyUnary (op, ty) ->
+      Format.fprintf formatter "Can not apply '%a' to type '%s'"
+        UnaryOp.pp op (pp_ty ty)
 
     | CannotResolveTypeOfExpression ->
       Format.fprintf formatter "Can not resolve type of expression"

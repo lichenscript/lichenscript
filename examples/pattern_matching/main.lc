@@ -1,0 +1,16 @@
+
+function isSix(num: i32): boolean {
+    match num {
+        case 6 => true
+        case _ => false
+    }
+}
+
+function main() {
+    if !isSix(0) {
+        print("is not six");
+    }
+    if isSix(6) {
+        print("is six");
+    }
+}

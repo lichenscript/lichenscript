@@ -472,7 +472,24 @@ and check_expression env expr =
     )
   )
 
-  | Unary _ -> failwith "unary"
+  | Unary(op, child) -> (
+    check_expression env child;
+    let node_type = Type_context.deref_node_type env.ctx child.ty_var in
+    let raise_err () =
+      let err = Type_error.(make_error env.ctx expr_loc (CannotApplyUnary(op, node_type))) in
+      raise (Type_error.Error err)
+    in
+    match op with
+    | Asttypes.UnaryOp.Not -> (
+      let ctor = Check_helper.find_construct_of env.ctx node_type in
+      match ctor with
+      | Some { TypeDef. builtin = true; name = "boolean"; _ } -> ()
+      | _ -> raise_err()
+    )
+
+    (* TODO: check other operations *)
+    | _ -> ()
+  )
 
   | Binary (op, left, right) -> (
     check_expression env left;

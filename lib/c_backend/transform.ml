@@ -975,7 +975,18 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       | _ -> failwith (Format.sprintf "unexpected: can not find member %s of id %d" id.pident_name expr.ty_var)
     )
 
-    | Unary _ -> failwith "n"
+    | Unary(op, expr) -> (
+      let expr' = transform_expression ~is_borrow:true env expr in
+
+      prepend_stmts := List.append !prepend_stmts expr'.prepend_stmts;
+      append_stmts := List.append expr'.append_stmts !append_stmts;
+
+      match op with
+      | UnaryOp.Not ->
+        C_op.Expr.Not expr'.expr
+
+      | _ -> failwith "not implement"
+    )
 
     | Binary (op, left, right) -> (
       let left' = transform_expression ~is_borrow:true env left in
@@ -1240,6 +1251,21 @@ and transform_pattern_matching env ~prepend_stmts ~loc ~ty_var _match =
     match spec with
     | Underscore ->
       (fun genereator -> genereator ~finalizers:[] ())
+
+    | Literal (Literal.Integer(i, _)) -> (
+      let if_test = C_op.Expr.IntValue(I32Binary(BinaryOp.Equal, match_expr, NewInt i)) in
+      (fun genereator ->
+        let if_stmt = { C_op.Stmt.
+          spec = If {
+            if_test;
+            if_consequent= genereator ~finalizers:[] ();
+            if_alternate = None;
+          };
+          loc = Loc.none;
+        } in
+        [if_stmt]
+      )
+    )
 
     | Literal _ -> failwith "not implement"
 

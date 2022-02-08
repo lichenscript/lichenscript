@@ -321,7 +321,16 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       id, (T.Expression.Index(expr, index_expr))
     )
 
-    | Unary _ -> -1, failwith "not implemented"
+    | Unary(op, child_expr) -> (
+      let child_expr = annotate_expression ~prev_deps env child_expr in
+      let node = {
+        value = TypeExpr.Unknown;
+        deps = [child_expr.ty_var];
+        loc;
+      } in
+      let id = Type_context.new_id (Env.ctx env) node in
+      id, T.Expression.Unary(op, child_expr)
+    )
 
     | Binary (op, left, right) -> (
       let left = annotate_expression ~prev_deps env left in

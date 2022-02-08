@@ -425,6 +425,11 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env (Int.to_string init_size);
     ps env ")"
 
+  | Not expr ->
+    ps env "LC_NOT(";
+    codegen_expression env expr;
+    ps env ")"
+
   | ArrayGetValue (sym, index) -> (
     ps env "LCArrayGetValue(rt, ";
     codegen_expression env sym;
