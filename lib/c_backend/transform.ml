@@ -1282,7 +1282,27 @@ and transform_pattern_matching env ~prepend_stmts ~loc ~ty_var _match =
       )
     )
 
-    | Literal _ -> failwith "not implement"
+    | Literal (Literal.Boolean bl) -> (
+      let if_test =
+        if bl then
+          C_op.Expr.IntValue match_expr
+        else
+          C_op.Expr.IntValue(Not match_expr)
+      in
+      (fun genereator ->
+        let if_stmt = { C_op.Stmt.
+          spec = If {
+            if_test;
+            if_consequent= genereator ~finalizers:[] ();
+            if_alternate = None;
+          };
+          loc = Loc.none;
+        } in
+        [if_stmt]
+      )
+    )
+
+    | Literal _ -> failwith "unimplemented"
 
     | Symbol (name, name_id) -> (
       let first_char = String.get name 0 in

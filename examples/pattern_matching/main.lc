@@ -13,6 +13,13 @@ function isVincent(name: string): boolean {
     }
 }
 
+function myNot(v: boolean): boolean {
+    match v {
+        case true => false
+        case false => true
+    }
+}
+
 function main() {
     if !isSix(0) {
         print("is not six");
@@ -28,4 +35,6 @@ function main() {
     if !isVincent("Smith") {
         print("is not Vincent");
     }
+
+    print(myNot(true));
 }

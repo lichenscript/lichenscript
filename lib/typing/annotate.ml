@@ -70,8 +70,8 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       let { while_test; while_block; while_loc } = _while in
       let while_test = annotate_expression ~prev_deps env while_test in
       let while_block = annotate_block_expr ~prev_deps:[while_test.ty_var] env while_block in
-      let next_desp = [ while_block.return_ty ] in
-      next_desp, T.Statement.While { while_test; while_block; while_loc }
+      let next_deps = [ while_block.return_ty ] in
+      next_deps, T.Statement.While { while_test; while_block; while_loc }
     )
 
     | Binding binding -> (
