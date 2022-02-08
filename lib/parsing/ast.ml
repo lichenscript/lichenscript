@@ -172,6 +172,7 @@ end
 and Pattern : sig
 
   type spec =
+    | Literal of Literal.t
     | Identifier of Identifier.t
     | EnumCtor of (Identifier.t * t)
 

@@ -90,6 +90,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
           binding_loc;
         }
       )
+
       | Symbol (_, sym_id) -> (
         let ctx = Env.ctx env in
         let node = Type_context.get_node ctx sym_id in
@@ -106,6 +107,8 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
           binding_loc;
         }
       )
+
+      | Literal _
       | EnumCtor _ -> (
         let err = Type_error.(make_error (Env.ctx env) binding_loc (CannotBindingOfPattern "enum")) in
         raise (Type_error.Error err)
@@ -1178,6 +1181,7 @@ and annotate_pattern ~kind env pat : (T.Pattern.t * int list) =
   let deps = ref [] in
   let spec =
     match spec with
+    | Literal l -> T.Pattern.Literal l
     | Identifier ident -> (
       (* It's a enum contructor *)
       if String.equal ident.pident_name "_" then (

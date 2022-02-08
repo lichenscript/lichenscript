@@ -1241,6 +1241,8 @@ and transform_pattern_matching env ~prepend_stmts ~loc ~ty_var _match =
     | Underscore ->
       (fun genereator -> genereator ~finalizers:[] ())
 
+    | Literal _ -> failwith "not implement"
+
     | Symbol (name, name_id) -> (
       let first_char = String.get name 0 in
       if Char.is_uppercase first_char then (

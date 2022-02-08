@@ -1562,6 +1562,13 @@ and parse_pattern env : Pattern.t =
         Identifier ident
     )
 
+    | Token.T_NUMBER _
+    | Token.T_STRING _
+    | Token.T_TRUE 
+    | Token.T_FALSE ->
+      let l = parse_literal env in
+      Literal l
+
     | _ -> (
       let perr_spec = Parser_env.get_unexpected_error next in
       let err = Parse_error.error {

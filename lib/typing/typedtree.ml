@@ -14,6 +14,7 @@ module Pattern = struct
 
   and spec =
   | Underscore
+  | Literal of Ast.Literal.t
   | Symbol of identifier
   | EnumCtor of (identifier * t)
   [@@deriving show]
