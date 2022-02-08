@@ -79,7 +79,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
 
       let binding_init = annotate_expression ~prev_deps env binding_init in
 
-      let binding_pat, pat_deps = annotate_pattern ~kind:binding_kind ~pat_id:0 env binding_pat in
+      let binding_pat, pat_deps = annotate_pattern ~pat_id:0 env binding_pat in
       let open T.Pattern in
       match binding_pat.spec with
       | Underscore -> (
@@ -183,6 +183,10 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let ty_var_opt = (Env.peek_scope env)#find_var_symbol id.pident_name in
       match ty_var_opt with
       | Some variable -> (
+        if not !(variable.var_init) then (
+          let err = Type_error.(make_error (Env.ctx env) expr.loc (CannotAccessBeforeInit id.pident_name)) in
+          raise (Type_error.Error err)
+        );
         (*
          * it's class or enum, create a ref to it,
          * for example, a None identifer, actually represents a constructor of None
@@ -514,7 +518,8 @@ and annotate_expression_match ~prev_deps env _match =
     parent_scope#add_child scope;
     Env.with_new_scope env scope (fun env ->
       let { clause_pat; clause_consequent; clause_loc } = clause in
-      let clause_pat, clause_deps = annotate_pattern ~kind:Ast.Pvar_const ~pat_id:0 env clause_pat in
+      prescan_pattern_for_scope ~kind:Ast.Pvar_const ~scope env clause_pat;
+      let clause_pat, clause_deps = annotate_pattern ~pat_id:0 env clause_pat in
       let clause_consequent = annotate_expression ~prev_deps:clause_deps env clause_consequent in
       { T.Expression.
         clause_pat;
@@ -600,9 +605,52 @@ and annotate_expression_if ~prev_deps env _if =
     if_loc;
   }
 
+and prescan_pattern_for_scope ~kind ~(scope: Scope.scope) env pat =
+  let open Ast.Pattern in
+  match pat.spec with
+  | Identifier { Identifier. pident_name; pident_loc } -> (
+    if String.equal pident_name "_" then ()
+    else if is_name_enum_or_class pident_name then ()
+    else (
+      let node = {
+        Core_type.
+        loc = pident_loc;
+        value = TypeExpr.Unknown;
+        deps = [];
+      } in
+      let id = Type_context.new_id (Env.ctx env) node in
+      (match scope#new_var_symbol pident_name ~id ~kind with
+      | `Duplicate -> (
+        let err = Type_error.(make_error (Env.ctx env) pident_loc (Redefinition pident_name)) in
+        raise Type_error.(Error err)
+      )
+      | _ -> ());
+    )
+  )
+
+  | EnumCtor (_, child_pat) -> prescan_pattern_for_scope ~kind ~scope env child_pat
+  | _ -> ()
+
 and annotate_block_impl ~prev_deps env block : T.Block.t =
   let open Ast.Block in
+  let scope = Env.peek_scope env in
+
+  let prescan_local_vars body =
+    List.iter
+      ~f:(fun stmt ->
+        let open Ast.Statement in
+        match stmt.spec with
+        | Binding { binding_kind; binding_pat; _ } ->
+          prescan_pattern_for_scope ~kind:binding_kind ~scope env binding_pat
+        | _ -> ()
+      )
+      body
+  in
+
   let { body; loc } = block in
+
+  prescan_local_vars body;
+
   let body_dep, body_stmts =
     List.fold_map
       ~init:prev_deps
@@ -1160,7 +1208,16 @@ and annotate_class env cls =
     { T.Declaration. cls_id; cls_visibility; cls_body; cls_loc; cls_comments; }
   )
 
-and annotate_an_def_identifer ~kind env ident =
+and annotate_an_def_identifer env ident =
+  let open Identifier in
+  let scope = Env.peek_scope env in
+  let { pident_name; _ } = ident in
+  let variable = scope#find_var_symbol pident_name in
+  let variable = Option.value_exn ~message:"identifier not found" variable in
+  variable.var_init := true;
+  pident_name, variable.var_id
+
+and annotate_function_param env ident =
   let open Identifier in
   let { pident_name; pident_loc } = ident in
   let node = {
@@ -1171,19 +1228,20 @@ and annotate_an_def_identifer ~kind env ident =
   } in
   let id = Type_context.new_id (Env.ctx env) node in
   let scope = Env.peek_scope env in
-  (match scope#new_var_symbol pident_name ~id ~kind with
+  (match scope#new_var_symbol ~id ~kind:Pvar_const pident_name  with
   | `Duplicate -> (
     let err = Type_error.(make_error (Env.ctx env) pident_loc (Redefinition pident_name)) in
     raise Type_error.(Error err)
   )
   | _ -> ());
+  scope#init_symbol pident_name;
   pident_name, id
 
 and is_name_enum_or_class name =
   let first_char = String.get name 0 in
   Char.is_uppercase first_char
 
-and annotate_pattern ~kind ~pat_id env pat : (T.Pattern.t * int list) =
+and annotate_pattern ~pat_id env pat : (T.Pattern.t * int list) =
   let open Ast.Pattern in
   let { spec; loc } = pat in
   let scope = Env.peek_scope env in
@@ -1208,7 +1266,7 @@ and annotate_pattern ~kind ~pat_id env pat : (T.Pattern.t * int list) =
         (T.Pattern.Symbol (ident.pident_name, ctor.var_id))
       ) else (
         (* local var *)
-        let name, id = annotate_an_def_identifer ~kind env ident in
+        let name, id = annotate_an_def_identifer env ident in
         deps := List.append !deps [id];
         (T.Pattern.Symbol (name, id))
       )
@@ -1222,7 +1280,7 @@ and annotate_pattern ~kind ~pat_id env pat : (T.Pattern.t * int list) =
       );
       let ctor_var = Option.value_exn ctor_var in
 
-      let param_pat, param_deps = annotate_pattern ~kind ~pat_id:(pat_id + 1) env pat in
+      let param_pat, param_deps = annotate_pattern ~pat_id:(pat_id + 1) env pat in
       deps := List.concat [ param_deps; !deps; [ctor_var.var_id]];
 
       (T.Pattern.EnumCtor (
@@ -1290,7 +1348,7 @@ and annotate_function_params env params : T.Function.params * TypeExpr.params * 
   let open Ast.Function in
   let annoate_param param =
     let { param_name; param_ty; param_loc; param_rest } = param in
-    let param_name = annotate_an_def_identifer ~kind:Ast.Pvar_const env param_name in
+    let param_name = annotate_function_param env param_name in
     let _, param_id = param_name in
     let deps = ref [] in
     let value = ref TypeExpr.Unknown in

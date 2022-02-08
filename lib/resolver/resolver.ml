@@ -47,8 +47,11 @@ class file_scope ~prev env extern_modules = object
   method! insert_var_symbol name var =
     prev#insert_var_symbol name var
 
-  method! new_var_symbol name ~id ~kind =
-    prev#new_var_symbol name ~id ~kind
+  method! new_var_symbol ~id ~kind name =
+    prev#new_var_symbol ~id ~kind name 
+
+  method! init_symbol name =
+    prev#init_symbol name
 
   method! insert_type_symbol name sym =
     prev#insert_type_symbol name sym

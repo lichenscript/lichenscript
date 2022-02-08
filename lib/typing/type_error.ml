@@ -17,6 +17,7 @@ and spec =
   | CannotImplement of TypeExpr.t
   | CannotUsedAsKeyOfMap of TypeExpr.t
   | CannotApplyUnary of UnaryOp.t * TypeExpr.t
+  | CannotAccessBeforeInit of string
   | MissingMethodForInterface of string * string  (* interface_name, method_name *)
   | InvalidAssign
   | OnlyAssignArrayIndexAlpha
@@ -97,6 +98,9 @@ module PP = struct
     | CannotUsedAsKeyOfMap ty ->
       let left_type = Type_context.print_type_value ctx ty in
       Format.fprintf formatter "Type '%s' can not be used ad key of Map." left_type
+
+    | CannotAccessBeforeInit var_name ->
+      Format.fprintf formatter "Cannot access '%s' before initialization." var_name
 
     | MissingMethodForInterface(intf_name, method_name) ->
       Format.fprintf formatter "Missing method '%s' for interface '%s'." method_name intf_name

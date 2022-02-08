@@ -1,1 +1,1 @@
-3:10 Can not find name 'test'
+3:10 Cannot access 'test' before initialization.
