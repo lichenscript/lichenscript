@@ -44,6 +44,24 @@ class file_scope ~prev env extern_modules = object
 
   method! set_variable_captured _level (_name: string) = false
 
+  method! insert_var_symbol name var =
+    prev#insert_var_symbol name var
+
+  method! new_var_symbol name ~id ~kind =
+    prev#new_var_symbol name ~id ~kind
+
+  method! insert_type_symbol name sym =
+    prev#insert_type_symbol name sym
+
+  method! next_var_id = prev#next_var_id
+
+  method! vars = prev#vars
+
+  method! set_visibility name v =
+    prev#set_visibility name v
+
+  method! get_visibility name = prev#get_visibility name
+
   (* override *)
   method! find_var_symbol (name: string): Scope.variable option =
     let module_result = super#find_var_symbol name in
