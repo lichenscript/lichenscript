@@ -1,0 +1,10 @@
+
+function test(a: Option<i32>): boolean {
+  match a {
+    case Some(3) => true
+  }
+}
+
+function main () {
+  test(Some(4));
+}

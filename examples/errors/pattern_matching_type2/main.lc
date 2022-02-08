@@ -1,0 +1,16 @@
+
+enum Number {
+    case One
+    case Two
+}
+
+function test(num: Number): boolean {
+    match num {
+      case Some(_) => true
+      case _ => false
+    }
+}
+
+function main() {
+   test(One);
+}

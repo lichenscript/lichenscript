@@ -667,8 +667,6 @@ and check_expression env expr =
   )
 
   | Match _match -> (
-    let { match_expr; match_clauses; match_loc } = _match in
-
     let check_clause_pattern expr_type (pat: Typedtree.Pattern.t) =
       match pat.spec with
       | Underscore
@@ -709,17 +707,24 @@ and check_expression env expr =
           let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType(ctor_name, expr_type))) in
           raise (Type_error.Error err)
         in
-        let _typedef =
+        let enum_ctor_typedef =
           match Type_context.deref_node_type env.ctx ctor_id with
           | TypeDef { TypeDef. spec = EnumCtor enum_ctor ; _ } -> enum_ctor
           | _ -> failwith "unrechable"
         in
         let ctor_opt = Check_helper.find_construct_of env.ctx expr_type in
         match ctor_opt with
-        | Some _ctor -> ()
-        | None -> raise_err ()
+        | Some { TypeDef. id = enum_id;  spec = Enum _; _ } -> (
+          if enum_id <> enum_ctor_typedef.enum_ctor_super_id then
+            raise_err ()
+          else ()
+        )
+
+        | _ -> raise_err ()
       )
     in
+
+    let { match_expr; match_clauses; match_loc } = _match in
 
     check_expression env match_expr;
     let match_expr_type = Type_context.deref_node_type env.ctx match_expr.ty_var in
@@ -766,12 +771,51 @@ and check_expression env expr =
           match_clauses
       )
     in
+
+    check_pattern_exhausted _match;
+
     Type_context.update_node_type env.ctx expr.ty_var ty
   )
 
   | This
   | Super -> ()
   | _ -> failwith "unexpected"
+
+and check_pattern_exhausted _match =
+  let open T.Expression in
+
+  let rec get_max_pattern_id_of_pat max pat =
+    let open T.Pattern in
+    let pat_id =
+      if pat.pat_id > max then
+        pat.pat_id
+      else
+        max
+    in
+    match pat.spec with
+    | EnumCtor(_, child) -> get_max_pattern_id_of_pat pat_id child
+    | _ -> pat_id
+  in
+
+  let { match_clauses; _ } = _match in
+
+  let max_pattern_id =
+    List.fold
+      ~init:0
+      ~f:(fun acc clause ->
+        let { clause_pat; _ } = clause in
+        let max_id_of_clause = get_max_pattern_id_of_pat 0 clause_pat in
+        if max_id_of_clause > acc then
+          max_id_of_clause
+        else
+          acc
+      )
+      match_clauses
+  in
+
+  let _relationships = Array.create ~len:(max_pattern_id + 1) [] in
+  let _slots = Array.create ~len:(max_pattern_id + 1) [] in
+  ()
 
 and check_lambda env lambda =
   let { T.Expression. lambda_return_ty; lambda_body; _ } = lambda in
