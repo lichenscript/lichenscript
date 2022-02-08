@@ -5,6 +5,9 @@
 @external("lc_std_print")
 public declare function print(...content: any[]);
 
+@external("lc_std_exit")
+public declare function exit(exitCode: i32);
+
 public class Object {
 
     virtual toString(): string {

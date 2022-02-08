@@ -1802,5 +1802,10 @@ LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args) 
         return  /* None */MK_UNION(1);
     }
 
-    return  lc_std_map_remove_complex(rt, map, args[0]);
+    return lc_std_map_remove_complex(rt, map, args[0]);
+}
+
+LCValue lc_std_exit(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    int code = args[0].int_val;
+    exit(code);
 }
