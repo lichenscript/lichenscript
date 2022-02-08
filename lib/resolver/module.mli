@@ -20,7 +20,9 @@ exception ReexportSymbol of (export * export)
 
 type t
 
-val create: full_path: string -> unit -> t
+val create: full_path:string -> module_scope:Scope.scope -> unit -> t
+
+val module_scope: t -> Scope.scope
 
 val add_file: t -> file -> unit
 

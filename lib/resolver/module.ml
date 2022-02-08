@@ -37,14 +37,18 @@ type t = {
   mod_full_path: string;
   mutable files: file list;
   exports: (string, export) Hashtbl.t;
+  module_scope: Scope.scope;
 }
 
-let create ~full_path () =
+let create ~full_path ~module_scope () =
   {
     mod_full_path = full_path;
     files = [];
     exports = Hashtbl.create (module String);
+    module_scope;
   }
+
+let module_scope env = env.module_scope
 
 let add_file env file =
   env.files <- file::env.files

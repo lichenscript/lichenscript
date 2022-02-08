@@ -4,7 +4,7 @@ open Scope
 
 type t = {
   ctx: Type_context.t;
-  module_scope: scope;
+  file_scope: scope;
   open_domains: string array list;
   mutable current_scope: scope;
   mutable errors: Type_error.t list;
@@ -12,12 +12,12 @@ type t = {
   mutable in_lambda: bool;
 }
 
-let create ?(open_domains=[]) ~module_scope ctx =
+let create ?(open_domains=[]) ~file_scope ctx =
   {
     ctx;
     open_domains;
-    module_scope;
-    current_scope = module_scope;
+    file_scope;
+    current_scope = file_scope;
     errors = [];
     scope_counter = 1;
     in_lambda = false;
@@ -40,7 +40,7 @@ let set_current_scope env scope =
 
 let peek_scope env = env.current_scope
 
-let module_scope env = env.module_scope
+let file_scope env = env.file_scope
 
 let add_error env err =
   env.errors <- err::env.errors

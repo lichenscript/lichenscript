@@ -1654,7 +1654,7 @@ let annotate_program env (program: Ast.program) =
   let ty_var = Type_context.new_id (Env.ctx env) val_ in
   let tree = { T.
     tprogram_declarations;
-    tprogram_scope = Env.module_scope env;
+    tprogram_scope = Env.file_scope env;
     ty_var
   } in
   tree

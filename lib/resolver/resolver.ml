@@ -34,7 +34,12 @@ let create ~find_paths ~ctx () =
     find_paths;
   }
 
-class module_scope ~prev env extern_modules = object
+class[@warning "-unused-ancestor"] module_scope ~prev () = object
+  inherit Scope.scope ~prev () as super
+
+end
+
+class file_scope ~prev env extern_modules = object
   inherit Scope.scope ~prev () as super
 
   method! set_variable_captured _level (_name: string) = false
@@ -117,7 +122,7 @@ let insert_moudule_file env ~mod_path file =
     failwith (Format.sprintf "unexpected: can not find mod %s" mod_path)
   )
 
-let rec compile_file_to_path ~ctx ~mod_path env path =
+let rec compile_file_to_path ~ctx ~mod_path env _mod path =
   let file_content = In_channel.read_all path in
   let file_key = File_key.LibFile path in
   let ast =
@@ -181,11 +186,12 @@ let rec compile_file_to_path ~ctx ~mod_path env path =
 
   let extern_modules = List.rev !extern_modules in
 
-  let module_scope = new module_scope ~prev:(Type_context.root_scope ctx) env extern_modules in
+  let module_scope = Module.module_scope _mod in
+  let file_scope = new file_scope ~prev:module_scope env extern_modules in
   (* parse and create env, do annotation when all files are parsed
    * because annotation stage needs all exported symbols are resolved
    *)
-  let typed_env = Lichenscript_typing.Env.create ~module_scope ctx in
+  let typed_env = Lichenscript_typing.Env.create ~file_scope ctx in
 
   (* add all top level symbols to typed_env *)
   Tree_helper.add_top_level_symbols_to_typed_env typed_env ast.tree;
@@ -204,7 +210,8 @@ let rec compile_file_to_path ~ctx ~mod_path env path =
 (* recursive all files in the path *)
 and parse_module_by_dir ~ctx env dir_path : string option =
   let iterate_parse_file mod_path =
-    let _mod = Module.create ~full_path:mod_path () in
+    let module_scope = new module_scope ~prev:(Type_context.root_scope ctx) () in
+    let _mod = Module.create ~full_path:mod_path ~module_scope () in
     Linker.set_module env.linker mod_path _mod;
     let children = Sys.ls_dir mod_path in
     (* only compile files in this level *)
@@ -215,7 +222,7 @@ and parse_module_by_dir ~ctx env dir_path : string option =
           try[@alert "-deprecated"]  (* disable the deprecated alert *)
             let test_result = Re.exec allow_suffix child_path |> Re.Group.all in
             if Array.length test_result > 1 then ((* is a .lc file *)
-              compile_file_to_path ~ctx ~mod_path env child_path
+              compile_file_to_path ~ctx ~mod_path env _mod child_path
             )
           with
           | Not_found -> ()
@@ -296,7 +303,7 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~debug entry_file_pat
     let ctx = Lichenscript_typing.Type_context.create () in
     let env = create ~find_paths:[ Option.value_exn std_dir ] ~ctx () in
 
-    (* parse the entry file *)
+    (* parse the entry dir *)
     let dir_of_entry = Filename.dirname entry_file_path in
     let entry_full_path = parse_module_by_dir ~ctx env dir_of_entry in
 

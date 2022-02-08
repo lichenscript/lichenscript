@@ -2,7 +2,7 @@ open Scope
 
 type t
 
-val create: ?open_domains:(string array list) -> module_scope:scope -> Type_context.t -> t
+val create: ?open_domains:(string array list) -> file_scope:scope -> Type_context.t -> t
 
 val ctx : t -> Type_context.t
 
@@ -16,7 +16,7 @@ val set_current_scope: t -> scope -> unit
 
 val peek_scope: t -> scope
 
-val module_scope: t -> scope
+val file_scope: t -> scope
 
 val add_error: t -> Type_error.t -> unit
 
