@@ -8,6 +8,9 @@ public declare function print(...content: any[]);
 @external("lc_std_exit")
 public declare function exit(exitCode: i32);
 
+@external("lc_std_panic")
+public declare function panic(...content: any[]);
+
 public class Object {
 
     virtual toString(): string {

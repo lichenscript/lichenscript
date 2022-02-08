@@ -70,7 +70,7 @@ and build_and_run args index =
   let build_result = build_command args index in
   match build_result with
   | Some path ->
-    run_bin_path path
+    ignore (run_bin_path path)
 
   | None -> ()
 
@@ -267,14 +267,16 @@ and print_loc_title ~prefix loc_opt =
     | None -> ()
   )
 
+(* replace current process *)
 and run_bin_path path =
-  match Unix.fork () with
+  Unix.exec ~prog:path ~argv:[path] ()
+  (* match Unix.fork () with
   | `In_the_child -> (
     ignore (Unix.exec ~prog:path ~argv:[path] ())
   )
   | `In_the_parent pid -> (
     Unix.waitpid_exn pid
-  )
+  ) *)
 
 ;;
 

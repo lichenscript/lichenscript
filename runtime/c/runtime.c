@@ -22,6 +22,7 @@
 
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
+#include <execinfo.h>
 #endif
 
 #define LC_INIT_SYMBOL_BUCKET_SIZE 128
@@ -1808,4 +1809,21 @@ LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args) 
 LCValue lc_std_exit(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     int code = args[0].int_val;
     exit(code);
+}
+
+LCValue lc_std_panic(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    lc_std_print(rt, this, argc, args);
+
+#if defined(__APPLE__)
+    printf("[LichenSciprt] Panic stack:\n");
+    void* callstack[128];
+    int i, frames = backtrace(callstack, 128);
+    char** strs = backtrace_symbols(callstack, frames);
+    for (i = 0; i < frames; ++i) {
+        printf("%s\n", strs[i]);
+    }
+    free(strs);
+#endif
+
+    exit(2);
 }

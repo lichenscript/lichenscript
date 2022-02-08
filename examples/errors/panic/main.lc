@@ -1,0 +1,16 @@
+
+function main() {
+    a();
+}
+
+function a() {
+    b();
+}
+
+function b() {
+    c();
+}
+
+function c() {
+    panic("panic");
+}
