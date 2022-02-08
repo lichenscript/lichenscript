@@ -152,6 +152,7 @@ and Expr : sig
   | IntValue of t
   | GetField of t * string * string (* expr classname fieldname *)
   | StringCmp of Asttypes.BinaryOp.t * t * t
+  | StringEqUtf8 of t * string
   | Retaining of Expr.t
   [@@deriving show]
 

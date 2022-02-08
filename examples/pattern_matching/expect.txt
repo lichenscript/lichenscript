@@ -1,2 +1,4 @@
 is not six
 is six
+is Vincent
+is not Vincent

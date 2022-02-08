@@ -6,11 +6,26 @@ function isSix(num: i32): boolean {
     }
 }
 
+function isVincent(name: string): boolean {
+    match name {
+        case "Vincent Chan" => true
+        case _ => false
+    }
+}
+
 function main() {
     if !isSix(0) {
         print("is not six");
     }
     if isSix(6) {
         print("is six");
+    }
+
+    if isVincent("Vincent Chan") {
+        print("is Vincent");
+    }
+
+    if !isVincent("Smith") {
+        print("is not Vincent");
     }
 }

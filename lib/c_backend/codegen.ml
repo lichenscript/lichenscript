@@ -599,6 +599,16 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ")"
   )
 
+  | StringEqUtf8(expr, expected) -> (
+    ps env "LCStringEqUtf8(rt, ";
+    codegen_expression env expr;
+    ps env ", \"";
+    ps env expected;
+    ps env "\", ";
+    ps env (Int.to_string (String.length expected));
+    ps env ")"
+  )
+
   | Retaining expr -> (
     ps env "(LCRetain(";
     codegen_expression env expr;

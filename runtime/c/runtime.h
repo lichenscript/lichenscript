@@ -228,6 +228,7 @@ typedef struct LCLambda {
 
 LCValue LCNewStringFromCStringLen(LCRuntime* rt, const unsigned char* content, uint32_t len);
 LCValue LCNewStringFromCString(LCRuntime* rt, const unsigned char* content);
+int LCStringEqUtf8(LCRuntime* rt, LCValue this, const char* str, size_t len);
 
 LCValue LCNewRefCell(LCRuntime* rt, LCValue value);
 void LCRefCellSetValue(LCRuntime* rt, LCValue cell, LCValue value);

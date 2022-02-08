@@ -1267,6 +1267,21 @@ and transform_pattern_matching env ~prepend_stmts ~loc ~ty_var _match =
       )
     )
 
+    | Literal (Literal.String(str, _, _)) -> (
+      let if_test = C_op.Expr.StringEqUtf8(match_expr, str) in
+      (fun genereator ->
+        let if_stmt = { C_op.Stmt.
+          spec = If {
+            if_test;
+            if_consequent= genereator ~finalizers:[] ();
+            if_alternate = None;
+          };
+          loc = Loc.none;
+        } in
+        [if_stmt]
+      )
+    )
+
     | Literal _ -> failwith "not implement"
 
     | Symbol (name, name_id) -> (

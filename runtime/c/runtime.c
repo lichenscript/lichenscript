@@ -386,6 +386,43 @@ static LCValue LC_Object_toString(LCRuntime* rt, LCValue this, int argc, LCValue
     return LCNewStringFromCString(rt, (const unsigned char*)"Object");;
 }
 
+static char* LCStringToUTF8(LCRuntime* rt, LCString* str) {
+    char* space = lc_malloc(rt, str->length * 2 + 1);
+    int idx = 0;
+    int len;
+    uint8_t* buf = (uint8_t*)space;
+
+    while (idx < str->length) {
+        len = unicode_to_utf8(buf, str->u.str16[idx]);
+        buf += len;
+        idx++;
+    }
+
+    *buf = 0;
+
+    return space;
+}
+
+int LCStringEqUtf8(LCRuntime* rt, LCValue this, const char* cmp_str, size_t len) {
+    int result;
+    LCString* str = (LCString*)this.ptr_val;
+
+    if (!str->is_wide_char) {
+        if (str->length != len) {
+            return 0;
+        }
+
+        return memcmp(str->u.str8, cmp_str, len) == 0;
+    }
+
+    char* utf8_str = LCStringToUTF8(rt, str);
+
+    result = strcmp(utf8_str, cmp_str);
+
+    lc_free(rt, utf8_str);
+    return result;
+}
+
 static LCClassMethodDef Object_method_def[] = {
     { "toString", 0, LC_Object_toString }
 };
@@ -1060,8 +1097,15 @@ LCValue LCRunMain(LCProgram* program) {
     return program->main_fun(program->runtime, MK_NULL(), 0, NULL);
 }
 
-static void std_print_string(LCString* str) {
-    printf("%s", str->u.str8);
+static void std_print_string(LCRuntime* rt, LCString* str) {
+    if (!str->is_wide_char) {
+        printf("%s", str->u.str8);
+        return;
+    }
+
+    char* space = LCStringToUTF8(rt, str);
+    printf("%s", space);
+    lc_free(rt, space);
 }
 
 static void std_print_val(LCRuntime* rt, LCValue val) {
@@ -1088,7 +1132,7 @@ static void std_print_val(LCRuntime* rt, LCValue val) {
         break;
 
     case LC_TY_STRING:
-        std_print_string((LCString*)val.ptr_val);
+        std_print_string(rt, (LCString*)val.ptr_val);
         break;
     
     default:
