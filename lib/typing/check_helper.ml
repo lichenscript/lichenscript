@@ -254,17 +254,25 @@ let is_array ctx type_expr =
   | Array _ -> true
   | _ -> false
 
-let is_i32 ctx type_expr =
+let is_primitive_with_name ctx ~name:expect_name type_expr =
   let type_expr = Type_context.deref_type ctx type_expr in
   let expr_def_opt = find_construct_of ctx type_expr in
   (match expr_def_opt with
     | Some def -> (
       let open TypeDef in
       def.builtin &&
-      String.equal def.name "i32"
+      String.equal def.name expect_name
     )
     | _ -> false
   )
+
+let is_i32 = is_primitive_with_name ~name:"i32"
+
+let is_f32 = is_primitive_with_name ~name:"f32"
+
+let is_char = is_primitive_with_name ~name:"char"
+
+let is_boolean = is_primitive_with_name ~name:"boolean"
 
 let rec replace_type_vars_with_maps ctx type_map type_expr =
   let open Core_type.TypeExpr in

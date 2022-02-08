@@ -41,6 +41,7 @@ and spec =
   | ClassPropRedefinition of string * string
   | ClassInitNotAssignable of string * string * TypeExpr.t * TypeExpr.t
   | CannotBindingOfPattern of string
+  | UnexpectedPatternType of string * TypeExpr.t
 
 let make_error ctx loc spec =
   { loc; spec; ctx }
@@ -188,6 +189,9 @@ module PP = struct
 
     | CannotBindingOfPattern pattern_name ->
       Format.fprintf formatter "Currently can not bind '%s', will support in the future." pattern_name
+
+    | UnexpectedPatternType(pat_name, ty) ->
+      Format.fprintf formatter "Unexpected pattern type '%s', expected '%s'." pat_name (pp_ty ty)
 
   let error ~ctx formatter err =
     let { spec; loc; _ } = err in
