@@ -79,7 +79,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
 
       let binding_init = annotate_expression ~prev_deps env binding_init in
 
-      let binding_pat, pat_deps = annotate_pattern ~kind:binding_kind env binding_pat in
+      let binding_pat, pat_deps = annotate_pattern ~kind:binding_kind ~pat_id:0 env binding_pat in
       let open T.Pattern in
       match binding_pat.spec with
       | Underscore -> (
@@ -514,7 +514,7 @@ and annotate_expression_match ~prev_deps env _match =
     parent_scope#add_child scope;
     Env.with_new_scope env scope (fun env ->
       let { clause_pat; clause_consequent; clause_loc } = clause in
-      let clause_pat, clause_deps = annotate_pattern ~kind:Ast.Pvar_const env clause_pat in
+      let clause_pat, clause_deps = annotate_pattern ~kind:Ast.Pvar_const ~pat_id:0 env clause_pat in
       let clause_consequent = annotate_expression ~prev_deps:clause_deps env clause_consequent in
       { T.Expression.
         clause_pat;
@@ -1183,7 +1183,7 @@ and is_name_enum_or_class name =
   let first_char = String.get name 0 in
   Char.is_uppercase first_char
 
-and annotate_pattern ~kind env pat : (T.Pattern.t * int list) =
+and annotate_pattern ~kind ~pat_id env pat : (T.Pattern.t * int list) =
   let open Ast.Pattern in
   let { spec; loc } = pat in
   let scope = Env.peek_scope env in
@@ -1222,7 +1222,7 @@ and annotate_pattern ~kind env pat : (T.Pattern.t * int list) =
       );
       let ctor_var = Option.value_exn ctor_var in
 
-      let param_pat, param_deps = annotate_pattern ~kind env pat in
+      let param_pat, param_deps = annotate_pattern ~kind ~pat_id:(pat_id + 1) env pat in
       deps := List.concat [ param_deps; !deps; [ctor_var.var_id]];
 
       (T.Pattern.EnumCtor (
@@ -1232,7 +1232,7 @@ and annotate_pattern ~kind env pat : (T.Pattern.t * int list) =
     )
 
   in
-  { T.Pattern. spec; loc }, List.rev !deps
+  { T.Pattern. spec; loc; pat_id }, List.rev !deps
 
 (* only collect deps, construct value in type check *)
 and annotate_type env ty : (TypeExpr.t * int list) =

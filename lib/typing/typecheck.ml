@@ -668,46 +668,61 @@ and check_expression env expr =
 
   | Match _match -> (
     let { match_expr; match_clauses; match_loc } = _match in
-    check_expression env match_expr;
-    let match_expr_type = Type_context.deref_node_type env.ctx match_expr.ty_var in
 
-    let check_clause_pattern (pat: Typedtree.Pattern.t) =
+    let check_clause_pattern expr_type (pat: Typedtree.Pattern.t) =
       match pat.spec with
       | Underscore
       | Symbol _ -> ()
       | Literal (Ast.Literal.Boolean _) -> (
-        if not (Check_helper.is_boolean env.ctx match_expr_type) then (
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("boolean", match_expr_type))) in
+        if not (Check_helper.is_boolean env.ctx expr_type) then (
+          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("boolean", expr_type))) in
           raise (Type_error.Error err)
         )
       )
       | Literal (Ast.Literal.Char _) -> (
-        if not (Check_helper.is_char env.ctx match_expr_type) then (
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("char", match_expr_type))) in
+        if not (Check_helper.is_char env.ctx expr_type) then (
+          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("char", expr_type))) in
           raise (Type_error.Error err)
         )
       )
       | Literal (Ast.Literal.Float _) -> (
-        if not (Check_helper.is_f32 env.ctx match_expr_type) then (
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("float", match_expr_type))) in
+        if not (Check_helper.is_f32 env.ctx expr_type) then (
+          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("float", expr_type))) in
           raise (Type_error.Error err)
         )
       )
       | Literal (Ast.Literal.Integer _) -> (
-        if not (Check_helper.is_i32 env.ctx match_expr_type) then (
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("number", match_expr_type))) in
+        if not (Check_helper.is_i32 env.ctx expr_type) then (
+          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("number", expr_type))) in
           raise (Type_error.Error err)
         )
       )
       | Literal (Ast.Literal.String _) -> (
-        match match_expr_type with
+        match expr_type with
         | TypeExpr.String -> ()
         | _ ->
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("string", match_expr_type))) in
+          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("string", expr_type))) in
           raise (Type_error.Error err)
       )
-      | EnumCtor _ -> ()
+      | EnumCtor((ctor_name, ctor_id), _child_pat) -> (
+        let raise_err () =
+          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType(ctor_name, expr_type))) in
+          raise (Type_error.Error err)
+        in
+        let _typedef =
+          match Type_context.deref_node_type env.ctx ctor_id with
+          | TypeDef { TypeDef. spec = EnumCtor enum_ctor ; _ } -> enum_ctor
+          | _ -> failwith "unrechable"
+        in
+        let ctor_opt = Check_helper.find_construct_of env.ctx expr_type in
+        match ctor_opt with
+        | Some _ctor -> ()
+        | None -> raise_err ()
+      )
     in
+
+    check_expression env match_expr;
+    let match_expr_type = Type_context.deref_node_type env.ctx match_expr.ty_var in
 
     let ty =
       if List.is_empty match_clauses then (
@@ -718,7 +733,7 @@ and check_expression env expr =
         List.fold
           ~init:TypeExpr.Unknown
           ~f:(fun acc clause ->
-            check_clause_pattern clause.clause_pat;
+            check_clause_pattern match_expr_type clause.clause_pat;
             let consequent = clause.clause_consequent in
             check_expression env consequent;
             let node_expr = Type_context.deref_node_type env.ctx consequent.ty_var in
