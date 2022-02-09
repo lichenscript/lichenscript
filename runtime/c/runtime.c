@@ -1648,6 +1648,9 @@ LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
         tuple->next = NULL;
 
         map->size++;
+        if (map->last != NULL) {
+            map->last->next = tuple;
+        }
         map->last = tuple;
         if (map->head == NULL) {
             map->head = tuple;

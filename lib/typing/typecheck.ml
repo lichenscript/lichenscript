@@ -329,22 +329,43 @@ and check_expression env expr =
           check_expression env map_entry_value;
         )
         map_entries;
-      let first = List.hd_exn map_entries in
-      let first_type = T.Expression.(first.map_entry_value.ty_var) in
-      let first_key_type =
-        match first.map_entry_key with
-        | Ast.Literal.String _ -> TypeExpr.String
-        (* | Ast.Literal.Char _ -> TypeExpr.Ref(ty_char env)
-        | Ast.Literal.Integer _ -> TypeExpr.Ref(ty_i32 env)
-        | Ast.Literal.Boolean _ -> TypeExpr.Ref(ty_boolean env)
-        | Ast.Literal.Float _ ->  *)
-        | _ ->
-          let ty = TypeExpr.Ref(ty_f32 env) in
-          let err = Type_error.(make_error env.ctx first.map_entry_loc (CannotUsedAsKeyOfMap ty)) in
-          raise (Type_error.Error err)
+
+      let key_ty, value_ty =
+        List.fold
+        ~init:(TypeExpr.TypeSymbol "K", TypeExpr.TypeSymbol "V")
+        ~f:(fun (_acc_key, acc_value) entry ->
+          check_expression env entry.map_entry_value;
+          let key_ty =
+            match entry.map_entry_key with
+            | Ast.Literal.String _ -> TypeExpr.String
+            (* | Ast.Literal.Char _ -> TypeExpr.Ref(ty_char env)
+            | Ast.Literal.Integer _ -> TypeExpr.Ref(ty_i32 env)
+            | Ast.Literal.Boolean _ -> TypeExpr.Ref(ty_boolean env)
+            | Ast.Literal.Float _ ->  *)
+            | _ ->
+              let ty = TypeExpr.Ref(ty_f32 env) in
+              let err = Type_error.(make_error env.ctx entry.map_entry_loc (CannotUsedAsKeyOfMap ty)) in
+              raise (Type_error.Error err)
+          in
+          let node_type = Type_context.deref_node_type env.ctx entry.map_entry_value.ty_var in
+          let value_ty =
+            match (acc_value, node_type) with
+            | (TypeExpr.TypeSymbol "V", _) -> node_type
+            | _ ->
+              if Check_helper.type_assinable env.ctx acc_value node_type then
+                acc_value
+              else if Check_helper.type_assinable env.ctx node_type acc_value then
+                node_type
+              else (
+                let err = Type_error.(make_error env.ctx entry.map_entry_loc (NotAssignable(acc_value, node_type))) in
+                raise (Type_error.Error err)
+              )
+          in
+          (key_ty, value_ty)
+        )
+        map_entries
       in
-      let first_node = Type_context.get_node env.ctx first_type in
-      Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Ctor (Ref map_ty, [first_key_type; first_node.value]))
+      Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Ctor (Ref map_ty, [key_ty; value_ty]))
     )
   )
 
