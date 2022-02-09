@@ -43,6 +43,7 @@ and spec =
   | ClassInitNotAssignable of string * string * TypeExpr.t * TypeExpr.t
   | CannotBindingOfPattern of string
   | UnexpectedPatternType of string * TypeExpr.t
+  | PatternNotExausted
 
 let make_error ctx loc spec =
   { loc; spec; ctx }
@@ -196,6 +197,9 @@ module PP = struct
 
     | UnexpectedPatternType(pat_name, ty) ->
       Format.fprintf formatter "Unexpected pattern type '%s', expected '%s'." pat_name (pp_ty ty)
+
+    | PatternNotExausted ->
+      Format.fprintf formatter "Pattern is not exausted."
 
   let error ~ctx formatter err =
     let { spec; loc; _ } = err in

@@ -1498,6 +1498,7 @@ and annotate_enum env enum =
   in
 
   Env.with_new_scope env scope (fun env ->
+    let enum_members = ref [] in
     let annotate_case index _case =
       let { case_name; case_fields; case_loc } = _case in
       let member_var = Option.value_exn (scope#find_var_symbol case_name.pident_name) in
@@ -1510,24 +1511,29 @@ and annotate_enum env enum =
         raise (Type_error.Error err)
       );
 
-      let ty_def = {
+      let ctor_ty_def = {
         TypeDef.
         enum_ctor_tag_id = index;
         enum_ctor_name = case_name.pident_name;
         enum_ctor_super_id = variable.var_id;
         enum_ctor_params = fields_types;
       } in
+
+      let ty_def = { TypeDef.
+        id = member_var.var_id;
+        builtin = false;
+        name = case_name.pident_name;
+        spec = EnumCtor ctor_ty_def;
+      } in
+
+      enum_members := (case_name.pident_name, ty_def)::(!enum_members);
+
       Type_context.map_node
         ctx
         ~f:(fun _ -> {
           deps = List.concat ([variable.var_id]::deps);
           loc = case_loc;
-          value = (TypeExpr.TypeDef {
-            id = member_var.var_id;
-            builtin = false;
-            name = case_name.pident_name;
-            spec = EnumCtor ty_def;
-          });
+          value = TypeExpr.TypeDef ty_def;
         })
         member_var.var_id
       ;
@@ -1549,7 +1555,7 @@ and annotate_enum env enum =
 
     let ty_def = {
       TypeDef.
-      enum_members = [];
+      enum_members = List.rev !enum_members;
       enum_params;
     } in
 

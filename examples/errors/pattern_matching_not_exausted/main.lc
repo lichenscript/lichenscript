@@ -1,7 +1,7 @@
 
 function test(a: Option<i32>): boolean {
   match a {
-    case Some(3) => true
+    case Some(_) => true
   }
 }
 

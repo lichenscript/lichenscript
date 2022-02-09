@@ -19,14 +19,14 @@ open Core_type
 module TypeVarMap = Map.Make(String)
 
 (* recursive find type *)
-let find_construct_of ctx type_expr =
+let find_construct_of ctx type_expr: (TypeDef.t * TypeExpr.t list) option =
   let open TypeExpr in
   let type_expr = Type_context.deref_type ctx type_expr in
   match type_expr with
-  | Ctor (c, _) -> (
+  | Ctor (c, args) -> (
     let value = Type_context.deref_type ctx c in
     match value with
-    | TypeDef sym -> Some sym
+    | TypeDef sym -> Some (sym, args)
     | _ -> None
   )
 
@@ -92,24 +92,25 @@ let rec type_assinable ctx left right =
     let c1_def = find_construct_of ctx left in
     let c2_def = find_construct_of ctx right in
     match (c1_def, c2_def) with
-    | (Some { id = enum_id; spec = Enum _; _ }, Some { spec = EnumCtor { enum_ctor_super_id; _ }; _}) ->
+    | (Some({ id = enum_id; spec = Enum _; _ }, _), Some({ spec = EnumCtor { enum_ctor_super_id; _ }; _}, _)) ->
       enum_id = enum_ctor_super_id
 
     (* assigning class to interface *)
-    | (Some { id = intf_id; spec = Interface _ ; _ }, Some { spec = Class { tcls_implements; _ }; _ }) -> (
+    | (Some({ id = intf_id; spec = Interface _ ; _ }, _), Some({ spec = Class { tcls_implements; _ }; _ }, _)) -> (
       let test =
         List.find
         ~f:(fun (impl, _) ->
           let ctor_id = find_construct_of ctx impl in
           match ctor_id with
-          | Some { TypeDef. id; _ } -> id = intf_id
+          | Some({ TypeDef. id; _ }, _) -> id = intf_id
           | None -> false
         )
         tcls_implements in
       Option.is_some test
     )
 
-    | (Some left_def, Some right_def) ->
+    | (Some(left_def, _left_args), Some(right_def, _right_args)) ->
+      (* TODO: compare args *)
       if TypeDef.(left_def == right_def) then
         true
       else
@@ -132,10 +133,10 @@ and type_equal ctx left right =
     let c1_def = find_construct_of ctx left in
     let c2_def = find_construct_of ctx right in
     match (c1_def, c2_def) with
-    | (Some { id = enum_id; spec = Enum _; _ }, Some { spec = EnumCtor { enum_ctor_super_id; _ }; _}) ->
+    | (Some({ id = enum_id; spec = Enum _; _ }, _), Some({ spec = EnumCtor { enum_ctor_super_id; _ }; _}, _)) ->
       enum_id = enum_ctor_super_id
 
-    | (Some left_sym, Some right_sym) ->
+    | (Some(left_sym, _), Some(right_sym, _)) ->
       if TypeDef.(left_sym == right_sym) then
         true
       else
@@ -151,7 +152,7 @@ let check_is_primitive_type ~group ctx (left: TypeExpr.t) (right: TypeExpr.t) =
   let left_def_opt = find_construct_of ctx left in
   let right_def_opt = find_construct_of ctx right in
   (match (left_def_opt, right_def_opt) with
-    | (Some left, Some right) -> (
+    | (Some(left, []), Some(right, [])) -> (
       let open TypeDef in
       left.builtin && right.builtin && (String.equal left.name right.name) &&
       (Array.mem group ~equal:String.equal left.name)
@@ -164,7 +165,7 @@ let type_should_not_release ctx expr =
   let expr = Type_context.deref_type ctx expr in
   let expr_def_opt = find_construct_of ctx expr in
   (match expr_def_opt with
-    | Some def -> (
+    | Some(def, []) -> (
       let open TypeDef in
       def.builtin &&
       (Array.mem group ~equal:String.equal def.name)
@@ -258,7 +259,7 @@ let is_primitive_with_name ctx ~name:expect_name type_expr =
   let type_expr = Type_context.deref_type ctx type_expr in
   let expr_def_opt = find_construct_of ctx type_expr in
   (match expr_def_opt with
-    | Some def -> (
+    | Some(def, []) -> (
       let open TypeDef in
       def.builtin &&
       String.equal def.name expect_name
@@ -471,3 +472,9 @@ let rec find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int
 
   | _ -> None
 
+type pattern_exhausted =
+  | Pat_exausted
+  | Pat_begin
+  | Pat_boolean of bool * bool  (* has true, has false *)
+  | Pat_enum_branch of (Typedtree.identifier * Typedtree.Pattern.t) list
+[@@deriving show]

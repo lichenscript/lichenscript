@@ -318,23 +318,27 @@ and check_expression env expr =
     let map_opt = env.scope#find_type_symbol "Map" in
     let map_ty = Option.value_exn ~message:"Cannot found Map in the current scope" map_opt in
     if List.is_empty map_entries then (
-      Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Array Unknown)
+      Type_context.update_node_type
+        env.ctx
+        expr.ty_var
+        TypeExpr.(Ctor (Ref map_ty, [(TypeSymbol "K"); (TypeSymbol "V")]))
     ) else (
       (* TODO: check every expressions are the same *)
-    List.iter
-      ~f:(fun { map_entry_value; _ } ->
-        check_expression env map_entry_value;
-      )
-      map_entries;
+      List.iter
+        ~f:(fun { map_entry_value; _ } ->
+          check_expression env map_entry_value;
+        )
+        map_entries;
       let first = List.hd_exn map_entries in
       let first_type = T.Expression.(first.map_entry_value.ty_var) in
       let first_key_type =
         match first.map_entry_key with
-        | Ast.Literal.Integer _ -> TypeExpr.Ref(ty_i32 env)
-        | Ast.Literal.Char _ -> TypeExpr.Ref(ty_char env)
         | Ast.Literal.String _ -> TypeExpr.String
+        (* | Ast.Literal.Char _ -> TypeExpr.Ref(ty_char env)
+        | Ast.Literal.Integer _ -> TypeExpr.Ref(ty_i32 env)
         | Ast.Literal.Boolean _ -> TypeExpr.Ref(ty_boolean env)
-        | Ast.Literal.Float _ -> 
+        | Ast.Literal.Float _ ->  *)
+        | _ ->
           let ty = TypeExpr.Ref(ty_f32 env) in
           let err = Type_error.(make_error env.ctx first.map_entry_loc (CannotUsedAsKeyOfMap ty)) in
           raise (Type_error.Error err)
@@ -483,7 +487,7 @@ and check_expression env expr =
     | Asttypes.UnaryOp.Not -> (
       let ctor = Check_helper.find_construct_of env.ctx node_type in
       match ctor with
-      | Some { TypeDef. builtin = true; name = "boolean"; _ } -> ()
+      | Some({ TypeDef. builtin = true; name = "boolean"; _ }, []) -> ()
       | _ -> raise_err()
     )
 
@@ -714,7 +718,8 @@ and check_expression env expr =
         in
         let ctor_opt = Check_helper.find_construct_of env.ctx expr_type in
         match ctor_opt with
-        | Some { TypeDef. id = enum_id;  spec = Enum _; _ } -> (
+        | Some({ TypeDef. id = enum_id;  spec = Enum _; _ }, _) -> (
+          (* TODO: check args *)
           if enum_id <> enum_ctor_typedef.enum_ctor_super_id then
             raise_err ()
           else ()
@@ -772,7 +777,7 @@ and check_expression env expr =
       )
     in
 
-    check_pattern_exhausted _match;
+    check_match_exhausted env _match;
 
     Type_context.update_node_type env.ctx expr.ty_var ty
   )
@@ -781,41 +786,132 @@ and check_expression env expr =
   | Super -> ()
   | _ -> failwith "unexpected"
 
-and check_pattern_exhausted _match =
+and check_match_exhausted env _match =
   let open T.Expression in
 
-  let rec get_max_pattern_id_of_pat max pat =
-    let open T.Pattern in
-    let pat_id =
-      if pat.pat_id > max then
-        pat.pat_id
-      else
-        max
+  let rec check_patterns_exhausted patterns =
+    let open Check_helper in
+    let result =
+      List.fold
+        ~init:Pat_begin
+        ~f:(fun acc pattern ->
+          let open T.Pattern in
+          match pattern.spec with
+          | Underscore
+          | Symbol _ -> (
+            Pat_exausted
+          )
+
+          | Literal (Ast.Literal.Boolean v) -> (
+            match acc with
+            | Pat_begin ->
+              if v then
+                Pat_boolean(true, false)
+              else
+                Pat_boolean(false, true)
+
+            | Pat_boolean(has_true, has_false) ->
+              if v then
+                Pat_boolean(true, has_false)
+              else
+                Pat_boolean(has_true, true)
+
+            | _ -> acc
+          )
+
+          | EnumCtor (id, child_pat) -> (
+            match acc with
+            | Pat_begin ->
+              Pat_enum_branch [(id, child_pat)]
+
+            | Pat_enum_branch exist ->
+              Pat_enum_branch ((id, child_pat)::exist)
+
+            | _ -> acc
+          )
+
+          | _ -> acc
+        )
+        patterns
     in
-    match pat.spec with
-    | EnumCtor(_, child) -> get_max_pattern_id_of_pat pat_id child
-    | _ -> pat_id
+    match result with
+    | Pat_boolean(true, true)
+    | Pat_exausted -> ()
+    | Pat_enum_branch items -> (
+      let branches_map = Hashtbl.create (module String) in
+
+      List.iter
+        ~f:(fun item ->
+          let ((name, _), _) = item in
+          match Hashtbl.find branches_map name with
+          | Some list ->
+            Hashtbl.set branches_map ~key:name ~data:(item::list)
+          | None ->
+            Hashtbl.set branches_map ~key:name ~data:[item]
+        )
+        items;
+
+      Hashtbl.iter
+        ~f:(fun items ->
+          let patterns = List.map ~f:(fun (_, pat) -> pat) items in
+          check_patterns_exhausted patterns
+        )
+        branches_map;
+
+      let (_ctor_name, ctor_id), _ = List.hd_exn items in
+
+      let def = Type_context.deref_node_type env.ctx ctor_id in
+      let first_enum_ctor =
+        match def with
+        | TypeExpr.TypeDef { Core_type.TypeDef. spec = EnumCtor ctor;_ } -> ctor
+        | _ -> failwith "unrechable"
+      in
+
+      let enum_super_id = first_enum_ctor.enum_ctor_super_id in
+      let super_def = Type_context.deref_node_type env.ctx enum_super_id in
+      let unwrap_super_def =
+        match super_def with
+        | TypeExpr.TypeDef { Core_type.TypeDef. spec = Enum enum;_ } -> enum
+        | _ -> failwith "unrechable"
+      in
+
+      let visited_map =
+        unwrap_super_def.enum_members
+        |> List.map
+          ~f:(fun (member_name, _) ->
+            member_name
+          )
+        |> Hash_set.of_list (module String)
+      in
+
+      List.iter
+        ~f:(fun item ->
+          let ((name, _), _) = item in
+          Hash_set.remove visited_map name
+        )
+        items;
+
+      if not (Hash_set.is_empty visited_map) then (
+        let err = Type_error.(make_error env.ctx _match.match_loc PatternNotExausted) in
+        raise (Type_error.Error err)
+      )
+    )
+
+    | _ -> (
+      let err = Type_error.(make_error env.ctx _match.match_loc PatternNotExausted) in
+      raise (Type_error.Error err)
+    )
   in
 
   let { match_clauses; _ } = _match in
 
-  let max_pattern_id =
-    List.fold
-      ~init:0
-      ~f:(fun acc clause ->
-        let { clause_pat; _ } = clause in
-        let max_id_of_clause = get_max_pattern_id_of_pat 0 clause_pat in
-        if max_id_of_clause > acc then
-          max_id_of_clause
-        else
-          acc
-      )
-      match_clauses
+  let patterns =
+    List.map
+    ~f:(fun clause -> clause.clause_pat)
+    match_clauses
   in
 
-  let _relationships = Array.create ~len:(max_pattern_id + 1) [] in
-  let _slots = Array.create ~len:(max_pattern_id + 1) [] in
-  ()
+  check_patterns_exhausted patterns
 
 and check_lambda env lambda =
   let { T.Expression. lambda_return_ty; lambda_body; _ } = lambda in
@@ -863,7 +959,8 @@ and check_class env cls =
   let check_class_implements (impl_expr, loc) =
     let typedef = Check_helper.find_construct_of env.ctx impl_expr in
     match typedef with
-    | Some { TypeDef. name = intf_name; spec = Interface { intf_methods } ; _ } -> (
+    | Some({ TypeDef. name = intf_name; spec = Interface { intf_methods } ; _ }, _) -> (
+      (* TODO: check args *)
       List.iter
         ~f:(fun (method_name, elm) -> 
           match elm with

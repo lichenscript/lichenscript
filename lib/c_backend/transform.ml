@@ -640,7 +640,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         let ctor = Check_helper.find_construct_of env.ctx node_type in
         let open Core_type in
         match ctor with
-        | Some { TypeDef. spec = EnumCtor _; _ } ->
+        | Some({ TypeDef. spec = EnumCtor _; _ }, _) ->
           let sym = find_variable env name in
           C_op.Expr.ExternalCall(sym, None, [])
 
@@ -961,7 +961,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         let expr_type = Type_context.deref_type env.ctx node.value in
         let expr_ctor_opt = Check_helper.find_construct_of env.ctx expr_type in
         match expr_ctor_opt with
-        | Some { id = expr_id; _ }-> (
+        | Some({ id = expr_id; _ }, _) -> (
           let cls_meta = Hashtbl.find_exn env.cls_meta_map expr_id in
           let prop_name = Hashtbl.find_exn cls_meta.cls_fields_map id.pident_name in
           C_op.Expr.GetField(expr_result.expr, cls_meta.cls_gen_name, prop_name)
@@ -1457,7 +1457,7 @@ and transform_spreading_init env tmp_id spread_ty_var spread_expr =
   let expr_node_type = Type_context.deref_node_type env.ctx spread_ty_var in
 
   let ctor_opt = Check_helper.find_construct_of env.ctx expr_node_type in
-  let ctor = Option.value_exn
+  let ctor, _ = Option.value_exn
     ~message:(Format.asprintf "Can not find ctor of spreading init: %d %a" spread_ty_var Core_type.TypeExpr.pp expr_node_type)
     ctor_opt
   in
@@ -1574,7 +1574,7 @@ and generate_cls_meta env cls_id gen_name =
     match cls_def.tcls_extends with
     | Some ancester -> (
       let ctor_opt = Check_helper.find_construct_of env.ctx ancester in
-      let ctor = Option.value_exn ctor_opt in
+      let ctor, _ = Option.value_exn ctor_opt in
       generate_properties_including_ancester result ctor
     )
 

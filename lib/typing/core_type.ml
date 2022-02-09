@@ -154,13 +154,8 @@ and TypeDef : sig
     props: TypeExpr.t PropsMap.t;
   }
 
-  and enum_member = {
-    enum_mem_name: string;
-    enum_mem_fields: t list;
-  }
-
   and enum_type = {
-    enum_members: enum_member list;
+    enum_members: (string * t) list;
     enum_params: string list;
   }
 
@@ -241,13 +236,8 @@ end = struct
     props: TypeExpr.t PropsMap.t;
   }
 
-  and enum_member = {
-    enum_mem_name: string;
-    enum_mem_fields: t list;
-  }
-
   and enum_type = {
-    enum_members: enum_member list;
+    enum_members: (string * t) list;
     enum_params: string list;
   }
 
