@@ -8,8 +8,9 @@
     "name": "Vincent Chan",
     "email": "okcdz@diverse.space"
   },
-  "scripts": {
-    "postinstall": "node install.js"
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vincentdchan/LichenScript"
   },
   "bin": {
     "lsc": "bin/lsc"

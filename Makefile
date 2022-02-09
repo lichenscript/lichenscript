@@ -31,5 +31,10 @@ is_prime: compiler
 	./_build/default/bin/main.exe run ./examples/is_prime/main.lc \
 		$(FLAGS) -D ./_build_wt/is_prime
 
+release-darwin-x64: compiler
+	rm -rf ./npm/lichenscript-darwin-x64/bin
+	mkdir -p ./npm/lichenscript-darwin-x64/bin
+	cp ./_build/default/bin/main.exe ./npm/lichenscript-darwin-x64/bin/lichenscript
+
 compiler:
 	dune build

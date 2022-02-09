@@ -15,7 +15,10 @@
  * limitations under the License.
  */ 
 
- function getPkgName() {
+const { spawn } = require('child_process');
+const path = require('path');
+
+function getPkgName() {
   const platform = os.platform();
   const arch = os.arch();
   return `lichenscript-${platform}-${arch}`;
@@ -28,12 +31,26 @@ const supportList = [
 ]
 
 function main() {
-	const pkgName = getPkgName();
+  const pkgName = getPkgName();
   if (supportList.indexOf(pkgName) < 0) {
     console.error(`Your arch ${pkgName} is not supported.`);
     process.exit(2);
   }
 
+  const stdPath = path.resolve(__filename, '../std');
+  const runtimePath = path.resolve(__filename, '../runtime');
+
+  const binPath = require.resolve(`${pkgName}/bin/lichenscript`);
+
+  const args = process.argv.slice(1);
+  spawn(binPath, args, {
+    env: {
+      ...process.env,
+      "LSC_RUNTIME": runtimePath,
+      "LSC_STD": stdPath,
+    },
+    stdio: 'inherit',
+  });
 }
 
 main();
