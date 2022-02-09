@@ -61,7 +61,7 @@ let make_declare_of_decl id (decl: Typedtree.Declaration.t) =
 
   | _ -> None
 
-let link_from_entry env ~debug entry =
+let link_from_entry env ~verbose entry =
   let reach_nodes = Array.create ~len:(ResizableArray.size env.ctx.ty_map) false in
   let needs_decl = Array.create ~len:(ResizableArray.size env.ctx.ty_map) false in
 
@@ -101,7 +101,7 @@ let link_from_entry env ~debug entry =
 
   let orders = (iterate_node VisitPathSet.empty entry) in
 
-  if debug then (
+  if verbose then (
     Format.eprintf "- entry %d\n" entry;
     List.iteri
       ~f:(fun index id ->

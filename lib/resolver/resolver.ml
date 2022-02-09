@@ -285,7 +285,7 @@ let annotate_all_modules env =
     )
     env.linker
 
-let typecheck_all_modules ~ctx ~debug env =
+let typecheck_all_modules ~ctx ~verbose env =
   annotate_all_modules env;
   Linker.iter_modules
     ~f:(fun m ->
@@ -294,7 +294,7 @@ let typecheck_all_modules ~ctx ~debug env =
       ~f:(fun file ->
         let open Module in
         let tree = Option.value_exn file.typed_tree in
-        Typecheck.typecheck_module ~debug ctx tree
+        Typecheck.typecheck_module ~verbose ctx tree
       )
       files;
       (* Typecheck.typecheck_module ctx m. *)
@@ -310,25 +310,17 @@ let typecheck_all_modules ~ctx ~debug env =
  * because cyclic dependencies is allowed.
  * Annotated parsed tree remain the "holes" to type check
  *)
-let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~debug entry_file_path =
-  if Option.is_none std_dir then (
-    Format.printf "std library is not found\n";
-    ignore (exit 1)
-  );
-  if Option.is_none runtime_dir then (
-    Format.printf "runtime library is not found\n";
-    ignore (exit 1)
-  );
+let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~mode:_ ~verbose entry_file_path : (string * string * string option) list =
   try
     (* ctx is a typing context for all modules *)
     let ctx = Lichenscript_typing.Type_context.create () in
-    let env = create ~find_paths:[ Option.value_exn std_dir ] ~ctx () in
+    let env = create ~find_paths:[ std_dir ] ~ctx () in
 
     (* parse the entry dir *)
     let dir_of_entry = Filename.dirname entry_file_path in
     let entry_full_path = parse_module_by_dir ~ctx env dir_of_entry in
 
-    typecheck_all_modules ~ctx ~debug env;
+    typecheck_all_modules ~ctx ~verbose env;
 
     (* open std.preclude to module scope *)
 
@@ -347,15 +339,19 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~debug entry_file_pat
       ignore (exit 0)
     );
 
-    let declarations = Linker.link_from_entry env.linker ~debug (Option.value_exn main_fun_id) in
+    let declarations = Linker.link_from_entry env.linker ~verbose (Option.value_exn main_fun_id) in
 
     let output = Lichenscript_c.codegen ~ctx declarations in
     let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
     let output_path = write_to_file build_dir mod_name output in
     let build_dir = Option.value_exn build_dir in
     let bin_name = entry_file_path |> last_piece_of_path |> (Filename.chop_extension) in
-    write_makefiles ~bin_name ~runtime_dir:(Option.value_exn runtime_dir) build_dir [ (mod_name, output_path) ];
-    build_dir, (Some (Filename.concat build_dir bin_name))
+    let profiles = write_makefiles ~bin_name ~runtime_dir:runtime_dir build_dir [ (mod_name, output_path) ] in
+    List.map
+      ~f:(fun (profile_name, profile_path) ->
+        profile_name, profile_path, (Some (Filename.concat profile_path bin_name))
+      )
+      profiles
   with
     | Type_error.Error e ->
       raise (TypeCheckError [e])
@@ -380,6 +376,18 @@ and write_to_file build_dir mod_name content: string =
   output_file_path
 
 and write_makefiles ~bin_name ~runtime_dir build_dir mods =
+  let debug_dir = Filename.concat build_dir "debug" in
+  let release_dir = Filename.concat build_dir "release" in
+  Unix.mkdir_p debug_dir;
+  Unix.mkdir_p release_dir;
+  write_makefiles_with_mode ~bin_name ~runtime_dir ~mode:"debug" debug_dir mods;
+  write_makefiles_with_mode ~bin_name ~runtime_dir ~mode:"release" release_dir mods;
+  [
+    ("debug", debug_dir);
+    ("release", release_dir);
+  ]
+
+and write_makefiles_with_mode ~bin_name ~runtime_dir ~mode build_dir mods =
   let output_path = Filename.concat build_dir "Makefile" in
   let open Makefile in
   let runtime_dir = Filename.concat runtime_dir "c" in
@@ -389,7 +397,9 @@ and write_makefiles ~bin_name ~runtime_dir build_dir mods =
       {
         entry_name = "all";
         deps = List.concat [ ["runtime"]; (List.map ~f:(fun (m, _) -> m) mods)];
-        content = Format.sprintf "cc %s -o %s" c_srcs bin_name;
+        content = [
+          Format.sprintf "$(CC) $(FLAGS) %s -o %s" c_srcs bin_name
+        ];
       };
       {
         entry_name = "runtime";
@@ -400,16 +410,32 @@ and write_makefiles ~bin_name ~runtime_dir build_dir mods =
             |> Filename.realpath
           )
           ["runtime.c"; "runtime.h"];
-        content = "cc -c " ^ Filename.(concat runtime_dir "runtime.c"|> realpath);
+        content = [
+          "$(CC) $(FLAGS) -c " ^ Filename.(concat runtime_dir "runtime.c"|> realpath)
+        ];
       }
     ];
     List.map
-      ~f:(fun (m, output) -> {
-        entry_name = m;
-        deps = [];
-        content = Format.sprintf "cc -I%s -c %s" (Filename.realpath runtime_dir) (Filename.basename output);
-      })
+      ~f:(fun (m, output) ->
+        let output_full_path = Filename.realpath output in
+        {
+          entry_name = m;
+          deps = [output_full_path];
+          content = [
+            Format.sprintf "$(CC) $(FLAGS) -I%s -c %s" (Filename.realpath runtime_dir) output_full_path
+          ];
+        }
+      )
       mods;
   ] in
-  let data = to_string entries in
+  let flags =
+    if String.equal mode "debug" then
+      "FLAGS=-O0 -g3\n"
+    else
+      "FLAGS=-O3 -g0\n"
+  in
+  let data =
+    "CC=cc\n" ^
+    flags ^
+    to_string entries in
   Out_channel.write_all output_path ~data

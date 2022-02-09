@@ -6,4 +6,4 @@
 
 (* val type_check: Type_context.t -> ?debug:bool -> unit -> Type_error.t list *)
 
-val typecheck_module: Type_context.t -> debug:bool -> Typedtree.program -> unit
+val typecheck_module: Type_context.t -> verbose:bool -> Typedtree.program -> unit

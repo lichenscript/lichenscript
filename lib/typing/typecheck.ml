@@ -74,7 +74,7 @@ let with_scope env scope cb =
   env.scope <- prev;
   result
 
-let rec typecheck_module ctx ~debug (typedtree: T.program) =
+let rec typecheck_module ctx ~verbose (typedtree: T.program) =
   try
     let { T. tprogram_declarations; tprogram_scope; _ } = typedtree in
     let env = {
@@ -83,11 +83,11 @@ let rec typecheck_module ctx ~debug (typedtree: T.program) =
       return_types = [];
     } in
     List.iter ~f:(check_declaration env) tprogram_declarations;
-    if debug then (
+    if verbose then (
       Type_context.print ctx
     );
   with e ->
-    if debug then (
+    if verbose then (
       Type_context.print ctx
     );
     raise e

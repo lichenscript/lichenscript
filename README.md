@@ -15,16 +15,21 @@ It's designed to be lightweight, easy to compile to target platform with very sm
 
 - Modern syntax, close to TypeScript/JavaScript
 - Static typing
-- Running on almost all platform through C/JavaScript
+- Running on almost all platforms through C/JavaScript
 - Isolate environment
 - Very lightweight runtime and very small overhead
 
 ## Senerios
 
-- Web game development
-- Sanbox environment in Web
-- Plugin engine for your Web App
+- Plugin system for a Website
+- Game development
 - Mini-program environment
+
+# Install
+
+```
+npm install -g lichenscript
+```
 
 # Roadmap
 
@@ -33,7 +38,8 @@ It's designed to be lightweight, easy to compile to target platform with very sm
 📖 Planning
 
 | Syntax | Status |
-| ------- | ------ |
+| ------ | ------ |
+| Discriminated union | ✅ |
 | Lambda Expression | ✅ |
 | Pattern matching | ✅ |
 | Object inheritance | ✅ |
@@ -44,6 +50,7 @@ It's designed to be lightweight, easy to compile to target platform with very sm
 | Async/await | 📖 |
 
 | Stdlib | Status |
+| ------ | ------ |
 | Array | ✅ |
 | Map | ✅ |
 

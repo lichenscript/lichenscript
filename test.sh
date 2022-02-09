@@ -1,6 +1,9 @@
 #!/bin/bash
 
-FLAGS="--std ./std -R ./runtime --base ./examples"
+export LSC_RUNTIME="./runtime"
+export LSC_STD="./std"
+
+FLAGS="--base ./examples"
 
 dune build
 _build/default/test/lichenscript_test.exe ./examples -C ./_build/default/bin/main.exe $@ \
