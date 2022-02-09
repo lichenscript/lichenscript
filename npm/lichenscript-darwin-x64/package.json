@@ -1,0 +1,17 @@
+{
+  "name": "ichenscript-darwin-x64",
+  "description": "The compiler of LichenScript",
+  "author": {
+    "name": "Vincent Chan",
+    "email": "okcdz@diverse.space"
+  },
+  "version": "0.0.1",
+  "license": "MIT",
+  "preferUnplugged": false,
+  "os": [
+    "darwin"
+  ],
+  "cpu": [
+    "x64"
+  ]
+}

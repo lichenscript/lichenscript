@@ -1,0 +1,21 @@
+{
+  "name": "lichenscript",
+  "description": "The compiler of LichenScript",
+  "version": "0.0.1",
+  "homepage": "https://lichenscript.com/",
+  "author": {
+    "name": "Vincent Chan",
+    "email": "okcdz@diverse.space"
+  },
+  "scripts": {
+    "postinstall": "node install.js"
+  },
+  "bin": {
+    "lsc": "bin/lsc"
+  },
+  "optionalDependencies": {
+    "lichenscript-darwin-x64": "0.0.1",
+    "lichenscript-linux-x64": "0.0.1",
+    "lichenscript-darwin-arm64": "0.0.1"
+  }
+}
