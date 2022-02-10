@@ -1,5 +1,0 @@
-
-(executable
- (name file_packer)
- (libraries
-  core))

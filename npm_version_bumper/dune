@@ -1,0 +1,4 @@
+(executable
+ (name npm_version_bumper)
+ (libraries core re lichenscript_common)
+)
