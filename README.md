@@ -13,7 +13,7 @@ It's designed to be lightweight, easy to compile to target platform with very sm
 
 # Feature
 
-- Modern syntax, close to TypeScript/JavaScript
+- Modern syntaxes, close to TypeScript/JavaScript
 - Static typing
 - Running on almost all platforms through C/JavaScript
 - Isolate environment

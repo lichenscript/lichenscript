@@ -332,59 +332,44 @@ let get_visibility_of_class_elm class_elm =
   | Cls_elm_method(v, _) -> v
   | Cls_elm_get_set(v, _, _) -> v
 
-(*
-  * TODO: namespace
-  * class/enum static function
-  * object's property/method
-  *
-  * Special case:
-  * 1. for array: T[]
-  *    share the member of Array<T>
-  *
-  * 2. for string
-  *    share the member of String
-  *
-  *)
-let rec find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) option =
+let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
   let type_expr = Type_context.deref_type ctx type_expr in
+  let open TypeDef in
   match type_expr with
-  | Ctor(type_expr, type_vars) -> (
-    let type_expr = Type_context.deref_type ctx type_expr in
-    let open TypeDef in
-    match type_expr with
-    | TypeDef { id = cls_id; spec = Class cls; _ } -> (
-      let test_scope = scope#test_class_scope in
-      let outside_finder = (
-        fun (elm_name, elm) ->
-          let visibility = get_visibility_of_class_elm elm in
-          String.equal elm_name member_name && (Visibility.access_in_module visibility)
-        )
-      in
-      let finder =
-        match test_scope with
-        | Some id -> (
-          (* in the current class *)
-          if id = cls_id then
-            (fun (elm_name, _) -> String.equal elm_name member_name)
-          else
-            outside_finder
-        )
-        | None -> outside_finder
-      in
-      let result = List.find ~f:finder cls.tcls_elements in
+  | TypeDef { id = cls_id; spec = Class cls; _ } -> (
+    let test_scope = scope#test_class_scope in
+    let outside_finder = (
+      fun (elm_name, elm) ->
+        let visibility = get_visibility_of_class_elm elm in
+        String.equal elm_name member_name && (Visibility.access_in_module visibility)
+      )
+    in
+    let finder =
+      match test_scope with
+      | Some id -> (
+        (* in the current class *)
+        if id = cls_id then
+          (fun (elm_name, _) -> String.equal elm_name member_name)
+        else
+          outside_finder
+      )
+      | None -> outside_finder
+    in
+    let result = List.find ~f:finder cls.tcls_elements in
 
-      let types_map =
-        List.fold2_exn
-          ~init:TypeVarMap.empty
-          ~f:(fun acc def_var given_var ->
-            TypeVarMap.set acc ~key:def_var ~data:given_var
-          )
-          cls.tcls_vars type_vars
-      in
+    let types_map =
+      List.fold2_exn
+        ~init:TypeVarMap.empty
+        ~f:(fun acc def_var given_var ->
+          TypeVarMap.set acc ~key:def_var ~data:given_var
+        )
+        cls.tcls_vars type_vars
+    in
 
-      let open Option in
-      let open Core_type in
-      result >>= fun (_, cls_elm) ->
+    let open Option in
+    let open Core_type in
+    match result with
+    | Some (_, cls_elm) -> (
       match cls_elm with
       | Cls_elm_method (_, ({ TypeDef. id = member_id; spec = ClassMethod { method_params; method_return; _ }; _ } as def)) -> (
         let params = replace_params_with_type ctx types_map method_params in
@@ -404,8 +389,36 @@ let rec find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int
         Some (replace_type_vars_with_maps ctx types_map value, member_id)
 
       | _ -> None
-
     )
+    | None -> (
+      cls.tcls_extends >>= fun ancester ->
+      find_member_of_type ctx ~scope ancester member_name
+    )
+  )
+  | _ -> failwith "unrechable"
+
+(*
+  * TODO: namespace
+  * class/enum static function
+  * object's property/method
+  *
+  * Special case:
+  * 1. for array: T[]
+  *    share the member of Array<T>
+  *
+  * 2. for string
+  *    share the member of String
+  *
+  *)
+and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) option =
+  let type_expr = Type_context.deref_type ctx type_expr in
+  match type_expr with
+  | Ctor(type_expr, type_vars) -> (
+    let type_expr = Type_context.deref_type ctx type_expr in
+    let open TypeDef in
+    match type_expr with
+    | TypeDef { spec = Class _; _ } ->
+      find_member_of_class ctx ~scope type_expr member_name type_vars
 
     | TypeDef { spec = Interface intf; _ } -> (
       let find_method =
