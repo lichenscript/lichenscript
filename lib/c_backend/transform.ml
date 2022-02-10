@@ -1207,13 +1207,21 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     | Super -> failwith "not implemented: super"
 
     | Index(expr, index) -> (
-      let expr = transform_expression ~is_borrow:true env expr in
+      let expr' = transform_expression ~is_borrow:true env expr in
+      let node_type = Type_context.deref_node_type env.ctx expr.ty_var in
+
       let index = transform_expression env index in
 
-      prepend_stmts := List.concat [ !prepend_stmts; index.prepend_stmts; expr.prepend_stmts ];
-      append_stmts := List.concat [ expr.append_stmts; index.append_stmts; !append_stmts ];
+      prepend_stmts := List.concat [ !prepend_stmts; index.prepend_stmts; expr'.prepend_stmts ];
+      append_stmts := List.concat [ expr'.append_stmts; index.append_stmts; !append_stmts ];
 
-      C_op.Expr.ArrayGetValue(expr.expr, (C_op.Expr.IntValue index.expr))
+      match node_type with
+      | String ->
+        C_op.Expr.ExternalCall(C_op.SymLocal "lc_std_string_get_char", Some expr'.expr, [index.expr])
+
+      | _ ->
+        C_op.Expr.ArrayGetValue(expr'.expr, (C_op.Expr.IntValue index.expr))
+
     )
 
   in

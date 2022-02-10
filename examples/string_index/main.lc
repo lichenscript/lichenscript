@@ -1,0 +1,9 @@
+
+function main() {
+  const str = "Hello world";
+  let index = 0;
+  while index < str.length {
+    print(str[index]);
+    index += 1;
+  }
+}

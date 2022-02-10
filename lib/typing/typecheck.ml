@@ -486,15 +486,25 @@ and check_expression env expr =
     check_expression env index_expr;
     check_expression env main_expr;
 
-    let node = Type_context.get_node env.ctx main_expr.ty_var in
-    match (Check_helper.try_unwrap_array env.ctx node.value) with
-    | Some t ->
+    let node_type = Type_context.deref_node_type env.ctx main_expr.ty_var in
+    match node_type with
+    | String -> (
+      let ty_char = ty_char env in
+      let t = TypeExpr.Ctor(Ref ty_char, []) in
       Type_context.update_node_type env.ctx expr.ty_var t
-
-    | None -> (
-      let err = Type_error.(make_error env.ctx expr_loc (CannotGetIndex node.value)) in
-      raise (Type_error.Error err)
     )
+
+    | _ ->
+      begin
+        match (Check_helper.try_unwrap_array env.ctx node_type) with
+        | Some t ->
+          Type_context.update_node_type env.ctx expr.ty_var t
+
+        | None -> (
+          let err = Type_error.(make_error env.ctx expr_loc (CannotGetIndex node_type)) in
+          raise (Type_error.Error err)
+        )
+      end
   )
 
   | Unary(op, child) -> (
