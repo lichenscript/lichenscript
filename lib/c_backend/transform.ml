@@ -370,7 +370,6 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
     |> List.concat
   in
 
-  let cleanup = generate_finalize_stmts fun_scope in
 
   let generate_name_def () =
     let names = fun_meta.def_local_names in
@@ -378,6 +377,29 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
       spec = VarDecl names;
       loc = Loc.none;
     }]
+  in
+
+  let ending_parts =
+    match List.last body.body with
+    | Some { Typedtree.Statement. spec = Return _; _ } -> []
+    | Some { Typedtree.Statement. spec = Expr _; _ } ->
+      let cleanup = generate_finalize_stmts fun_scope in
+
+      let return_stmt = { C_op.Stmt.
+        spec = Return (Some (C_op.Expr.Ident (C_op.SymLocal "ret")));
+        loc = Loc.none;
+      } in
+      List.append cleanup [return_stmt]
+
+    | _ -> (
+      let cleanup = generate_finalize_stmts fun_scope in
+
+      let return_stmt = { C_op.Stmt.
+        spec = Return (Some C_op.Expr.Null);
+        loc = Loc.none;
+      } in
+      List.append cleanup [return_stmt]
+    )
   in
 
   let def =
@@ -389,7 +411,7 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
 
   let new_body = {
     C_op.Block.
-    body = List.concat [ def; stmts; cleanup ];
+    body = List.concat [ def; stmts; ending_parts ];
     loc = body.loc;
   } in
 

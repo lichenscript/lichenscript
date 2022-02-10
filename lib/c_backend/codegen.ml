@@ -682,7 +682,7 @@ and codegen_function env (_fun: Func.t) =
 
   with_indent env (fun () ->
     print_indents env;
-    ps env "LCValue ret = MK_NULL();\n";
+    ps env "LCValue ret;\n";
 
     if _fun.tmp_vars_count > 0 then (
       print_indents env;
@@ -690,8 +690,6 @@ and codegen_function env (_fun: Func.t) =
     );
 
     codegen_function_block env _fun.body;
-    print_indents env;
-    ps env "return ret;\n";
   );
 
   ps env "}\n"
