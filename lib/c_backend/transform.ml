@@ -32,11 +32,8 @@ module TScope = struct
   type t = {
     name_map: (string, C_op.symbol) Hashtbl.t;
 
-    (**
-     * if a local varirable is moved,
-     * there is no need to generate release stmts
-     *)
-    moved_local_var: string Hash_set.t;
+    local_vars_to_release: C_op.symbol list ref;
+
     raw: scope option;
     prev: t option;
   }
@@ -45,7 +42,7 @@ module TScope = struct
     let name_map = Hashtbl.create (module String) in
     {
       name_map;
-      moved_local_var = Hash_set.create (module String);
+      local_vars_to_release = ref [];
       raw = scope;
       prev = None;
     }
@@ -67,6 +64,20 @@ module TScope = struct
 
   let set_name scope =
     Hashtbl.set scope.name_map
+
+  let add_vars_to_release scope name =
+    scope.local_vars_to_release := name::!(scope.local_vars_to_release)
+
+  let remove_release_var scope name =
+    scope.local_vars_to_release :=
+      List.filter
+        ~f:(fun sym ->
+          match (sym, name) with
+          | (C_op.SymLocal local_name, C_op.SymLocal name) ->
+            not (String.equal local_name name)
+          | _ -> true
+        )
+        !(scope.local_vars_to_release)
   
 end
 
@@ -134,7 +145,6 @@ type t = {
   mutable tmp_vars_count: int;
   mutable main_function_name: string option;
   mutable class_inits: C_op.Decl.class_init list;
-  mutable has_early_return: bool;
 
   (*
    * Some variables are local, but some are global,
@@ -192,7 +202,6 @@ let create ctx =
     tmp_vars_count = 0;
     main_function_name = None;
     class_inits = [];
-    has_early_return = false;
     global_name_map;
     cls_meta_map;
     current_fun_meta = None;
@@ -272,7 +281,6 @@ and transform_function env _fun =
   let original_name, original_name_id = header.name in
 
   env.current_fun_meta <- Some (create_current_fun_meta original_name);
-  env.has_early_return <- false;
 
   let fun_name = 
     match find_or_distribute_name env original_name_id original_name with
@@ -362,31 +370,7 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
     |> List.concat
   in
 
-  let cleanup_label =
-    if env.has_early_return then
-      [{ C_op.Stmt.
-        spec = Label "cleanup";
-        loc = Loc.none;
-      }]
-    else
-      []
-  in
-
-  let cleanup =
-    if (List.length local_vars) > 0 then (
-      List.filter_map
-        ~f:(fun (name, _var) ->
-          (* let node_type = Type_context.deref_node_type env.ctx var.var_id in
-          if Check_helper.type_should_not_release env.ctx node_type then
-            None
-          else *)
-          Some ({ C_op.Stmt.
-            spec = Release (Ident (C_op.SymLocal name));
-            loc = Loc.none;
-          })
-        )
-        local_vars
-    ) else [] in
+  let cleanup = generate_finalize_stmts fun_scope in
 
   let generate_name_def () =
     let names = fun_meta.def_local_names in
@@ -405,7 +389,7 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
 
   let new_body = {
     C_op.Block.
-    body = List.concat [ def; stmts; cleanup_label; cleanup ];
+    body = List.concat [ def; stmts; cleanup ];
     loc = body.loc;
   } in
 
@@ -503,6 +487,8 @@ and transform_statement ?ret env stmt =
     let name = TScope.find_variable scope original_name in
     let init_expr = transform_expression ~is_move:true env binding.binding_init in
 
+    TScope.add_vars_to_release scope name;
+
     let assign_expr =
       if should_var_captured variable then (
         let init_expr = C_op.Expr.NewRef init_expr.expr in
@@ -539,16 +525,20 @@ and transform_statement ?ret env stmt =
   | Debugger -> []
 
   | Return ret_opt -> (
-    env.has_early_return <- true;
     let ret =
       Option.map ~f:(transform_return_expr ~ret:"ret") ret_opt
       |> Option.value ~default:[]
     in
-    let goto_stmt = { C_op.Stmt.
-      spec = Goto "cleanup";
+    let ret_stmt = { C_op.Stmt.
+      spec = Return (Some (C_op.Expr.Ident (C_op.SymLocal "ret")));
       loc;
     } in
-    List.append ret [goto_stmt]
+    let cleanup = generate_finalize_stmts env.scope in
+    List.concat [
+      ret;
+      cleanup;
+      [ret_stmt];
+    ]
   )
 
   | Empty -> []
@@ -662,7 +652,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         let need_release = not (Check_helper.type_should_not_release env.ctx node_type) in
 
         if is_move then (
-          Hash_set.add env.scope.moved_local_var name;
+          TScope.remove_release_var env.scope sym;
           id_expr
         ) else if (not is_borrow) && (not is_move) && need_release then  (
           let id_expr = id_expr in
@@ -1548,25 +1538,22 @@ and transform_block env ?ret (block: Typedtree.Block.t): C_op.Stmt.t list =
   with_scope env block_scope (fun env ->
     let stmts = List.map ~f:(transform_statement ?ret env) block.body |> List.concat in
 
-    let local_vars = block.scope#vars in
-    let cleanup =
-      if (List.length local_vars) > 0 then (
-        List.filter_map
-          ~f:(fun (name, _) ->
-            let sym = TScope.find_variable block_scope name in
-            if Hash_set.mem block_scope.moved_local_var name then
-              None
-            else
-              Some { C_op.Stmt.
-                spec = Release (Ident sym);
-                loc = Loc.none;
-              }
-          )
-          local_vars
-      ) else [] in
+    let cleanup = generate_finalize_stmts block_scope in
 
     List.append stmts cleanup
   )
+
+and generate_finalize_stmts scope =
+  let open TScope in
+  !(scope.local_vars_to_release)
+  |> List.rev
+  |> List.filter_map
+    ~f:(fun sym ->
+      Some { C_op.Stmt.
+        spec = Release (Ident sym);
+        loc = Loc.none;
+      }
+    )
 
 and generate_cls_meta env cls_id gen_name =
   let node = Type_context.get_node env.ctx cls_id in
@@ -1638,7 +1625,6 @@ and transform_class env cls: C_op.Decl.spec list =
           let { cls_method_name; cls_method_params; cls_method_body; cls_method_scope; _ } = _method in
 
           env.tmp_vars_count <- 0;
-          env.has_early_return <- false;
 
           (* let fun_name = distribute_name env cls_method_name in *)
           let origin_method_name, method_id = cls_method_name in
@@ -1747,10 +1733,8 @@ and transform_enum env enum =
 
 and transform_lambda env ~lambda_name content _ty_var =
   let prev_fun_meta = env.current_fun_meta in
-  let prev_has_early_return = env.has_early_return in
 
   env.current_fun_meta <- Some (create_current_fun_meta lambda_name);
-  env.has_early_return <- false;
 
   let lambda_gen_name = "LCC_" ^ lambda_name in
 
@@ -1784,7 +1768,6 @@ and transform_lambda env ~lambda_name content _ty_var =
   in
 
   env.current_fun_meta <- prev_fun_meta;
-  env.has_early_return <- prev_has_early_return;
 
   result;
 

@@ -156,6 +156,19 @@ let rec codegen_statement (env: t) stmt =
     ps env label;
     ps env ";"
 
+  | Return expr_opt -> (
+    ps env "return";
+    match expr_opt with
+    | Some expr ->
+      ps env " ";
+      codegen_expression env expr;
+      ps env ";"
+
+    | None -> ps env ";"
+
+  )
+
+
 and codegen_expression_if env if_spec =
   let open C_op.Stmt in
   let { if_test; if_consequent; if_alternate } = if_spec in

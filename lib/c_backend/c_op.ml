@@ -110,6 +110,7 @@ and Stmt : sig
   | Release of Expr.t
   | Label of string
   | Goto of string
+  | Return of Expr.t option
   [@@deriving show]
 
   type t = {
