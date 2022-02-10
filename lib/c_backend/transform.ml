@@ -910,7 +910,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
               )
               (* TODO: check if it's a virtual function *)
               | _ ->
-                let callee_node = Type_context.get_node env.ctx callee.ty_var in
+                let callee_node = Type_context.get_node env.ctx method_id in
                 let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
                 let ctor = Option.value_exn ~message:"Cannot find typedef of class" ctor_opt in
                 let ctor_ty_id = ctor.id in
