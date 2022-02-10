@@ -510,27 +510,65 @@ let string_escape env lexbuf =
     (env, str, codes, false)
   | _ -> failwith "unreachable"
 
+let char_end env raw c lexbuf =
+  match%sedlex lexbuf with
+  | "'" ->
+    let x = lexeme lexbuf in
+    Buffer.add_string raw x;
+    (env, c, raw, end_pos_of_lexbuf env lexbuf)
+
+  | any -> (
+    let c = lexeme lexbuf in
+    let loc = loc_of_lexbuf env lexbuf in
+    let env = unexpected_error env loc c in
+    (env, c, raw, end_pos_of_lexbuf env lexbuf)
+  )
+
+  | _ -> failwith "unreachable"
+
+let char_quote env raw lexbuf =
+  match%sedlex lexbuf with
+  | "'" ->
+    let c = lexeme lexbuf in
+    let loc = loc_of_lexbuf env lexbuf in
+    let env = unexpected_error env loc c in
+    (env, c, raw, end_pos_of_lexbuf env lexbuf)
+
+  | '\n' ->
+    let x = lexeme lexbuf in
+    Buffer.add_string raw x;
+    let env = illegal env (loc_of_lexbuf env lexbuf) in
+    let env = new_line env lexbuf in
+    (env, x, raw, end_pos_of_lexbuf env lexbuf)
+
+  | eof ->
+    let x = lexeme lexbuf in
+    Buffer.add_string raw x;
+    let env = illegal env (loc_of_lexbuf env lexbuf) in
+    (env, x, raw, end_pos_of_lexbuf env lexbuf)
+
+  | any ->
+    let c = lexeme lexbuf in
+    Buffer.add_string raw c;
+    char_end env raw c lexbuf
+
+  | _ -> failwith "unreachable"
+
 (* Really simple version of string lexing. Just try to find beginning and end of
  * string. We can inspect the string later to find invalid escapes, etc *)
-let rec string_quote env q buf raw octal lexbuf =
+let rec string_quote env buf raw octal lexbuf =
   match%sedlex lexbuf with
-  | "'"
   | '"' ->
     let q' = lexeme lexbuf in
     Buffer.add_string raw q';
-    if q = q' then
-      (env, end_pos_of_lexbuf env lexbuf, octal)
-    else (
-      Buffer.add_string buf q';
-      string_quote env q buf raw octal lexbuf
-    )
+    (env, end_pos_of_lexbuf env lexbuf, octal)
   | '\\' ->
     Buffer.add_string raw "\\";
     let (env, str, codes, octal') = string_escape env lexbuf in
     let octal = octal' || octal in
     Buffer.add_string raw str;
     Array.iter (Wtf8.add_wtf_8 buf) codes;
-    string_quote env q buf raw octal lexbuf
+    string_quote env buf raw octal lexbuf
   | '\n' ->
     let x = lexeme lexbuf in
     Buffer.add_string raw x;
@@ -550,7 +588,7 @@ let rec string_quote env q buf raw octal lexbuf =
     let x = lexeme lexbuf in
     Buffer.add_string raw x;
     Buffer.add_string buf x;
-    string_quote env q buf raw octal lexbuf
+    string_quote env buf raw octal lexbuf
   | _ -> failwith "unreachable"
 
 let rec template_part env cooked raw literal lexbuf =
@@ -662,7 +700,15 @@ let token (env : Lex_env.t) lexbuf : result =
     else
       Token (env, T_ERROR "#!")
   (* Values *)
-  | "'"
+  | "'" ->
+    let quote = lexeme lexbuf in
+    let start = start_pos_of_lexbuf env lexbuf in
+    let raw = Buffer.create 4 in
+    Buffer.add_string raw quote;
+    let env, ch, raw, _end = char_quote env raw lexbuf in
+    let loc = { Loc.source = Lex_env.source env; start; _end } in
+    Token (env, T_CHAR (loc, String.get ch 0, Buffer.contents raw))
+
   | '"' ->
     let quote = lexeme lexbuf in
     let start = start_pos_of_lexbuf env lexbuf in
@@ -670,7 +716,7 @@ let token (env : Lex_env.t) lexbuf : result =
     let raw = Buffer.create 127 in
     Buffer.add_string raw quote;
     let octal = false in
-    let (env, _end, octal) = string_quote env quote buf raw octal lexbuf in
+    let (env, _end, octal) = string_quote env buf raw octal lexbuf in
     let loc = { Loc.source = Lex_env.source env; start; _end } in
     Token (env, T_STRING (loc, Buffer.contents buf, Buffer.contents raw, octal))
   | '`' ->
@@ -1522,7 +1568,13 @@ let type_token env lexbuf =
     let buf = Buffer.create 127 in
     let (env, end_pos) = line_comment env buf lexbuf in
     Comment (env, mk_comment env start_pos end_pos buf false)
-  | "'"
+  | "'" ->
+    let start = start_pos_of_lexbuf env lexbuf in
+    let raw = Buffer.create 4 in
+    let env, ch, raw, _end = char_quote env raw lexbuf in
+    let loc = { Loc.source = Lex_env.source env; start; _end } in
+    Token (env, T_CHAR (loc, String.get ch 0, Buffer.contents raw))
+
   | '"' ->
     let quote = lexeme lexbuf in
     let start = start_pos_of_lexbuf env lexbuf in
@@ -1530,7 +1582,7 @@ let type_token env lexbuf =
     let raw = Buffer.create 127 in
     Buffer.add_string raw quote;
     let octal = false in
-    let (env, _end, octal) = string_quote env quote buf raw octal lexbuf in
+    let (env, _end, octal) = string_quote env buf raw octal lexbuf in
     let loc = { Loc.source = Lex_env.source env; start; _end } in
     Token (env, T_STRING (loc, Buffer.contents buf, Buffer.contents raw, octal))
   (*

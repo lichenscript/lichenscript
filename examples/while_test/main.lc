@@ -1,19 +1,20 @@
 
 function main () {
     const data = [
-        "a",
-        "b",
-        "c",
-        "b",
-        "a",
-        "c",
+        "abc",
+        "bcc",
+        "c#c",
+        "boc",
+        "a#c",
+        "ccc",
     ];
 
     let index = 0;
     let counter = 0;
 
     while index < data.length {
-        if data[index] == "b" {
+        const item = data[index];
+        if item[1] == '#' {
             counter += 1;
         }
         index += 1;

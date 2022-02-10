@@ -8,6 +8,7 @@ type t =
       kind: bigint_type;
       raw: string;
     }
+  | T_CHAR of (Loc.t * char * string)
   | T_STRING of (Loc.t * string * string * bool) (* loc, value, raw, octal *)
   | T_TEMPLATE_PART of (Loc.t * template_part * bool) (* loc, value, is_tail *)
   | T_IDENTIFIER of {
@@ -181,6 +182,7 @@ and template_part = {
 let token_to_string = function
   | T_NUMBER _ -> "T_NUMBER"
   | T_BIGINT _ -> "T_BIGINT"
+  | T_CHAR _ -> "T_CHAR"
   | T_STRING _ -> "T_STRING"
   | T_TEMPLATE_PART _ -> "T_TEMPLATE_PART"
   | T_IDENTIFIER _ -> "T_IDENTIFIER"
@@ -306,6 +308,7 @@ let token_to_string = function
 let value_of_token = function
   | T_NUMBER { raw; _ } -> raw
   | T_BIGINT { raw; _ } -> raw
+  | T_CHAR (_, _, raw) -> raw
   | T_STRING (_, _, raw, _) -> raw
   | T_TEMPLATE_PART (_, { literal; _ }, _) -> literal
   | T_IDENTIFIER { raw; _ } -> raw

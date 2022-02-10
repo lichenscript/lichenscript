@@ -193,7 +193,7 @@ let type_logic_compareable ctx left right =
   match (left, right) with
   | TypeExpr.String, TypeExpr.String -> true
   | _ ->
-    check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64" |] ctx left right
+    check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "char" |] ctx left right
 
 let try_unwrap_array ctx expr =
   let expr = Type_context.deref_type ctx expr in

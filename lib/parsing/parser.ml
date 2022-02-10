@@ -1303,6 +1303,10 @@ and parse_literal env =
     Eat.token env;
     Literal.Integer (raw, None)
 
+  | Token.T_CHAR(_, ch, _) ->
+    Eat.token env;
+    Literal.Char ch
+
   | Token.T_STRING (loc, value, _, _) ->
     Eat.token env;
     Literal.String (value, loc, None)
@@ -1339,6 +1343,7 @@ and parse_primary_expression env : Expression.t =
 
       | Token.T_NUMBER _
       | Token.T_STRING _
+      | Token.T_CHAR _
       | Token.T_TRUE
       | Token.T_FALSE
         -> Constant(parse_literal env)
