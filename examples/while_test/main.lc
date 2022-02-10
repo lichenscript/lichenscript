@@ -1,0 +1,23 @@
+
+function main () {
+    const data = [
+        "a",
+        "b",
+        "c",
+        "b",
+        "a",
+        "c",
+    ];
+
+    let index = 0;
+    let counter = 0;
+
+    while index < data.length {
+        if data[index] == "b" {
+            counter += 1;
+        }
+        index += 1;
+    }
+
+    print(counter);
+}

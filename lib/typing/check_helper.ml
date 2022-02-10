@@ -267,6 +267,8 @@ let is_primitive_with_name ctx ~name:expect_name type_expr =
     | _ -> false
   )
 
+let is_unit = is_primitive_with_name ~name:"unit"
+
 let is_i32 = is_primitive_with_name ~name:"i32"
 
 let is_f32 = is_primitive_with_name ~name:"f32"

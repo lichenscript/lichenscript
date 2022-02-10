@@ -701,6 +701,16 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       let tmp_id = env.tmp_vars_count in
       env.tmp_vars_count <- env.tmp_vars_count + 1;
       let tmp_var = "t[" ^ (Int.to_string tmp_id) ^ "]" in
+
+      if Check_helper.is_unit env.ctx (Type_context.deref_node_type env.ctx ty_var) then (
+        let init_stmt = { C_op.Stmt.
+          spec = Expr(C_op.Expr.Assign(Ident (C_op.SymLocal tmp_var), Null));
+          loc = Loc.none;
+        } in
+
+        prepend_stmts := List.append !prepend_stmts [init_stmt];
+      );
+
       let spec = transform_expression_if env ~ret:tmp_var ~prepend_stmts ~append_stmts loc if_desc in
       let tmp_stmt = { C_op.Stmt.
         spec = If spec;
@@ -1219,8 +1229,10 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       | String ->
         C_op.Expr.ExternalCall(C_op.SymLocal "lc_std_string_get_char", Some expr'.expr, [index.expr])
 
-      | _ ->
-        C_op.Expr.ArrayGetValue(expr'.expr, (C_op.Expr.IntValue index.expr))
+      | _ -> (
+        let result = C_op.Expr.ArrayGetValue(expr'.expr, (C_op.Expr.IntValue index.expr)) in
+        auto_release_expr env ~is_move ~append_stmts expr.ty_var result
+      )
 
     )
 
