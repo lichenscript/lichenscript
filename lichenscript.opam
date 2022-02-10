@@ -1,6 +1,9 @@
 opam-version: "2.0"
 maintainer: "Vincent Chan <okcdz@diverse.space>"
 authors: "Vincent Chan <okcdz@diverse.space>"
+synopsis: "Compiler of LichenScript"
+homepage: "https://lichenscript.com/"
+bug-reports: "https://github.com/vincentdchan/LichenScript/issues"
 depends: [
   "ocaml" {>= "4.12.0"}
   "dune" {>= "1.11.0"}
@@ -9,5 +12,6 @@ depends: [
   "core"
   "core_kernel"
   "sedlex"
+  "re"
   "wtf8"
 ]

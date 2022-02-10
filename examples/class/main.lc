@@ -9,6 +9,10 @@ class Base {
         };
     }
 
+    baseCall() {
+        print("base call");
+    }
+
     virtual printName() {
         print("name")
     }
@@ -38,6 +42,7 @@ class Child extends Base {
 
 function main() {
     const child = Child.new();
+    child.baseCall();
     child.printName();
 
     child.setName("new name");
