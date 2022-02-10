@@ -8,7 +8,7 @@ Easy to integrated with the Web Ecosystem.
 
 LichenScript is designed to write untrustworthy plugins for a exist system.
 For example, LichenScript can be used to write third-party plugins for your website/mobile app, which is isolated.
-It has modern syntax such as pattern matching/discriminated union.
+It has modern syntaxes such as pattern matching/discriminated union.
 It's designed to be lightweight, easy to compile to target platform with very small overhead.
 
 # Feature
@@ -39,10 +39,15 @@ npm install -g lichenscript
 
 | Syntax | Status |
 | ------ | ------ |
+| i32/f32 | ✅ |
+| String | ✅ |
+| Array/Map | ✅ |
+| Class/Enum | ✅ |
 | Discriminated union | ✅ |
 | Lambda Expression | ✅ |
 | Pattern matching | ✅ |
 | Object inheritance | ✅ |
+| i64/f64 | 🔨 |
 | Tuple | 🔨 |
 | For Iterator | 🔨 |
 | Customize getter/setter | 🔨 |
@@ -53,6 +58,7 @@ npm install -g lichenscript
 | ------ | ------ |
 | Array | ✅ |
 | Map | ✅ |
+| Regex | 📖 |
 
 | Target | Status |
 | ------ | ------ |
@@ -64,39 +70,29 @@ npm install -g lichenscript
 
 ## What's the different with Rust? Why not Rust?
 
-### LS do NOT use lifetime
+LichenScript does NOT use lifetime.
 
-LS is high level language.
-I don't want the programmer to care about the detail
+LichenScript is a high level language.
+I don't want the programmers to care about the detail
 of the memory such as liftime/smart pointer.
 
-LS is designed to use the ecosystem of C++ in
-Computer Graphic. So comping to C is reasonable.
+LichenScript is designed to use the ecosystem of C++ in
+Computer Graphic. So compiling to C is reasonable.
 
-It't not hard to support Rust in the future.
+It can be easily integrated with Rust with C-ABI.
 
-### LS is more dynamic than Rust
+### LichenScript is more dynamic than Rust
 
-No a bunch of pointer types.
-Dynamic dispatch, supports any.
-Support inheritance.
+- Doesn't have a bunch of pointer types.
+- Support inheritance.
 
 ## What's different from JavaScript/TypeScript?
 
-More lightweight, don't depends on a heavy runtime.
-The C runtime is very small, LS's object uses reference
-counting to free memory.
-
-More static features.
-
-### class private field are guaranteed by the type system
-
-Unlike JavaScript/TypeScipt, which is 'fake' private,
-LS's private is guaranteed, so you don't need a `#` syntax
-to implement real private field.
+- More lightweight to run, don't depends on a heavy runtime.
+- The C runtime is very small, LichenScript's object uses reference counting to free memory.
+- More static features.
 
 ### No exceptions and try/catch
 
 Exception mechanism depends on a heavy runtime.
-
-### More static
+So it's exclude from the language.
