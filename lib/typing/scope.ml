@@ -161,6 +161,8 @@ class scope ?prev () = object(self)
     let open Option in
     prev >>= (fun prev -> prev#test_class_scope)
 
+  method test_function_scope = false
+
 end
 
 class class_scope ?prev cls_id this_expr = object
@@ -182,6 +184,13 @@ class class_scope ?prev cls_id this_expr = object
   method! this_expr = this_expr
 
   method! test_class_scope = Some cls_id
+
+end
+
+class function_scope ?prev () = object
+  inherit scope ?prev ()
+
+  method! test_function_scope = true
 
 end
 

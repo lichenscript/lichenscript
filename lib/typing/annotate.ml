@@ -212,7 +212,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     )
 
     | Lambda lambda -> (
-      let lambda_scope = new scope ~prev:(Env.peek_scope env) () in
+      let lambda_scope = new function_scope ~prev:(Env.peek_scope env) () in
       Env.with_new_scope env lambda_scope (fun env ->
         let prev_in_lambda = Env.in_lambda env in
 
@@ -913,7 +913,7 @@ and annotate_class env cls =
       List.map ~f:(fun elm ->
         match elm with
         | Cls_method _method -> (
-          let method_scope = new scope ~prev:(Env.peek_scope env) () in
+          let method_scope = new function_scope ~prev:(Env.peek_scope env) () in
           let { cls_method_attributes; cls_method_visibility; cls_method_modifier; cls_method_name; cls_method_params; cls_method_loc; cls_method_body; cls_method_return_ty; _ } = _method in
           let type_visibility = annotate_visibility cls_method_visibility in
           let is_static =
@@ -1408,7 +1408,7 @@ and annotate_function env fun_ =
   let open Ast.Function in
 
   let prev_scope = Env.peek_scope env in
-  let fun_scope = new scope ~prev:prev_scope () in
+  let fun_scope = new function_scope ~prev:prev_scope () in
 
   Env.with_new_scope env fun_scope (fun env ->
     let { visibility = _visibility; header; body; loc; comments; } = fun_ in

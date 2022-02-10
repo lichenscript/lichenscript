@@ -65,7 +65,7 @@ module TScope = struct
   let set_name scope =
     Hashtbl.set scope.name_map
 
-  let add_vars_to_release scope name =
+  let add_vars_to_release scope (name: C_op.symbol) =
     scope.local_vars_to_release := name::!(scope.local_vars_to_release)
 
   let remove_release_var scope name =
@@ -78,6 +78,16 @@ module TScope = struct
           | _ -> true
         )
         !(scope.local_vars_to_release)
+
+  let rec get_symbols_to_release_til_function acc scope =
+    let acc = List.append acc !(scope.local_vars_to_release) in
+    let raw = Option.value_exn scope.raw in
+    if raw#test_function_scope then
+      acc
+    else (
+      let prev_scope = Option.value_exn scope.prev in
+      get_symbols_to_release_til_function acc prev_scope
+    )
   
 end
 
@@ -349,14 +359,14 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
 
   distribute_name_to_scope fun_scope fun_meta local_vars;
 
-  let max_tmp_value = ref env.tmp_vars_count in
+  let max_tmp_value = ref 0 in
 
-  let before_stmts = env.tmp_vars_count in
+  (* let before_stmts = env.tmp_vars_count in *)
 
   let stmts =
     List.map
       ~f:(fun stmt ->
-        env.tmp_vars_count <- before_stmts;
+        env.tmp_vars_count <- 0;
 
         let result = transform_statement env stmt in
 
@@ -369,7 +379,6 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
       body.body
     |> List.concat
   in
-
 
   let generate_name_def () =
     let names = fun_meta.def_local_names in
@@ -555,7 +564,7 @@ and transform_statement ?ret env stmt =
       spec = Return (Some (C_op.Expr.Ident (C_op.SymLocal "ret")));
       loc;
     } in
-    let cleanup = generate_finalize_stmts env.scope in
+    let cleanup = generate_finalize_stmts_function env.scope in
     List.concat [
       ret;
       cleanup;
@@ -1006,6 +1015,12 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       match op with
       | UnaryOp.Not ->
         C_op.Expr.Not expr'.expr
+
+      | UnaryOp.Plus ->
+        expr'.expr
+
+      | UnaryOp.Minus ->
+        C_op.Expr.I32Binary(BinaryOp.Mult, expr'.expr, C_op.Expr.NewInt "-1")
 
       | _ -> failwith "not implement"
     )
@@ -1560,14 +1575,33 @@ and transform_block env ?ret (block: Typedtree.Block.t): C_op.Stmt.t list =
   with_scope env block_scope (fun env ->
     let stmts = List.map ~f:(transform_statement ?ret env) block.body |> List.concat in
 
-    let cleanup = generate_finalize_stmts block_scope in
+    let cleanup = generate_finalize_stmts env.scope in
 
     List.append stmts cleanup
   )
 
+(*
+ * for normal blocks,
+ * only the vars in the current blocks should be released
+ *)
 and generate_finalize_stmts scope =
   let open TScope in
   !(scope.local_vars_to_release)
+  |> List.rev
+  |> List.filter_map
+    ~f:(fun sym ->
+      Some { C_op.Stmt.
+        spec = Release (Ident sym);
+        loc = Loc.none;
+      }
+    )
+
+(*
+ * for return statements,
+ * all the variables in the function should be released
+ *)
+and generate_finalize_stmts_function scope =
+  TScope.get_symbols_to_release_til_function [] scope
   |> List.rev
   |> List.filter_map
     ~f:(fun sym ->

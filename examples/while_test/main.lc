@@ -1,24 +1,21 @@
 
-function main () {
-    const data = [
-        "abc",
-        "bcc",
-        "c#c",
-        "boc",
-        "a#c",
-        "ccc",
-    ];
-
-    let index = 0;
-    let counter = 0;
+function findData(data: string[], expect: string): i32 {
+    let index: i32 = 0;
 
     while index < data.length {
         const item = data[index];
-        if item[1] == '#' {
-            counter += 1;
+        if item == expect {
+            return index;
         }
         index += 1;
     }
 
-    print(counter);
+    -1
+}
+
+function main () {
+    const index = findData(["one", "two", "three"], "two");
+    if index >= 0 {
+        print("found!");
+    }
 }

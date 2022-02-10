@@ -1082,12 +1082,15 @@ LCValue LCNewArrayLen(LCRuntime* rt, size_t size) {
 }
 
 LCValue LCArrayGetValue(LCRuntime* rt, LCValue this, int index) {
+    LCValue item;
     LCArray* arr = (LCArray*)this.ptr_val;
     if (unlikely(index < 0 || index >= arr->len)) {
         fprintf(stderr, "[LichenScript] Panic: index %d out of range, size: %d\n", index, arr->len);
         lc_panic_internal();
     }
-    return arr->data[index];
+    item = arr->data[index];
+    LCRetain(item);
+    return item;
 }
 
 void LCArraySetValue(LCRuntime* rt, LCValue this, int argc, LCValue* args) {

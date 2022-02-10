@@ -522,6 +522,14 @@ and check_expression env expr =
       | _ -> raise_err()
     )
 
+    | Asttypes.UnaryOp.Plus
+    | Asttypes.UnaryOp.Minus -> (
+      if not (Check_helper.is_i32 env.ctx node_type) && not (Check_helper.is_f32 env.ctx node_type) then (
+        raise_err ()
+      );
+      Type_context.update_node_type env.ctx expr.ty_var node_type
+    )
+
     (* TODO: check other operations *)
     | _ -> ()
   )
