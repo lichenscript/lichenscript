@@ -1144,7 +1144,11 @@ static void std_print_val(LCRuntime* rt, LCValue val) {
         break;
 
     case LC_TY_NULL:
-        printf("()");
+        printf("unit");
+        break;
+
+    case LC_TY_CHAR:
+        printf("'%c'", val.int_val);
         break;
 
     case LC_TY_STRING:
@@ -1471,6 +1475,19 @@ LCValue lc_std_string_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* a
     result->hash = 0;
 
     return MK_STRING(result);
+}
+
+LCValue lc_std_string_get_char(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    int index = args[0].int_val;
+    LCString* str = (LCString*)args[1].ptr_val;
+    if (index < 0 || index >= str->length) {
+        fprintf(stderr, "[LichenScript] Panic: index %d out of range, size: %d\n", index, str->length);
+        lc_panic_internal();
+    }
+    if (str->is_wide_char) {
+        return MK_CHAR(str->u.str16[index]);
+    }
+    return MK_CHAR(str->u.str8[index]);
 }
 
 typedef struct LCMapTuple {

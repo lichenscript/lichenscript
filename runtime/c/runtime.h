@@ -285,6 +285,7 @@ LCValue lc_std_string_concat(LCRuntime* rt, LCValue this, int arg_len, LCValue* 
 LCValue lc_std_string_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 LCValue lc_std_string_cmp(LCRuntime* rt, LCCmpType cmp_type, LCValue left, LCValue right);
 LCValue lc_std_string_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
+LCValue lc_std_string_get_char(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 
 typedef struct LCMapTuple LCMapTuple;
 typedef struct LCMapBucket LCMapBucket;
