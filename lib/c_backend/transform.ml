@@ -1203,7 +1203,12 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
               }]
             | InitSpread spread_expr -> (
               let transformed_spread = transform_expression env spread_expr in
-              let spread_expr' = prepend_expr env ~is_borrow:false ~prepend_stmts ~append_stmts transformed_spread.expr in
+              prepend_stmts := List.append !prepend_stmts transformed_spread.prepend_stmts;
+              append_stmts := List.append !append_stmts transformed_spread.append_stmts;
+              let spread_expr' = prepend_expr env ~is_borrow:false
+                ~prepend_stmts ~append_stmts
+                transformed_spread.expr
+              in
               transform_spreading_init env tmp_id spread_expr.ty_var spread_expr'
             )
 
