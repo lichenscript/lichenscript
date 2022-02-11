@@ -710,10 +710,15 @@ and check_expression env expr =
   )
 
   | Match _match -> (
-    let check_clause_pattern expr_type (pat: Typedtree.Pattern.t) =
+    let rec check_clause_pattern expr_type (pat: Typedtree.Pattern.t) =
       match pat.spec with
-      | Underscore
-      | Symbol _ -> ()
+      | Underscore -> ()
+      | Symbol (name, name_id) -> (
+        if not (Annotate.is_name_enum_or_class name) then (
+          Type_context.update_node_type env.ctx name_id expr_type
+        );
+      )
+
       | Literal (Ast.Literal.Boolean _) -> (
         if not (Check_helper.is_boolean env.ctx expr_type) then (
           let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("boolean", expr_type))) in
@@ -745,7 +750,7 @@ and check_expression env expr =
           let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("string", expr_type))) in
           raise (Type_error.Error err)
       )
-      | EnumCtor((ctor_name, ctor_id), _child_pat) -> (
+      | EnumCtor((ctor_name, ctor_id), child_pat) -> (
         let raise_err () =
           let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType(ctor_name, expr_type))) in
           raise (Type_error.Error err)
@@ -757,11 +762,12 @@ and check_expression env expr =
         in
         let ctor_opt = Check_helper.find_construct_of env.ctx expr_type in
         match ctor_opt with
-        | Some({ TypeDef. id = enum_id;  spec = Enum _; _ }, _) -> (
+        | Some({ TypeDef. id = enum_id;  spec = Enum _; _ }, [arg]) -> (
           (* TODO: check args *)
-          if enum_id <> enum_ctor_typedef.enum_ctor_super_id then
+          if enum_id <> enum_ctor_typedef.enum_ctor_super_id then (
             raise_err ()
-          else ()
+          );
+          check_clause_pattern arg child_pat
         )
 
         | _ -> raise_err ()

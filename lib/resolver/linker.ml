@@ -105,15 +105,13 @@ and link_from_entry_internal env ~verbose entry : Typedtree.Declaration.t list =
 
   (* remove duplicate nodes *)
   let normalize_deps deps =
-    let reached_nodes = Array.create ~len:(ResizableArray.size env.ctx.ty_map) false in
+    let reached_nodes = Hash_set.create (module Int) in
     Array.filter
       ~f:(fun dep ->
-        if dep < 0 then
-          true
-        else if Array.get reached_nodes dep then
+        if Hash_set.mem reached_nodes dep then
           false
         else (
-          Array.set reached_nodes dep true;
+          Hash_set.add reached_nodes dep;
           true
         )
       )
