@@ -11,15 +11,28 @@ For example, LichenScript can be used to write third-party plugins for your webs
 It has modern syntaxes such as pattern matching/discriminated union.
 It's designed to be lightweight, easy to compile to target platform with very small overhead.
 
-# Feature
+# Features
 
 - Modern syntaxes, close to TypeScript/JavaScript
 - Static typing
-- Running on almost all platforms through C/JavaScript
-- Isolate environment
-- Very lightweight runtime and very small overhead
+- Pattern matching
 
-## Senerios
+**Target C:**
+
+- AOT compilation
+- Fast cold start
+- Lightweight runtime
+- Portable(WebAssembly/Mobile)
+- Reference counting
+- Use the library of C/C++/Rust through C-ABI
+
+**Target JavaScript(WIP):**
+
+- Readable
+- Small overhead
+- Isolate environment
+
+# Senerios
 
 - Plugin system for a Website
 - Game development
