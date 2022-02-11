@@ -357,6 +357,8 @@ and codegen_symbol env sym =
 
   | SymThis -> ps env "this"
 
+  | SymLambdaThis -> ps env "LC_LAMBDA_THIS(this)"
+
 and codegen_expression (env: t) (expr: Expr.t) =
   let open Expr in
   match expr with
@@ -536,7 +538,9 @@ and codegen_expression (env: t) (expr: Expr.t) =
       codegen_expression env right;
       ps env ")"
 
-    | SymThis -> failwith "impossible assgning to this"
+    | SymThis
+    | SymLambdaThis
+      -> failwith "impossible assgning to this"
     );
   )
 
@@ -564,7 +568,9 @@ and codegen_expression (env: t) (expr: Expr.t) =
       ps env (Int.to_string index);
       ps env ")"
 
-    | SymThis -> failwith "impossible to updating this"
+    | SymThis
+    | SymLambdaThis
+      -> failwith "impossible to updating this"
 
     );
     ps env ", ";

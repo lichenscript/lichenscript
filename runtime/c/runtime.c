@@ -246,6 +246,9 @@ static void LCFreeObject(LCRuntime* rt, LCValue val);
 static inline void LCFreeLambda(LCRuntime* rt, LCValue val) {
     LCLambda* lambda = (LCLambda*)val.ptr_val; 
     size_t i;
+
+    LCRelease(rt, lambda->captured_this);
+
     for (i = 0; i < lambda->captured_values_size; i++) {
         LCRelease(rt, lambda->captured_values[i]);
     }

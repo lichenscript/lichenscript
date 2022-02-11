@@ -240,6 +240,7 @@ LCValue LCUnionObjectGet(LCRuntime* rt, LCValue this, int index);
 int LCUnionGetType(LCValue);
 
 LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, LCValue this, int argc, LCValue* args);
+#define LC_LAMBDA_THIS(v) ((LCLambda*)v.ptr_val)->captured_this
 LCValue LCLambdaGetValue(LCRuntime* rt, LCValue lambda, int index);
 LCValue* LCLambdaGetValuePointer(LCRuntime* rt, LCValue lambda, int index);
 LCValue LCLambdaGetRefValue(LCRuntime* rt, LCValue lambda, int index);

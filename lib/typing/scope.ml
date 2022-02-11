@@ -165,6 +165,8 @@ class scope ?prev () = object(self)
 
   method test_while_scope = false
 
+  method test_lambda_scope = false
+
 end
 
 class class_scope ?prev cls_id this_expr = object
@@ -200,6 +202,13 @@ class while_scope ?prev () = object
   inherit scope ?prev ()
 
   method! test_while_scope = true
+
+end
+
+class lambda_scope ?prev () = object
+  inherit function_scope ?prev ()
+
+  method! test_lambda_scope = true
 
 end
 

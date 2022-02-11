@@ -15,6 +15,7 @@ type symbol =
   | SymParam of int
   | SymLambda of int
   | SymThis
+  | SymLambdaThis
   [@@deriving show]
 
 let map_symbol ~f s =
@@ -23,6 +24,7 @@ let map_symbol ~f s =
   | SymParam _
   | SymLambda _
   | SymThis
+  | SymLambdaThis
     -> s
 
 module%gen rec Decl : sig

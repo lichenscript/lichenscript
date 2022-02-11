@@ -1,0 +1,18 @@
+
+class MyClass {
+
+    name: string
+
+    lazyLoadName(): () => string {
+        return (): string => {
+            this.name
+        };
+    }
+
+}
+
+function main() {
+    const myClass = MyClass{ name: "Vincent Chan" };
+    const lambda = myClass.lazyLoadName();
+    print(lambda());
+}

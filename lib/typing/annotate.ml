@@ -219,7 +219,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     )
 
     | Lambda lambda -> (
-      let lambda_scope = new function_scope ~prev:(Env.peek_scope env) () in
+      let lambda_scope = new lambda_scope ~prev:(Env.peek_scope env) () in
       Env.with_new_scope env lambda_scope (fun env ->
         let prev_in_lambda = Env.in_lambda env in
 

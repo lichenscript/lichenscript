@@ -98,6 +98,32 @@ module TScope = struct
       let prev_scope = Option.value_exn scope.prev in
       get_symbols_to_release_til_while acc prev_scope
     )
+
+  let rec is_in_class scope =
+    match scope.raw with
+    | Some raw -> (
+      if Option.is_some raw#test_class_scope then
+        true
+      else (
+        match scope.prev with
+        | Some prev -> is_in_class prev
+        | None -> false
+      )
+    )
+    | None -> false
+
+  let is_in_lambda scope =
+    match scope.raw with
+    | Some raw -> (
+      if raw#test_lambda_scope then
+        true
+      else (
+        match scope.prev with
+        | Some prev -> is_in_class prev
+        | None -> false
+      )
+    )
+    | None -> false
   
 end
 
@@ -243,8 +269,7 @@ let rec transform_declaration env decl =
   let { spec; loc; attributes } = decl in
   match spec with
   | Class cls -> (
-    let specs = transform_class env cls in
-    List.map ~f:(fun spec -> { C_op.Decl. spec; loc }) specs
+    transform_class env cls loc
   )
   | Function_ _fun -> (
     let specs = transform_function env _fun in
@@ -736,7 +761,14 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       env.lambdas <- lambda::env.lambdas;
 
-      let expr = C_op.Expr.NewLambda(lambda_fun_name, Null, capturing_names) in
+      let this_expr =
+        if TScope.is_in_class env.scope then
+          C_op.Expr.Ident(C_op.SymThis)
+        else
+          Null
+      in
+
+      let expr = C_op.Expr.NewLambda(lambda_fun_name, this_expr, capturing_names) in
       auto_release_expr env ~is_move ~append_stmts ty_var expr
     )
 
@@ -958,7 +990,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
                 let ctor = Option.value_exn ~message:"Cannot find typedef of class" ctor_opt in
                 let ctor_ty_id = ctor.id in
                 let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
-                C_op.Expr.ExternalCall(global_name, None, params)
+                C_op.Expr.ExternalCall(global_name, Some this_expr.expr, params)
             )
 
             (* it's a static function *)
@@ -1265,8 +1297,12 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     | Match _match ->
       transform_pattern_matching env ~prepend_stmts ~loc ~ty_var _match
 
-    | This ->
-      C_op.Expr.Ident SymThis
+    | This -> (
+      if TScope.is_in_lambda env.scope then
+        C_op.Expr.Ident SymLambdaThis
+      else
+        C_op.Expr.Ident SymThis
+    )
 
     | Super -> failwith "not implemented: super"
 
@@ -1693,7 +1729,7 @@ and generate_cls_meta env cls_id gen_name =
 
   result
 
-and transform_class env cls: C_op.Decl.spec list =
+and transform_class env cls loc: C_op.Decl.t list =
   let open Declaration in
   let { cls_id; cls_body; _ } = cls in
   let original_name, cls_name_id = cls_id in
@@ -1710,7 +1746,7 @@ and transform_class env cls: C_op.Decl.spec list =
 
   let class_methods = ref [] in
 
-  let methods: C_op.Decl.spec list = 
+  let methods: C_op.Decl.t list = 
     List.fold
       ~init:[]
       ~f:(fun acc elm ->
@@ -1743,18 +1779,20 @@ and transform_class env cls: C_op.Decl.spec list =
             }::!class_methods
           );
 
-          let _fun =
-            transform_function_impl
-              env
+          let _fun = { C_op.Decl.
+            spec = (transform_function_impl env
               ~name:new_name
               ~params:cls_method_params
               ~scope:(Option.value_exn cls_method_scope)
               ~body:cls_method_body
-              ~comments:[]
-          in
+              ~comments:[]);
+            loc = _method.cls_method_loc;
+          } in
 
-          _fun::acc
-          (* { C_op.Decl. spec = _fun; loc = cls_method_loc }::acc *)
+          let lambdas = env.lambdas in
+          env.lambdas <- [];
+
+          List.append lambdas (_fun::acc)
         )
         | Cls_property _ -> acc
         | Cls_declare _ -> failwith "unimplemented: declare"
@@ -1782,7 +1820,9 @@ and transform_class env cls: C_op.Decl.spec list =
     properties = cls_meta.cls_fields;
   } in
 
-  List.append [ (C_op.Decl.Class cls) ] methods
+  List.append
+    [ { C_op.Decl. spec = C_op.Decl.Class cls; loc; } ]
+    methods
 
 (*
  * Generate finalizer statements for a class:
