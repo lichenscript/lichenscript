@@ -111,7 +111,7 @@ and build_command args index : string option =
         )
       )
 
-      | "-v" | "--verbose" ->
+      | "-V" | "--verbose" ->
         verbose := true
 
       | "--build-dir" | "-D" -> (

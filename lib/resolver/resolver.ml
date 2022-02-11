@@ -430,7 +430,7 @@ and write_makefiles_with_mode ~bin_name ~runtime_dir ~mode build_dir mods =
   ] in
   let flags =
     if String.equal mode "debug" then
-      "FLAGS=-O0 -g3\n"
+      "FLAGS=-O0 -g3 -D LSC_DEBUG\n"
     else
       "FLAGS=-O3 -g0\n"
   in

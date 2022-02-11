@@ -489,11 +489,13 @@ void LCFreeRuntime(LCRuntime* rt) {
 
     lc_free(rt, rt->cls_meta_data);
 
+#ifdef LSC_DEBUG
     if (rt->malloc_state.malloc_count != 1) {
         fprintf(stderr, "[LichenScript] memory leaks %zu\n", rt->malloc_state.malloc_count);
         lc_raw_free(rt);
         exit(1);
     }
+#endif
 
     lc_raw_free(rt);
 }
