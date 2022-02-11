@@ -27,6 +27,12 @@ type t = {
   find_paths: string list;
 }
 
+type profile = {
+  profile_name: string;
+  profile_dir: string;
+  profile_exe_path: string;
+}
+
 let create ~find_paths ~ctx () =
   let linker = Linker.create ~ctx () in
   {
@@ -310,7 +316,7 @@ let typecheck_all_modules ~ctx ~verbose env =
  * because cyclic dependencies is allowed.
  * Annotated parsed tree remain the "holes" to type check
  *)
-let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~mode:_ ~verbose entry_file_path : (string * string * string option) list =
+let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~platform ~verbose entry_file_path : profile list =
   try
     (* ctx is a typing context for all modules *)
     let ctx = Lichenscript_typing.Type_context.create () in
@@ -346,12 +352,8 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~mode:_ ~verbose entr
     let output_path = write_to_file build_dir mod_name output in
     let build_dir = Option.value_exn build_dir in
     let bin_name = entry_file_path |> last_piece_of_path |> (Filename.chop_extension) in
-    let profiles = write_makefiles ~bin_name ~runtime_dir:runtime_dir build_dir [ (mod_name, output_path) ] in
-    List.map
-      ~f:(fun (profile_name, profile_path) ->
-        profile_name, profile_path, (Some (Filename.concat profile_path bin_name))
-      )
-      profiles
+    write_makefiles
+      ~bin_name ~runtime_dir ~platform build_dir [ (mod_name, output_path) ]
   with
     | Type_error.Error e ->
       raise (TypeCheckError [e])
@@ -363,7 +365,7 @@ and write_to_file build_dir mod_name content: string =
   let build_dir =
     match build_dir with
     | Some v -> v
-    | None -> Filename.concat Filename.temp_dir_name "waterlang"
+    | None -> Filename.concat Filename.temp_dir_name ".lichenscript"
   in
   (match Sys.file_exists build_dir with
   | `No -> (
@@ -375,19 +377,43 @@ and write_to_file build_dir mod_name content: string =
   Out_channel.write_all output_file_path ~data:content;
   output_file_path
 
-and write_makefiles ~bin_name ~runtime_dir build_dir mods =
-  let debug_dir = Filename.concat build_dir "debug" in
-  let release_dir = Filename.concat build_dir "release" in
+and write_makefiles ~bin_name ~runtime_dir ~platform build_dir mods: profile list =
+  let debug_dir =
+    match platform with
+    | "native" -> Filename.concat build_dir "debug"
+    | "wasm32" -> Filename.concat build_dir "wasm32_debug"
+    | _ -> failwith ("unsupport platform: " ^ platform)
+  in
+  let release_dir =
+    match platform with
+    | "native" ->Filename.concat build_dir "release"
+    | "wasm32" -> Filename.concat build_dir "wasm32_release"
+    | _ -> failwith  ("unsupport platform: " ^ platform)
+  in
+  let bin_name =
+    match platform with
+    | "native" -> bin_name
+    | "wasm32" -> bin_name ^ ".js"
+    | _ -> failwith  ("unsupport platform: " ^ platform)
+  in
   Unix.mkdir_p debug_dir;
   Unix.mkdir_p release_dir;
-  write_makefiles_with_mode ~bin_name ~runtime_dir ~mode:"debug" debug_dir mods;
-  write_makefiles_with_mode ~bin_name ~runtime_dir ~mode:"release" release_dir mods;
+  write_makefiles_with_mode ~bin_name ~runtime_dir ~mode:"debug" ~platform debug_dir mods;
+  write_makefiles_with_mode ~bin_name ~runtime_dir ~mode:"release" ~platform release_dir mods;
   [
-    ("debug", debug_dir);
-    ("release", release_dir);
+    {
+      profile_name = "debug";
+      profile_dir = debug_dir;
+      profile_exe_path = Filename.concat debug_dir bin_name;
+    };
+    {
+      profile_name = "release";
+      profile_dir = release_dir;
+      profile_exe_path = Filename.concat release_dir bin_name;
+    }
   ]
 
-and write_makefiles_with_mode ~bin_name ~runtime_dir ~mode build_dir mods =
+and write_makefiles_with_mode ~bin_name ~runtime_dir ~mode ~platform build_dir mods =
   let output_path = Filename.concat build_dir "Makefile" in
   let open Makefile in
   let runtime_dir = Filename.concat runtime_dir "c" in
@@ -434,8 +460,14 @@ and write_makefiles_with_mode ~bin_name ~runtime_dir ~mode build_dir mods =
     else
       "FLAGS=-O3 -g0\n"
   in
+  let cc =
+    match platform with
+    | "native" -> "cc"
+    | "wasm32" -> "emcc"
+    | _ -> failwith  ("unsupport platform: " ^ platform)
+  in
   let data =
-    "CC=cc\n" ^
+    "CC=" ^ cc ^ "\n" ^
     flags ^
     to_string entries in
   Out_channel.write_all output_path ~data

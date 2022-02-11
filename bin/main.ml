@@ -40,7 +40,7 @@ lsc build <entry> [<args>]
                          default: current directory
   --build-dir, -D <dir>  Specify a directory to build,
                          a temp directory will be used if this is not specified.
-  --platform <platform>  native/wasm/js, default: native
+  --platform <platform>  native/wasm32, default: native
   --mode <debug|release> Choose the mode of debug/release
   --verbose, -V          Print verbose log
   -h, --help             Show help message
@@ -150,16 +150,23 @@ and build_command args index : string option =
       ignore (exit 2);
       None
     ) else 
-      build_entry (Option.value_exn !entry) std !buildDir runtimeDir !mode !verbose
+      build_entry (Option.value_exn !entry) std !buildDir runtimeDir !mode !verbose !platform
 
-and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose: string option =
+and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platform: string option =
   let open Resolver in
   try
     let entry_full_path = Filename.realpath entry in
-    let profiles = Resolver.compile_file_path ~std_dir ~build_dir ~runtime_dir ~mode ~verbose entry_full_path in
-    let _, build_dir, result = List.find_exn ~f:(fun (profile_name, _, _) -> String.equal profile_name mode) profiles in
-    run_make_in_dir build_dir;
-    result
+    let profiles = Resolver.compile_file_path
+      ~std_dir ~build_dir ~runtime_dir ~verbose ~platform entry_full_path
+    in
+    let profile = List.find_exn
+      ~f:(fun profile ->
+        String.equal profile.profile_name mode
+      )
+      profiles
+    in
+    run_make_in_dir profile.profile_dir;
+    Some profile.profile_exe_path
   with
     | Unix.Unix_error (_, err, err_s) -> (
       Format.printf "Failed: %s: %s %s\n" entry err err_s;
@@ -260,7 +267,10 @@ and print_loc_title ~prefix loc_opt =
 
 (* replace current process *)
 and run_bin_path path =
-  Unix.exec ~prog:path ~argv:[path] ()
+  if Filename.check_suffix path ".js" then
+    Unix.exec ~prog:"node" ~argv:["node"; path] ()
+  else
+    Unix.exec ~prog:path ~argv:[path] ()
   (* match Unix.fork () with
   | `In_the_child -> (
     ignore (Unix.exec ~prog:path ~argv:[path] ())
