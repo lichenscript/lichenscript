@@ -30,6 +30,6 @@ function isSome(o: Option<string>): boolean {
 function main() {
     const generateor = generate();
     while isSome(generateor()) {
-        print("a");
+        print("ok");
     }
 }

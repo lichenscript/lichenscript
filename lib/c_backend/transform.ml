@@ -480,24 +480,25 @@ and transform_statement ?ret env stmt =
   )
 
   | While { while_test; while_block; while_loc } -> (
-    let transform_expression = transform_expression env while_test in
+    let while_test' = transform_expression env while_test in
 
     let bodys = transform_block ?ret env while_block in
     let body = {
       C_op.Block.
-      body = bodys;
+      body =
+        List.append while_test'.append_stmts bodys;
       loc = while_block.loc;
     } in
 
     List.concat [
-      transform_expression.prepend_stmts;
+      while_test'.prepend_stmts;
       [
         { C_op.Stmt.
-          spec = While(transform_expression.expr, body);
+          spec = While(while_test'.expr, body);
           loc = while_loc;
         }
       ];
-      transform_expression.append_stmts;
+      while_test'.append_stmts;
     ]
   )
 
