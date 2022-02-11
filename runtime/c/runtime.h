@@ -222,6 +222,7 @@ void LCRelease(LCRuntime* rt, LCValue obj);
 typedef struct LCLambda {
     LC_OBJ_HEADER
     LCCFunction c_fun;
+    LCValue     captured_this;
     size_t      captured_values_size;
     LCValue     captured_values[];
 } LCLambda;
@@ -238,7 +239,7 @@ LCValue LCNewUnionObject(LCRuntime* rt, int tag, int size, LCValue* args);
 LCValue LCUnionObjectGet(LCRuntime* rt, LCValue this, int index);
 int LCUnionGetType(LCValue);
 
-LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, int argc, LCValue* args);
+LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, LCValue this, int argc, LCValue* args);
 LCValue LCLambdaGetValue(LCRuntime* rt, LCValue lambda, int index);
 LCValue* LCLambdaGetValuePointer(LCRuntime* rt, LCValue lambda, int index);
 LCValue LCLambdaGetRefValue(LCRuntime* rt, LCValue lambda, int index);

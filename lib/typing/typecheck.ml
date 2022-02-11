@@ -445,7 +445,11 @@ and check_expression env expr =
 
         | TypeExpr.TypeDef { TypeDef. spec = EnumCtor enum_ctor; _} -> (
           let super_id = enum_ctor.enum_ctor_super_id in
-          Type_context.update_node_type ctx expr.ty_var (TypeExpr.Ctor (Ref super_id, []))
+          let params_types = List.map
+            ~f:(fun param -> Type_context.deref_node_type ctx param.ty_var)
+            call_params
+          in
+          Type_context.update_node_type ctx expr.ty_var (TypeExpr.Ctor (Ref super_id, params_types))
         )
 
         | _ -> (

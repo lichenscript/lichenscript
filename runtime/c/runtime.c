@@ -950,12 +950,15 @@ int LCUnionGetType(LCValue val) {
     return union_obj->tag;
 }
 
-LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, int argc, LCValue* args) {
+LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, LCValue this, int argc, LCValue* args) {
     size_t size = sizeof(LCLambda) + argc * sizeof(LCValue);
     LCLambda* lambda = (LCLambda*)lc_mallocz(rt, size);
     lambda->header.count = 1;
     lambda->c_fun = c_fun;
     lambda->captured_values_size = argc;
+
+    LCRetain(this);
+    lambda->captured_this = this;
 
     size_t i;
     for (i = 0; i < argc; i++) {

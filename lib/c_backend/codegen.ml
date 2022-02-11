@@ -395,9 +395,11 @@ and codegen_expression (env: t) (expr: Expr.t) =
   | NewBoolean false ->
     ps env Primitives.Constant._false
 
-  | NewLambda (c_name, params) ->
+  | NewLambda (c_name, this, params) ->
     ps env "LCNewLambda(rt, ";
     ps env c_name;
+    ps env ", ";
+    codegen_expression env this;
     ps env ", ";
     if Array.is_empty params then
       ps env "0, NULL"

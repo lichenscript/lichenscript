@@ -736,7 +736,8 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       env.lambdas <- lambda::env.lambdas;
 
-      auto_release_expr env ~is_move ~append_stmts ty_var (C_op.Expr.NewLambda(lambda_fun_name, capturing_names))
+      let expr = C_op.Expr.NewLambda(lambda_fun_name, Null, capturing_names) in
+      auto_release_expr env ~is_move ~append_stmts ty_var expr
     )
 
     | If if_desc ->
@@ -1221,7 +1222,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
                 loc = init_entry_loc;
               }]
             | InitSpread spread_expr -> (
-              let transformed_spread = transform_expression env spread_expr in
+              let transformed_spread = transform_expression ~is_move:true env spread_expr in
               prepend_stmts := List.append !prepend_stmts transformed_spread.prepend_stmts;
               append_stmts := List.append !append_stmts transformed_spread.append_stmts;
               let spread_expr' = prepend_expr env ~is_borrow:false
