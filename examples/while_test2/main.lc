@@ -29,7 +29,15 @@ function isSome(o: Option<string>): boolean {
 
 function main() {
     const generateor = generate();
+    let index = 0;
     while isSome(generateor()) {
-        print("ok");
+        const content = "ok ";
+        print(content, index);
+
+        if index == 3 {
+            break;
+        }
+
+        index += 1;
     }
 }

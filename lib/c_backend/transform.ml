@@ -88,6 +88,16 @@ module TScope = struct
       let prev_scope = Option.value_exn scope.prev in
       get_symbols_to_release_til_function acc prev_scope
     )
+
+  let rec get_symbols_to_release_til_while acc scope =
+    let acc = List.append acc !(scope.local_vars_to_release) in
+    let raw = Option.value_exn scope.raw in
+    if raw#test_while_scope then
+      acc
+    else (
+      let prev_scope = Option.value_exn scope.prev in
+      get_symbols_to_release_til_while acc prev_scope
+    )
   
 end
 
@@ -541,19 +551,28 @@ and transform_statement ?ret env stmt =
     ]
   )
 
-  | Break _ -> [
-    { C_op.Stmt.
-      spec = Break;
-      loc;
-    }
-  ]
+  | Break _ ->
+    let stmts = generate_finalize_stmts_while env.scope in
+    List.append
+      stmts
+      [
+        { C_op.Stmt.
+          spec = Break;
+          loc;
+        }
+      ]
 
-  | Continue _ -> [
-    { C_op.Stmt.
-      spec = Continue;
-      loc;
-    }
-  ]
+  | Continue _ ->
+    let stmts = generate_finalize_stmts_while env.scope in
+    List.append
+      stmts
+      [
+        { C_op.Stmt.
+          spec = Continue;
+          loc;
+        }
+      ]
+
   | Debugger -> []
 
   | Return ret_opt -> (
@@ -1609,6 +1628,17 @@ and generate_finalize_stmts scope =
  *)
 and generate_finalize_stmts_function scope =
   TScope.get_symbols_to_release_til_function [] scope
+  |> List.rev
+  |> List.filter_map
+    ~f:(fun sym ->
+      Some { C_op.Stmt.
+        spec = Release (Ident sym);
+        loc = Loc.none;
+      }
+    )
+
+and generate_finalize_stmts_while scope =
+  TScope.get_symbols_to_release_til_while [] scope
   |> List.rev
   |> List.filter_map
     ~f:(fun sym ->

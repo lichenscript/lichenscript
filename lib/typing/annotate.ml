@@ -69,7 +69,10 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
     | While _while -> (
       let { while_test; while_block; while_loc } = _while in
       let while_test = annotate_expression ~prev_deps env while_test in
-      let while_block = annotate_block_expr ~prev_deps:[while_test.ty_var] env while_block in
+      let while_scope = new while_scope ~prev:(Env.peek_scope env) () in
+      let while_block = annotate_block_expr
+        ~prev_deps:[while_test.ty_var] ~scope:while_scope env while_block
+      in
       let next_deps = [ while_block.return_ty ] in
       next_deps, T.Statement.While { while_test; while_block; while_loc }
     )
@@ -115,8 +118,12 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       )
     )
 
-    | Break _
-    | Continue _
+    | Break label ->
+      prev_deps, (T.Statement.Break label)
+
+    | Continue label ->
+      prev_deps, (T.Statement.Continue label)
+
     | Debugger -> prev_deps, failwith "not implment"
 
     | Return ret_opt -> (
@@ -672,9 +679,13 @@ and annotate_block_impl ~prev_deps env block : T.Block.t =
     return_ty;
   }
 
-and annotate_block_expr ~prev_deps env block : T.Block.t =
+and annotate_block_expr ~prev_deps ?scope env block : T.Block.t =
   let prev_scope = Env.peek_scope env in
-  let block_scope = new scope ~prev:prev_scope () in
+  let block_scope =
+    match scope with
+    | Some s -> s
+    | _ -> new scope ~prev:prev_scope ()
+  in
   prev_scope#add_child block_scope;
 
   Env.with_new_scope env block_scope (fun env ->
