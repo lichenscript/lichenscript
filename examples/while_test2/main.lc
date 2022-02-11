@@ -1,0 +1,35 @@
+
+function generate(): () => Option<string> {
+    const data = [
+        "Amy",
+        "Bobby",
+        "Candy",
+        "Daddy",
+        "Fancy",
+    ];
+    let index = 0;
+    return (): Option<string> => {
+        if index >= data.length {
+            return None;
+        }
+        const result = data[index];
+
+        index += 1;
+
+        Some(result)
+    };
+}
+
+function isSome(o: Option<string>): boolean {
+    match o {
+        case Some(_) => true
+        case None => false
+    }
+}
+
+function main() {
+    const generateor = generate();
+    while isSome(generateor()) {
+        print("a");
+    }
+}

@@ -61,20 +61,73 @@ let make_declare_of_decl id (decl: Typedtree.Declaration.t) =
 
   | _ -> None
 
-let link_from_entry env ~verbose entry =
-  let reach_nodes = Array.create ~len:(ResizableArray.size env.ctx.ty_map) false in
+(*
+ * 1. for normal function, the parent should be added after the children
+ *
+ *    function A() -> function B()
+ *
+ *    the generated order should be:
+ *
+ *    functionB() { ... }
+ *    functionA() { ... }
+ *
+ * 2. for cyclic function, a declaration should be added:
+ *
+ *    function A() -> function B() -> function A()
+ *
+ *    the generated order should be:
+ *
+ *    declare functionA()
+ *    functionB() { ... }
+ *    functionA() { ... }
+ *
+ * 3. for more complex function
+ *
+ *    function A() -> function D()
+ *                 \
+ *                  \-> function B() -> function C() -> function D()
+ *
+ *    the generated order should be:
+ *
+ *    function D()
+ *    function C()
+ *    function B()
+ *    function A()
+ *
+ *    the deeper branch should be linked firstly
+ *
+ *)
+let rec link_from_entry env ~verbose entry : Typedtree.Declaration.t list =
+  link_from_entry_internal env ~verbose entry
+
+and link_from_entry_internal env ~verbose entry : Typedtree.Declaration.t list =
   let needs_decl = Array.create ~len:(ResizableArray.size env.ctx.ty_map) false in
+
+  (* remove duplicate nodes *)
+  let normalize_deps deps =
+    let reached_nodes = Array.create ~len:(ResizableArray.size env.ctx.ty_map) false in
+    Array.filter
+      ~f:(fun dep ->
+        if dep < 0 then
+          true
+        else if Array.get reached_nodes dep then
+          false
+        else (
+          Array.set reached_nodes dep true;
+          true
+        )
+      )
+      deps
+  in
 
   let rec iterate_node path id =
     if VisitPathSet.mem path id then (
-      (* it's a cyclic reference *)
-      Array.set needs_decl id true
-    );
-    if Array.get reach_nodes id then
+      (* it's a cyclic reference, set decls in the children *)
+      Array.set needs_decl id true;
       []
-    else (
+    ) else (
       let open Type_context in
-      Array.set reach_nodes id true;
+
       let node = ResizableArray.get env.ctx.ty_map id in
       let next_path = VisitPathSet.add path id in
 
@@ -99,40 +152,47 @@ let link_from_entry env ~verbose entry =
     )
   in
 
-  let orders = (iterate_node VisitPathSet.empty entry) in
+  let orders =
+    iterate_node VisitPathSet.empty entry
+    |> List.to_array
+  in
+
+  Array.rev_inplace orders;
+  let orders = normalize_deps orders in
 
   if verbose then (
     Format.eprintf "- entry %d\n" entry;
-    List.iteri
+    Array.iteri
       ~f:(fun index id ->
         Format.printf "- %d: %d\n" index id
       )
-      (List.rev orders)
+      orders
   );
 
   let declarations =
-    List.fold
-    ~init:[]
-    ~f:(fun acc id->
-      if id >= 0 then (
-        let open Type_context in
-        match Hashtbl.find env.ctx.declarations id with
-        | None -> acc
-        | Some decl ->
-          decl::acc
-      ) else (
-        let positive = id * (-1) in
-        let open Type_context in
-        match Hashtbl.find env.ctx.declarations positive with
-        | None -> acc
-        | Some decl -> (
-          match make_declare_of_decl positive decl with
-          | Some d -> d::acc
+    orders
+    |> Array.fold
+      ~init:[]
+      ~f:(fun acc id->
+        if id >= 0 then (
+          let open Type_context in
+          match Hashtbl.find env.ctx.declarations id with
           | None -> acc
+          | Some decl ->
+            decl::acc
+        ) else (
+          let positive = id * (-1) in
+          let open Type_context in
+          match Hashtbl.find env.ctx.declarations positive with
+          | None -> acc
+          | Some decl -> (
+            match make_declare_of_decl positive decl with
+            | Some d -> d::acc
+            | None -> acc
+          )
         )
       )
-    )
-    orders
+    |> List.rev
   in
   declarations
 

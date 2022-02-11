@@ -661,9 +661,10 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         let ctor = Check_helper.find_construct_of env.ctx node_type in
         let open Core_type in
         match ctor with
-        | Some({ TypeDef. spec = EnumCtor _; _ }, _) ->
-          let sym = find_variable env name in
-          C_op.Expr.ExternalCall(sym, None, [])
+        | Some({ TypeDef. id = ctor_id; spec = EnumCtor _; _ }, _) ->
+          let generate_name = Hashtbl.find_exn env.global_name_map ctor_id in
+          (* let sym = find_variable env name in *)
+          C_op.Expr.ExternalCall(generate_name, None, [])
 
         | _ ->
           let id_ty = Type_context.print_type_value env.ctx node_type in
@@ -1777,8 +1778,9 @@ and transform_enum env enum =
   let { cases; _ } = enum in
   List.mapi
     ~f:(fun index case ->
-      let case_name, _ = case.case_name in
+      let case_name, case_name_id = case.case_name in
       let new_name = distribute_name env case_name in
+      Hashtbl.set env.global_name_map ~key:case_name_id ~data:(SymLocal new_name);
       C_op.Decl.EnumCtor {
         enum_ctor_name = new_name;
         enum_ctor_tag_id = index;
