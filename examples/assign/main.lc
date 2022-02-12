@@ -1,0 +1,21 @@
+
+class Person {
+
+  name: string
+
+}
+
+function main () {
+  let content = "Vincent Chan";
+  print(content);
+  content = "Roger";
+  print(content);
+
+  const content2 = content;
+  print(content2);
+
+  const person = Person { name: content };
+  print(person.name);
+  person.name = "Steve";
+  print(person.name);
+}

@@ -68,7 +68,7 @@ module TScope = struct
   let add_vars_to_release scope (name: C_op.symbol) =
     scope.local_vars_to_release := name::!(scope.local_vars_to_release)
 
-  let remove_release_var scope name =
+  let[@warning "-unused-value-declaration"] remove_release_var scope name =
     scope.local_vars_to_release :=
       List.filter
         ~f:(fun sym ->
@@ -538,9 +538,9 @@ and transform_statement ?ret env stmt =
   )
 
   | Binding binding -> (
-    let original_name =
+    let original_name, name_id =
       match binding.binding_pat with
-      | { spec = Pattern.Symbol (name, _); _ } -> name
+      | { spec = Pattern.Symbol sym; _ } -> sym
       | _ -> failwith "unrechable"
     in
 
@@ -554,7 +554,15 @@ and transform_statement ?ret env stmt =
     let name = TScope.find_variable scope original_name in
     let init_expr = transform_expression ~is_move:true env binding.binding_init in
 
-    TScope.add_vars_to_release scope name;
+    let node_type = Type_context.deref_node_type env.ctx name_id in
+    let need_release = not (Check_helper.type_should_not_release env.ctx node_type) in
+    (*
+     * if a variable is captured, it will be upgraded into a RefCell.
+     * Whatevet type it is, it should be released.
+     *)
+    if need_release || !(variable.var_captured) then (
+      TScope.add_vars_to_release scope name
+    );
 
     let assign_expr =
       if should_var_captured variable then (
@@ -728,9 +736,11 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         let node_type = Type_context.deref_node_type env.ctx variable.var_id in
         let need_release = not (Check_helper.type_should_not_release env.ctx node_type) in
 
-        if is_move then (
-          TScope.remove_release_var env.scope sym;
-          id_expr
+        if is_move && need_release then (
+          (* TScope.remove_release_var env.scope sym;
+          id_expr *)
+          let id_expr = id_expr in
+          C_op.Expr.Retaining id_expr
         ) else if (not is_borrow) && (not is_move) && need_release then  (
           let id_expr = id_expr in
           C_op.Expr.Retaining id_expr
@@ -1125,7 +1135,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
      *   - Assign to this property: this.xxx = expr
      *)
     | Assign (op_opt, left_expr, expr) -> (
-      let expr' = transform_expression env expr in
+      let expr' = transform_expression ~is_move:true env expr in
 
       prepend_stmts := List.concat [ !prepend_stmts; expr'.prepend_stmts ];
       append_stmts := List.concat [ !append_stmts; expr'.append_stmts ];
