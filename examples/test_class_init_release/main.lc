@@ -1,0 +1,17 @@
+class Item {
+    id: string
+    getId(): string {
+        return this.id;
+    }
+}
+
+function inferPatternType(val: Option<Item>) {
+    match val {
+        case Some(item) => print(item.getId())  // `item` should be inferred as type `Item` here.
+        case _          => print("unexpected match arm.")
+    }
+}
+
+function main() {
+    inferPatternType(Some(Item{ id: "item0" }));
+}

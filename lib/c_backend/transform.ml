@@ -1279,6 +1279,14 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       prepend_stmts := List.append !prepend_stmts (init_cls_stmt::init_stmts);
 
+      if not is_move then (
+        let release_stmt = { C_op.Stmt.
+          spec = Release(C_op.Expr.Temp tmp_id);
+          loc = Loc.none;
+        } in
+        append_stmts := List.append !append_stmts [release_stmt];
+      );
+
       C_op.Expr.Temp tmp_id
     )
 
