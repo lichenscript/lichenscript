@@ -17,6 +17,7 @@
 
 const { spawn } = require('child_process');
 const path = require('path');
+const os = require('os');
 
 function getPkgName() {
   const platform = os.platform();
