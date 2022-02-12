@@ -78,6 +78,12 @@ Execute the command:
 lsc run --platform wasm32 ./main.lc
 ```
 
+# Syntaxes
+
+The documentation is still work in progress.
+
+Check [Examples](./examples/).
+
 # Roadmap
 
 ✅ Done
