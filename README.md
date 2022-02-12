@@ -9,7 +9,7 @@ Easy to integrated with the Web Ecosystem.
 
 ## Why
 
-LichenScript is designed to write untrustworthy plugins for a exist system.
+LichenScript is designed to write untrustworthy plugins for an exist system.
 For example, LichenScript can be used to write third-party plugins for your website/mobile app, which is isolated.
 It has modern syntaxes such as pattern matching/discriminated union.
 It's designed to be lightweight, easy to compile to target platform with very small overhead.
@@ -134,10 +134,7 @@ Computer Graphic. So compiling to C is reasonable.
 
 It can be easily integrated with Rust with C-ABI.
 
-### LichenScript is more dynamic than Rust
-
-- Doesn't have a bunch of pointer types.
-- Support inheritance.
+LichenScript supports inheritance.
 
 ## What's different from JavaScript/TypeScript?
 
