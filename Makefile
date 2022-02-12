@@ -12,6 +12,16 @@ release-darwin-x64: compiler
 	mkdir -p ./npm/lichenscript-darwin-x64/bin
 	cp ./_build/default/bin/main.exe ./npm/lichenscript-darwin-x64/bin/lichenscript
 
+release-darwin-arm64: compiler
+	rm -rf ./npm/lichenscript-darwin-arm64/bin
+	mkdir -p ./npm/lichenscript-darwin-arm64/bin
+	cp ./_build/default/bin/main.exe ./npm/lichenscript-darwin-arm64/bin/lichenscript
+
+release-linux-x64: compiler
+	rm -rf ./npm/lichenscript-linux-x64/bin
+	mkdir -p ./npm/lichenscript-linux-x64/bin
+	cp ./_build/default/bin/main.exe ./npm/lichenscript-linux-x64/bin/lichenscript
+
 compiler:
 	dune build
 

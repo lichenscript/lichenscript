@@ -1,4 +1,7 @@
 
+[![npm version](https://img.shields.io/npm/v/lichenscript.svg)](https://www.npmjs.com/package/lichenscript)
+
+
 # LichenScript
 
 A lightweight language compiled to JavaScript/C.
