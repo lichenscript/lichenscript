@@ -184,7 +184,14 @@ and check_statement env stmt =
     check_expression env expr
 
   | While { while_test; while_block; _ } -> (
-    check_expression env while_test; (* TODO: check boolean? *)
+    check_expression env while_test;
+    let test_type = Type_context.deref_node_type env.ctx while_test.ty_var in
+    if not (Check_helper.is_boolean env.ctx test_type) then (
+      let open Type_error in
+      let spec = WhileTestShouldBeBoolean test_type in
+      let err = make_error env.ctx while_test.loc spec in
+      raise (Error err)
+    );
     List.iter ~f:(check_statement env) while_block.body
   )
 
@@ -223,6 +230,15 @@ and check_expression_if env if_spec =
   let open T.Expression in
   let { if_test; if_consequent; if_alternative; if_ty_var; _ } = if_spec in
   check_expression env if_test;
+
+  let test_type = Type_context.deref_node_type env.ctx if_test.ty_var in
+  if not (Check_helper.is_boolean env.ctx test_type) then (
+    let open Type_error in
+    let spec = IfTestShouldBeBoolean test_type in
+    let err = make_error env.ctx if_test.loc spec in
+    raise (Error err)
+  );
+
   check_block env if_consequent;
 
   let node = Type_context.get_node env.ctx if_consequent.return_ty in
@@ -425,7 +441,6 @@ and check_expression env expr =
 
     match deref_type_expr with
     | TypeExpr.Lambda(params, ret) -> (
-      (* TODO: check call params *)
       check_params params;
       Type_context.update_node_type ctx expr.ty_var ret
     )
@@ -522,7 +537,9 @@ and check_expression env expr =
     | Asttypes.UnaryOp.Not -> (
       let ctor = Check_helper.find_construct_of env.ctx node_type in
       match ctor with
-      | Some({ TypeDef. builtin = true; name = "boolean"; _ }, []) -> ()
+      | Some({ TypeDef. builtin = true; name = "boolean"; _ }, []) -> (
+        Type_context.update_node_type env.ctx expr.ty_var node_type
+      )
       | _ -> raise_err()
     )
 
@@ -535,7 +552,7 @@ and check_expression env expr =
     )
 
     (* TODO: check other operations *)
-    | _ -> ()
+    | _ -> raise_err ()
   )
 
   | Binary (op, left, right) -> (

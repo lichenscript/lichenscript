@@ -44,6 +44,8 @@ and spec =
   | CannotBindingOfPattern of string
   | UnexpectedPatternType of string * TypeExpr.t
   | PatternNotExausted
+  | WhileTestShouldBeBoolean of TypeExpr.t
+  | IfTestShouldBeBoolean of TypeExpr.t
 
 let make_error ctx loc spec =
   { loc; spec; ctx }
@@ -200,6 +202,12 @@ module PP = struct
 
     | PatternNotExausted ->
       Format.fprintf formatter "Pattern is not exausted."
+
+    | WhileTestShouldBeBoolean ty ->
+      Format.fprintf formatter "The type of expression after while should be 'boolean', but got '%s'." (pp_ty ty)
+
+    | IfTestShouldBeBoolean ty ->
+      Format.fprintf formatter "The type of expression after if should be 'boolean', but got '%s'." (pp_ty ty)
 
   let error ~ctx formatter err =
     let { spec; loc; _ } = err in
