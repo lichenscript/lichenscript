@@ -355,7 +355,9 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~platform ~verbose en
       | None -> (
         let working_dir = Sys.getcwd() in
         let tmp = Filename.concat working_dir ".lichenscript" in
-        Unix.mkdir tmp;
+        if not (Sys.is_directory_exn tmp) then (
+          Unix.mkdir tmp
+        );
         tmp
       )
     in
