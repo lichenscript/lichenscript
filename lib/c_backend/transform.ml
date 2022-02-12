@@ -983,7 +983,6 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
                 (* external method *)
                 C_op.Expr.ExternalCall((C_op.SymLocal ext_name), Some this_expr.expr, params)
               )
-              (* TODO: check if it's a virtual function *)
               | _ ->
                 let callee_node = Type_context.get_node env.ctx method_id in
                 let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in

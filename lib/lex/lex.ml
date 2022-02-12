@@ -901,12 +901,6 @@ let token (env : Lex_env.t) lexbuf : result =
     let raw = lexeme lexbuf in
     let (env, value) = decode_identifier env raw in
     Token (env, T_IDENTIFIER { loc; value; raw })
-  (* TODO: Use [Symbol.iterator] instead of @@iterator. *)
-  | "@@iterator"
-  | "@@asyncIterator" ->
-    let loc = loc_of_lexbuf env lexbuf in
-    let raw = lexeme lexbuf in
-    Token (env, T_IDENTIFIER { loc; value = raw; raw })
   (* Syntax *)
   | "{" -> Token (env, T_LCURLY)
   | "}" -> Token (env, T_RCURLY)

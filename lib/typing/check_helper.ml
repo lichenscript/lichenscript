@@ -109,12 +109,22 @@ let rec type_assinable ctx left right =
       Option.is_some test
     )
 
-    | (Some(left_def, _left_args), Some(right_def, _right_args)) ->
-      (* TODO: compare args *)
-      if TypeDef.(left_def == right_def) then
-        true
-      else
-        false
+    | (Some(left_def, left_args), Some(right_def, right_args)) ->
+      TypeDef.(left_def == right_def) && (
+        let result = List.fold2
+          ~init:true
+          ~f:(fun acc left right ->
+            if (not acc) then
+              acc
+            else
+              type_equal ctx left right
+          )
+          left_args right_args
+        in
+        match result with
+        | List.Or_unequal_lengths.Ok r -> r
+        | List.Or_unequal_lengths.Unequal_lengths -> false
+      )
     
     | _ ->
       false
