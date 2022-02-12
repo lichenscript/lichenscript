@@ -38,12 +38,12 @@ function main() {
     process.exit(2);
   }
 
-  const stdPath = path.resolve(__filename, '../std');
-  const runtimePath = path.resolve(__filename, '../runtime');
+  const stdPath = path.resolve(__dirname, '../std');
+  const runtimePath = path.resolve(__dirname, '../runtime');
 
   const binPath = require.resolve(`${pkgName}/bin/lichenscript`);
 
-  const args = process.argv.slice(1);
+  const args = process.argv.slice(2);
   spawn(binPath, args, {
     env: {
       ...process.env,

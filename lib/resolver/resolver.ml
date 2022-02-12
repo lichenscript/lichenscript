@@ -349,8 +349,17 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~platform ~verbose en
 
     let output = Lichenscript_c.codegen ~ctx declarations in
     let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
+    let build_dir =
+      match build_dir with
+      | Some v -> v
+      | None -> (
+        let working_dir = Sys.getcwd() in
+        let tmp = Filename.concat working_dir ".lichenscript" in
+        Unix.mkdir tmp;
+        tmp
+      )
+    in
     let output_path = write_to_file build_dir mod_name output in
-    let build_dir = Option.value_exn build_dir in
     let bin_name = entry_file_path |> last_piece_of_path |> (Filename.chop_extension) in
     write_makefiles
       ~bin_name ~runtime_dir ~platform build_dir [ (mod_name, output_path) ]
@@ -362,11 +371,6 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~platform ~verbose en
       raise (ParseError errors)
 
 and write_to_file build_dir mod_name content: string =
-  let build_dir =
-    match build_dir with
-    | Some v -> v
-    | None -> Filename.concat Filename.temp_dir_name ".lichenscript"
-  in
   (match Sys.file_exists build_dir with
   | `No -> (
     Unix.mkdir_p build_dir
