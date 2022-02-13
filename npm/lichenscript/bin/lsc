@@ -44,13 +44,18 @@ function main() {
   const binPath = require.resolve(`${pkgName}/bin/lichenscript`);
 
   const args = process.argv.slice(2);
-  spawn(binPath, args, {
+  const childProcess = spawn(binPath, args, {
     env: {
       ...process.env,
       "LSC_RUNTIME": runtimePath,
       "LSC_STD": stdPath,
     },
     stdio: 'inherit',
+  });
+
+  // pass through the exit code
+  childProcess.on('exit', (code) => {
+    process.exit(code);
   });
 }
 
