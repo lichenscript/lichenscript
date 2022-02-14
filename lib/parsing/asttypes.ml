@@ -116,15 +116,6 @@ module BinaryOp = struct
   
 end
 
-module UpdateOp = struct
-
-  type t =
-    | Increase
-    | Decrease
-    [@@deriving show]
-  
-end
-
 type visibility =
   | Pvisibility_public
   | Pvisibility_protected

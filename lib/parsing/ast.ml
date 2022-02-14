@@ -104,7 +104,6 @@ and Expression : sig
     | Index of t * t
     | Unary of Asttypes.UnaryOp.t * t
     | Binary of Asttypes.BinaryOp.t * t * t
-    | Update of Asttypes.UpdateOp.t * t * bool (* prefix *)
     | Assign of Asttypes.AssignOp.t option * t * t
     | Block of Block.t
     | Init of init

@@ -1172,50 +1172,8 @@ and parse_unary_expression env: Expression.t =
     parse_update_expression env
 
 and parse_update_expression env : Expression.t =
-  let open Expression in
-  let token_to_op =
-    let open Asttypes.UpdateOp in
-    function
-      | Token.T_INCR -> Increase
-      | Token.T_DECR -> Decrease
-      | _ -> failwith "unreachable"
-  in
-  let next = Peek.token env in
-  match next with
-  | Token.T_INCR
-  | Token.T_DECR ->
-    begin
-      let start_loc = Peek.loc env in
-      Eat.token env;
-      let expr = parse_unary_expression env in
-      let op = token_to_op next in
-      let spec = Update(op, expr, true) in
-      {
-        spec;
-        loc = with_start_loc env start_loc;
-        attributes = [];
-      }
-    end
-  | _ ->
-    let start_loc = Peek.loc env in
-    let expr = parse_left_handside_expression_allow_call env in
-    let next = Peek.token env in
-    match next with
-    | Token.T_INCR
-    | Token.T_DECR ->
-      begin
-        Eat.token env;
-        let op = token_to_op next in
-        let spec = Update(op, expr, false) in
-        {
-          spec;
-          loc = with_start_loc env start_loc;
-          attributes = [];
-        }
-      end
-
-    | _ ->
-      expr
+  let expr = parse_left_handside_expression_allow_call env in
+  expr
 
 and parse_arguments env =
   let result = ref [] in

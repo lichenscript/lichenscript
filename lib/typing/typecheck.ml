@@ -850,7 +850,6 @@ and check_expression env expr =
 
   | This
   | Super -> ()
-  | _ -> failwith "unexpected"
 
 and check_match_exhausted env _match =
   let open T.Expression in

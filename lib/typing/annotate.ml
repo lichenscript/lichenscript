@@ -357,8 +357,6 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       id, (T.Expression.Binary(op, left, right))
     )
 
-    | Update _ -> -1, failwith "not implemented"
-
     (*
      * 1. assigning to local vars: a = 3
      * 2. assigning to member:

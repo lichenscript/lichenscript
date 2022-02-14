@@ -99,9 +99,6 @@ module%gen rec Expression : sig
     | Binary of
       Asttypes.BinaryOp.t * t * t
 
-    | Update of
-      Asttypes.UpdateOp.t * t * bool
-
     | Assign of Asttypes.AssignOp.t option * t * t
     | Block of Block.t
     | Init of init

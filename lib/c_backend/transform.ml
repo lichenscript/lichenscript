@@ -1119,8 +1119,6 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         C_op.Expr.I32Binary(op, left'.expr, right'.expr)
     )
 
-    | Update _ -> failwith "update"
-
     (*
      * There are a lot of cases of assignment.
      *
