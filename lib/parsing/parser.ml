@@ -1366,32 +1366,37 @@ and parse_primary_expression env : Expression.t =
 
       | Token.T_MATCH -> (
         Eat.token env;
-        let continue_parse_body match_expr =
-          let relaxed_block = parse_relaxed_kv_block env in
-          Parser_helper.cast_relaxed_block_into_match ~start_loc match_expr relaxed_block
-        in
-        match (Peek.token env) with
-        | Token.T_IDENTIFIER _ -> (
-          let id = parse_identifier env in
-          let relaxed_block = parse_relaxed_kv_block env in
-          (* init and match *)
-          if (Peek.token env) = Token.T_LCURLY then (
-            let init = Parser_helper.cast_relaxed_block_into_init ~start_loc ~init_name:id relaxed_block in
-            continue_parse_body init
-          ) else (
-            let id_expr = {
-              Expression.
-              spec = Identifier id;
-              loc = id.pident_loc;
-              attributes = [];
-            } in
-            Parser_helper.cast_relaxed_block_into_match ~start_loc id_expr relaxed_block
-          )
-        )
+        let match_expr = Parser_env.with_allow_init env false parse_expression in
+        let match_clauses = ref [] in
+        Expect.token env Token.T_LCURLY;
 
-        | _ ->
-          let match_expr = parse_expression env in
-          continue_parse_body match_expr
+        while (Peek.token env) <> Token.T_RCURLY do
+          Expect.token env Token.T_CASE;
+          let pat = parse_pattern env in
+
+          Expect.token env Token.T_ARROW;
+
+          let clause_consequent = parse_expression env in
+
+          (* if (Peek.token env) <> Token.T_RCURLY then (
+            Expect.token env Token.T_COMMA;
+          ); *)
+
+          let clause = {
+            Expression.
+            clause_pat = pat;
+            clause_consequent;
+            clause_loc = with_start_loc env start_loc;
+          } in
+          match_clauses := clause::(!match_clauses);
+        done;
+
+        Expect.token env Token.T_RCURLY;
+        Match {
+          match_expr;
+          match_clauses = List.rev !match_clauses;
+          match_loc = with_start_loc env start_loc;
+        }
       )
 
       | Token.T_THIS ->
@@ -1452,68 +1457,6 @@ and parse_expression_if env =
 
 and parse_group_expression env =
   parse_maybe_arrow_function env
-
-and parse_relaxed_kv_block env = 
-  let has_case = ref false in
-  let parse_releaxed_kv env =
-    let start_loc = Peek.loc env in
-    let open Parser_helper in
-    match (Peek.token env) with
-    | Token.T_ELLIPSIS -> (
-      Eat.token env;
-      let expr = parse_expression env in
-      Relaxed_spread(start_loc, expr)
-    )
-    | _ -> (
-      let relaxed_case_prefix =
-        match (Peek.token env) with
-        | Token.T_CASE ->
-          Eat.token env;
-          has_case := true;
-          true;
-        | _ -> false
-      in
-      let relaxed_key = parse_pattern env in
-      let relaxed_op = Peek.token env in
-      (match relaxed_op with
-      | Token.T_COLON
-      | Token.T_ARROW -> ()
-      | _ -> (
-        let perr_spec = Parser_env.get_unexpected_error (Peek.token env) in
-        let err = Parse_error.error {
-          perr_spec;
-          perr_loc = with_start_loc env start_loc;
-        } in
-        Parse_error.error err
-      ));
-      Eat.token env;
-      let relaxed_value = parse_expression env in
-      Relaxed_node {
-        relaxed_case_prefix;
-        relaxed_key;
-        relaxed_op;
-        relaxed_value;
-        relaxed_kv_loc = with_start_loc env start_loc;
-      }
-    )
-  in
-  let start_loc = Peek.loc env in
-  let entries = ref [] in
-  Expect.token env Token.T_LCURLY;
-
-  while (Peek.token env) <> Token.T_RCURLY do
-    let kv = parse_releaxed_kv env in
-    entries := kv::!entries;
-    if not (!has_case) && (Peek.token env) = Token.T_COMMA then (
-      Eat.token env
-    )
-  done;
-
-  Expect.token env Token.T_RCURLY;
-  { Parser_helper.
-    entries = List.rev !entries;
-    loc = with_start_loc env start_loc;
-  }
 
 and parse_pattern env : Pattern.t =
   let open Pattern in
