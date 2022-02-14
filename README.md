@@ -41,6 +41,16 @@ It's designed to be lightweight, easy to compile to target platform with very sm
 - Game development
 - Mini-program environment
 
+# Prerequisite
+
+macOS:
+
+- Install [XCode](https://developer.apple.com/xcode/)
+
+Linux:
+
+- Install [gcc](https://gcc.gnu.org/) or [clang](https://clang.llvm.org/)
+
 # Install
 
 ```
@@ -83,6 +93,10 @@ lsc run --platform wasm32 ./main.lc
 The documentation is still work in progress.
 
 Check [Examples](./examples/).
+
+# VSCode Extension
+
+Intall [lichenscript-vscode](https://github.com/vincentdchan/lichenscript-vscode) from the extension store.
 
 # Roadmap
 
