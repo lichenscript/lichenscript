@@ -45,6 +45,21 @@ module Bin = struct
     | Xor -> "LC_I32_XOR"
     | BitAnd -> "LC_I32_BIT_AND"
 
+  let prim_f32 (op: Asttypes.BinaryOp.t) =
+    match op with
+    | Equal -> "LC_F32_EQ"
+    | NotEqual -> "LC_F32_NOT_EQ"
+    | LessThan -> "LC_F32_LT"
+    | LessThanEqual -> "LC_F32_LTEQ"
+    | GreaterThan -> "LC_F32_GT"
+    | GreaterThanEqual -> "LC_F32_GTEQ"
+    | Plus -> "LC_F32_PLUS"
+    | Minus -> "LC_F32_MINUS"
+    | Mult -> "LC_F32_MULT"
+    | Div -> "LC_F32_DIV"
+    | Mod -> "LC_I32_MOD"
+    | _ -> failwith "unsupport binary op for f32"
+
   let to_cmp (op: Asttypes.BinaryOp.t) =
     match op with
     | Equal -> "LC_CMP_EQ"

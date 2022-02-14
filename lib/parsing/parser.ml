@@ -1260,9 +1260,13 @@ and parse_literal env =
   let start_loc = Peek.loc env in
   let next = Peek.token env in
   match next with
-  | Token.T_NUMBER { raw; _ } ->
+  | Token.T_NUMBER { raw; _ } -> (
     Eat.token env;
-    Literal.Integer (raw, None)
+    if String.contains raw '.' then
+      Literal.Float (raw, None)
+    else
+      Literal.Integer (raw, None)
+  )
 
   | Token.T_CHAR(_, ch, _) ->
     Eat.token env;

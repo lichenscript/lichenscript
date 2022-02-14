@@ -5,9 +5,5 @@ function main() {
         a - b
     });
 
-    let index = 0;
-    while index < arr.length {
-        print(arr[index]);
-        index += 1;
-    }
+    print(arr);
 }

@@ -516,6 +516,16 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ")"
   )
 
+  | F32Binary(op, left, right) -> (
+    let name = Primitives.Bin.prim_f32 op in
+    ps env name;
+    ps env "(";
+    codegen_expression env left;
+    ps env ", ";
+    codegen_expression env right;
+    ps env ")"
+  )
+
   | Assign(Expr.Ident name, right) -> (
     (* TODO: release the left, retain the right *)
     (match name with

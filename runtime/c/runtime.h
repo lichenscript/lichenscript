@@ -145,6 +145,19 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 #define LC_I32_RIGHT_SHIFT(l, r) MK_I32((l).int_val >> (r).int_val)
 #define LC_I32_BIT_OR(l, r) MK_I32((l).int_val | (r).int_val)
 #define LC_I32_BIT_AND(l, r) MK_I32((l).int_val & (r).int_val)
+
+#define LC_F32_EQ(l, r) MK_BOOL((l).float_val == (r).float_val)
+#define LC_F32_NOT_EQ(l, r) MK_BOOL((l).float_val != (r).float_val)
+#define LC_F32_LT(l, r) MK_BOOL((l).float_val < (r).float_val)
+#define LC_F32_LTEQ(l, r) MK_BOOL((l).float_val <= (r).float_val)
+#define LC_F32_GT(l, r) MK_BOOL((l).float_val > (r).float_val)
+#define LC_F32_GTEQ(l, r) MK_BOOL((l).float_val >= (r).float_val)
+#define LC_F32_PLUS(l, r) MK_F32((l).float_val + (r).float_val)
+#define LC_F32_MINUS(l, r) MK_F32((l).float_val - (r).float_val)
+#define LC_F32_MULT(l, r) MK_F32((l).float_val * (r).float_val)
+#define LC_F32_DIV(l, r) MK_F32((l).float_val / (r).float_val)
+#define LC_F32_MOD(l, r) MK_F32((l).float_val % (r).float_val)
+
 #define LCCast(v, CNAME) ((CNAME)((v).ptr_val))
 
 #endif
@@ -184,7 +197,7 @@ typedef struct LCBox64 {
         int64_t  i64;
         uint64_t u64;
         double   f64;
-    };
+    } u;
 } LCBox64;
 
 typedef struct LCMallocState {
@@ -203,6 +216,9 @@ typedef struct LCProgram {
     LCRuntime* runtime;
     LCCFunction main_fun;
 } LCProgram;
+
+LCValue LCNewI64(LCRuntime* rt, int64_t val);
+LCValue LCNewF64(LCRuntime* rt, double val);
 
 LCValue LCRunMain(LCProgram* program);
 

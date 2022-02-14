@@ -212,7 +212,7 @@ static LCValue* init_i64_pool(LCRuntime* rt) {
     for (i = 0; i < I64_POOL_SIZE; i++) {
         int val = I64_POOL_SIZE / 2 - i;
         LCBox64* ptr = rt->i64_pool_space + i;
-        ptr->i64 = val;
+        ptr->u.i64 = val;
         ptr->header.count = LC_NO_GC;
         result[i].tag = LC_TY_BOXED_I64;
         result[i].ptr_val = (LCObject*)ptr;
@@ -1117,6 +1117,26 @@ LCValue LCNewSymbol(LCRuntime* rt, const char* content) {
     return LCNewSymbolLen(rt, content, strlen(content));
 }
 
+LCValue LCNewI64(LCRuntime* rt, int64_t val) {
+    LCBox64* ptr = (LCBox64*)lc_malloc(rt, sizeof(LCBox64));
+
+    ptr->header.class_id = 0;
+    ptr->header.count = 1;
+    ptr->u.i64 = val;
+
+    return (LCValue) { { .ptr_val = (LCObject*)ptr }, LC_TY_BOXED_I64 };
+}
+
+LCValue LCNewF64(LCRuntime* rt, double val) {
+    LCBox64* ptr = (LCBox64*)lc_malloc(rt, sizeof(LCBox64));
+
+    ptr->header.class_id = 0;
+    ptr->header.count = 1;
+    ptr->u.f64 = val;
+
+    return (LCValue) { { .ptr_val = (LCObject*)ptr }, LC_TY_BOXED_I64 };
+}
+
 LCValue LCRunMain(LCProgram* program) {
     if (program->main_fun == NULL) {
         return MK_NULL();
@@ -1134,6 +1154,8 @@ static void std_print_string(LCRuntime* rt, LCString* str) {
     printf("%s", space);
     lc_free(rt, space);
 }
+
+void std_print_array(LCRuntime* rt, LCValue val);
 
 static void std_print_val(LCRuntime* rt, LCValue val) {
     switch (val.tag)
@@ -1165,11 +1187,43 @@ static void std_print_val(LCRuntime* rt, LCValue val) {
     case LC_TY_STRING:
         std_print_string(rt, (LCString*)val.ptr_val);
         break;
+
+    case LC_TY_BOXED_I64:
+        printf("%lld", ((LCBox64*)val.ptr_val)->u.i64);
+        break;
+
+    case LC_TY_BOXED_F64:
+        printf("%lf", ((LCBox64*)val.ptr_val)->u.f64);
+        break;
+
+    case LC_TY_ARRAY:
+        std_print_array(rt, val);
+        break;
+
+    case LC_TY_MAP:
+        printf("Map");
+        break;
     
     default:
         break;
     }
 
+}
+
+void std_print_array(LCRuntime* rt, LCValue val) {
+    LCArray* arr = (LCArray*)val.ptr_val;
+    uint32_t i;
+
+    printf("[");
+
+    for (i = 0; i < arr->len; i++) {
+        std_print_val(rt, arr->data[i]);
+        if (i < arr->len - 1) {
+            printf(", ");
+        }
+    }
+
+    printf("]");
 }
 
 LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def) {
