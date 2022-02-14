@@ -41,52 +41,9 @@ It's designed to be lightweight, easy to compile to target platform with very sm
 - Game development
 - Mini-program environment
 
-# Prerequisite
+# Get started
 
-macOS:
-
-- Install [XCode](https://developer.apple.com/xcode/)
-
-Linux:
-
-- Install [gcc](https://gcc.gnu.org/) or [clang](https://clang.llvm.org/)
-
-# Install
-
-```
-npm install -g lichenscript
-```
-
-# Quick Start
-
-Make a new directory, and create a file named `main.lc` in it.
-
-Coding in this file:
-
-```
-function main() {
-    print("Hello World");
-    print("你好世界");
-}
-```
-
-Execute the command to run:
-
-```shell
-lsc run ./main.lc
-```
-
-## Build the WebAssembly version:
-
-Make sure you have installed [Emscripten](https://emscripten.org/)
-and [Node.js](https://nodejs.org/).
-And make sure `emcc` is available in your shell.
-
-Execute the command:
-
-```shell
-lsc run --platform wasm32 ./main.lc
-```
+Follow the [documents](https://docs.lichenscript.com/get-started).
 
 # Syntaxes
 
