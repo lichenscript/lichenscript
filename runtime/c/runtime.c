@@ -1127,6 +1127,57 @@ LCValue LCNewI64(LCRuntime* rt, int64_t val) {
     return (LCValue) { { .ptr_val = (LCObject*)ptr }, LC_TY_BOXED_I64 };
 }
 
+LCValue LCI64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue right) {
+    LCBox64* left_ptr = (LCBox64*)left.ptr_val;
+    LCBox64* right_ptr = (LCBox64*)right.ptr_val;
+    int64_t result = 0;
+
+    switch (op) {
+        case LC_ARTH_PLUS:
+            result = left_ptr->u.i64 + right_ptr->u.i64;
+            break;
+
+        case LC_ARTH_MINUS:
+            result = left_ptr->u.i64 - right_ptr->u.i64;
+            break;
+
+        case LC_ARTH_MULT:
+            result = left_ptr->u.i64 * right_ptr->u.i64;
+            break;
+
+        case LC_ARTH_DIV:
+            result = left_ptr->u.i64 / right_ptr->u.i64;
+            break;
+
+        case LC_ARTH_MOD:
+            result = left_ptr->u.i64 % right_ptr->u.i64;
+            break;
+
+        case LC_ARTH_LSHIFT:
+            result = left_ptr->u.i64 << right_ptr->u.i64;
+            break;
+
+        case LC_ARTH_RSHIFT:
+            result = left_ptr->u.i64 >> right_ptr->u.i64;
+            break;
+
+        case LC_ARTH_BIT_OR:
+            result = left_ptr->u.i64 | right_ptr->u.i64;
+            break;
+
+        case LC_ARTH_BIT_XOR:
+            result = left_ptr->u.i64 ^ right_ptr->u.i64;
+            break;
+
+        case LC_ARTH_BIT_AND:
+            result = left_ptr->u.i64 & right_ptr->u.i64;
+            break;
+
+    }
+
+    return LCNewI64(rt, result);
+}
+
 LCValue LCNewF64(LCRuntime* rt, double val) {
     LCBox64* ptr = (LCBox64*)lc_malloc(rt, sizeof(LCBox64));
 

@@ -171,7 +171,8 @@ let check_is_primitive_type ~group ctx (left: TypeExpr.t) (right: TypeExpr.t) =
   )
 
 let type_should_not_release ctx expr =
-  let group = [| "unit"; "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "char"; "boolean" |] in
+  (* i64/f64 should not release on 64bit platform *)
+  let group = [| "unit"; "i32"; "u32"; "f32"; "char"; "boolean" |] in
   let expr = Type_context.deref_type ctx expr in
   let expr_def_opt = find_construct_of ctx expr in
   (match expr_def_opt with
