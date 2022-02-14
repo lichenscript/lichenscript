@@ -1291,6 +1291,31 @@ LCValue lc_std_array_resize(LCRuntime* rt, LCValue this, int arg_len, LCValue* a
     return MK_NULL();
 }
 
+typedef struct lc_sort_ctx {
+    LCRuntime* rt;
+    LCValue lambda;
+} lc_sort_ctx;
+
+static int lc_cmp_generic(void* ptr, const void* a, const void* b) {
+    lc_sort_ctx* ctx = (lc_sort_ctx*)ptr;
+    LCValue ret;
+    LCValue* val_a = (LCValue*)a;
+    LCValue* val_b = (LCValue*)b;
+
+    ret = LCEvalLambda(ctx->rt, ctx->lambda, 0, (LCValue[]) { *val_a, *val_b });
+
+    return ret.int_val;
+}
+
+LCValue lc_std_array_sort(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    lc_sort_ctx ctx = { rt, args[0] };
+    LCArray* arr = (LCArray*)this.ptr_val;
+
+    qsort_r(arr->data, arr->len, sizeof(LCValue), &ctx, lc_cmp_generic);
+
+    return MK_NULL();
+}
+
 LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
     LCArray* arr = (LCArray*)this.ptr_val;
 

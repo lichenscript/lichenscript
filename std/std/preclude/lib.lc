@@ -27,6 +27,9 @@ public class Array<T> {
     @external("lc_std_array_resize")
     declare resize(newLen: i32, item: T);
 
+    @external("lc_std_array_sort")
+    declare sort(cmp: (a: T, b: T) => i32);
+
     @external("lc_std_array_get_length")
     declare get length(): i32;
 

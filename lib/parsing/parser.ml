@@ -1040,6 +1040,9 @@ and parse_relaxed_arrow env : ReleaxedArrow.t =
 
   while (Peek.token env) <> Token.T_RPAREN do
     let param = parse_relaxed_param () in
+    if (Peek.token env) = Token.T_COMMA then (
+      Eat.token env
+    );
     params := param::!params
   done;
 

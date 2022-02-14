@@ -310,7 +310,19 @@ let rec replace_type_vars_with_maps ctx type_map type_expr =
     replace_type_vars_with_maps ctx type_map node.value
   )
 
-  | Lambda _ -> type_expr
+  | Lambda (params, ret) -> (
+    let { params_content; params_rest } = params in
+    let params_content = List.map
+      ~f:(fun (name, t) -> (name, replace_type_vars_with_maps ctx type_map t))
+      params_content
+    in
+    let params_rest = Option.map
+      ~f:(fun (name, t) -> (name, replace_type_vars_with_maps ctx type_map t))
+      params_rest
+    in
+    let ret = replace_type_vars_with_maps ctx type_map ret in
+    Lambda ({ params_content; params_rest }, ret)
+  )
 
   | Method _ -> type_expr
 
