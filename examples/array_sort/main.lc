@@ -1,9 +1,7 @@
 
 function main() {
     const arr = [3, 2, 1, 4, 5];
-    arr.sort((a: i32, b: i32): i32 => {
-        a - b
-    });
+    arr.sort((a: i32, b: i32): i32 => a - b);
 
     print(arr);
 }
