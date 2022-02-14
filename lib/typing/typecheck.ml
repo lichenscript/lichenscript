@@ -439,6 +439,36 @@ and check_expression env expr =
       )
     in
 
+    let check_enum_ctor_params symbol_map (params: TypeExpr.t list) =
+      let pass_params = List.to_array call_params in
+      let expected_params = List.to_array params in
+
+      let symbol_map = ref symbol_map in
+
+      for i = 0 to ((Array.length expected_params) - 1) do
+        let expect_param = Array.get expected_params i in
+        let pass_param = Array.get pass_params i in
+        let pass_param_type = Type_context.deref_node_type env.ctx pass_param.ty_var in
+        match expect_param with
+        | TypeExpr.TypeSymbol sym_name ->
+          symbol_map := Check_helper.TypeVarMap.set !symbol_map ~key:sym_name ~data:pass_param_type
+
+        | _ ->
+          let expect_param_name = Int.to_string i in
+          if i >= (Array.length pass_params) then (
+            let err = Type_error.(make_error env.ctx expr_loc (ParamDoesNotProvided expect_param_name)) in
+            raise (Type_error.Error err)
+          );
+          let pass_param_type = Type_context.deref_node_type env.ctx pass_param.ty_var in
+          if not (Check_helper.type_assinable env.ctx expect_param pass_param_type) then (
+            let err = Type_error.(make_error env.ctx expr_loc (CannotPassParam(expect_param_name, expect_param, pass_param_type))) in
+            raise (Type_error.Error err)
+          )
+      done;
+
+      !symbol_map
+    in
+
     match deref_type_expr with
     | TypeExpr.Lambda(params, ret) -> (
       check_params params;
@@ -460,10 +490,26 @@ and check_expression env expr =
 
         | TypeExpr.TypeDef { TypeDef. spec = EnumCtor enum_ctor; _} -> (
           let super_id = enum_ctor.enum_ctor_super_id in
-          let params_types = List.map
-            ~f:(fun param -> Type_context.deref_node_type ctx param.ty_var)
-            call_params
+
+          let symbol_map = check_enum_ctor_params Check_helper.TypeVarMap.empty enum_ctor.enum_ctor_params in
+
+          let enum_base_node = Type_context.deref_node_type env.ctx super_id in
+          let unwrap_enum_base =
+            match enum_base_node with
+            | TypeExpr.TypeDef { TypeDef. spec = Enum enum; _ } -> enum
+            | _ -> failwith "unrechable"
           in
+
+          let params_types =
+            List.map
+              ~f:(fun name ->
+                match Check_helper.TypeVarMap.find symbol_map name with
+                | Some ty -> ty
+                | None -> TypeExpr.TypeSymbol name
+              )
+              unwrap_enum_base.enum_params
+          in
+
           Type_context.update_node_type ctx expr.ty_var (TypeExpr.Ctor (Ref super_id, params_types))
         )
 
