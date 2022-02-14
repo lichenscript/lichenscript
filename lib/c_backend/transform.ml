@@ -205,6 +205,12 @@ type t = {
   mutable lambdas: C_op.Decl.t list;
 }
 
+let[@warning "-unused-value-declaration"] is_identifier expr =
+  let open Typedtree.Expression in
+  match expr.spec with
+  | Typedtree.Expression.Identifier _ -> true
+  | _ -> false
+
 let push_scope env (scope: TScope.t) =
   let scope = {
     scope with
@@ -650,31 +656,28 @@ and auto_release_expr env ?(is_move=false) ~append_stmts ty_var expr =
     assign_expr
   )
 
-and prepend_expr env ~is_borrow ~prepend_stmts ~append_stmts expr =
-  if is_borrow then expr
-  else begin
-    let tmp_id = env.tmp_vars_count in
-    env.tmp_vars_count <- env.tmp_vars_count + 1;
+and prepend_expr env ~prepend_stmts ~append_stmts (expr: expr_result) =
+  let tmp_id = env.tmp_vars_count in
+  env.tmp_vars_count <- env.tmp_vars_count + 1;
 
-    let assign_expr = C_op.Expr.Assign(
-      (Ident (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"))),
-      expr
-    ) in
+  let assign_expr = C_op.Expr.Assign(
+    (Ident (C_op.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"))),
+    expr.expr
+  ) in
 
-    let prepend_stmt = {
-      C_op.Stmt.
-      spec = Expr assign_expr;
-      loc = Loc.none;
-    } in
+  let prepend_stmt = {
+    C_op.Stmt.
+    spec = Expr assign_expr;
+    loc = Loc.none;
+  } in
 
-    prepend_stmts := List.append !prepend_stmts [prepend_stmt];
+  prepend_stmts := List.append !prepend_stmts [prepend_stmt];
 
-    let result = C_op.Expr.Temp tmp_id in
+  let result = C_op.Expr.Temp tmp_id in
 
-    append_stmts := (gen_release_temp tmp_id)::!append_stmts;
+  append_stmts := (gen_release_temp tmp_id)::!append_stmts;
 
-    result
-  end
+  result
 
 and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
   let open Expression in
@@ -1267,11 +1270,11 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
               }]
             | InitSpread spread_expr -> (
               let transformed_spread = transform_expression ~is_move:true env spread_expr in
-              prepend_stmts := List.append !prepend_stmts transformed_spread.prepend_stmts;
-              append_stmts := List.append !append_stmts transformed_spread.append_stmts;
-              let spread_expr' = prepend_expr env ~is_borrow:false
-                ~prepend_stmts ~append_stmts
-                transformed_spread.expr
+              let spread_expr' =
+                if is_identifier spread_expr then
+                  transformed_spread.expr
+                else
+                  prepend_expr env ~prepend_stmts ~append_stmts transformed_spread
               in
               transform_spreading_init env tmp_id spread_expr.ty_var spread_expr'
             )
@@ -1315,7 +1318,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       C_op.Expr.Temp tmp_id
 
     | Match _match ->
-      transform_pattern_matching env ~prepend_stmts ~loc ~ty_var _match
+      transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _match
 
     | This -> (
       if TScope.is_in_lambda env.scope then
@@ -1353,10 +1356,16 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     append_stmts = !append_stmts;
   }
 
-and transform_pattern_matching env ~prepend_stmts ~loc ~ty_var _match =
+and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _match =
   let open Typedtree.Expression in
   let { match_expr; match_clauses; _ } = _match in
-  let match_expr = transform_expression ~is_borrow:true env match_expr in
+  let transformed_expr = transform_expression ~is_borrow:true env match_expr in
+  let match_expr =
+    if is_identifier match_expr then
+      transformed_expr.expr
+    else
+      prepend_expr env ~prepend_stmts ~append_stmts (transform_expression ~is_borrow:true env match_expr)
+  in
   let result_tmp = env.tmp_vars_count in
   env.tmp_vars_count <- env.tmp_vars_count + 1;
 
@@ -1559,7 +1568,7 @@ and transform_pattern_matching env ~prepend_stmts ~loc ~ty_var _match =
         [done_stmt];
       ] in
 
-      let pm_meta = transform_pattern_to_test match_expr.expr clause.clause_pat in
+      let pm_meta = transform_pattern_to_test match_expr clause.clause_pat in
       let pm_stmts = pm_meta consequent in
 
       prepend_stmts := List.append
