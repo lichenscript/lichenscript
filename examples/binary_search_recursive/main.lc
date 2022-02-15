@@ -4,7 +4,7 @@ function binarySearchRecursive(data: i32[], key: i32, low: i32, high: i32): Opti
         return None;
     }
 
-    let mid = low + (high - low) / 2;
+    const mid = low + (high - low) / 2;
 
     if key == data[mid] {
         Some(mid)

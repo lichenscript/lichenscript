@@ -156,7 +156,6 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 #define LC_F32_MINUS(l, r) MK_F32((l).float_val - (r).float_val)
 #define LC_F32_MULT(l, r) MK_F32((l).float_val * (r).float_val)
 #define LC_F32_DIV(l, r) MK_F32((l).float_val / (r).float_val)
-#define LC_F32_MOD(l, r) MK_F32((l).float_val % (r).float_val)
 
 #define LCCast(v, CNAME) ((CNAME)((v).ptr_val))
 
@@ -222,6 +221,8 @@ LCValue LCNewI64(LCRuntime* rt, int64_t val);
 LCValue LCI64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue right);
 
 LCValue LCNewF64(LCRuntime* rt, double val);
+
+LCValue LCF64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue right);
 
 LCValue LCRunMain(LCProgram* program);
 

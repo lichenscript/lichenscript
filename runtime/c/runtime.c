@@ -1188,6 +1188,36 @@ LCValue LCNewF64(LCRuntime* rt, double val) {
     return (LCValue) { { .ptr_val = (LCObject*)ptr }, LC_TY_BOXED_I64 };
 }
 
+LCValue LCF64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue right) {
+    LCBox64* left_ptr = (LCBox64*)left.ptr_val;
+    LCBox64* right_ptr = (LCBox64*)right.ptr_val;
+    double result = 0;
+
+    switch (op) {
+        case LC_ARTH_PLUS:
+            result = left_ptr->u.f64 + right_ptr->u.f64;
+            break;
+
+        case LC_ARTH_MINUS:
+            result = left_ptr->u.f64 - right_ptr->u.f64;
+            break;
+
+        case LC_ARTH_MULT:
+            result = left_ptr->u.f64 * right_ptr->u.f64;
+            break;
+
+        case LC_ARTH_DIV:
+            result = left_ptr->u.f64 / right_ptr->u.f64;
+            break;
+
+        default:
+            break;
+
+    }
+
+    return LCNewF64(rt, result);
+}
+
 LCValue LCRunMain(LCProgram* program) {
     if (program->main_fun == NULL) {
         return MK_NULL();
