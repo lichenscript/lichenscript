@@ -45,6 +45,20 @@ module Bin = struct
     | Xor -> "LC_I32_XOR"
     | BitAnd -> "LC_I32_BIT_AND"
 
+  let to_arithmetic_op (op: Asttypes.BinaryOp.t) =
+    match op with
+    | Plus -> "LC_ARTH_PLUS"
+    | Minus -> "LC_ARTH_MINUS"
+    | Mult -> "LC_ARTH_MULT"
+    | Div -> "LC_ARTH_DIV"
+    | Mod -> "LC_ARTH_MOD"
+    | LShift -> "LC_ARTH_LSHIFT"
+    | RShift -> "LC_ARTH_RSHIFT"
+    | BitOr -> "LC_ARTH_BIT_OR"
+    | Xor -> "LC_ARTH_BIT_XOR"
+    | BitAnd -> "LC_I32_BIT_AND"
+    | _ -> failwith "unsupport binary op for f32"
+
   let prim_f32 (op: Asttypes.BinaryOp.t) =
     match op with
     | Equal -> "LC_F32_EQ"

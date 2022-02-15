@@ -516,10 +516,30 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ")"
   )
 
+  | I64Binary(op, left, right) -> (
+    ps env "LCI64Binary(rt, ";
+    ps env (Primitives.Bin.to_arithmetic_op op);
+    ps env ", ";
+    codegen_expression env left;
+    ps env ", ";
+    codegen_expression env right;
+    ps env ")"
+  )
+
   | F32Binary(op, left, right) -> (
     let name = Primitives.Bin.prim_f32 op in
     ps env name;
     ps env "(";
+    codegen_expression env left;
+    ps env ", ";
+    codegen_expression env right;
+    ps env ")"
+  )
+
+  | F64Binary(op, left, right) -> (
+    ps env "LCF64Binary(rt, ";
+    ps env (Primitives.Bin.to_arithmetic_op op);
+    ps env ", ";
     codegen_expression env left;
     ps env ", ";
     codegen_expression env right;

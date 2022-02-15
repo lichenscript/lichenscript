@@ -282,7 +282,11 @@ let is_unit = is_primitive_with_name ~name:"unit"
 
 let is_i32 = is_primitive_with_name ~name:"i32"
 
+let is_i64 = is_primitive_with_name ~name:"i64"
+
 let is_f32 = is_primitive_with_name ~name:"f32"
+
+let is_f64 = is_primitive_with_name ~name:"f64"
 
 let is_char = is_primitive_with_name ~name:"char"
 

@@ -1120,7 +1120,11 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       | _ -> (
         let node_type = Type_context.deref_node_type env.ctx ty_var in
-        if Check_helper.is_f32 env.ctx node_type then
+        if Check_helper.is_i64 env.ctx node_type then
+          C_op.Expr.I64Binary(op, left'.expr, right'.expr)
+        else if Check_helper.is_f64 env.ctx node_type then
+          C_op.Expr.F64Binary(op, left'.expr, right'.expr)
+        else if Check_helper.is_f32 env.ctx node_type then
           C_op.Expr.F32Binary(op, left'.expr, right'.expr)
         else
           C_op.Expr.I32Binary(op, left'.expr, right'.expr)

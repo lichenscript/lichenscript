@@ -142,6 +142,8 @@ and Expr : sig
   | ArrayGetValue of (t * t)
   | I32Binary of Asttypes.BinaryOp.t * t * t
   | F32Binary of Asttypes.BinaryOp.t * t * t
+  | I64Binary of Asttypes.BinaryOp.t * t * t
+  | F64Binary of Asttypes.BinaryOp.t * t * t
   | CallLambda of t * t list
   | Call of int * t list
   | Invoke of t * string * t list
