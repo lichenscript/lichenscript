@@ -615,20 +615,25 @@ and transform_statement ?ret env stmt =
   | Debugger -> []
 
   | Return ret_opt -> (
-    let ret =
-      Option.map ~f:(transform_return_expr ~ret:"ret") ret_opt
-      |> Option.value ~default:[]
-    in
-    let ret_stmt = { C_op.Stmt.
-      spec = Return (Some (C_op.Expr.Ident (C_op.SymLocal "ret")));
-      loc;
-    } in
     let cleanup = generate_finalize_stmts_function env.scope in
-    List.concat [
-      ret;
-      cleanup;
-      [ret_stmt];
-    ]
+    match ret_opt with
+    | Some ret ->
+      let ret = transform_return_expr ~ret:"ret" ret in
+      let ret_stmt = { C_op.Stmt.
+        spec = Return (Some (C_op.Expr.Ident (C_op.SymLocal "ret")));
+        loc;
+      } in
+      List.concat [
+        ret;
+        cleanup;
+        [ret_stmt];
+      ]
+    | None ->
+      let ret_stmt = { C_op.Stmt.
+        spec = Return (Some C_op.Expr.Null);
+        loc;
+      } in
+      List.append cleanup [ret_stmt]
   )
 
   | Empty -> []

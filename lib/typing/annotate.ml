@@ -135,7 +135,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
         [ty_var], (T.Statement.Return (Some expr))
       )
 
-      | None -> [], (T.Statement.Return None)
+      | None -> prev_deps, (T.Statement.Return None)
     )
 
     | Empty ->
