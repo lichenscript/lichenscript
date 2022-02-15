@@ -112,6 +112,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       )
 
       | Literal _
+      | Array _
       | EnumCtor _ -> (
         let err = Type_error.(make_error (Env.ctx env) binding_loc (CannotBindingOfPattern "enum")) in
         raise (Type_error.Error err)
@@ -634,6 +635,10 @@ and prescan_pattern_for_scope ~kind ~(scope: Scope.scope) env pat =
   )
 
   | EnumCtor (_, child_pat) -> prescan_pattern_for_scope ~kind ~scope env child_pat
+  | Array { elements; rest } ->
+    List.iter ~f:(prescan_pattern_for_scope ~kind ~scope env) elements;
+    Option.iter ~f:(prescan_pattern_for_scope ~kind ~scope env) rest
+
   | _ -> ()
 
 and annotate_block_impl ~prev_deps env block : T.Block.t =
@@ -1296,6 +1301,29 @@ and annotate_pattern ~pat_id env pat : (T.Pattern.t * int list) =
         (id.pident_name, ctor_var.var_id),
         param_pat
       ))
+    )
+
+    | Array array_pat -> (
+      let { elements; rest; } = array_pat in
+      
+      let elements, element_deps =
+        elements
+        |> List.map ~f:(annotate_pattern ~pat_id:(pat_id + 1) env)
+        |> List.unzip
+      in
+
+      let rest, rest_deps =
+        match rest with
+        | Some rest_elm ->
+          let rest, rest_deps = annotate_pattern ~pat_id:(pat_id + 1) env rest_elm in
+          (Some rest), rest_deps
+
+        | None -> None, []
+      in
+
+      deps := List.concat [ element_deps |> List.concat; rest_deps; !deps; ];
+
+      T.Pattern.Array { elements; rest }
     )
 
   in

@@ -170,10 +170,16 @@ end
 
 and Pattern : sig
 
-  type spec =
+  type array_pat = {
+    elements: t list;
+    rest: t option;
+  }
+
+  and spec =
     | Literal of Literal.t
     | Identifier of Identifier.t
     | EnumCtor of (Identifier.t * t)
+    | Array of array_pat
 
   and t = {
     spec: spec;

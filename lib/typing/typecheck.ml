@@ -850,6 +850,24 @@ and check_expression env expr =
 
         | _ -> raise_err ()
       )
+      | Array { elements; rest } -> (
+        let raise_err () =
+          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("array", expr_type))) in
+          raise (Type_error.Error err)
+        in
+        match expr_type with
+        | TypeExpr.Array child_type -> (
+          List.iter ~f:(check_clause_pattern child_type) elements;
+          match rest with
+          | Some rest ->
+            check_clause_pattern expr_type rest
+
+          | None -> ()
+        )
+
+        | _ -> raise_err ()
+      )
+
     in
 
     let { match_expr; match_clauses; match_loc } = _match in
