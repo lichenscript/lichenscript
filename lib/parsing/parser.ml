@@ -1461,6 +1461,29 @@ and parse_group_expression env =
 and parse_pattern env : Pattern.t =
   let open Pattern in
   let start_loc = Peek.loc env in
+
+  let rec parse_array_pattern_continue elements =
+    match (Peek.token env) with
+    | Token.T_RBRACKET ->
+      Eat.token env;
+      Array { elements = List.rev elements; rest = None }
+
+    | Token.T_ELLIPSIS -> (
+      Eat.token env;
+      let pat = parse_pattern env in
+      Expect.token env Token.T_RBRACKET;
+      Array { elements = List.rev elements; rest = Some pat }
+    )
+
+    | _ ->
+      let pat = parse_pattern env in
+      if (Peek.token env) <> Token.T_RBRACKET then (
+        Expect.token env Token.T_COMMA;
+      );
+      parse_array_pattern_continue (pat::elements)
+
+  in
+
   let next = Peek.token env in
   let spec =
     match next with
@@ -1481,6 +1504,12 @@ and parse_pattern env : Pattern.t =
     | Token.T_FALSE ->
       let l = parse_literal env in
       Literal l
+
+    | Token.T_LBRACKET -> (
+      Eat.token env;
+
+      parse_array_pattern_continue []
+    )
 
     | _ -> (
       let perr_spec = Parser_env.get_unexpected_error next in

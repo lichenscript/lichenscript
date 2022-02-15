@@ -1750,6 +1750,35 @@ LCValue lc_std_array_sort(LCRuntime* rt, LCValue this, int arg_len, LCValue* arg
     return MK_NULL();
 }
 
+LCValue lc_std_array_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    int upper, lower, len, i;
+    LCValue item;
+    LCArray* new_arr;
+    LCArray* arr = (LCArray*)this.ptr_val;
+    lower = args[0].int_val;
+    upper = args[1].int_val;
+
+    lower = max_int(0, lower);
+    upper = min_int(arr->len, upper);
+
+    if (unlikely(lower >= upper)) {
+        return LCNewArrayLen(rt, 0);
+    }
+
+    len = upper - lower;
+    new_arr = LCNewArrayWithCap(rt, len);
+
+    for (i = lower; i < upper; i++) {
+        item = arr->data[i];
+        LCRetain(item);
+        new_arr->data[i - lower] = item;
+    }
+
+    new_arr->len = len;
+
+    return (LCValue) { { .ptr_val = (LCObject*)new_arr },  LC_TY_ARRAY };
+}
+
 LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
     LCArray* arr = (LCArray*)this.ptr_val;
 

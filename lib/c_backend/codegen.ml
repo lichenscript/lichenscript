@@ -625,6 +625,9 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ")"
   )
 
+  | IntValue(NewInt str_val) ->
+    ps env str_val
+
   | IntValue e ->
     ps env "(";
     codegen_expression env e;

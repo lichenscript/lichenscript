@@ -1,0 +1,29 @@
+
+function isOneTwoThree(arr: i32[]): boolean {
+    match arr {
+        case [1,2,3] => true
+        case _ => false
+    }
+}
+
+function isOneTwoThreeMore(arr: i32[]): boolean {
+    match arr {
+        case [1,2,3, ..._] => true
+        case _ => false
+    }
+}
+
+function printRest(arr: i32[]) {
+    match arr {
+        case [1,2,3, ...rest] => print(rest)
+        case _ => {}
+    }
+}
+
+function main() {
+    print(isOneTwoThree([1,2,3]));
+    print(isOneTwoThree([1,2,2]));
+    print(isOneTwoThree([1,2,3,4]));
+    print(isOneTwoThreeMore([1,2,3,4]));
+    printRest([1,2,3,4,5,6]);
+}

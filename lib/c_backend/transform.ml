@@ -1393,6 +1393,13 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
   let tmp_counter = ref [] in
   let label_name = "done_" ^ (Int.to_string ty_var) in
 
+  let is_last_goto stmts =
+    let last_opt = List.last stmts in
+    match last_opt with
+    | Some { C_op.Stmt. spec = Goto _; _ } -> true
+    | _ -> false
+  in
+
   let rec transform_pattern_to_test match_expr pat : PMMeta.t =
     let open Pattern in
     let { spec; _ } = pat in
@@ -1511,13 +1518,6 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
         spec = Release(C_op.Expr.Temp match_tmp);
         loc = Loc.none;
       } in
-
-      let is_last_goto stmts =
-        let last_opt = List.last stmts in
-        match last_opt with
-        | Some { C_op.Stmt. spec = Goto _; _ } -> true
-        | _ -> false
-      in
       
       let open PMMeta in
       let this_pm: t = fun generator ->
@@ -1548,6 +1548,117 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
       let child_pm = transform_pattern_to_test (Temp match_tmp) child in
       this_pm >>= child_pm
     )
+
+    | Array { elements; rest; } -> (
+      let elm_len = List.length elements in
+      let open C_op in
+      let need_test =
+        Expr.IntValue (
+        match rest with
+        | Some _ ->
+          Expr.I32Binary(
+            BinaryOp.GreaterThanEqual,
+            Expr.ExternalCall(SymLocal "lc_std_array_get_length", Some match_expr, []),
+            Expr.NewInt (Int.to_string elm_len))
+
+        | None ->
+          Expr.I32Binary(
+            BinaryOp.Equal,
+            Expr.ExternalCall(SymLocal "lc_std_array_get_length", Some match_expr, []),
+            Expr.NewInt (Int.to_string elm_len))
+      )
+
+      in
+
+      let assign_stmts, release_stmts, child_pms = 
+        elements
+        |> List.mapi
+          ~f:(fun index elm ->
+            let match_tmp = env.tmp_vars_count in
+            env.tmp_vars_count <- env.tmp_vars_count + 1;
+            let assign_stmt = { C_op.Stmt.
+              spec = Expr(Assign(Temp match_tmp, ArrayGetValue(match_expr, Expr.IntValue(Expr.NewInt (Int.to_string index)))));
+              loc = Loc.none;
+            } in
+
+            let release_stmt = { C_op.Stmt.
+              spec = Release(Expr.Temp match_tmp);
+              loc = Loc.none;
+            } in
+
+            let child_pm = transform_pattern_to_test (Temp match_tmp) elm in
+
+            assign_stmt, release_stmt, child_pm
+          )
+        |> List.unzip3
+      in
+
+      let rest_assigns, rest_releases, rest_pms =
+        match rest with
+        | Some rest_pat -> (
+          let match_tmp = env.tmp_vars_count in
+          env.tmp_vars_count <- env.tmp_vars_count + 1;
+
+          let assign_stmt = { C_op.Stmt.
+            spec = Expr(Assign(
+              Temp match_tmp,
+              ExternalCall(
+                SymLocal "lc_std_array_slice",
+                Some match_expr,
+                [Expr.NewInt (Int.to_string elm_len); Expr.ExternalCall(SymLocal "lc_std_array_get_length", Some match_expr, [])])));
+            loc = Loc.none;
+          } in
+
+          let release_stmt = { C_op.Stmt.
+            spec = Release(Expr.Temp match_tmp);
+            loc = Loc.none;
+          } in
+
+          let rest_pm = transform_pattern_to_test (Temp match_tmp) rest_pat in
+
+          [assign_stmt], [release_stmt], [rest_pm]
+        )
+
+        | None ->
+          [], [], []
+
+      in
+
+      let open PMMeta in
+      let this_pm: t = fun generator ->
+        let acc = generator ~finalizers:(List.append rest_releases release_stmts) () in
+        let if_consequent =
+          if is_last_goto acc then
+            List.concat [
+              assign_stmts;
+              rest_assigns;
+              acc;
+            ]
+          else
+            List.concat [
+              assign_stmts;
+              rest_assigns;
+              acc;
+              rest_releases;
+              release_stmts;
+            ]
+        in
+        let if_stmt = { C_op.Stmt.
+          spec = If {
+            if_test = need_test;
+            if_consequent;
+            if_alternate = None;
+          };
+          loc = Loc.none;
+        } in
+        [if_stmt]
+      in
+      List.fold
+        ~init:this_pm
+        ~f:(fun acc elm -> acc >>= elm)
+        (List.append child_pms rest_pms)
+    )
+
   in
 
   let transform_clause clause =

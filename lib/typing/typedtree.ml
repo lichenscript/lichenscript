@@ -7,7 +7,12 @@ type identifier = (string * int)
 
 module Pattern = struct
 
-  type t = {
+  type array_pat = {
+    elements: t list;
+    rest: t option;
+  }
+
+  and t = {
     spec: spec;
     loc: Loc.t;
     (*
@@ -22,6 +27,7 @@ module Pattern = struct
   | Literal of Ast.Literal.t
   | Symbol of identifier
   | EnumCtor of (identifier * t)
+  | Array of array_pat
   [@@deriving show]
 
 end
