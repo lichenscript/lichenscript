@@ -68,11 +68,7 @@ let binnumber = [%sedlex.regexp? ('0', ('B' | 'b'), underscored_bin)]
 
 let octnumber = [%sedlex.regexp? ('0', ('O' | 'o'), underscored_oct)]
 
-let legacyoctnumber = [%sedlex.regexp? ('0', Plus oct_digit)]
-
 (* no underscores allowed *)
-
-let legacynonoctnumber = [%sedlex.regexp? ('0', Star oct_digit, '8' .. '9', Star digit)]
 
 let hexnumber = [%sedlex.regexp? ('0', ('X' | 'x'), underscored_hex)]
 
@@ -264,18 +260,12 @@ let mk_num_singleton number_type raw =
   (* convert singleton number type into a float *)
   let value =
     match number_type with
-    | LEGACY_OCTAL ->
-      begin
-        try Int64.to_float (Int64.of_string ("0o" ^ num))
-        with Failure _ -> failwith ("Invalid legacy octal " ^ num)
-      end
     | BINARY
     | OCTAL ->
       begin
         try Int64.to_float (Int64.of_string num)
         with Failure _ -> failwith ("Invalid binary/octal " ^ num)
       end
-    | LEGACY_NON_OCTAL
     | NORMAL ->
       begin
         try float_of_string num with Failure _ -> failwith ("Invalid number " ^ num)
@@ -767,21 +757,6 @@ let token (env : Lex_env.t) lexbuf : result =
         | octnumber -> Token (env, T_NUMBER { kind = OCTAL; raw = lexeme lexbuf })
         | _ -> failwith "unreachable")
   | octnumber -> Token (env, T_NUMBER { kind = OCTAL; raw = lexeme lexbuf })
-  | (legacynonoctnumber, word) ->
-    (* Numbers cannot be immediately followed by words *)
-    recover env lexbuf ~f:(fun env lexbuf ->
-        match%sedlex lexbuf with
-        | legacynonoctnumber ->
-          Token (env, T_NUMBER { kind = LEGACY_NON_OCTAL; raw = lexeme lexbuf })
-        | _ -> failwith "unreachable")
-  | legacynonoctnumber -> Token (env, T_NUMBER { kind = LEGACY_NON_OCTAL; raw = lexeme lexbuf })
-  | (legacyoctnumber, (letter | '8' .. '9'), Star alphanumeric) ->
-    (* Numbers cannot be immediately followed by words *)
-    recover env lexbuf ~f:(fun env lexbuf ->
-        match%sedlex lexbuf with
-        | legacyoctnumber -> Token (env, T_NUMBER { kind = LEGACY_OCTAL; raw = lexeme lexbuf })
-        | _ -> failwith "unreachable")
-  | legacyoctnumber -> Token (env, T_NUMBER { kind = LEGACY_OCTAL; raw = lexeme lexbuf })
   | (hexbigint, word) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
@@ -1626,17 +1601,6 @@ let type_token env lexbuf =
   | (Opt neg, octnumber) ->
     let num = lexeme lexbuf in
     Token (env, mk_num_singleton OCTAL num)
-  | (Opt neg, legacyoctnumber, (letter | '8' .. '9'), Star alphanumeric) ->
-    (* Numbers cannot be immediately followed by words *)
-    recover env lexbuf ~f:(fun env lexbuf ->
-        match%sedlex lexbuf with
-        | (Opt neg, legacyoctnumber) ->
-          let num = lexeme lexbuf in
-          Token (env, mk_num_singleton LEGACY_OCTAL num)
-        | _ -> failwith "unreachable")
-  | (Opt neg, legacyoctnumber) ->
-    let num = lexeme lexbuf in
-    Token (env, mk_num_singleton LEGACY_OCTAL num)
   | (Opt neg, hexbigint, word) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->

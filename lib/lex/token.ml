@@ -158,8 +158,6 @@ and bool_or_boolean =
 
 and number_type =
   | BINARY
-  | LEGACY_OCTAL
-  | LEGACY_NON_OCTAL (* NonOctalDecimalIntegerLiteral in Annex B *)
   | OCTAL
   | NORMAL
 
