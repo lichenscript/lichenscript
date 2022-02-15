@@ -1,0 +1,8 @@
+
+function main() {
+    const a = 3;
+    const b = if a == 4 {
+        4
+    };
+    print(b);
+}

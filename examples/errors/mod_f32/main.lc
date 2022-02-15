@@ -1,0 +1,4 @@
+
+function main() {
+    const a = 0.3 % 0.2;
+}

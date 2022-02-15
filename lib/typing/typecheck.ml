@@ -228,7 +228,7 @@ and check_statement env stmt =
 
 and check_expression_if env if_spec =
   let open T.Expression in
-  let { if_test; if_consequent; if_alternative; if_ty_var; _ } = if_spec in
+  let { if_test; if_consequent; if_alternative; if_ty_var; if_loc; _ } = if_spec in
   check_expression env if_test;
 
   let test_type = Type_context.deref_node_type env.ctx if_test.ty_var in
@@ -271,8 +271,19 @@ and check_expression_if env if_spec =
         raise (Type_error.Error err)
       )
     )
-    | None ->
-      node.value
+    (*
+     * if there is no alternative, this if expression is regarded as 'unit' type,
+     *)
+    | None -> (
+      let ty_unit = ty_unit env in
+      let result = TypeExpr.Ctor(Ref ty_unit, []) in
+      if not (Check_helper.type_assinable env.ctx result node.value) then (
+        let err = Type_error.(make_error env.ctx if_loc (NotAssignable(result, node.value))) in
+        raise (Type_error.Error err)
+      );
+
+      result
+    )
   in
 
   Type_context.update_node_type env.ctx if_ty_var if_ty
