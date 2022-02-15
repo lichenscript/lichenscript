@@ -1595,6 +1595,7 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
 
       let rest_assigns, rest_releases, rest_pms =
         match rest with
+        | Some { spec = Underscore; _ } -> [], [], []
         | Some rest_pat -> (
           let match_tmp = env.tmp_vars_count in
           env.tmp_vars_count <- env.tmp_vars_count + 1;
