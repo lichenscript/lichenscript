@@ -341,6 +341,7 @@ static void LCFreeObject(LCRuntime* rt, LCValue val) {
         break;
         
     case LC_TY_STRING:
+    case LC_TY_TUPLE:
     case LC_TY_SYMBOL:
     case LC_TY_CLASS_OBJECT_META:
     case LC_TY_BOXED_I64:
