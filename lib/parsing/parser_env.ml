@@ -110,6 +110,7 @@ type env = {
   source: File_key.t option;
   top_level: Top_level.t;
   mutable allow_init: bool;
+  mutable allow_arrow: bool;
   mutable include_module_ids: string list;
   mutable scope: Parse_scope.t;
 }
@@ -147,6 +148,7 @@ let init_env source content =
     scope = Parse_scope.create Parse_scope.PScope_Module;
     top_level = Top_level.create ();
     allow_init = true;
+    allow_arrow = true;
   }
 
 let include_module_ids env = List.rev env.include_module_ids
@@ -168,7 +170,16 @@ let with_allow_init env allow_init cb =
   env.allow_init <- prev_allow;
   result
 
+let with_allow_arrow env allow_arrow cb =
+  let prev_allow = env.allow_arrow in
+  env.allow_arrow <- allow_arrow;
+  let result = cb env in
+  env.allow_arrow <- prev_allow;
+  result
+
 let allow_init env = env.allow_init
+
+let allow_arrow env = env.allow_arrow
 
 let scope env = env.scope
 

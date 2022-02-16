@@ -217,6 +217,7 @@ and Function : sig
 
   and header = {
     id: Identifier.t;
+    type_vars:  Identifier.t list;
     params: params;
     return_ty: Type.t option;
     header_loc: Loc.t;
@@ -324,6 +325,7 @@ and Declaration : sig
     cls_decl_method_attributes: attributes;
     cls_decl_method_get_set: class_get_set option;
     cls_decl_method_name: Identifier.t;
+    cls_decl_method_type_vars: Identifier.t list;
     cls_decl_method_params: Function.params;
     cls_decl_method_loc: Loc.t;
     cls_decl_method_return_ty: Type.t option;

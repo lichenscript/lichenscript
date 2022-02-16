@@ -1752,6 +1752,37 @@ LCValue lc_std_array_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* ar
     return (LCValue) { { .ptr_val = (LCObject*)new_arr },  LC_TY_ARRAY };
 }
 
+LCValue lc_std_array_map(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    uint32_t i;
+    LCArray* arr = (LCArray*)this.ptr_val;
+    LCArray* new_arr = LCNewArrayWithCap(rt, arr->capacity);
+
+    for (i = 0; i < arr->len; i++) {
+        new_arr->data[i] = LCEvalLambda(rt, args[0], 1, (LCValue[]) { arr->data[i] });
+    }
+
+    new_arr->len = arr->len;
+
+    return (LCValue) { { .ptr_val = (LCObject*)new_arr },  LC_TY_ARRAY };
+}
+
+LCValue lc_std_array_filter(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    LCValue item, test_tmp;
+    LCValue result = LCNewArray(rt);
+    LCArray* arr = (LCArray*)this.ptr_val;
+    uint32_t i;
+
+    for (i = 0; i < arr->len; i++) {
+        item = arr->data[i];
+        test_tmp = LCEvalLambda(rt, args[0], 1, (LCValue[]) { item });
+        if (test_tmp.int_val) {
+            lc_std_array_push(rt, result, 1, (LCValue[]) { item });
+        }
+    }
+
+    return result;
+}
+
 LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
     LCArray* arr = (LCArray*)this.ptr_val;
 
@@ -2311,6 +2342,11 @@ LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args) 
     }
 
     return lc_std_map_remove_complex(rt, map, args[0]);
+}
+
+LCValue lc_std_map_size(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCMap* map = (LCMap*)this.ptr_val;
+    return MK_I32(map->size);
 }
 
 LCValue lc_std_exit(LCRuntime* rt, LCValue this, int argc, LCValue* args) {

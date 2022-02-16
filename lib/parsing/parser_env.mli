@@ -15,7 +15,11 @@ val with_scope: env -> Parse_scope.t -> (unit -> 'a) -> 'a
 
 val with_allow_init: env -> bool -> (env -> 'a) -> 'a
 
+val with_allow_arrow: env -> bool -> (env -> 'a) -> 'a
+
 val allow_init: env -> bool
+
+val allow_arrow: env -> bool
 
 val scope: env -> Parse_scope.t
 

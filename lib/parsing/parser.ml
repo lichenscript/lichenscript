@@ -84,29 +84,34 @@ let parse_relaxed_arrow env ~(f: env -> 'a) parse_type : 'a ReleaxedArrow.t =
 
   let params = ref [] in
 
-  Expect.token env Token.T_LPAREN;
+  Parser_env.with_allow_arrow env true (fun env ->
+    Expect.token env Token.T_LPAREN;
 
-  while (Peek.token env) <> Token.T_RPAREN do
-    let param = parse_relaxed_param () in
-    if (Peek.token env) = Token.T_COMMA then (
-      Eat.token env
-    );
-    params := param::!params
-  done;
+    while (Peek.token env) <> Token.T_RPAREN do
+      let param = parse_relaxed_param () in
+      if (Peek.token env) = Token.T_COMMA then (
+        Eat.token env
+      );
+      params := param::!params
+    done;
 
-  Expect.token env Token.T_RPAREN;
+    Expect.token env Token.T_RPAREN;
+  );
+
   let params_loc = with_start_loc env start_pos in
 
   let return_ty =
     if (Peek.token env) = Token.T_COLON then (
       Eat.token env;
-      Some (parse_type env)
+      Parser_env.with_allow_arrow env false (fun env ->
+        Some (parse_type env)
+      )
     ) else
       None
   in
 
   let arrow =
-    if (Peek.token env) = Token.T_ARROW then (
+    if (Parser_env.allow_arrow env) && (Peek.token env) = Token.T_ARROW then (
       let start_pos = Peek.loc env in
       Eat.token env;
       let arrow_content = f env in
@@ -593,6 +598,11 @@ and parse_function_header env: Function.header =
   let start_loc = Peek.loc env in
   Expect.token env Token.T_FUNCTION;
   let id = parse_identifier env in
+  let type_vars =
+    if (Peek.token env) = Token.T_LESS_THAN then
+      parse_type_vars env
+    else []
+  in
   let params = parse_params env in
   let next = Peek.token env in
   let return_ty =
@@ -608,6 +618,7 @@ and parse_function_header env: Function.header =
   in
   { Function.
     id;
+    type_vars;
     params;
     return_ty;
     header_loc = with_start_loc env start_loc;
@@ -816,6 +827,11 @@ and parse_class_body env: Declaration.class_body =
         (* is a method called get *)
         | _ -> first_id, None
       in
+      let type_vars =
+        if (Peek.token env) = Token.T_LESS_THAN then
+          parse_type_vars env
+        else []
+      in
       let params = parse_params env in
       let cls_decl_method_return_ty =
         if Peek.token env = Token.T_COLON then (
@@ -829,6 +845,7 @@ and parse_class_body env: Declaration.class_body =
         cls_decl_method_attributes = attributes;
         cls_decl_method_get_set;
         cls_decl_method_name;
+        cls_decl_method_type_vars = type_vars;
         cls_decl_method_params = params;
         cls_decl_method_loc = with_start_loc env start_pos;
         cls_decl_method_return_ty;
@@ -1082,7 +1099,6 @@ and parse_maybe_arrow_function env : Expression.t =
     )
 
   )
-
 
 and parse_binary_expression env : Expression.t =
   let open Expression in
@@ -1598,10 +1614,22 @@ and parse_primary_type env =
           )
           relaxed_arrow.params
       in
-      {
-        spec = Ty_tuple children;
-        loc = with_start_loc env start_loc;
-      }
+      match children with
+      | [] -> (
+        let perr_spec = Parser_env.get_unexpected_error (Token.T_RPAREN) in
+        Parse_error.error {
+          perr_spec;
+          perr_loc = (Peek.loc env);
+        }
+      )
+
+      | one::[] -> one
+
+      | _ ->
+        {
+          spec = Ty_tuple children;
+          loc = with_start_loc env start_loc;
+        }
     )
   )
 

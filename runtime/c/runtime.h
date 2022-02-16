@@ -312,6 +312,8 @@ LCValue lc_std_array_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValu
 LCValue lc_std_array_resize(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 LCValue lc_std_array_sort(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 LCValue lc_std_array_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
+LCValue lc_std_array_map(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
+LCValue lc_std_array_filter(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 
 LCValue lc_std_string_concat(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
@@ -339,6 +341,7 @@ LCValue lc_std_map_new(LCRuntime* rt, int key_ty, int init_size);
 LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 LCValue lc_std_map_get(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args);
+LCValue lc_std_map_size(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
 LCValue lc_std_exit(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 LCValue lc_std_panic(LCRuntime* rt, LCValue this, int argc, LCValue* args);
