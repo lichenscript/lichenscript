@@ -22,6 +22,7 @@ and attributes = attribute list
 module%gen rec Literal : sig
 
   type t =
+    | Unit
     | Integer of string * char option
     | Char of char
     (* 'c' *)
@@ -102,6 +103,7 @@ and Expression : sig
     | Call of call
     | Member of t * Identifier.t
     | Index of t * t
+    | Tuple of t list
     | Unary of Asttypes.UnaryOp.t * t
     | Binary of Asttypes.BinaryOp.t * t * t
     | Assign of Asttypes.AssignOp.t option * t * t
@@ -179,6 +181,7 @@ and Pattern : sig
     | Literal of Literal.t
     | Identifier of Identifier.t
     | EnumCtor of (Identifier.t * t)
+    | Tuple of t list
     | Array of array_pat
 
   and t = {
@@ -233,6 +236,8 @@ and Type : sig
     | Ty_any
     | Ty_ctor of Identifier.t * t list
       (* List<int> *)
+
+    | Ty_tuple of t list
 
     | Ty_array of t
 

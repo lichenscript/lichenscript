@@ -92,6 +92,8 @@ module rec TypeExpr : sig
      *)
     | Method of TypeDef.t * params * t
 
+    | Tuple of t list
+
     (*
      * Alias of Array<T>
      *)
@@ -120,6 +122,7 @@ end = struct
     | Ref of int
     | Lambda of params * t
     | Method of TypeDef.t * params * t
+    | Tuple of t list
     | Array of t
     | String
     | TypeDef of TypeDef.t
@@ -142,6 +145,20 @@ end = struct
     | Ref i -> Format.fprintf formatter "ref '%d" i
     | Lambda _ -> Format.fprintf formatter "lambda"
     | Method (_method, _, _) -> Format.fprintf formatter "::%s" TypeDef.(_method.name)
+    | Tuple childrens -> (
+      let children_len = List.length childrens in
+      Format.fprintf formatter "(";
+      List.iteri
+        ~f:(fun index item ->
+          pp formatter item;
+          if index <> (children_len - 1) then (
+            Format.fprintf formatter ", "
+          )
+        )
+        childrens;
+      Format.fprintf formatter ")"
+    )
+
     | Array t -> Format.fprintf formatter "%a[]" pp t
     | String -> Format.fprintf formatter "string"
     | TypeDef def -> Format.fprintf formatter "typedef(%a)" TypeDef.pp def

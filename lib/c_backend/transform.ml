@@ -694,6 +694,9 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     | Constant literal -> (
       let open Literal in
       match literal with
+      | Unit ->
+        C_op.Expr.Null
+
       | String(content, _, _) -> 
         auto_release_expr env ~is_move ~append_stmts ty_var (C_op.Expr.NewString content)
 
@@ -813,6 +816,21 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       prepend_stmts := List.append !prepend_stmts [tmp_stmt];
 
       C_op.Expr.Temp tmp_id
+
+    | Tuple children ->
+      let children_expr =
+        List.map
+          ~f:(fun expr ->
+            let tmp = transform_expression env expr in
+
+            prepend_stmts := List.append !prepend_stmts tmp.prepend_stmts;
+            append_stmts := List.append tmp.append_stmts !append_stmts;
+
+            tmp.expr
+          )
+          children
+      in
+      C_op.Expr.ExternalCall(C_op.SymLocal "LCNewTuple", None, children_expr)
 
     | Array arr_list -> (
       let tmp_id = env.tmp_vars_count in
@@ -1547,6 +1565,51 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
       in
       let child_pm = transform_pattern_to_test (Temp match_tmp) child in
       this_pm >>= child_pm
+    )
+
+    | Tuple children -> (
+      let open C_op in
+      let assign_stmts, release_stmts, child_pms = 
+        children
+        |> List.mapi
+          ~f:(fun index elm ->
+            let match_tmp = env.tmp_vars_count in
+            env.tmp_vars_count <- env.tmp_vars_count + 1;
+            let assign_stmt = { C_op.Stmt.
+              spec = Expr(Assign(Temp match_tmp, TupleGetValue(match_expr, index)));
+              loc = Loc.none;
+            } in
+
+            let release_stmt = { C_op.Stmt.
+              spec = Release(Expr.Temp match_tmp);
+              loc = Loc.none;
+            } in
+
+            let child_pm = transform_pattern_to_test (Temp match_tmp) elm in
+
+            assign_stmt, release_stmt, child_pm
+          )
+        |> List.unzip3
+      in
+      let open PMMeta in
+      let this_pm: t = fun generator ->
+        let acc = generator ~finalizers:release_stmts () in
+        if is_last_goto acc then
+          List.concat [
+            assign_stmts;
+            acc;
+          ]
+        else
+          List.concat [
+            assign_stmts;
+            acc;
+            release_stmts;
+          ]
+      in
+      List.fold
+        ~init:this_pm
+        ~f:(fun acc elm -> acc >>= elm)
+        child_pms
     )
 
     | Array { elements; rest; } -> (

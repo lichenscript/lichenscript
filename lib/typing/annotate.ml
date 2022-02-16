@@ -111,6 +111,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
         }
       )
 
+      | Tuple _
       | Literal _
       | Array _
       | EnumCtor _ -> (
@@ -154,6 +155,10 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let open Ast.Literal in
       let deps, value =
         match cnst with
+        | Unit ->
+          let ty_var = Option.value_exn (root_scope#find_type_symbol "unit") in
+          [ty_var], TypeExpr.Ctor(Ref ty_var, [])
+
         | Integer _ ->
           let ty_var = Option.value_exn (root_scope#find_type_symbol "i32") in
           [ty_var], TypeExpr.Ctor(Ref ty_var, [])
@@ -306,6 +311,27 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     | Call call ->
       let ty_var, spec = annotate_expression_call ~prev_deps env loc call in
       ty_var, (T.Expression.Call spec)
+
+    | Tuple children -> (
+      let deps, expressions =
+        children
+        |> List.fold_map
+          ~init:[]
+          ~f:(fun acc item ->
+            let item_expr = annotate_expression ~prev_deps:[] env item in
+            let dep = T.Expression.(item_expr.ty_var) in
+            dep::acc, item_expr
+          )
+      in
+      let node = {
+        value = TypeExpr.Unknown;
+        loc;
+        deps = List.append prev_deps deps;
+      } in
+      let id = Type_context.new_id (Env.ctx env) node in
+      id, T.Expression.Tuple expressions
+    )
+
 
     | Member (expr, name) -> (
       let expr = annotate_expression ~prev_deps env expr in
@@ -635,6 +661,10 @@ and prescan_pattern_for_scope ~kind ~(scope: Scope.scope) env pat =
   )
 
   | EnumCtor (_, child_pat) -> prescan_pattern_for_scope ~kind ~scope env child_pat
+
+  | Tuple children ->
+    List.iter ~f:(prescan_pattern_for_scope ~kind ~scope env) children
+
   | Array { elements; rest } ->
     List.iter ~f:(prescan_pattern_for_scope ~kind ~scope env) elements;
     Option.iter ~f:(prescan_pattern_for_scope ~kind ~scope env) rest
@@ -1303,6 +1333,18 @@ and annotate_pattern ~pat_id env pat : (T.Pattern.t * int list) =
       ))
     )
 
+    | Tuple children -> (
+      let elements, element_deps =
+        children
+        |> List.map ~f:(annotate_pattern ~pat_id:(pat_id + 1) env)
+        |> List.unzip
+      in
+
+      deps := List.append !deps (List.concat element_deps);
+
+      T.Pattern.Tuple elements
+    )
+
     | Array array_pat -> (
       let { elements; rest; } = array_pat in
       
@@ -1369,6 +1411,16 @@ and annotate_type env ty : (TypeExpr.t * int list) =
     )
 
   )
+
+  | Ty_tuple children -> (
+    let children_types, children_deps =
+      children
+      |> List.map ~f:(annotate_type env)
+      |> List.unzip
+    in
+    TypeExpr.Tuple children_types, (List.concat children_deps)
+  )
+
   | Ty_array target -> (
     let target_type, target_type_deps = annotate_type env target in
     TypeExpr.Array target_type, target_type_deps

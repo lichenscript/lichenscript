@@ -341,6 +341,17 @@ and check_expression env expr =
     Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Array arr_type)
   )
 
+  | Tuple children -> (
+    let children_types = List.map
+      ~f:(fun child ->
+        check_expression env child;
+        Type_context.deref_node_type env.ctx child.ty_var
+      )
+      children
+    in
+    Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Tuple children_types)
+  )
+
   | Map map_entries -> (
     let map_opt = env.scope#find_type_symbol "Map" in
     let map_ty = Option.value_exn ~message:"Cannot found Map in the current scope" map_opt in
@@ -797,6 +808,13 @@ and check_expression env expr =
         );
       )
 
+      | Literal Ast.Literal.Unit -> (
+        if not (Check_helper.is_unit env.ctx expr_type) then (
+          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("unit", expr_type))) in
+          raise (Type_error.Error err)
+        )
+      )
+
       | Literal (Ast.Literal.Boolean _) -> (
         if not (Check_helper.is_boolean env.ctx expr_type) then (
           let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("boolean", expr_type))) in
@@ -846,6 +864,27 @@ and check_expression env expr =
             raise_err ()
           );
           check_clause_pattern arg child_pat
+        )
+
+        | _ -> raise_err ()
+      )
+      | Tuple children -> (
+        let raise_err () =
+          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("tuple", expr_type))) in
+          raise (Type_error.Error err)
+        in
+        match expr_type with
+        | TypeExpr.Tuple children_types -> (
+          let tmp =
+            List.map2
+            ~f:(fun child_pat child_type ->
+              check_clause_pattern child_type child_pat;
+            )
+            children children_types
+          in
+          match tmp with
+          | List.Or_unequal_lengths.Ok _ -> ()
+          | List.Or_unequal_lengths.Unequal_lengths -> raise_err ()
         )
 
         | _ -> raise_err ()
@@ -929,6 +968,18 @@ and check_expression env expr =
 and check_match_exhausted env _match =
   let open T.Expression in
 
+  let check_tuples_exausted slots patterns =
+    let open Check_helper in
+    List.iteri
+      ~f:(fun index child ->
+        let exist = Array.get slots index in
+        Array.set slots index (child::exist)
+      )
+      patterns;
+
+    Pat_tuple slots
+  in
+
   let rec check_patterns_exhausted patterns =
     let open Check_helper in
     let result =
@@ -966,6 +1017,20 @@ and check_match_exhausted env _match =
 
             | Pat_enum_branch exist ->
               Pat_enum_branch ((id, child_pat)::exist)
+
+            | _ -> acc
+          )
+
+          | Tuple children -> (
+            let children_len = List.length children in
+            match acc with
+            | Pat_begin -> (
+              let slots = Array.create ~len:children_len [] in
+              check_tuples_exausted slots children
+            )
+
+            | Pat_tuple slots when (Array.length slots) = children_len ->
+              check_tuples_exausted slots children
 
             | _ -> acc
           )
@@ -1035,6 +1100,12 @@ and check_match_exhausted env _match =
         let err = Type_error.(make_error env.ctx _match.match_loc PatternNotExausted) in
         raise (Type_error.Error err)
       )
+    )
+
+    | Pat_tuple tuples -> (
+      Array.iter
+        ~f:(check_patterns_exhausted)
+        tuples;
     )
 
     | _ -> (

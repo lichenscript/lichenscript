@@ -50,7 +50,9 @@ let rec type_assinable ctx left right =
   | (_, Method _) -> false
   | (String, String) -> true
 
-  (* Array _ <- Array<T> *)
+  | (Tuple _, Tuple _) ->
+    type_equal ctx left right
+
   | (Array _, Array(TypeSymbol _)) -> true
 
   | (Array left_arr, Array right_arr) ->
@@ -137,6 +139,24 @@ and type_equal ctx left right =
   match (left, right) with
   | (Any, Any) -> true
   | (String, String) -> true
+
+  | (Tuple left_children, Tuple right_children) -> (
+    let tmp =
+      List.fold2
+      ~init:true
+      ~f:(fun acc left_item right_item ->
+        if not acc then false
+        else
+          type_equal ctx left_item right_item
+      )
+      left_children
+      right_children
+    in
+    match tmp with
+    | List.Or_unequal_lengths.Ok t -> t
+    | List.Or_unequal_lengths.Unequal_lengths -> false
+  )
+
   | (Array left_arr, Array right_arr) ->
     type_equal ctx left_arr right_arr
   | _, _ -> (
@@ -331,6 +351,10 @@ let rec replace_type_vars_with_maps ctx type_map type_expr =
 
   | Method _ -> type_expr
 
+  | Tuple children ->
+    let children = List.map ~f:(replace_type_vars_with_maps ctx type_map) children in
+    Tuple children
+
   | Array arr ->
     Array (replace_type_vars_with_maps ctx type_map arr)
 
@@ -518,5 +542,6 @@ type pattern_exhausted =
   | Pat_exausted
   | Pat_begin
   | Pat_boolean of bool * bool  (* has true, has false *)
+  | Pat_tuple of Typedtree.Pattern.t list array
   | Pat_enum_branch of (Typedtree.identifier * Typedtree.Pattern.t) list
 [@@deriving show]

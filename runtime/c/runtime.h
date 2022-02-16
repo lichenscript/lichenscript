@@ -44,6 +44,7 @@ typedef enum LCObjectType {
     LC_TY_LAMBDA,
     LC_TY_WEAK_REF,
     LC_TY_CLASS_OBJECT_META,
+    LC_TY_TUPLE,
     LC_TY_ARRAY,
     LC_TY_MAP,
     LC_TY_CLASS_OBJECT,
@@ -206,6 +207,17 @@ typedef struct LCMallocState {
 } LCMallocState;
 
 typedef struct LCRuntime LCRuntime;
+
+typedef struct LCTuple {
+    LC_OBJ_HEADER
+    size_t  len;
+    LCValue data[];
+} LCTuple;
+
+LCValue LCNewTuple(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args);
+
+#define LC_TUPLE_GET(v, index) (((LCTuple*)((v).ptr_val))->data[index])
+
 typedef struct LCArray LCArray;
 
 typedef LCValue (*LCCFunction)(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args);
@@ -271,9 +283,6 @@ LCValue LCNewArray(LCRuntime* rt);
 LCValue LCNewArrayLen(LCRuntime* rt, size_t size);
 LCValue LCArrayGetValue(LCRuntime* rt, LCValue this, int index);
 void LCArraySetValue(LCRuntime* rt, LCValue this, int argc, LCValue* args);
-
-LCValue LCNewSymbolLen(LCRuntime* rt, const char* content, uint32_t len);
-LCValue LCNewSymbol(LCRuntime* rt, const char* content);
 
 typedef struct LCClassMethodDef {
     const char* name;

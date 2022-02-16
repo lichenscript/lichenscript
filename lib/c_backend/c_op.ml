@@ -139,6 +139,7 @@ and Expr : sig
   | NewArray of int
   | NewMap of int
   | Not of t
+  | TupleGetValue of (t * int)
   | ArrayGetValue of (t * t)
   | I32Binary of Asttypes.BinaryOp.t * t * t
   | F32Binary of Asttypes.BinaryOp.t * t * t
