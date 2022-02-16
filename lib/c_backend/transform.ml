@@ -2008,8 +2008,8 @@ and transform_class env cls loc: C_op.Decl.t list =
 
           List.append lambdas (_fun::acc)
         )
-        | Cls_property _ -> acc
-        | Cls_declare _ -> failwith "unimplemented: declare"
+        | Cls_property _
+        | Cls_declare _ -> acc
       )
       cls_body.cls_body_elements;
   in

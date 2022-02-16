@@ -1,8 +1,29 @@
 
+
+function insertData(map: Map<string, string>) {
+    const data = ["aaa", "bbb", "ccc", "ddd", "eee", "fff", "ggg", "hhh", "iii"];
+    let index = 0;
+
+    while index < data.length {
+        const item = data[index];
+        map.set(item, item);
+        index += 1;
+    }
+
+    index = 0;
+    while index < data.length {
+        const item = data[index];
+        map.delete(item);
+        index += 1;
+    }
+}
+
 function main() {
     let a = #{
         "name": "Vincent Chan"
     };
+    insertData(a);
+    print(a.size);
     let test = a.get("name");
     match test {
         case Some(name) => print("found: ", name)

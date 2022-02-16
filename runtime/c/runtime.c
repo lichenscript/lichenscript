@@ -2127,7 +2127,7 @@ static void lc_std_map_construct_hashtable(LCRuntime* rt, LCMap* map) {
     int bucket_size = LC_MAP_DEFAULT_BUCKET_SIZE;
     LCMapBucket** buckets = lc_mallocz(rt, sizeof(LCMapBucket*) * bucket_size);
 
-    while (t != map->last) {
+    while (t != NULL) {
         tmp = t->next;
 
         hash = LCValueHash(rt, t->key);
@@ -2176,7 +2176,15 @@ LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
             map->head = tuple;
         }
 
-        if (!map->is_small) {
+        if (map->is_small) {
+            if (map->size >= 8 && (
+                map->key_ty == LC_TY_STRING || map->key_ty == LC_TY_I32 || map->key_ty == LC_TY_CHAR)) {
+
+                lc_std_map_construct_hashtable(rt, map);
+            }
+
+            return MK_NULL();
+        } else {
             hash = LCValueHash(rt, args[0]);
             index = hash % map->bucket_size;
 
@@ -2195,14 +2203,6 @@ LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
         tuple->value = args[1];
         return MK_NULL();
     }
-
-    if (map->size >= 8 && (
-        map->key_ty == LC_TY_STRING || map->key_ty == LC_TY_I32 || map->key_ty == LC_TY_CHAR)) {
-
-        lc_std_map_construct_hashtable(rt, map);
-    }
-
-    return MK_NULL();
 }
 
 static inline void lc_free_map_tuple(LCRuntime* rt, LCMapTuple* tuple) {
@@ -2244,6 +2244,7 @@ void lc_std_map_free(LCRuntime* rt, LCValue val) {
                 bucket = bp;
             }
         }
+        lc_free(rt, map->buckets);
     }
 
 clean:
@@ -2264,7 +2265,7 @@ LCValue lc_std_map_get(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
 
 static inline LCValue lc_std_map_remove_complex(LCRuntime* rt, LCMap* map, LCValue key) {
     LCMapTuple* t;
-    LCMapBucket **bucket_ref;
+    LCMapBucket **bucket_ref, *next_bucket;
     uint32_t hash = LCValueHash(rt, key);
     int index = hash % map->bucket_size;
     LCValue result;
@@ -2292,8 +2293,11 @@ static inline LCValue lc_std_map_remove_complex(LCRuntime* rt, LCMap* map, LCVal
 
             lc_free_map_tuple(rt, t);
 
-            (*bucket_ref) = (*bucket_ref)->next;
+            next_bucket = (*bucket_ref)->next;
+            lc_free(rt, *bucket_ref);
+            (*bucket_ref) = next_bucket;
 
+            map->size--;
             return result;
         }
 
@@ -2330,7 +2334,7 @@ LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args) 
                 }
 
                 lc_free_map_tuple(rt, t);
-                map->size++;
+                map->size--;
 
                 return result;
             }
