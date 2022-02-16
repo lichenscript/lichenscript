@@ -33,22 +33,22 @@ type parse_result = {
  * (1 + 1)
  *)
 module ReleaxedArrow = struct
-  type arrow ={
-    arrow_expr: Expression.t;
+  type 'a arrow ={
+    arrow_content: 'a;
     arrow_loc: Loc.t
   }
 
-  type param = {
-    param_expr: Expression.t;
+  type 'a param = {
+    param_content: 'a;
     param_colon: (Type.t * Loc.t) option;
     param_loc: Loc.t
   }
 
-  type t = {
-    params: param list;
+  type 'a t = {
+    params: 'a param list;
     params_loc: Loc.t;
     return_ty: Type.t option;
-    arrow: arrow option;
+    arrow: 'a arrow option;
     loc: Loc.t;
   }
   
@@ -946,7 +946,7 @@ and parse_maybe_arrow_function env : Expression.t =
         (fun param ->
           let open ReleaxedArrow in
           let param_name =
-            match param.param_expr.spec with
+            match param.param_content.spec with
             | Expression.Identifier id ->
               id
             | _ ->
@@ -963,7 +963,7 @@ and parse_maybe_arrow_function env : Expression.t =
       params_loc = relaxed_arrow.params_loc;
     } in
     let open ReleaxedArrow in
-    let lambda_body = arrow.arrow_expr in
+    let lambda_body = arrow.arrow_content in
     let lambda = {
       lambda_body;
       lambda_params;
@@ -1001,11 +1001,11 @@ and parse_maybe_arrow_function env : Expression.t =
       | None -> ()
       );
 
-      first.param_expr
+      first.param_content
     )
 
     | _ -> (
-      let expressions = List.map (fun p -> ReleaxedArrow.(p.param_expr)) relaxed_arrow.params in
+      let expressions = List.map (fun p -> ReleaxedArrow.(p.param_content)) relaxed_arrow.params in
       { Expression.
         spec = Tuple expressions;
         loc = relaxed_arrow.loc;
@@ -1015,12 +1015,12 @@ and parse_maybe_arrow_function env : Expression.t =
 
   )
 
-and parse_relaxed_arrow env : ReleaxedArrow.t =
+and parse_relaxed_arrow env : Expression.t ReleaxedArrow.t =
   let start_pos = Peek.loc env in
 
   let parse_relaxed_param () =
     let start_pos = Peek.loc env in
-    let param_expr = Parser_env.with_allow_init env true parse_expression in
+    let param_content = Parser_env.with_allow_init env true parse_expression in
     let param_colon =
       if (Peek.token env) = Token.T_COLON then (
         let start_pos = Peek.loc env in
@@ -1031,7 +1031,7 @@ and parse_relaxed_arrow env : ReleaxedArrow.t =
         None
     in
     { ReleaxedArrow.
-      param_expr;
+      param_content;
       param_colon;
       param_loc = with_start_loc env start_pos;
     }
@@ -1064,10 +1064,10 @@ and parse_relaxed_arrow env : ReleaxedArrow.t =
     if (Peek.token env) = Token.T_ARROW then (
       let start_pos = Peek.loc env in
       Eat.token env;
-      let arrow_expr = parse_expression env in
+      let arrow_content = parse_expression env in
       let arrow = {
         ReleaxedArrow.
-        arrow_expr;
+        arrow_content;
         arrow_loc = with_start_loc env start_pos;
       } in
       Some arrow
