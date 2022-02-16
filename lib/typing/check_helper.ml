@@ -542,5 +542,6 @@ type pattern_exhausted =
   | Pat_exausted
   | Pat_begin
   | Pat_boolean of bool * bool  (* has true, has false *)
+  | Pat_tuple of Typedtree.Pattern.t list array
   | Pat_enum_branch of (Typedtree.identifier * Typedtree.Pattern.t) list
 [@@deriving show]

@@ -968,6 +968,18 @@ and check_expression env expr =
 and check_match_exhausted env _match =
   let open T.Expression in
 
+  let check_tuples_exausted slots patterns =
+    let open Check_helper in
+    List.iteri
+      ~f:(fun index child ->
+        let exist = Array.get slots index in
+        Array.set slots index (child::exist)
+      )
+      patterns;
+
+    Pat_tuple slots
+  in
+
   let rec check_patterns_exhausted patterns =
     let open Check_helper in
     let result =
@@ -1005,6 +1017,20 @@ and check_match_exhausted env _match =
 
             | Pat_enum_branch exist ->
               Pat_enum_branch ((id, child_pat)::exist)
+
+            | _ -> acc
+          )
+
+          | Tuple children -> (
+            let children_len = List.length children in
+            match acc with
+            | Pat_begin -> (
+              let slots = Array.create ~len:children_len [] in
+              check_tuples_exausted slots children
+            )
+
+            | Pat_tuple slots when (Array.length slots) = children_len ->
+              check_tuples_exausted slots children
 
             | _ -> acc
           )
@@ -1074,6 +1100,12 @@ and check_match_exhausted env _match =
         let err = Type_error.(make_error env.ctx _match.match_loc PatternNotExausted) in
         raise (Type_error.Error err)
       )
+    )
+
+    | Pat_tuple tuples -> (
+      Array.iter
+        ~f:(check_patterns_exhausted)
+        tuples;
     )
 
     | _ -> (
