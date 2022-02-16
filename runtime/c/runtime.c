@@ -326,6 +326,7 @@ static void LCFreeObject(LCRuntime* rt, LCValue val) {
         break;
         
     case LC_TY_STRING:
+    case LC_TY_TUPLE:
     case LC_TY_SYMBOL:
     case LC_TY_CLASS_OBJECT_META:
     case LC_TY_BOXED_I64:
@@ -1037,6 +1038,23 @@ void LCArraySetValue(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     LCRelease(rt, arr->data[index]);
     LCRetain(args[1]);
     arr->data[index] = args[1];
+}
+
+LCValue LCNewTuple(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args) {
+    int32_t i;
+    size_t size = sizeof(LCTuple) + sizeof(LCValue) * arg_len;
+
+    LCTuple* tuple = (LCTuple*)lc_malloc(rt, size);
+
+    tuple->header.count = 1;
+    tuple->header.class_id = 0;
+
+    for (i = 0; i < arg_len; i++) {
+        LCRetain(args[i]);
+        tuple->data[i] = args[i];
+    }
+
+    return (LCValue) { { .ptr_val = (LCObject*)tuple }, LC_TY_TUPLE };
 }
 
 LCValue LCNewI64(LCRuntime* rt, int64_t val) {

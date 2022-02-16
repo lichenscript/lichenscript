@@ -817,7 +817,20 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       C_op.Expr.Temp tmp_id
 
-    | Tuple _ -> failwith "tuple unimplemented"
+    | Tuple children ->
+      let children_expr =
+        List.map
+          ~f:(fun expr ->
+            let tmp = transform_expression env expr in
+
+            prepend_stmts := List.append !prepend_stmts tmp.prepend_stmts;
+            append_stmts := List.append tmp.append_stmts !append_stmts;
+
+            tmp.expr
+          )
+          children
+      in
+      C_op.Expr.ExternalCall(C_op.SymLocal "LCNewTuple", None, children_expr)
 
     | Array arr_list -> (
       let tmp_id = env.tmp_vars_count in

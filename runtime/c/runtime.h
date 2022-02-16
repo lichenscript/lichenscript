@@ -44,6 +44,7 @@ typedef enum LCObjectType {
     LC_TY_LAMBDA,
     LC_TY_WEAK_REF,
     LC_TY_CLASS_OBJECT_META,
+    LC_TY_TUPLE,
     LC_TY_ARRAY,
     LC_TY_MAP,
     LC_TY_CLASS_OBJECT,
@@ -206,6 +207,14 @@ typedef struct LCMallocState {
 } LCMallocState;
 
 typedef struct LCRuntime LCRuntime;
+
+typedef struct LCTuple {
+    LC_OBJ_HEADER
+    LCValue data[];
+} LCTuple;
+
+LCValue LCNewTuple(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args);
+
 typedef struct LCArray LCArray;
 
 typedef LCValue (*LCCFunction)(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args);
