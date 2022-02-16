@@ -71,8 +71,8 @@ Intall [lichenscript-vscode](https://github.com/vincentdchan/lichenscript-vscode
 | Lambda Expression | ✅ |
 | Pattern matching | ✅ |
 | Object inheritance | ✅ |
+| Tuple | ✅ |
 | i64/f64 | 🔨 |
-| Tuple | 🔨 |
 | For Iterator | 🔨 |
 | Customize getter/setter | 🔨 |
 | Operator overloading | 📖 |
