@@ -753,7 +753,7 @@ and annotate_declaration env decl : T.Declaration.t =
       let { decl_spec; decl_visibility; decl_loc } = declare in
       match decl_spec with
       | DeclFunction declare_fun -> (
-        let { Ast.Function. id; params; return_ty; _ } = declare_fun in
+        let { Ast.Function. id; type_vars; params; return_ty; _ } = declare_fun in
         let parent_scope = Env.peek_scope env in
         let ty_id =
           match parent_scope#find_var_symbol id.pident_name with
@@ -763,62 +763,68 @@ and annotate_declaration env decl : T.Declaration.t =
 
         let scope = new scope ~prev:parent_scope () in
 
-        let params, params_type, params_deps = Env.with_new_scope env scope (fun env ->
-          annotate_function_params env params
-        ) in
-
-        let fun_return, fun_return_deps =
-          match return_ty with
-          | Some ty -> (
-            annotate_type env ty
+        List.iter
+          ~f:(fun id ->
+            scope#insert_generic_type_symbol id.pident_name
           )
-          | None -> (
-            let unit_ty = Env.ty_unit env in
-            TypeExpr.Ctor(Ref unit_ty, []), []
-          )
-        in
+          type_vars;
 
-        let ty_def = {
-          TypeDef.
-          id = ty_id;
-          builtin = false;
-          name = id.pident_name;
-          spec = Function {
-            fun_params = params_type;
-            fun_return;
-          }
-        } in
+        Env.with_new_scope env scope (fun env ->
+          let params, params_type, params_deps = annotate_function_params env params in
+          let fun_return, fun_return_deps =
+            match return_ty with
+            | Some ty -> (
+              annotate_type env ty
+            )
+            | None -> (
+              let unit_ty = Env.ty_unit env in
+              TypeExpr.Ctor(Ref unit_ty, []), []
+            )
+          in
 
-        Type_context.update_node (Env.ctx env) ty_id {
-          value = TypeExpr.TypeDef ty_def;
-          deps = List.append params_deps fun_return_deps;
-          loc = decl_loc;
-        };
+          let ty_def = {
+            TypeDef.
+            id = ty_id;
+            builtin = false;
+            name = id.pident_name;
+            spec = Function {
+              fun_vars = List.map ~f:(fun id -> id.pident_name) type_vars;
+              fun_params = params_type;
+              fun_return;
+            }
+          } in
 
-        (match List.last attributes with
-        | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; _ } ->
-          Type_context.set_external_symbol (Env.ctx env) ty_id ext_name
+          Type_context.update_node (Env.ctx env) ty_id {
+            value = TypeExpr.TypeDef ty_def;
+            deps = List.append params_deps fun_return_deps;
+            loc = decl_loc;
+          };
 
-        | _ ->
-          let open Type_error in
-          let err = make_error (Env.ctx env) loc DeclareFunctionShouldSpecificExternal in
-          raise (Error err)
-        );
+          (match List.last attributes with
+          | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; _ } ->
+            Type_context.set_external_symbol (Env.ctx env) ty_id ext_name
 
-        let header = {
-          T.Function.
-          name = (Identifier.(id.pident_name), ty_id);
-          name_loc= Identifier.(id.pident_loc) ;
-          params;
-        } in
+          | _ ->
+            let open Type_error in
+            let err = make_error (Env.ctx env) loc DeclareFunctionShouldSpecificExternal in
+            raise (Error err)
+          );
 
-        ty_id, (T.Declaration.Declare {
-          T.Declaration.
-          decl_visibility;
-          decl_ty_var = ty_id;
-          decl_spec = T.Declaration.DeclFunction header;
-          decl_loc;
-        })
+          let header = {
+            T.Function.
+            name = (Identifier.(id.pident_name), ty_id);
+            name_loc= Identifier.(id.pident_loc) ;
+            params;
+          } in
+
+          ty_id, (T.Declaration.Declare {
+            T.Declaration.
+            decl_visibility;
+            decl_ty_var = ty_id;
+            decl_spec = T.Declaration.DeclFunction header;
+            decl_loc;
+          })
+        )
       )
     )
 
@@ -997,6 +1003,7 @@ and annotate_class env cls =
                 builtin = false;
                 name = cls_method_name.pident_name;
                 spec = Function {
+                  fun_vars = [];
                   fun_params = method_params;
                   fun_return = method_return;
                 };
@@ -1091,7 +1098,7 @@ and annotate_class env cls =
         )
 
         | Cls_declare declare -> (
-          let { cls_decl_method_attributes; cls_decl_method_name; cls_decl_method_params; cls_decl_method_loc; cls_decl_method_return_ty; cls_decl_method_get_set; _ } = declare in
+          let { cls_decl_method_attributes; cls_decl_method_name; cls_decl_method_type_vars; cls_decl_method_params; cls_decl_method_loc; cls_decl_method_return_ty; cls_decl_method_get_set; _ } = declare in
           let type_visibility = Visibility.Public in
 
           let declare_id = Type_context.size ctx in
@@ -1109,106 +1116,107 @@ and annotate_class env cls =
           let parent_scope = Env.peek_scope env in
           let scope = new scope ~prev:parent_scope () in
 
-          let cls_decl_method_params, method_params, cls_method_params_deps =
-            Env.with_new_scope env scope (fun env ->
-              annotate_function_params env cls_decl_method_params
-            )
-          in
+          List.iter
+            ~f:(fun id -> scope#insert_generic_type_symbol id.pident_name)
+            cls_decl_method_type_vars;
 
-          let method_return, return_ty_deps =
-            match cls_decl_method_return_ty with
-            | Some ty -> annotate_type env ty
-            | None -> (
-              let unit_type = Env.ty_unit env in
-              TypeExpr.(Ctor (Ref unit_type, [])), [unit_type]
-            )
-          in
+          Env.with_new_scope env scope (fun env ->
+            let cls_decl_method_params, method_params, cls_method_params_deps = annotate_function_params env cls_decl_method_params in
+            let method_return, return_ty_deps =
+              match cls_decl_method_return_ty with
+              | Some ty -> annotate_type env ty
+              | None -> (
+                let unit_type = Env.ty_unit env in
+                TypeExpr.(Ctor (Ref unit_type, [])), [unit_type]
+              )
+            in
 
-          let method_get_set =
-            Option.map
-            ~f:(fun get_set ->
-              match get_set with
-              | Ast.Declaration.Cls_getter -> TypeDef.Getter
-              | Ast.Declaration.Cls_setter -> TypeDef.Setter
-            )
-            cls_decl_method_get_set
-          in
+            let method_get_set =
+              Option.map
+              ~f:(fun get_set ->
+                match get_set with
+                | Ast.Declaration.Cls_getter -> TypeDef.Getter
+                | Ast.Declaration.Cls_setter -> TypeDef.Setter
+              )
+              cls_decl_method_get_set
+            in
 
-          let new_type =
-            { TypeDef.
-              id = declare_id;
-              builtin = false;
-              name = cls_decl_method_name.pident_name;
-              spec = ClassMethod {
-                method_cls_id = cls_var.var_id;
-                method_get_set;
-                method_is_virtual = false;
-                method_params = method_params;
-                method_return;
-              };
-            }
-          in
+            let new_type =
+              { TypeDef.
+                id = declare_id;
+                builtin = false;
+                name = cls_decl_method_name.pident_name;
+                spec = ClassMethod {
+                  method_cls_id = cls_var.var_id;
+                  method_get_set;
+                  method_is_virtual = false;
+                  method_params = method_params;
+                  method_return;
+                };
+              }
+            in
 
-          let cls_elm = 
-            match cls_decl_method_get_set with
-            | Some Ast.Declaration.Cls_getter ->
-              Core_type.TypeDef.Cls_elm_get_set(type_visibility, Some new_type, None)
+            let cls_elm = 
+              match cls_decl_method_get_set with
+              | Some Ast.Declaration.Cls_getter ->
+                Core_type.TypeDef.Cls_elm_get_set(type_visibility, Some new_type, None)
 
-            | Some Ast.Declaration.Cls_setter ->
-              Core_type.TypeDef.Cls_elm_get_set(type_visibility, None, Some new_type)
+              | Some Ast.Declaration.Cls_setter ->
+                Core_type.TypeDef.Cls_elm_get_set(type_visibility, None, Some new_type)
+
+              | None ->
+                Core_type.TypeDef.Cls_elm_method(type_visibility, new_type)
+
+            in
+
+            add_tcls_element (cls_decl_method_name.pident_name, cls_elm) cls_decl_method_loc;
+
+            ignore (Type_context.new_id ctx
+              { Core_type.
+                deps = (List.append cls_method_params_deps return_ty_deps)
+                |> List.filter
+                  ~f:(fun id -> id <> cls_var.var_id)
+                ;
+                value = (TypeExpr.TypeDef new_type);
+                loc = cls_decl_method_loc;
+              });
+
+            (match cls_decl_method_get_set with
+            | Some Cls_getter -> 
+              class_scope#insert_cls_element
+                { Scope.ClsElm.
+                  name = (cls_decl_method_name.pident_name, declare_id);
+                  spec = Getter;
+                  (* temporary use public here *)
+                  visibility = Some Asttypes.Pvisibility_public;
+                }
+
+            | Some Cls_setter ->
+              class_scope#insert_cls_element
+                { Scope.ClsElm.
+                  name = cls_decl_method_name.pident_name, declare_id;
+                  spec = Setter;
+                  (* temporary use public here *)
+                  visibility = Some Asttypes.Pvisibility_public;
+                }
 
             | None ->
-              Core_type.TypeDef.Cls_elm_method(type_visibility, new_type)
+              class_scope#insert_cls_element
+                { Scope.ClsElm.
+                  name = cls_decl_method_name.pident_name, declare_id;
+                  spec = Method;
+                  (* temporary use public here *)
+                  visibility = Some Asttypes.Pvisibility_public;
+                }
+            );
 
-          in
-
-          add_tcls_element (cls_decl_method_name.pident_name, cls_elm) cls_decl_method_loc;
-
-          ignore (Type_context.new_id ctx
-            { Core_type.
-              deps = (List.append cls_method_params_deps return_ty_deps)
-              |> List.filter
-                ~f:(fun id -> id <> cls_var.var_id)
-              ;
-              value = (TypeExpr.TypeDef new_type);
-              loc = cls_decl_method_loc;
-            });
-
-          (match cls_decl_method_get_set with
-          | Some Cls_getter -> 
-            class_scope#insert_cls_element
-              { Scope.ClsElm.
-                name = (cls_decl_method_name.pident_name, declare_id);
-                spec = Getter;
-                (* temporary use public here *)
-                visibility = Some Asttypes.Pvisibility_public;
-              }
-
-          | Some Cls_setter ->
-            class_scope#insert_cls_element
-              { Scope.ClsElm.
-                name = cls_decl_method_name.pident_name, declare_id;
-                spec = Setter;
-                (* temporary use public here *)
-                visibility = Some Asttypes.Pvisibility_public;
-              }
-
-          | None ->
-            class_scope#insert_cls_element
-              { Scope.ClsElm.
-                name = cls_decl_method_name.pident_name, declare_id;
-                spec = Method;
-                (* temporary use public here *)
-                visibility = Some Asttypes.Pvisibility_public;
-              }
-          );
-
-          T.Declaration.Cls_declare {
-            cls_decl_method_attributes;
-            cls_decl_method_loc;
-            cls_decl_method_name = cls_decl_method_name.pident_name, declare_id;
-            cls_decl_method_params;
-          }
+            T.Declaration.Cls_declare {
+              cls_decl_method_attributes;
+              cls_decl_method_loc;
+              cls_decl_method_name = cls_decl_method_name.pident_name, declare_id;
+              cls_decl_method_params;
+            }
+          )
         )
       )
       cls_body_elements
@@ -1544,6 +1552,7 @@ and annotate_function env fun_ =
       builtin = false;
       name = fun_.header.id.pident_name;
       spec = Function {
+        fun_vars = List.map ~f:(fun id -> id.pident_name) header.type_vars;
         fun_params = params_type;
         fun_return = return_ty;
       };

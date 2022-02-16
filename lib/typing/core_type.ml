@@ -177,6 +177,7 @@ and TypeDef : sig
   }
 
   and _function = {
+    fun_vars:   string list;
     fun_params: TypeExpr.params;
     fun_return: TypeExpr.t;
   }
@@ -259,6 +260,7 @@ end = struct
   }
 
   and _function = {
+    fun_vars:   string list;
     fun_params: TypeExpr.params;
     fun_return: TypeExpr.t;
   }

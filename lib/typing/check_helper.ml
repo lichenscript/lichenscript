@@ -39,24 +39,45 @@ let find_typedef_of ctx type_expr =
   | TypeDef sym -> Some sym
   | _ -> None
 
-let rec type_assinable ctx left right =
+let rec type_assinable_with_maps ctx var_maps left right =
   let open TypeExpr in
   let left = Type_context.deref_type ctx left in
   let right = Type_context.deref_type ctx right in
   match (left, right) with
-  | (Any, _) -> true
-  | (_, Any) -> false
+  | (Any, _) -> var_maps, true
+  | (_, Any) -> var_maps, false
   | (Method _, _)
-  | (_, Method _) -> false
-  | (String, String) -> true
+  | (_, Method _) -> var_maps, false
+  | (String, String) -> var_maps, true
 
-  | (Tuple _, Tuple _) ->
-    type_equal ctx left right
+  | (TypeSymbol a, TypeSymbol b) ->
+    var_maps, String.equal a b
 
-  | (Array _, Array(TypeSymbol _)) -> true
+  | (TypeSymbol a, _) ->
+    (TypeVarMap.set var_maps ~key:a ~data:right), true
+
+  | (Tuple left_children, Tuple right_children) -> (
+    let tmp =
+      List.fold2
+      ~init:(var_maps, true)
+      ~f:(fun (var_maps, acc) left_item right_item ->
+        if not acc then (var_maps, false)
+        else (
+          type_assinable_with_maps ctx var_maps left_item right_item
+        )
+      )
+      left_children
+      right_children
+    in
+    match tmp with
+    | List.Or_unequal_lengths.Ok t -> t
+    | List.Or_unequal_lengths.Unequal_lengths -> var_maps, false
+  )
+
+  | (Array _, Array(TypeSymbol _)) -> var_maps, true
 
   | (Array left_arr, Array right_arr) ->
-    type_equal ctx left_arr right_arr
+    var_maps, (type_equal ctx left_arr right_arr)
 
   | (Lambda (params1, rt1), Lambda (params2, rt2)) -> (
     let test_params =
@@ -81,13 +102,8 @@ let rec type_assinable ctx left right =
       | _, _ -> false
     in
 
-    let test_rt =
-      if not (type_assinable ctx rt1 rt2) then (
-        false
-      ) else 
-        true
-    in
-    test_params && test_rest && test_rt
+    let var_maps, test_rt = type_assinable_with_maps ctx var_maps rt1 rt2 in
+    var_maps, (test_params && test_rest && test_rt)
   )
 
   | _ -> (
@@ -95,7 +111,7 @@ let rec type_assinable ctx left right =
     let c2_def = find_construct_of ctx right in
     match (c1_def, c2_def) with
     | (Some({ id = enum_id; spec = Enum _; _ }, _), Some({ spec = EnumCtor { enum_ctor_super_id; _ }; _}, _)) ->
-      enum_id = enum_ctor_super_id
+      var_maps, (enum_id = enum_ctor_super_id)
 
     (* assigning class to interface *)
     | (Some({ id = intf_id; spec = Interface _ ; _ }, _), Some({ spec = Class { tcls_implements; _ }; _ }, _)) -> (
@@ -108,29 +124,36 @@ let rec type_assinable ctx left right =
           | None -> false
         )
         tcls_implements in
-      Option.is_some test
+      var_maps, (Option.is_some test)
     )
 
     | (Some(left_def, left_args), Some(right_def, right_args)) ->
-      TypeDef.(left_def == right_def) && (
-        let result = List.fold2
-          ~init:true
-          ~f:(fun acc left right ->
-            if (not acc) then
-              acc
-            else
-              type_equal ctx left right
-          )
-          left_args right_args
-        in
-        match result with
-        | List.Or_unequal_lengths.Ok r -> r
-        | List.Or_unequal_lengths.Unequal_lengths -> false
-      )
+      let result =
+        TypeDef.(left_def == right_def) && (
+          let result = List.fold2
+            ~init:true
+            ~f:(fun acc left right ->
+              if (not acc) then
+                acc
+              else
+                type_equal ctx left right
+            )
+            left_args right_args
+          in
+          match result with
+          | List.Or_unequal_lengths.Ok r -> r
+          | List.Or_unequal_lengths.Unequal_lengths -> false
+        )
+      in
+      var_maps, result
     
     | _ ->
-      false
+      var_maps, false
   )
+
+and type_assinable ctx left right =
+  let _, result = type_assinable_with_maps ctx TypeVarMap.empty left right in
+  result
 
 and type_equal ctx left right =
   let open TypeExpr in

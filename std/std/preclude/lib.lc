@@ -33,6 +33,9 @@ public class Array<T> {
     @external("lc_std_array_slice")
     declare slice(begin: i32, end: i32): T[];
 
+    @external("lc_std_array_map")
+    declare map<V>(f: (element: T) => V): V[];
+
     @external("lc_std_array_get_length")
     declare get length(): i32;
 

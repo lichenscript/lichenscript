@@ -1752,6 +1752,20 @@ LCValue lc_std_array_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* ar
     return (LCValue) { { .ptr_val = (LCObject*)new_arr },  LC_TY_ARRAY };
 }
 
+LCValue lc_std_array_map(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    size_t i;
+    LCArray* arr = (LCArray*)this.ptr_val;
+    LCArray* new_arr = LCNewArrayWithCap(rt, arr->capacity);
+
+    for (i = 0; i < arr->len; i++) {
+        new_arr->data[i] = LCEvalLambda(rt, args[0], 1, (LCValue[]) { arr->data[i] });
+    }
+
+    new_arr->len = arr->len;
+
+    return (LCValue) { { .ptr_val = (LCObject*)new_arr },  LC_TY_ARRAY };
+}
+
 LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
     LCArray* arr = (LCArray*)this.ptr_val;
 

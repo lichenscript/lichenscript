@@ -414,10 +414,11 @@ and check_expression env expr =
     let ty_int = callee.ty_var in
     let deref_type_expr = Type_context.deref_node_type ctx ty_int  in
 
-    let check_params (expected_params: TypeExpr.params) =
+    let check_params symbol_map (expected_params: TypeExpr.params) =
       let { TypeExpr. params_content; params_rest } = expected_params in
       let pass_params = List.to_array call_params in
       let expected_params = List.to_array params_content in
+      let symbol_map = ref symbol_map in
       for i = 0 to ((Array.length expected_params) - 1) do
         let expect_param_name, expect_param = Array.get expected_params i in
         if i >= (Array.length pass_params) then (
@@ -426,7 +427,9 @@ and check_expression env expr =
         );
         let pass_param = Array.get pass_params i in
         let pass_param_type = Type_context.deref_node_type env.ctx pass_param.ty_var in
-        if not (Check_helper.type_assinable env.ctx expect_param pass_param_type) then (
+        let test_map, test_result = Check_helper.type_assinable_with_maps env.ctx !symbol_map expect_param pass_param_type in
+        symbol_map := test_map;
+        if not test_result then (
           let err = Type_error.(make_error env.ctx expr_loc (CannotPassParam(expect_param_name, expect_param, pass_param_type))) in
           raise (Type_error.Error err)
         )
@@ -458,7 +461,8 @@ and check_expression env expr =
           let actual = Array.length pass_params in
           let err = Type_error.(make_error env.ctx expr_loc (UnexpectedParams(expected, actual))) in
           raise (Type_error.Error err)
-      )
+      );
+      !symbol_map
     in
 
     let check_enum_ctor_params symbol_map (params: TypeExpr.t list) =
@@ -493,13 +497,13 @@ and check_expression env expr =
 
     match deref_type_expr with
     | TypeExpr.Lambda(params, ret) -> (
-      check_params params;
+      ignore (check_params Check_helper.TypeVarMap.empty params);
       Type_context.update_node_type ctx expr.ty_var ret
     )
 
     | TypeExpr.Method(_, params, ret) -> (
-      check_params params;
-      Type_context.update_node_type ctx expr.ty_var ret
+      let symbol_map = check_params Check_helper.TypeVarMap.empty params in
+      Type_context.update_node_type ctx expr.ty_var (Check_helper.replace_type_vars_with_maps env.ctx symbol_map ret)
     )
 
     | _ ->
@@ -507,8 +511,8 @@ and check_expression env expr =
         let _ty_def = Check_helper.find_construct_of ctx deref_type_expr in
         match deref_type_expr with
         | TypeExpr.TypeDef { TypeDef. spec = Function _fun; _ } ->
-          check_params _fun.fun_params;
-          Type_context.update_node_type ctx expr.ty_var _fun.fun_return
+          let symbol_map = check_params Check_helper.TypeVarMap.empty _fun.fun_params in
+          Type_context.update_node_type ctx expr.ty_var (Check_helper.replace_type_vars_with_maps env.ctx symbol_map _fun.fun_return)
 
         | TypeExpr.TypeDef { TypeDef. spec = EnumCtor enum_ctor; _} -> (
           let super_id = enum_ctor.enum_ctor_super_id in
