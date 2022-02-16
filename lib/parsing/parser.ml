@@ -1083,7 +1083,6 @@ and parse_maybe_arrow_function env : Expression.t =
 
   )
 
-
 and parse_binary_expression env : Expression.t =
   let open Expression in
   let rec parse_binary_enhance env left_expr left_token =
