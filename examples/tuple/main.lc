@@ -1,0 +1,9 @@
+
+function createTuple(): (string, i32) {
+    ("a", 1)
+}
+
+function main() {
+    const tuple = createTuple();
+    print(tuple);
+}

@@ -267,6 +267,17 @@ static void LCFreeClassObject(LCRuntime* rt, LCValue val) {
     lc_free(rt, val.ptr_val);
 }
 
+static inline void LCFreeTuple(LCRuntime* rt, LCValue val) {
+    size_t i;
+    LCTuple* tuple = (LCTuple*)val.ptr_val;
+
+    for (i = 0; i < tuple->len; i++) {
+        LCRelease(rt, tuple->data[i]);
+    }
+
+    lc_free(rt, tuple);
+}
+
 static inline void LCFreeArray(LCRuntime* rt, LCValue val) {
     LCArray* arr = (LCArray*)val.ptr_val;
     uint32_t i;
@@ -317,6 +328,10 @@ static void LCFreeObject(LCRuntime* rt, LCValue val) {
         LCFreeClassObject(rt, val);
         break;
 
+    case LC_TY_TUPLE:
+        LCFreeTuple(rt, val);
+        break;
+
     case LC_TY_ARRAY:
         LCFreeArray(rt, val);
         break;
@@ -326,7 +341,6 @@ static void LCFreeObject(LCRuntime* rt, LCValue val) {
         break;
         
     case LC_TY_STRING:
-    case LC_TY_TUPLE:
     case LC_TY_SYMBOL:
     case LC_TY_CLASS_OBJECT_META:
     case LC_TY_BOXED_I64:
@@ -1048,6 +1062,7 @@ LCValue LCNewTuple(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args) 
 
     tuple->header.count = 1;
     tuple->header.class_id = 0;
+    tuple->len = arg_len;
 
     for (i = 0; i < arg_len; i++) {
         LCRetain(args[i]);
@@ -1177,6 +1192,7 @@ static void std_print_string(LCRuntime* rt, LCString* str) {
 }
 
 void std_print_array(LCRuntime* rt, LCValue val);
+void std_print_tuple(LCRuntime* rt, LCValue val);
 
 static void std_print_val(LCRuntime* rt, LCValue val) {
     switch (val.tag)
@@ -1217,6 +1233,10 @@ static void std_print_val(LCRuntime* rt, LCValue val) {
         printf("%lf", ((LCBox64*)val.ptr_val)->u.f64);
         break;
 
+    case LC_TY_TUPLE:
+        std_print_tuple(rt, val);
+        break;
+
     case LC_TY_ARRAY:
         std_print_array(rt, val);
         break;
@@ -1229,6 +1249,19 @@ static void std_print_val(LCRuntime* rt, LCValue val) {
         break;
     }
 
+}
+
+void std_print_tuple(LCRuntime* rt, LCValue val) {
+    size_t i;
+    LCTuple* tuple = (LCTuple*)val.ptr_val;
+    printf("(");
+    for (i = 0; i < tuple->len; i++) {
+        std_print_val(rt, tuple->data[i]);
+        if (i < tuple->len - 1) {
+            printf (", ");
+        }
+    }
+    printf(")");
 }
 
 void std_print_array(LCRuntime* rt, LCValue val) {

@@ -210,6 +210,7 @@ typedef struct LCRuntime LCRuntime;
 
 typedef struct LCTuple {
     LC_OBJ_HEADER
+    size_t  len;
     LCValue data[];
 } LCTuple;
 
