@@ -27,6 +27,7 @@ module Pattern = struct
   | Literal of Ast.Literal.t
   | Symbol of identifier
   | EnumCtor of (identifier * t)
+  | Tuple of t list
   | Array of array_pat
   [@@deriving show]
 

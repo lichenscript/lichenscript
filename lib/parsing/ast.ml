@@ -181,6 +181,7 @@ and Pattern : sig
     | Literal of Literal.t
     | Identifier of Identifier.t
     | EnumCtor of (Identifier.t * t)
+    | Tuple of t list
     | Array of array_pat
 
   and t = {

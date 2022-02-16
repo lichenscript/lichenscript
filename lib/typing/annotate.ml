@@ -111,6 +111,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
         }
       )
 
+      | Tuple _
       | Literal _
       | Array _
       | EnumCtor _ -> (
@@ -1326,6 +1327,18 @@ and annotate_pattern ~pat_id env pat : (T.Pattern.t * int list) =
         (id.pident_name, ctor_var.var_id),
         param_pat
       ))
+    )
+
+    | Tuple children -> (
+      let elements, element_deps =
+        children
+        |> List.map ~f:(annotate_pattern ~pat_id:(pat_id + 1) env)
+        |> List.unzip
+      in
+
+      deps := List.append !deps (List.concat element_deps);
+
+      T.Pattern.Tuple elements
     )
 
     | Array array_pat -> (

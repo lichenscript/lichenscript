@@ -868,6 +868,27 @@ and check_expression env expr =
 
         | _ -> raise_err ()
       )
+      | Tuple children -> (
+        let raise_err () =
+          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("tuple", expr_type))) in
+          raise (Type_error.Error err)
+        in
+        match expr_type with
+        | TypeExpr.Tuple children_types -> (
+          let tmp =
+            List.map2
+            ~f:(fun child_pat child_type ->
+              check_clause_pattern child_type child_pat;
+            )
+            children children_types
+          in
+          match tmp with
+          | List.Or_unequal_lengths.Ok _ -> ()
+          | List.Or_unequal_lengths.Unequal_lengths -> raise_err ()
+        )
+
+        | _ -> raise_err ()
+      )
       | Array { elements; rest } -> (
         let raise_err () =
           let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("array", expr_type))) in
