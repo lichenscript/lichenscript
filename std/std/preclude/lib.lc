@@ -36,6 +36,9 @@ public class Array<T> {
     @external("lc_std_array_map")
     declare map<V>(f: (element: T) => V): V[];
 
+    @external("lc_std_array_filter")
+    declare filter(f: (element: T) => boolean): T[];
+
     @external("lc_std_array_get_length")
     declare get length(): i32;
 

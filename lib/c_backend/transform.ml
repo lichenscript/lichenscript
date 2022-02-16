@@ -1501,8 +1501,9 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
           [if_stmt]
         )
       ) else ( (* binding local var *)
+        let sym = find_variable env name in
         let assign_stmt = { C_op.Stmt.
-          spec = Expr(Assign(Ident (SymLocal name), match_expr));
+          spec = Expr(Assign(Ident sym, match_expr));
           loc = Loc.none;
         } in
         (fun genereator ->
