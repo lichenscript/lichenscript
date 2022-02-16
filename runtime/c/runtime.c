@@ -27,6 +27,7 @@
 
 #define LC_INIT_SYMBOL_BUCKET_SIZE 128
 #define LC_INIT_CLASS_META_CAP 8
+#define LC_SMALL_MAP_THRESHOLD 8
 #define I64_POOL_SIZE 1024
 
 #define lc_raw_malloc malloc
@@ -2177,7 +2178,7 @@ LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
         }
 
         if (map->is_small) {
-            if (map->size >= 8 && (
+            if (map->size >= LC_SMALL_MAP_THRESHOLD && (
                 map->key_ty == LC_TY_STRING || map->key_ty == LC_TY_I32 || map->key_ty == LC_TY_CHAR)) {
 
                 lc_std_map_construct_hashtable(rt, map);
@@ -2263,6 +2264,28 @@ LCValue lc_std_map_get(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     return /* Some(result) */LCNewUnionObject(rt, 0, 1, (LCValue[]) { t->value });
 }
 
+static void lc_std_map_become_small(LCRuntime* rt, LCMap* map) {
+    int i;
+    LCMapBucket *bucket, *next;
+
+    for (i = 0; i < map->bucket_size; i++) {
+        bucket = map->buckets[i];
+
+        while (bucket != NULL) {
+            next = bucket->next;
+
+            lc_free(rt, bucket);
+
+            bucket = next;
+        }
+    }
+
+    lc_free(rt, map->buckets);
+    map->buckets = NULL;
+
+    map->is_small = 1;
+}
+
 static inline LCValue lc_std_map_remove_complex(LCRuntime* rt, LCMap* map, LCValue key) {
     LCMapTuple* t;
     LCMapBucket **bucket_ref, *next_bucket;
@@ -2297,7 +2320,10 @@ static inline LCValue lc_std_map_remove_complex(LCRuntime* rt, LCMap* map, LCVal
             lc_free(rt, *bucket_ref);
             (*bucket_ref) = next_bucket;
 
-            map->size--;
+            if (--map->size < LC_SMALL_MAP_THRESHOLD) {
+                lc_std_map_become_small(rt, map);
+            }
+
             return result;
         }
 
