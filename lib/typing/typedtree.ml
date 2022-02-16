@@ -96,6 +96,7 @@ module%gen rec Expression : sig
     | Array of t list
     | Map of map_entry list
     | Call of call
+    | Tuple of t list
     | Member of t * Identifier.t
     | Index of t * t
     | Unary of

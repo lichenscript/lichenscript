@@ -977,6 +977,13 @@ and parse_maybe_arrow_function env : Expression.t =
 
   | None -> (
     match relaxed_arrow.params with
+    | [] -> (
+      { Expression.
+        spec = Constant (Literal.Unit);
+        loc = relaxed_arrow.loc;
+        attributes = [];
+      }
+    )
     | first::[] -> (
       (match first.param_colon with
       | Some (_, perr_loc) ->
@@ -998,16 +1005,12 @@ and parse_maybe_arrow_function env : Expression.t =
     )
 
     | _ -> (
-      let tok = Token.value_of_token Token.T_LPAREN in
-      let lex_error = Lichenscript_lex.Lex_error.Unexpected tok in
-      let perr_spec = Parse_error.LexError lex_error in
-      let err =
-        { Parse_error.
-          perr_loc = relaxed_arrow.params_loc;
-          perr_spec;
-        }
-      in
-      Parse_error.error err
+      let expressions = List.map (fun p -> ReleaxedArrow.(p.param_expr)) relaxed_arrow.params in
+      { Expression.
+        spec = Tuple expressions;
+        loc = relaxed_arrow.loc;
+        attributes = [];
+      }
     )
 
   )

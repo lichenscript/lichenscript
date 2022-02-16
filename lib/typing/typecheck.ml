@@ -341,6 +341,17 @@ and check_expression env expr =
     Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Array arr_type)
   )
 
+  | Tuple children -> (
+    let children_types = List.map
+      ~f:(fun child ->
+        check_expression env child;
+        Type_context.deref_node_type env.ctx child.ty_var
+      )
+      children
+    in
+    Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Tuple children_types)
+  )
+
   | Map map_entries -> (
     let map_opt = env.scope#find_type_symbol "Map" in
     let map_ty = Option.value_exn ~message:"Cannot found Map in the current scope" map_opt in
@@ -795,6 +806,13 @@ and check_expression env expr =
         if not (Annotate.is_name_enum_or_class name) then (
           Type_context.update_node_type env.ctx name_id expr_type
         );
+      )
+
+      | Literal Ast.Literal.Unit -> (
+        if not (Check_helper.is_unit env.ctx expr_type) then (
+          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("unit", expr_type))) in
+          raise (Type_error.Error err)
+        )
       )
 
       | Literal (Ast.Literal.Boolean _) -> (

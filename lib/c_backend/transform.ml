@@ -694,6 +694,9 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     | Constant literal -> (
       let open Literal in
       match literal with
+      | Unit ->
+        C_op.Expr.Null
+
       | String(content, _, _) -> 
         auto_release_expr env ~is_move ~append_stmts ty_var (C_op.Expr.NewString content)
 
@@ -813,6 +816,8 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       prepend_stmts := List.append !prepend_stmts [tmp_stmt];
 
       C_op.Expr.Temp tmp_id
+
+    | Tuple _ -> failwith "tuple unimplemented"
 
     | Array arr_list -> (
       let tmp_id = env.tmp_vars_count in

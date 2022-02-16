@@ -162,9 +162,6 @@ typedef struct LCClassMeta {
 typedef struct LCRuntime {
     LCMallocState malloc_state;
     uint32_t seed;
-    LCSymbolBucket* symbol_buckets;
-    uint32_t symbol_bucket_size;
-    uint32_t symbol_len;
     LCValue* i64_pool;
     LCBox64* i64_pool_space;
     uint32_t cls_meta_cap;
@@ -453,13 +450,6 @@ LCRuntime* LCNewRuntime() {
 
     runtime->seed = time(NULL);
 
-    size_t bucket_size = sizeof(LCSymbolBucket) * LC_INIT_SYMBOL_BUCKET_SIZE;
-    LCSymbolBucket* buckets = lc_mallocz(runtime, bucket_size);
-
-    runtime->symbol_buckets = buckets;
-    runtime->symbol_bucket_size = LC_INIT_SYMBOL_BUCKET_SIZE;
-    runtime->symbol_len = 0;
-
     runtime->i64_pool = init_i64_pool(runtime);
 
     runtime->cls_meta_cap = LC_INIT_CLASS_META_CAP;
@@ -475,18 +465,6 @@ LCRuntime* LCNewRuntime() {
 
 void LCFreeRuntime(LCRuntime* rt) {
     uint32_t i;
-    LCSymbolBucket* bucket_ptr;
-    LCSymbolBucket* next;
-    for (i = 0; i < rt->symbol_bucket_size; i++) {
-        bucket_ptr = rt->symbol_buckets[i].next;
-        while (bucket_ptr != NULL) {
-            next = bucket_ptr->next;
-            LCFreeObject(rt, bucket_ptr->content);
-            bucket_ptr = next;
-        }
-    }
-
-    lc_free(rt, rt->symbol_buckets);
 
     free_i64_pool(rt);
 
@@ -1010,58 +988,6 @@ void LCLambdaSetRefValue(LCRuntime* rt, LCValue lambda_val, int index, LCValue v
     LCRefCellSetValue(rt, ref, value);
 }
 
-LCValue LCNewSymbolLen(LCRuntime* rt, const char* content, uint32_t len) {
-    LCValue result = MK_NULL();
-    // LCString* result = NULL;
-    uint32_t symbol_hash = hash_string8((const uint8_t*)content, len, rt->seed);
-    uint32_t symbol_bucket_index = symbol_hash % rt->symbol_bucket_size;
-
-    LCSymbolBucket* bucket_at_index = &rt->symbol_buckets[symbol_bucket_index];
-    LCSymbolBucket* new_bucket = NULL;
-    LCString* str_ptr = NULL;
-
-    while (1) {
-        if (bucket_at_index->content.tag == LC_TY_NULL) {
-            break;
-        }
-
-        str_ptr = (LCString*)bucket_at_index->content.ptr_val;
-        if (strcmp((const char *)str_ptr->u.str8, content) == 0) {
-            result = bucket_at_index->content;
-            break;
-        }
-
-        if (bucket_at_index->next == NULL) {
-            break;
-        }
-        bucket_at_index = bucket_at_index->next;
-    }
-
-    // symbol not found
-    if (result.tag == LC_TY_NULL) {
-        result = LCNewStringFromCStringLen(rt, (const unsigned char*)content, len);
-        result.tag = LC_TY_SYMBOL;
-        str_ptr = (LCString*)result.ptr_val;
-        str_ptr->header.count = LC_NO_GC;
-        str_ptr->hash = hash_string8((const unsigned char*)content, len, rt->seed);
-
-        if (bucket_at_index->content.tag == LC_TY_NULL) {
-            bucket_at_index->content = result;
-        } else {
-            new_bucket = malloc(sizeof(LCSymbolBucket));
-            new_bucket->content = result;
-            new_bucket->next = NULL;
-
-            bucket_at_index->next = new_bucket;
-        }
-        rt->symbol_len++;
-    }
-
-    // TODO: enlarge symbol map
-
-    return result;
-}
-
 LCArray* LCNewArrayWithCap(LCRuntime* rt, size_t cap) {
     LCArray* result = (LCArray*)lc_malloc(rt, sizeof(LCArray));
     result->header.count = 1;
@@ -1111,10 +1037,6 @@ void LCArraySetValue(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     LCRelease(rt, arr->data[index]);
     LCRetain(args[1]);
     arr->data[index] = args[1];
-}
-
-LCValue LCNewSymbol(LCRuntime* rt, const char* content) {
-    return LCNewSymbolLen(rt, content, strlen(content));
 }
 
 LCValue LCNewI64(LCRuntime* rt, int64_t val) {

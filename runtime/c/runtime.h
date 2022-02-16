@@ -272,9 +272,6 @@ LCValue LCNewArrayLen(LCRuntime* rt, size_t size);
 LCValue LCArrayGetValue(LCRuntime* rt, LCValue this, int index);
 void LCArraySetValue(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
-LCValue LCNewSymbolLen(LCRuntime* rt, const char* content, uint32_t len);
-LCValue LCNewSymbol(LCRuntime* rt, const char* content);
-
 typedef struct LCClassMethodDef {
     const char* name;
     int flag;

@@ -187,6 +187,23 @@ and print_type_value ctx ty_value =
 
     "::" ^ _method.name ^ prefix ^ "): " ^ (print_type_value ctx rt)
 
+  | Tuple childrens -> (
+    let children_len = List.length childrens in
+    let buf = Buffer.create 8 in
+    Buffer.add_string buf "(";
+    List.iteri
+      ~f:(fun index item ->
+        let child = print_type_value ctx item in
+        Buffer.add_string buf child;
+        if index <> (children_len - 1) then (
+          Buffer.add_string buf ", "
+        )
+      )
+      childrens;
+    Buffer.add_string buf ")";
+    Buffer.contents buf
+  )
+
   | Array arr ->
     (print_type_value ctx arr) ^ "[]"
 
