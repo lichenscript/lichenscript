@@ -661,6 +661,10 @@ and prescan_pattern_for_scope ~kind ~(scope: Scope.scope) env pat =
   )
 
   | EnumCtor (_, child_pat) -> prescan_pattern_for_scope ~kind ~scope env child_pat
+
+  | Tuple children ->
+    List.iter ~f:(prescan_pattern_for_scope ~kind ~scope env) children
+
   | Array { elements; rest } ->
     List.iter ~f:(prescan_pattern_for_scope ~kind ~scope env) elements;
     Option.iter ~f:(prescan_pattern_for_scope ~kind ~scope env) rest

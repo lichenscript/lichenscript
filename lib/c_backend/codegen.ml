@@ -447,6 +447,14 @@ and codegen_expression (env: t) (expr: Expr.t) =
     codegen_expression env expr;
     ps env ")"
 
+  | TupleGetValue(expr, index) -> (
+     ps env "LC_TUPLE_GET(";
+     codegen_expression env expr;
+     ps env ", ";
+     ps env (Int.to_string index);
+     ps env ")"
+   )
+
   | ArrayGetValue (sym, index) -> (
     ps env "LCArrayGetValue(rt, ";
     codegen_expression env sym;

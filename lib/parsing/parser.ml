@@ -1515,6 +1515,26 @@ and parse_pattern env : Pattern.t =
       parse_array_pattern_continue []
     )
 
+    | Token.T_LPAREN -> (
+      Eat.token env;
+      let children = ref [] in
+
+      while (Peek.token env) <> Token.T_RPAREN do
+        let child = parse_pattern env in
+        children := child::(!children);
+        if (Peek.token env) <> Token.T_RPAREN then (
+          Expect.token env Token.T_COMMA
+        )
+      done;
+
+      Expect.token env Token.T_RPAREN;
+
+      match !children with
+      | [] -> Literal (Literal.Unit)
+      | _ ->
+        Tuple (List.rev !children)
+    )
+
     | _ -> (
       let perr_spec = Parser_env.get_unexpected_error next in
       let err = Parse_error.error {

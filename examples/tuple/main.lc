@@ -6,4 +6,8 @@ function createTuple(): (string, i32) {
 function main() {
     const tuple = createTuple();
     print(tuple);
+
+    match tuple {
+        case (a, b) => print("a: ", a, " b: ", b)
+    }
 }

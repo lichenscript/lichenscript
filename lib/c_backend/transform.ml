@@ -1567,6 +1567,51 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
       this_pm >>= child_pm
     )
 
+    | Tuple children -> (
+      let open C_op in
+      let assign_stmts, release_stmts, child_pms = 
+        children
+        |> List.mapi
+          ~f:(fun index elm ->
+            let match_tmp = env.tmp_vars_count in
+            env.tmp_vars_count <- env.tmp_vars_count + 1;
+            let assign_stmt = { C_op.Stmt.
+              spec = Expr(Assign(Temp match_tmp, TupleGetValue(match_expr, index)));
+              loc = Loc.none;
+            } in
+
+            let release_stmt = { C_op.Stmt.
+              spec = Release(Expr.Temp match_tmp);
+              loc = Loc.none;
+            } in
+
+            let child_pm = transform_pattern_to_test (Temp match_tmp) elm in
+
+            assign_stmt, release_stmt, child_pm
+          )
+        |> List.unzip3
+      in
+      let open PMMeta in
+      let this_pm: t = fun generator ->
+        let acc = generator ~finalizers:release_stmts () in
+        if is_last_goto acc then
+          List.concat [
+            assign_stmts;
+            acc;
+          ]
+        else
+          List.concat [
+            assign_stmts;
+            acc;
+            release_stmts;
+          ]
+      in
+      List.fold
+        ~init:this_pm
+        ~f:(fun acc elm -> acc >>= elm)
+        child_pms
+    )
+
     | Array { elements; rest; } -> (
       let elm_len = List.length elements in
       let open C_op in
