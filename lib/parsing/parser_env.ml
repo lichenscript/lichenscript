@@ -115,8 +115,12 @@ type env = {
   mutable scope: Parse_scope.t;
 }
 
-let add_top_level env ~name ~visibility =
-  Core_kernel.Hashtbl.set env.top_level.names ~key:name ~data:visibility
+let add_top_level env ~name ~loc ~visibility =
+  Core_kernel.Hashtbl.set env.top_level.names ~key:name ~data:{ Top_level.
+    item_name = name;
+    item_loc = loc;
+    item_visibility = visibility;
+  }
 
 let get_top_level env =
   env.top_level

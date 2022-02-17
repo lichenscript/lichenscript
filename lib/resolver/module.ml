@@ -14,6 +14,7 @@
  * limitations under the License.
  *)
 open Core
+open Lichenscript_lex
 open Lichenscript_parsing
 open Lichenscript_typing
 
@@ -31,7 +32,7 @@ type export = {
 }
 
 (* prev export * new export *)
-exception ReexportSymbol of (export * export)
+exception ReexportSymbol of (Loc.t * export * export)
 
 type t = {
   mod_full_path: string;
@@ -59,34 +60,29 @@ let set_files env files =
   env.files <- files
 
 let finalize_module_exports env =
+  let module_scope = env.module_scope in
+  let vars = module_scope#vars in
   List.iter
-    ~f:(fun file ->
-      let typed_env = file.typed_env in
-      let module_scope = Env.peek_scope typed_env in
-      let vars = module_scope#vars in
-      List.iter
-        ~f:(fun (name, ty_var) -> 
-          let visibility = module_scope#get_visibility name in
-          match visibility with
-          | Some Asttypes.Pvisibility_public -> (
-            let export = {
-              export_name = name;
-              export_var = ty_var;
-            } in
-            (match Hashtbl.find env.exports name with
-            | Some old_export -> (
-              raise (ReexportSymbol (old_export, export))
-            )
-            | None -> ()
-            );
-            Hashtbl.set env.exports ~key:name ~data:export;
-          )
-
-          | _ -> ()
+    ~f:(fun (name, ty_var) -> 
+      let visibility = module_scope#get_visibility name in
+      match visibility with
+      | Some Asttypes.Pvisibility_public -> (
+        let export = {
+          export_name = name;
+          export_var = ty_var;
+        } in
+        (match Hashtbl.find env.exports name with
+        | Some old_export -> (
+          raise (ReexportSymbol (ty_var.var_loc, old_export, export))
         )
-        vars
+        | None -> ()
+        );
+        Hashtbl.set env.exports ~key:name ~data:export;
+      )
+
+      | _ -> ()
     )
-    env.files
+    vars
 
 let find_export env ~name =
   Hashtbl.find env.exports name

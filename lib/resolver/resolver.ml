@@ -53,8 +53,8 @@ class file_scope ~prev env extern_modules = object
   method! insert_var_symbol name var =
     prev#insert_var_symbol name var
 
-  method! new_var_symbol ~id ~kind name =
-    prev#new_var_symbol ~id ~kind name 
+  method! new_var_symbol ~id ~kind ~loc name =
+    prev#new_var_symbol ~id ~kind ~loc name 
 
   method! init_symbol name =
     prev#init_symbol name
@@ -193,18 +193,20 @@ let rec compile_file_to_path ~ctx ~mod_path env _mod path =
             match acc with
             | Some _ -> acc
             | None ->
-              let path = Filename.concat path source in
-              if Sys.is_directory_exn path then (
-                Some path
-              ) else None
+              if Filename.is_absolute source then
+                Some (source, source)
+              else (
+                let path = Filename.concat path source in
+                if Sys.is_directory_exn path then (
+                  Some (Filename.realpath path, source)
+                ) else None
+              )
           )
           find_paths in
       match result with
-      | Some path -> (
-        match parse_module_by_dir ~ctx env path with
-        | Some full_path ->
-          extern_modules := full_path::!extern_modules;
-        | None -> ()
+      | Some (path, source) -> (
+        ignore (parse_module_by_dir ~ctx env ~real_path:path source);
+        extern_modules := path::!extern_modules;
       )
       | None ->
         failwith (Format.sprintf "can not find module %s" source)
@@ -234,8 +236,12 @@ let rec compile_file_to_path ~ctx ~mod_path env _mod path =
   in
   insert_moudule_file env ~mod_path file
 
-(* recursive all files in the path *)
-and parse_module_by_dir ~ctx env dir_path : string option =
+(*
+ * recursive all files in the path
+ *
+ * @param real_path must be an absolute path
+ *)
+and parse_module_by_dir ~ctx env ~real_path:dir_path _source : string option =
   let iterate_parse_file mod_path =
     let module_scope = new module_scope ~prev:(Type_context.root_scope ctx) () in
     let _mod = Module.create ~full_path:mod_path ~module_scope () in
@@ -258,10 +264,9 @@ and parse_module_by_dir ~ctx env dir_path : string option =
       children;
     Module.finalize_module_exports _mod;
   in
-  let full_path = Filename.realpath dir_path in
-  if not (Linker.has_module env.linker full_path) then (
-    iterate_parse_file full_path;
-    Some full_path
+  if not (Linker.has_module env.linker dir_path) then (
+    iterate_parse_file dir_path;
+    Some dir_path
   ) else
     None
 
@@ -324,7 +329,7 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~platform ~verbose en
 
     (* parse the entry dir *)
     let dir_of_entry = Filename.dirname entry_file_path in
-    let entry_full_path = parse_module_by_dir ~ctx env dir_of_entry in
+    let entry_full_path = parse_module_by_dir ~ctx env ~real_path:(Filename.realpath dir_of_entry) dir_of_entry  in
 
     typecheck_all_modules ~ctx ~verbose env;
 
