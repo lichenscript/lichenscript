@@ -5,6 +5,7 @@
   lichenscript_parsing
   lichenscript_typing
   lichenscript_c
+  lichenscript_js
   core_kernel
   re
   )
