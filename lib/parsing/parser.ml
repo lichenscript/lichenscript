@@ -1523,6 +1523,7 @@ and parse_pattern env : Pattern.t =
 
     | Token.T_NUMBER _
     | Token.T_STRING _
+    | Token.T_CHAR _
     | Token.T_TRUE 
     | Token.T_FALSE ->
       let l = parse_literal env in

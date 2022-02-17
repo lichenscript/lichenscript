@@ -1475,6 +1475,21 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
       )
     )
 
+    | Literal (Literal.Char ch) -> (
+      let if_test = C_op.Expr.IntValue(I32Binary(BinaryOp.Equal, match_expr, C_op.Expr.NewChar ch)) in
+      (fun genereator ->
+        let if_stmt = { C_op.Stmt.
+          spec = If {
+            if_test;
+            if_consequent= genereator ~finalizers:[] ();
+            if_alternate = None;
+          };
+          loc = Loc.none;
+        } in
+        [if_stmt]
+      )
+    )
+
     | Literal _ -> failwith "unimplemented"
 
     | Symbol (name, name_id) -> (
