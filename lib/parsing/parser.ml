@@ -225,6 +225,8 @@ and parse_declaration env : Declaration.t =
       let next = Peek.token env in
       match next with
       | Token.T_STRING (loc, content, _, _) -> (
+        Eat.token env;
+        ignore (Eat.maybe env Token.T_SEMICOLON);
         Import {
           source = content;
           source_loc = loc;
@@ -251,9 +253,9 @@ and parse_declaration env : Declaration.t =
         let _fun = parse_function ~visibility env in
 
         let { Function. header = { id; _ }; _ } = _fun in
-        let name = id.pident_name in
+        let { Identifier. pident_name; pident_loc; _ } = id in
 
-        Parser_env.add_top_level env ~name ~visibility;
+        Parser_env.add_top_level env ~name:pident_name ~loc:pident_loc ~visibility;
 
         Function_ _fun
       )
@@ -261,8 +263,8 @@ and parse_declaration env : Declaration.t =
       | Token.T_INTERFACE -> (
         let intf = parse_interface env ~visibility in
 
-        let name = intf.intf_name.pident_name in
-        Parser_env.add_top_level env ~name ~visibility;
+        let { Identifier. pident_name; pident_loc; _ } = intf.intf_name in
+        Parser_env.add_top_level env ~name:pident_name ~loc:pident_loc ~visibility;
 
         Interface intf
       )
@@ -273,8 +275,8 @@ and parse_declaration env : Declaration.t =
           let function_header = parse_function_header env in
           let spec = Declaration.DeclFunction function_header in
 
-          let name = function_header.id.pident_name in
-          Parser_env.add_top_level env ~name ~visibility;
+          let { Identifier. pident_name; pident_loc; _ } = function_header.id in
+          Parser_env.add_top_level env ~name:pident_name ~loc:pident_loc ~visibility;
 
           if Peek.token env = Token.T_SEMICOLON then (
             Eat.token env
@@ -292,7 +294,8 @@ and parse_declaration env : Declaration.t =
           let start_loc = Peek.loc env in
           Expect.token env Token.T_CASE;
           let case_name = parse_identifier env in
-          Parser_env.add_top_level env ~name:(case_name.pident_name) ~visibility;
+          let { Identifier. pident_name; pident_loc; _ } = case_name in
+          Parser_env.add_top_level env ~name:pident_name ~loc:pident_loc ~visibility;
           let fields =
             if (Peek.token env) == Token.T_LPAREN then (
               let result = ref [] in
@@ -339,7 +342,7 @@ and parse_declaration env : Declaration.t =
 
         Expect.token env Token.T_RCURLY;
 
-        Parser_env.add_top_level env ~name:(name.pident_name) ~visibility;
+        Parser_env.add_top_level env ~name:(name.pident_name) ~loc:name.pident_loc ~visibility;
 
         Enum { Enum.
           visibility;
@@ -750,7 +753,7 @@ and parse_class ~visibility env : Declaration._class =
   let id = parse_identifier env in
 
   let name = id.pident_name in
-  Parser_env.add_top_level env ~name ~visibility;
+  Parser_env.add_top_level env ~name ~loc:id.pident_loc ~visibility;
 
   let cls_type_vars =
     if (Peek.token env) = Token.T_LESS_THAN then

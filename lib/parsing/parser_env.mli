@@ -1,9 +1,10 @@
+open Lichenscript_lex
 
 type env
 
 val init_env: Lichenscript_lex.File_key.t option -> string -> env
 
-val add_top_level: env -> name:string -> visibility:Asttypes.visibility option -> unit
+val add_top_level: env -> name:string -> loc:Loc.t -> visibility:Asttypes.visibility option -> unit
 
 val get_top_level: env -> Top_level.t
 

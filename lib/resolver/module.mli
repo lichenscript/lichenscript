@@ -1,3 +1,4 @@
+open Lichenscript_lex
 open Lichenscript_parsing
 open Lichenscript_typing
 
@@ -16,7 +17,7 @@ type export = {
 }
 
 (* prev export * new export *)
-exception ReexportSymbol of (export * export)
+exception ReexportSymbol of (Loc.t * export * export)
 
 type t
 

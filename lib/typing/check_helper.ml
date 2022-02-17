@@ -128,24 +128,31 @@ let rec type_assinable_with_maps ctx var_maps left right =
     )
 
     | (Some(left_def, left_args), Some(right_def, right_args)) ->
-      let result =
-        TypeDef.(left_def == right_def) && (
-          let result = List.fold2
-            ~init:true
-            ~f:(fun acc left right ->
-              if (not acc) then
+      if TypeDef.(not (left_def == right_def)) then (
+        var_maps, false
+      ) else (
+        let result = List.fold2
+          ~init:(var_maps, true)
+          ~f:(fun acc left right ->
+            let var_names, acc' = acc in
+            match left with
+            | TypeSymbol sym_name ->
+              Format.eprintf "sym name: %s\n" sym_name;
+              (TypeVarMap.set var_names ~key:sym_name ~data:right), acc'
+
+            | _ -> (
+              if (not acc') then
                 acc
               else
-                type_equal ctx left right
+                var_maps, (type_equal ctx left right)
             )
-            left_args right_args
-          in
-          match result with
-          | List.Or_unequal_lengths.Ok r -> r
-          | List.Or_unequal_lengths.Unequal_lengths -> false
-        )
-      in
-      var_maps, result
+          )
+          left_args right_args
+        in
+        match result with
+        | List.Or_unequal_lengths.Ok r -> r
+        | List.Or_unequal_lengths.Unequal_lengths -> var_maps, false
+      )
     
     | _ ->
       var_maps, false

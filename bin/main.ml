@@ -198,6 +198,14 @@ and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platf
       ignore (exit 2);
       None
 
+    | Module.ReexportSymbol(loc, prev, new_export) ->
+      print_loc_title ~prefix:"resolve error" loc;
+      let start = loc.start in
+      Format.printf "%d:%d Re-export symbol '%s', previous definition is in: %s\n"
+        start.line start.column new_export.export_name (loc_to_string prev.export_var.var_loc);
+      ignore (exit 2);
+      None
+
 and run_make_in_dir build_dir =
   (* Out_channel.printf "Spawn to build in %s\n" (TermColor.bold ^ build_dir ^ TermColor.reset); *)
   Out_channel.flush Out_channel.stdout;
@@ -263,6 +271,17 @@ and print_loc_title ~prefix loc_opt =
       Out_channel.printf "%s in %s\n" prefix (TermColor.bold ^ source_str ^ TermColor.reset)
     )
     | None -> ()
+  )
+
+and loc_to_string (loc_opt: Loc.t) =
+  Loc.(
+    match loc_opt.source with
+    | Some source -> (
+      print_error_prefix ();
+      let source_str = Format.asprintf "%a:%d:%d" Lichenscript_lex.File_key.pp source loc_opt.start.line loc_opt.start.column in
+      source_str
+    )
+    | None -> ""
   )
 
 (* replace current process *)

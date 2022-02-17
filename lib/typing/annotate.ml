@@ -651,7 +651,7 @@ and prescan_pattern_for_scope ~kind ~(scope: Scope.scope) env pat =
         deps = [];
       } in
       let id = Type_context.new_id (Env.ctx env) node in
-      (match scope#new_var_symbol pident_name ~id ~kind with
+      (match scope#new_var_symbol pident_name ~id ~kind ~loc:pident_loc with
       | `Duplicate -> (
         let err = Type_error.(make_error (Env.ctx env) pident_loc (Redefinition pident_name)) in
         raise Type_error.(Error err)
@@ -1280,7 +1280,7 @@ and annotate_function_param env ident =
   } in
   let id = Type_context.new_id (Env.ctx env) node in
   let scope = Env.peek_scope env in
-  (match scope#new_var_symbol ~id ~kind:Pvar_const pident_name  with
+  (match scope#new_var_symbol ~id ~kind:Pvar_const ~loc:pident_loc pident_name  with
   | `Duplicate -> (
     let err = Type_error.(make_error (Env.ctx env) pident_loc (Redefinition pident_name)) in
     raise Type_error.(Error err)
