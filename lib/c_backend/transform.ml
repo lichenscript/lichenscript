@@ -1730,7 +1730,7 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
     let scope = create_scope_and_distribute_vars env clause.clause_scope in
     with_scope env scope (fun env ->
       let saved_tmp_count = env.tmp_vars_count in
-      let body = transform_expression env clause.clause_consequent in
+      let body = transform_expression ~is_move:true env clause.clause_consequent in
 
       let done_stmt = { C_op.Stmt.
         spec = Goto label_name;
