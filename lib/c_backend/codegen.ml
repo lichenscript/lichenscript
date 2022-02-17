@@ -324,7 +324,7 @@ and codegen_declaration env decl =
 
   | EnumCtor ctor -> (
     ps env (Format.sprintf "LCValue %s(LCRuntime* rt, LCValue this, int argv, LCValue* args) {\n" ctor.enum_ctor_name);
-    if ctor.enum_cotr_params_size = 0 then
+    if ctor.enum_ctor_params_size = 0 then
       ps env (Format.sprintf "    return MK_UNION(%d);\n" ctor.enum_ctor_tag_id)
     else (
       ps env (Format.sprintf "    return LCNewUnionObject(rt, %d, argv, args);\n" ctor.enum_ctor_tag_id)
