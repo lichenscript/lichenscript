@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <inttypes.h>
 #include "runtime.h"
 #include "string.h"
 #include "time.h"
@@ -351,7 +352,7 @@ static void LCFreeObject(LCRuntime* rt, LCValue val) {
         break;
     
     default:
-        fprintf(stderr, "[LichenScript] internal error, unkown tag: %lld\n", val.tag);
+        fprintf(stderr, "[LichenScript] internal error, unkown tag: %" PRId64 "\n", val.tag);
         lc_panic_internal();
 
     }
@@ -1227,7 +1228,7 @@ static void std_print_val(LCRuntime* rt, LCValue val) {
         break;
 
     case LC_TY_BOXED_I64:
-        printf("%lld", ((LCBox64*)val.ptr_val)->u.i64);
+        printf("%" PRId64, ((LCBox64*)val.ptr_val)->u.i64);
         break;
 
     case LC_TY_BOXED_F64:
