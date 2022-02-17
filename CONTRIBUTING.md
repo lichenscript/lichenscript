@@ -28,3 +28,7 @@ Make sure `opam` and `dune` are all available in your computer. If not, follow t
   ```
   > ${test_case_name} refers to an arbitray folder name under `./example/` 
 
+- Run specific platform:
+   ```bash
+   FLAGS="--platform js" ./test.sh
+   ```
