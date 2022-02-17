@@ -2221,7 +2221,7 @@ and transform_enum env enum loc : C_op.Decl.t list =
           let spec = C_op.Decl.EnumCtor {
             enum_ctor_name = new_name;
             enum_ctor_tag_id = index;
-            enum_cotr_params_size = List.length case.case_fields;
+            enum_ctor_params_size = List.length case.case_fields;
           } in
           [{ C_op.Decl. spec; loc }]
         )

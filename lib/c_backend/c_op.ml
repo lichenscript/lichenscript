@@ -66,7 +66,7 @@ module%gen rec Decl : sig
   type enum_ctor = {
     enum_ctor_name: string;
     enum_ctor_tag_id: int;
-    enum_cotr_params_size: int;
+    enum_ctor_params_size: int;
   }
   [@@deriving show]
 
