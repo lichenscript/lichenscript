@@ -1,0 +1,5 @@
+expect 100_000 == 100000: true
+expect 0b10 == 2: true
+expect 0o73 == 59: true
+expect 077 == 63: true
+expect 0xff == 255: true

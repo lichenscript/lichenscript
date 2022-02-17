@@ -1341,7 +1341,8 @@ and parse_literal env =
     if String.contains raw '.' then
       Literal.Float (raw, None)
     else
-      Literal.Integer (raw, None)
+      (* TODO: support i64 *)
+      Literal.Integer (Int32.of_string raw)
   )
 
   | Token.T_CHAR(_, ch, _) ->
