@@ -701,8 +701,9 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       | String(content, _, _) -> 
         auto_release_expr env ~is_move ~append_stmts ty_var (C_op.Expr.NewString content)
 
-      | Integer(content, _) ->
-        C_op.Expr.NewInt content
+      | Integer content ->
+        let int_str = Int32.to_string content in
+        C_op.Expr.NewInt int_str
 
       | Boolean bl ->
         C_op.Expr.NewBoolean bl
@@ -913,8 +914,9 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
               | String(content, _, _) -> 
                 auto_release_expr env ~is_move:false ~append_stmts ty_var (C_op.Expr.NewString content)
 
-              | Integer(content, _) ->
-                C_op.Expr.NewInt content
+              | Integer content ->
+                let int_str = Int32.to_string content in
+                C_op.Expr.NewInt int_str
 
               | _ ->
                 failwith "unimplemented"
@@ -1463,8 +1465,9 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
     | Underscore ->
       (fun genereator -> genereator ~finalizers:[] ())
 
-    | Literal (Literal.Integer(i, _)) -> (
-      let if_test = C_op.Expr.IntValue(I32Binary(BinaryOp.Equal, match_expr, NewInt i)) in
+    | Literal (Literal.Integer i) -> (
+      let i_str = Int32.to_string i in
+      let if_test = C_op.Expr.IntValue(I32Binary(BinaryOp.Equal, match_expr, NewInt i_str)) in
       (fun genereator ->
         let if_stmt = { C_op.Stmt.
           spec = If {
