@@ -135,16 +135,13 @@ let rec type_assinable_with_maps ctx var_maps left right =
           ~init:(var_maps, true)
           ~f:(fun acc left right ->
             let var_names, acc' = acc in
-            match left with
-            | TypeSymbol sym_name ->
-              Format.eprintf "sym name: %s\n" sym_name;
-              (TypeVarMap.set var_names ~key:sym_name ~data:right), acc'
-
+            match right with
+            | TypeSymbol _ -> acc
             | _ -> (
               if (not acc') then
                 acc
               else
-                var_maps, (type_equal ctx left right)
+                var_names, (type_equal ctx left right)
             )
           )
           left_args right_args
