@@ -40,7 +40,7 @@ lsc build <entry> [<args>]
                          default: current directory
   --build-dir, -D <dir>  Specify a directory to build,
                          a temp directory will be used if this is not specified.
-  --platform <platform>  native/wasm32, default: native
+  --platform <platform>  native/wasm32/js, default: native
   --mode <debug|release> Choose the mode of debug/release
   --verbose, -V          Print verbose log
   -h, --help             Show help message

@@ -51,7 +51,7 @@ let create ~ctx () =
     col = 0;
   }
 
-let rec tranpile_declaration env delcaration =
+let rec transpile_declaration env delcaration =
   let open Declaration in
   let { spec; _ } = delcaration in
   match spec with
@@ -77,5 +77,7 @@ and tranpile_id env (name, _) (loc: Loc.t) =
 
 let transpile_program ~ctx declarations =
   let env = create ~ctx () in
-  List.iter ~f:(tranpile_declaration env) declarations;
+  List.iter ~f:(transpile_declaration env) declarations;
   env
+
+let contents env = Buffer.contents env.buffer
