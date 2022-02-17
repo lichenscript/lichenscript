@@ -2298,9 +2298,8 @@ static inline LCValue lc_std_map_remove_complex(LCRuntime* rt, LCMap* map, LCVal
     while ((*bucket_ref) != NULL) {
 
         if ((*bucket_ref)->hash == hash && LCMapKeyEq(rt, (*bucket_ref)->data->key, key)) {
-            result = LCNewUnionObject(rt, 0, 1, (LCValue[]){ t->value });
-
             t = (*bucket_ref)->data;
+            result = LCNewUnionObject(rt, 0, 1, (LCValue[]){ t->value });
 
             if (t->prev) {
                 t->prev->next = t->next;
