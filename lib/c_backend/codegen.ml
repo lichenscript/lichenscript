@@ -616,7 +616,18 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ")"
   )
 
-  | Update _ -> failwith "unrechable"
+  | Update (op, left, expr) -> (
+    ps env "LCUpdateValue(";
+    ps env (Primitives.Assign.to_arithmetic_op op);
+    ps env ", ";
+    ps env "&(";
+    codegen_expression env left;
+    ps env ")";
+    ps env ", ";
+    codegen_expression env expr;
+    ps env ")"
+
+  )
 
   | TagEqual (expr, tag) -> (
     ps env "LCUnionGetType(";

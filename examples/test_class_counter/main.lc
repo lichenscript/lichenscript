@@ -1,0 +1,18 @@
+
+class ClassCounter {
+
+  content: i32
+
+  plus() {
+    this.content += 1;
+  }
+
+}
+
+function main() {
+  const counter = ClassCounter { content: 1 };
+  counter.plus();
+  counter.plus();
+  counter.plus();
+  print(counter.content);
+}

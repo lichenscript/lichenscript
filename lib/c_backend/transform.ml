@@ -1200,7 +1200,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       )
 
       (* TODO: maybe it's a setter? *)
-      | ({ spec = Typedtree.Expression.Member (main_expr, id); _ }, None) -> (
+      | ({ spec = Typedtree.Expression.Member (main_expr, id); _ }, _) -> (
         let transform_main_expr = transform_expression ~is_borrow:true env main_expr in
 
         prepend_stmts := List.concat [ !prepend_stmts; transform_main_expr.prepend_stmts ];
