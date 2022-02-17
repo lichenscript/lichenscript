@@ -159,11 +159,15 @@ and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platf
     let profiles = Resolver.compile_file_path
       ~std_dir ~build_dir ~runtime_dir ~verbose ~platform entry_full_path
     in
-    let profile = List.find_exn
-      ~f:(fun profile ->
-        String.equal profile.profile_name mode
-      )
-      profiles
+    let profile =
+      if String.equal platform "js" then
+        List.hd_exn profiles
+      else
+        List.find_exn
+          ~f:(fun profile ->
+            String.equal profile.profile_name mode
+          )
+          profiles
     in
     run_make_in_dir profile.profile_dir;
     Some profile.profile_exe_path

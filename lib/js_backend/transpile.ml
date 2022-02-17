@@ -69,7 +69,8 @@ and transpile_function env _fun =
   ps env "function ";
   tranpile_id env _fun.header.name _fun.header.name_loc;
   ps env "() {\n";
-  ps env ")\n"
+  ps env "console.log('Hello World');";
+  ps env "}\n"
 
 and tranpile_id env (name, _) (loc: Loc.t) =
   env.sourcemap#add_location env.col 0 loc.start.line loc.start.column;
