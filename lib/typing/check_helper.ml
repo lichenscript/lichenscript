@@ -335,14 +335,18 @@ let is_array ctx type_expr =
 
 let is_primitive_with_name ctx ~name:expect_name type_expr =
   let type_expr = Type_context.deref_type ctx type_expr in
-  let expr_def_opt = find_construct_of ctx type_expr in
-  (match expr_def_opt with
-    | Some(def, []) -> (
-      let open TypeDef in
-      def.builtin &&
-      String.equal def.name expect_name
-    )
-    | _ -> false
+  (match type_expr with
+    | String -> String.equal expect_name "string"
+    | _ ->
+      let expr_def_opt = find_construct_of ctx type_expr in
+      match expr_def_opt with
+        | Some(def, []) -> (
+          let open TypeDef in
+          def.builtin &&
+          String.equal def.name expect_name
+        )
+
+        | _ -> false
   )
 
 let is_unit = is_primitive_with_name ~name:"unit"
@@ -358,6 +362,11 @@ let is_f64 = is_primitive_with_name ~name:"f64"
 let is_char = is_primitive_with_name ~name:"char"
 
 let is_boolean = is_primitive_with_name ~name:"boolean"
+
+let is_string type_expr = 
+  match type_expr with
+  | TypeExpr.String -> true
+  | _ -> false
 
 let rec replace_type_vars_with_maps ctx type_map type_expr =
   let open Core_type.TypeExpr in
