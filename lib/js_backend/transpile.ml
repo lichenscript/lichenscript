@@ -24,6 +24,9 @@ type t = {
   ctx: Type_context.t;
   buffer: Buffer.t;
   sourcemap: sourcemap_generator;
+
+  global_name_map: (int, string) Hashtbl.t;
+
   mutable indents: int;
   mutable line: int;
   mutable col: int;
@@ -46,10 +49,12 @@ let ps env str =
 let create ~ctx () =
   let sourcemap = new sourcemap_generator in
   let buffer = Buffer.create 1024 in
+  let global_name_map = Hashtbl.create (module Int) in
   {
     ctx;
     buffer;
     sourcemap;
+    global_name_map;
     indents = 0;
     line = 1;
     col = 0;
@@ -71,7 +76,9 @@ let rec transpile_declaration env delcaration =
   let open Declaration in
   let { spec; _ } = delcaration in
   match spec with
-  | Class _ -> ()
+  | Class cls ->
+    transpile_class env cls
+
   | Function_ _fun ->
     transpile_function env _fun
 
@@ -79,6 +86,57 @@ let rec transpile_declaration env delcaration =
   | Declare _
   | Enum _
   | Import _ -> ()
+
+and transpile_class env cls =
+  let original_name, name_id = cls.cls_id in
+
+  let given_name = "LCC_" ^ original_name in
+  Hashtbl.set env.global_name_map ~key:name_id ~data:given_name;
+
+  let transpile_class_method ~given_name _method =
+    let { Typedtree.Declaration. cls_method_body; _ } = _method in
+    ps env "function ";
+    ps env given_name;
+    ps env "() {\n";
+    with_indents env (fun env ->
+      List.iter
+        ~f:(fun stmt ->
+          print_indents env;
+          transpile_statement env stmt;
+        )
+        cls_method_body.body
+    );
+    ps env "}\n"
+  in
+
+  let names = 
+    List.filter_map
+      ~f:(fun elm ->
+        match elm with
+        | Cls_method _method -> (
+          let { Typedtree.Declaration. cls_method_name = method_name', method_id; _ } = _method in
+          let method_name = "LCC_" ^ original_name ^ "_" ^ method_name' in
+          Hashtbl.set env.global_name_map ~key:method_id ~data:method_name;
+
+          transpile_class_method ~given_name:method_name _method;
+
+          Some (method_name', method_name)
+        )
+
+        | _ -> None
+      )
+      cls.cls_body.cls_body_elements
+  in
+
+  ps env ("const " ^ given_name ^ " = {\n");
+
+  List.iter
+    ~f:(fun (original_name, name) ->
+      ps env ("  " ^ original_name ^ ": " ^ name ^ ",\n");
+    )
+    names;
+
+  ps env "}\n"
 
 and transpile_statement env decl =
   let open Statement in
@@ -199,29 +257,34 @@ and transpile_expression env expr =
   | Call { callee; call_params; _} -> (
     match callee with
     | { spec = Identifier (_, id); _ } -> (
-      match Type_context.find_external_symbol env.ctx id with
+      (match Type_context.find_external_symbol env.ctx id with
       | Some ext_name -> (
         (* external method *)
         ps env ext_name;
-        ps env "(";
-
-        let params_len = List.length call_params in
-        List.iteri
-          ~f:(fun index item ->
-            transpile_expression env item;
-            if index <> (params_len - 1) then (
-              ps env ", "
-            )
-          )
-          call_params;
-
-        ps env ")"
       )
 
-      | _ -> failwith "unimplemented"
+      | _ -> (
+        let given_name = Hashtbl.find_exn env.global_name_map id in
+        ps env given_name
+      ));
+
+      ps env "(";
+
+      let params_len = List.length call_params in
+      List.iteri
+        ~f:(fun index item ->
+          transpile_expression env item;
+          if index <> (params_len - 1) then (
+            ps env ", "
+          )
+        )
+        call_params;
+
+      ps env ")"
+
     )
 
-    | _ -> failwith "unimplemented"
+    | _ -> ps env "/* unimplemented */{}"
   )
 
   | Tuple elements -> (
@@ -238,7 +301,12 @@ and transpile_expression env expr =
     ps env "]";
   )
 
-  | Member _
+  | Member (expr, name) -> (
+    transpile_expression env expr;
+    ps env ".";
+    ps env name.pident_name
+  )
+
   | Index _
   | Unary _ -> ()
   | Binary (op, left, right) -> (
@@ -286,8 +354,22 @@ and transpile_expression env expr =
     transpile_expression env right
   )
 
-  | Block _
-  | Init _
+  | Block _ -> ()
+
+  | Init init -> (
+    let { Typedtree.Expression. init_name = (_, name_id); _ } = init in
+    let given_name = Hashtbl.find_exn env.global_name_map name_id in
+    ps env "{\n";
+    with_indents env (fun env ->
+      print_indents env;
+      ps env "__proto__: ";
+      ps env given_name;
+      ps env ",\n";
+    ());
+    print_indents env;
+    ps env "}\n"
+  )
+
   | Match _ -> ()
   | This -> ps env "this"
   | Super -> ()
