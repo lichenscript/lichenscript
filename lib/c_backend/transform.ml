@@ -192,6 +192,8 @@ type t = {
   mutable main_function_name: string option;
   mutable class_inits: C_op.Decl.class_init list;
 
+  mutable prepends_decls: C_op.Decl.t list;
+
   (*
    * Some variables are local, but some are global,
    * such as a method of a class, the contructor of enum, etc
@@ -254,6 +256,7 @@ let create ctx =
     tmp_vars_count = 0;
     main_function_name = None;
     class_inits = [];
+    prepends_decls = [];
     global_name_map;
     cls_meta_map;
     current_fun_meta = None;
@@ -1973,6 +1976,34 @@ and transform_class env cls loc: C_op.Decl.t list =
   let cls_meta = generate_cls_meta env cls_id' fun_name in
   Hashtbl.set env.cls_meta_map ~key:cls_meta.cls_id ~data:cls_meta;
 
+  (*
+   * Prescan:
+   *
+   * Distributes names to all methods,
+   * because the body of all methods will call the method of class itself
+   *
+   *)
+  List.iter
+    ~f:(fun elm->
+      match elm with
+      | Cls_method _method -> (
+        let { cls_method_name; _ } = _method in
+        let origin_method_name, method_id = cls_method_name in
+        let new_name = original_name ^ "_" ^ origin_method_name in
+        let new_name = distribute_name env new_name in
+
+        let pre_declare = { C_op.Decl.
+          spec = FuncDecl (SymLocal new_name);
+          loc = Loc.none;
+        } in
+        env.prepends_decls <- pre_declare::(env.prepends_decls);
+
+        Hashtbl.set env.global_name_map ~key:method_id ~data:(SymLocal new_name);
+      )
+      | _ -> ()
+    )
+    cls_body.cls_body_elements;
+
   let class_methods = ref [] in
 
   let methods: C_op.Decl.t list = 
@@ -1985,12 +2016,12 @@ and transform_class env cls loc: C_op.Decl.t list =
 
           env.tmp_vars_count <- 0;
 
-          (* let fun_name = distribute_name env cls_method_name in *)
           let origin_method_name, method_id = cls_method_name in
-          let new_name = original_name ^ "_" ^ origin_method_name in
-          let new_name = distribute_name env new_name in
-
-          Hashtbl.set env.global_name_map ~key:method_id ~data:(SymLocal new_name);
+          let new_name =
+            match Hashtbl.find_exn env.global_name_map method_id with
+            | C_op.SymLocal name -> name
+            | _ -> failwith "unrechable"
+          in
 
           let open Core_type in
           let node_type = Type_context.deref_node_type env.ctx method_id in
@@ -2163,8 +2194,11 @@ let transform_declarations ctx declarations =
     )
   in
 
+  let prepends_decls = List.rev env.prepends_decls in
+  env.prepends_decls <- [];
+
   {
     main_function_name = env.main_function_name;
-    declarations;
+    declarations = List.append prepends_decls declarations;
     global_class_init;
   }

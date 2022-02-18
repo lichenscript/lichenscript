@@ -1,0 +1,17 @@
+
+class A {
+
+    methodA() {
+        this.methodB();
+    }
+
+    methodB() {
+        print("Hello World")
+    }
+
+}
+
+function main() {
+    const a = A{};
+    a.methodA();
+}
