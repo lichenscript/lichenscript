@@ -167,6 +167,20 @@ and link_from_entry_internal env ~verbose entry : Typedtree.Declaration.t list =
       orders
   );
 
+  (*
+   * if a declaration is tagged as @builtin()
+   * do NOT generate it
+   *)
+  let is_builtin (decl: Typedtree.Declaration.t) =
+    let open Lichenscript_parsing.Ast in
+    decl.attributes
+    |> List.find ~f:(function
+    | { attr_name = { txt = "builtin"; _ }; _ } -> true
+    | _ -> false
+    )
+    |> Option.is_some
+  in
+
   let declarations =
     orders
     |> Array.fold
@@ -177,16 +191,23 @@ and link_from_entry_internal env ~verbose entry : Typedtree.Declaration.t list =
           match Hashtbl.find env.ctx.declarations id with
           | None -> acc
           | Some decl ->
-            decl::acc
+            if is_builtin decl then
+              acc
+            else
+              decl::acc
         ) else (
           let positive = id * (-1) in
           let open Type_context in
           match Hashtbl.find env.ctx.declarations positive with
           | None -> acc
           | Some decl -> (
-            match make_declare_of_decl positive decl with
-            | Some d -> d::acc
-            | None -> acc
+            if is_builtin decl then
+              acc
+            else (
+              match make_declare_of_decl positive decl with
+              | Some d -> d::acc
+              | None -> acc
+            )
           )
         )
       )
