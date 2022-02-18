@@ -376,7 +376,9 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~platform ~verbose en
     )
 
     | "js" -> (
-      let output = Lichenscript_js.codegen ~ctx declarations in
+      let js_runtime_preclude_file = Filename.(concat (concat runtime_dir "js") "runtime.js") in
+      let preclude = In_channel.read_all js_runtime_preclude_file in
+      let output = Lichenscript_js.codegen ~ctx ~preclude declarations in
       let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
       let build_dir = get_build_dir () in
       let output_path = write_to_file build_dir mod_name ~ext:".js" output in

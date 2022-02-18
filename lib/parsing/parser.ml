@@ -577,9 +577,10 @@ and parse_statement env : Statement.t =
 
     | _ ->
       let expr = parse_expression env in
-      if Peek.token env == Token.T_SEMICOLON then
+      if Peek.token env == Token.T_SEMICOLON then (
+        Eat.token env;
         Semi expr
-      else
+      ) else
         Expr expr
 
   in
