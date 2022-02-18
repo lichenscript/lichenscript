@@ -1,5 +1,5 @@
 
 
-let codegen ~ctx tree =
-  let env = Transpile.transpile_program ~ctx tree in
+let codegen ~ctx ~preclude tree =
+  let env = Transpile.transpile_program ~ctx ~preclude tree in
   Transpile.contents env
