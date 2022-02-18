@@ -2021,7 +2021,8 @@ and transform_class env cls loc: C_op.Decl.t list =
           let lambdas = env.lambdas in
           env.lambdas <- [];
 
-          List.append lambdas (_fun::acc)
+          (* will be reversed in the future *)
+          List.append (_fun::lambdas) acc
         )
         | Cls_property _
         | Cls_declare _ -> acc
@@ -2051,7 +2052,7 @@ and transform_class env cls loc: C_op.Decl.t list =
 
   List.append
     [ { C_op.Decl. spec = C_op.Decl.Class cls; loc; } ]
-    methods
+    (List.rev methods)
 
 (*
  * Generate finalizer statements for a class:
