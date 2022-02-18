@@ -1126,7 +1126,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       let open Core_type in
       match (left_type, op) with
       | (TypeExpr.String, BinaryOp.Plus) ->
-        let spec = auto_release_expr env ~append_stmts ty_var
+        let spec = auto_release_expr ~is_move env ~append_stmts ty_var
           (C_op.Expr. ExternalCall(SymLocal "lc_std_string_concat", None, [left'.expr; right'.expr]))
         in
         spec
@@ -1138,7 +1138,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       | (TypeExpr.String, BinaryOp.GreaterThan)
       | (TypeExpr.String, BinaryOp.GreaterThanEqual)
         ->
-        let spec = auto_release_expr env ~append_stmts ty_var (C_op.Expr.StringCmp(op, left'.expr, right'.expr)) in
+        let spec = auto_release_expr ~is_move env ~append_stmts ty_var (C_op.Expr.StringCmp(op, left'.expr, right'.expr)) in
         spec
 
       | _ -> (
