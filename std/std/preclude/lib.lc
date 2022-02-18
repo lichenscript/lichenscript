@@ -11,6 +11,7 @@ public declare function exit(exitCode: i32);
 @external("lc_std_panic")
 public declare function panic(...content: any[]);
 
+@builtin()
 public class Object {
 
     virtual toString(): string {
@@ -19,6 +20,7 @@ public class Object {
 
 }
 
+@builtin()
 public class Array<T> {
 
     @external("lc_std_array_push")
@@ -44,6 +46,7 @@ public class Array<T> {
 
 }
 
+@builtin()
 public class String {
 
     @external("lc_std_string_get_length")
@@ -64,6 +67,7 @@ public enum Result<A, B> {
     case Error(B)
 }
 
+@builtin()
 public class Map<K, V> {
 
     @external("lc_std_map_set")
