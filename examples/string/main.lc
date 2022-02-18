@@ -2,7 +2,7 @@
 function main() {
     print("Hello World".length);
     print("你好世界".length);
-    let name = "LichenScript";
+    const name = "LichenScript";
     print("Hello " + name);
     print(name == "LichenScript");
     print(name == "LichenScript2");
@@ -11,4 +11,8 @@ function main() {
     print("lt2: ", "你好" > "nh");
     print("gt2: ", "你好" < "nh");
     print(name.slice(2, 6));
+    const url1 = "https://www." + "lichenscript.com";
+    const url2 = "https://www.lichenscript.com";
+    print(url1);
+    print(url2);
 }

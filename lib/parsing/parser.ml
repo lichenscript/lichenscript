@@ -1145,7 +1145,7 @@ and parse_binary_expression env : Expression.t =
   let open Expression in
   let rec parse_binary_enhance env left_expr left_token =
     let start_loc = Peek.loc env in
-    let expr = parse_exponentialtion_expression env in
+    let expr = parse_exponentiation_expression env in
     let left_prec = Precedence.binary_precedence left_token in
     let right_token = Peek.token env in
     let right_prec = Precedence.binary_precedence right_token in
@@ -1195,7 +1195,7 @@ and parse_binary_expression env : Expression.t =
     )
   in
 
-  let expr = parse_exponentialtion_expression env in
+  let expr = parse_exponentiation_expression env in
   let next = Peek.token env in
   let prec = Precedence.binary_precedence next in
   if prec > 0 then
@@ -1206,7 +1206,7 @@ and parse_binary_expression env : Expression.t =
   else
     expr
 
-and parse_exponentialtion_expression env =
+and parse_exponentiation_expression env =
   parse_unary_expression env
 
 and parse_unary_expression env: Expression.t =
