@@ -35,3 +35,7 @@ function lc_std_exit(code) {
   const process = require('process');
   process.exit(code);
 }
+
+function lc_std_string_slice() {
+  return String.prototype.slice.call(this, ...arguments);
+}
