@@ -63,14 +63,148 @@ module Continuation = struct
   
 end
 
-let normalize_stmt stmt : Statement.t = stmt
+(*
+ * has break/continue/return
+ *)
+module ControlFlow = struct
+  [@warning "-unused-value-declaration"]
+
+  let rec has_control_flow (expr: Expression.t): bool =
+    let open Expression in
+    match expr.spec with
+    | Lambda _ -> failwith "un"
+
+    | If if_desc -> if_desc_has_control_flow if_desc
+
+    | Array _
+    | Map _
+    | Call _
+    | Tuple _
+    | Member _
+    | Index _
+    | Unary _
+    | Binary _
+    | Assign _
+    | Block _
+    | Init _
+    | Match _
+    | Identifier _
+    | Constant _
+    | This
+    | Super ->
+      false
+
+  and block_has_control_flow _blk = false
+
+  and if_desc_has_control_flow if_desc =
+    let open Expression in
+    let { if_test; if_consequent; if_alternative; _ } = if_desc in
+    (has_control_flow if_test) &&
+    (block_has_control_flow if_consequent) &&
+    (match if_alternative with
+    | Some (If_alt_if if_desc) -> if_desc_has_control_flow if_desc
+    | Some (If_alt_block blk) -> block_has_control_flow blk
+    | None -> false
+    )
+  
+end
+
+let normalize_expr expr : Statement.t list * Expression.t =
+  let open Expression in
+  match expr.spec with
+  | Lambda _
+  | If _
+  | Array _
+  | Map _
+  | Call _
+  | Tuple _
+  | Member _
+  | Index _
+  | Unary _
+  | Binary _
+  | Assign _
+  | Block _
+  | Init _
+  | Match _
+  | Identifier _
+  | Constant _
+  | This
+  | Super -> [], expr
+
+let rec normalize_stmt stmt : Statement.t list =
+  let open Statement in
+  match stmt.spec with
+  | Expr expr ->
+    let stmts, expr' = normalize_expr expr in
+    List.append
+      stmts
+      [{ stmt with
+        spec = Expr expr';
+      }]
+
+  | Semi expr ->
+    let stmts, expr' = normalize_expr expr in
+    List.append
+      stmts
+      [{ stmt with
+        spec = Semi expr';
+      }]
+
+  | While while_desc -> (
+    let { while_test; while_block; _ } = while_desc in
+    let stmts, new_test = normalize_expr while_test in
+    List.append
+      stmts
+      [{ stmt with
+        spec = While { while_desc with
+          while_test = new_test;
+          while_block = { while_block with
+            body =
+              while_block.body
+              |> List.map ~f:normalize_stmt
+              |> List.concat;
+          };
+        };
+      }]
+  )
+
+  | Binding binding -> (
+    let stmts, expr' = normalize_expr binding.binding_init in
+    List.append
+      stmts
+      [{ stmt with
+        spec = Binding { binding with
+          binding_init = expr';
+        };
+      }]
+  )
+
+  | Return expr_opt -> (
+    match expr_opt with
+    | Some expr ->
+      let stmts, expr' = normalize_expr expr in
+      List.append
+        stmts
+        [{ stmt with
+          spec = Return (Some expr');
+        }]
+
+    | None -> [stmt]
+
+  )
+
+  (* default: *)
+  | Debugger
+  | Continue _
+  | Break _
+  | Empty -> [stmt]
 
 let normalize_function _fun: Function.t =
   let open Function in
   let stmts = List.map ~f:normalize_stmt _fun.body.body in
   { _fun with
     body = { _fun.body with
-      body = stmts;
+      body = List.concat stmts;
     }
   }
 
@@ -84,7 +218,7 @@ let normalize_class (cls: Declaration._class) : Declaration._class =
 
       Cls_method { _method with
         cls_method_body = { _method.cls_method_body with
-          body = stmts;
+          body = List.concat stmts;
         }
       }
     )
