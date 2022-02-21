@@ -1,0 +1,5 @@
+
+function main() {
+    let txt = "Hello ";
+    txt -= "World"
+}

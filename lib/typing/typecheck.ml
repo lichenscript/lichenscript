@@ -630,79 +630,10 @@ and check_expression env expr =
   | Binary (op, left, right) -> (
     check_expression env left;
     check_expression env right;
-    let left_node = Type_context.get_node env.ctx left.ty_var in
-    let right_node = Type_context.get_node env.ctx right.ty_var in
-    let ctx = env.ctx in
-    let loc = expr_loc in
-    let id = expr.ty_var in
-    let open Asttypes in
-    match op with
-    | BinaryOp.Plus -> (
-      if not (Check_helper.type_addable ctx left_node.value right_node.value) then (
-        let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-        raise (Type_error.Error err)
-      );
-      Type_context.update_node_type ctx id left_node.value;
-    )
-
-    | BinaryOp.Minus
-    | BinaryOp.Mult
-    | BinaryOp.Div
-      -> (
-      if not (Check_helper.type_arithmetic ctx left_node.value right_node.value) then (
-        let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-        raise (Type_error.Error err)
-      );
-      Type_context.update_node_type ctx id left_node.value;
-    )
-
-    | BinaryOp.Mod
-    | BinaryOp.BitAnd
-    | BinaryOp.Xor
-    | BinaryOp.BitOr
-      -> (
-      if not (Check_helper.type_arithmetic_integer ctx left_node.value right_node.value) then (
-        let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-        raise (Type_error.Error err)
-      );
-      Type_context.update_node_type ctx id left_node.value;
-    )
-
-    | BinaryOp.Equal
-    | BinaryOp.NotEqual
-    | BinaryOp.LessThan
-    | BinaryOp.LessThanEqual
-    | BinaryOp.GreaterThan
-    | BinaryOp.GreaterThanEqual
-      -> (
-        if not (Check_helper.type_logic_compareable ctx left_node.value right_node.value) then (
-          let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-          raise (Type_error.Error err)
-        );
-        let bool_ty = ty_boolean env in
-        Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
-      )
-
-    | BinaryOp.And
-    | BinaryOp.Or
-      -> (
-        if (not (Check_helper.is_boolean ctx left_node.value)) || (not (Check_helper.is_boolean ctx right_node.value)) then (
-          let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-          raise (Type_error.Error err)
-        );
-        let bool_ty = ty_boolean env in
-        Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
-      )
-
-    | _ -> (
-        if not (Check_helper.type_logic_compareable ctx left_node.value right_node.value) then (
-          let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-          raise (Type_error.Error err)
-        );
-    )
+    check_binary_op env op expr left right;
   )
 
-  | Assign (_, left, right) -> (
+  | Assign (op, left, right) -> (
     check_expression env left;
     check_expression env right;
     let ctx = env.ctx in
@@ -746,13 +677,18 @@ and check_expression env expr =
     | _ -> ()
     );
 
-    let sym_node = Type_context.get_node ctx left.ty_var in
-    let expr_node = Type_context.get_node ctx right.ty_var in
-    if not (Check_helper.type_assinable ctx sym_node.value expr_node.value) then (
-      let err = Type_error.(make_error ctx expr_loc (NotAssignable(sym_node.value, expr_node.value))) in
-      raise (Type_error.Error err)
+    match op with
+    | None -> (
+      let sym_node = Type_context.get_node ctx left.ty_var in
+      let expr_node = Type_context.get_node ctx right.ty_var in
+      if not (Check_helper.type_assinable ctx sym_node.value expr_node.value) then (
+        let err = Type_error.(make_error ctx expr_loc (NotAssignable(sym_node.value, expr_node.value))) in
+        raise (Type_error.Error err)
+      )
     )
 
+    | Some op ->
+      check_binary_op env (Asttypes.AssignOp.to_binary op) expr left right
   )
 
   | Block blk -> check_block env blk
@@ -979,6 +915,78 @@ and check_expression env expr =
 
   | This
   | Super -> ()
+
+and check_binary_op env op expr left right =
+  let left_node = Type_context.get_node env.ctx left.ty_var in
+  let right_node = Type_context.get_node env.ctx right.ty_var in
+  let ctx = env.ctx in
+  let loc = expr.loc in
+  let id = expr.ty_var in
+  let open Asttypes in
+  match op with
+  | BinaryOp.Plus -> (
+    if not (Check_helper.type_addable ctx left_node.value right_node.value) then (
+      let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+      raise (Type_error.Error err)
+    );
+    Type_context.update_node_type ctx id left_node.value;
+  )
+
+  | BinaryOp.Minus
+  | BinaryOp.Mult
+  | BinaryOp.Div
+    -> (
+    if not (Check_helper.type_arithmetic ctx left_node.value right_node.value) then (
+      let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+      raise (Type_error.Error err)
+    );
+    Type_context.update_node_type ctx id left_node.value;
+  )
+
+  | BinaryOp.Mod
+  | BinaryOp.BitAnd
+  | BinaryOp.Xor
+  | BinaryOp.BitOr
+    -> (
+    if not (Check_helper.type_arithmetic_integer ctx left_node.value right_node.value) then (
+      let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+      raise (Type_error.Error err)
+    );
+    Type_context.update_node_type ctx id left_node.value;
+  )
+
+  | BinaryOp.Equal
+  | BinaryOp.NotEqual
+  | BinaryOp.LessThan
+  | BinaryOp.LessThanEqual
+  | BinaryOp.GreaterThan
+  | BinaryOp.GreaterThanEqual
+    -> (
+      if not (Check_helper.type_logic_compareable ctx left_node.value right_node.value) then (
+        let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+        raise (Type_error.Error err)
+      );
+      let bool_ty = ty_boolean env in
+      Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
+    )
+
+  | BinaryOp.And
+  | BinaryOp.Or
+    -> (
+      if (not (Check_helper.is_boolean ctx left_node.value)) || (not (Check_helper.is_boolean ctx right_node.value)) then (
+        let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+        raise (Type_error.Error err)
+      );
+      let bool_ty = ty_boolean env in
+      Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
+    )
+
+  | _ -> (
+      if not (Check_helper.type_logic_compareable ctx left_node.value right_node.value) then (
+        let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+        raise (Type_error.Error err)
+      );
+  )
 
 and check_match_exhausted env _match =
   let open T.Expression in

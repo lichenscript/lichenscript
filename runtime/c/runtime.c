@@ -498,7 +498,8 @@ void LCFreeRuntime(LCRuntime* rt) {
     lc_raw_free(rt);
 }
 
-void LCUpdateValue(LCArithmeticType op, LCValue* left, LCValue right) {
+void LCUpdateValue(LCRuntime* rt, LCArithmeticType op, LCValue* left, LCValue right) {
+    LCValue tmp;
     LCValue* this = left;
     int ty = this->tag;
     if (ty == LC_TY_REFCELL) {
@@ -574,6 +575,22 @@ void LCUpdateValue(LCArithmeticType op, LCValue* left, LCValue right) {
             }
 
         }
+    } else if (ty == LC_TY_STRING) {
+        switch (op) {
+            case LC_ARTH_PLUS:
+                tmp = lc_std_string_concat(rt, MK_NULL(), 2, (LCValue[]) {*left, right});
+                LCRelease(rt, *left);
+                LCRelease(rt, right);
+                *left = tmp;
+                break;
+
+            default: {
+                fprintf(stderr, "[LichenScript] Can not apply op: %d for type: %d", op, ty);
+                lc_panic_internal();
+            }
+
+        }
+
     }
 }
 

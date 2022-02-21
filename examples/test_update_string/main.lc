@@ -1,0 +1,6 @@
+
+function main() {
+    let name = "Hello ";
+    name += "World";
+    print(name);
+}
