@@ -73,6 +73,8 @@ module BinaryOp = struct
     | BitOr
     | Xor
     | BitAnd
+    | And
+    | Or
     [@@deriving show]
 
   let from_token =
@@ -94,7 +96,9 @@ module BinaryOp = struct
     | Token.T_BIT_OR -> BitOr
     | Token.T_BIT_XOR -> Xor
     | Token.T_BIT_AND -> BitAnd
-    | _ -> failwith "unreachable"
+    | Token.T_AND -> And
+    | Token.T_OR -> Or
+    | _ as t -> failwith ("unreachable: " ^ Token.token_to_string t)
 
   let to_string = function
     | Equal -> "=="
@@ -113,6 +117,8 @@ module BinaryOp = struct
     | BitOr -> "|"
     | Xor -> "^"
     | BitAnd -> "&"
+    | And -> "&&"
+    | Or -> "||"
   
 end
 
