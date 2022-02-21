@@ -588,7 +588,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
     codegen_expression env right
 
   | Update (op, C_op.Expr.Ident symbol, expr) -> (
-    ps env "LCUpdateValue(";
+    ps env "LCUpdateValue(rt, ";
     ps env (Primitives.Assign.to_arithmetic_op op);
     ps env ", ";
     (match symbol with
@@ -617,7 +617,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
   )
 
   | Update (op, left, expr) -> (
-    ps env "LCUpdateValue(";
+    ps env "LCUpdateValue(rt, ";
     ps env (Primitives.Assign.to_arithmetic_op op);
     ps env ", ";
     ps env "&(";

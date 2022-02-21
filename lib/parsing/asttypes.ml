@@ -37,23 +37,6 @@ module UnaryOp = struct
   
 end
 
-module AssignOp = struct
-
-  type t =
-    | PlusAssign
-    | MinusAssign
-    | MultAssign
-    | DivAssign
-    | ModAssign
-    | LShiftAssign
-    | RShiftAssign
-    | BitOrAssign
-    | BitXorAssign
-    | BitAndAssign
-    [@@deriving show]
-  
-end
-
 module BinaryOp = struct
 
   type t =
@@ -120,6 +103,37 @@ module BinaryOp = struct
     | And -> "&&"
     | Or -> "||"
   
+end
+
+module AssignOp = struct
+
+  type t =
+    | PlusAssign
+    | MinusAssign
+    | MultAssign
+    | DivAssign
+    | ModAssign
+    | LShiftAssign
+    | RShiftAssign
+    | BitOrAssign
+    | BitXorAssign
+    | BitAndAssign
+    [@@deriving show]
+
+  let to_binary op =
+    let open BinaryOp in
+    match op with
+    | PlusAssign -> Plus
+    | MinusAssign -> Minus
+    | MultAssign -> Mult
+    | DivAssign -> Div
+    | ModAssign -> Mod
+    | LShiftAssign -> LShift
+    | RShiftAssign -> RShift
+    | BitOrAssign -> BitOr
+    | BitXorAssign -> Xor
+    | BitAndAssign -> BitAnd
+
 end
 
 type visibility =
