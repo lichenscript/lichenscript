@@ -86,6 +86,8 @@ typedef struct LCRefCountHeader {
 typedef struct LCGCObjectHeader {
     int      count;
     uint32_t class_id;
+    LCGCObject* prev;
+    LCGCObject* next;
 } LCGCObjectHeader;
 
 struct LCObject {

@@ -169,6 +169,8 @@ typedef struct LCRuntime {
     uint32_t cls_meta_cap;
     uint32_t cls_meta_size;
     LCClassMeta* cls_meta_data;
+    LCGCObject* gc_object_head;
+    LCGCObject* gc_object_last;
 } LCRuntime;
 
 typedef struct LCArray {
@@ -199,6 +201,45 @@ static inline uint32_t hash_string16(const uint16_t *str,
     for(i = 0; i < len; i++)
         h = h * 263 + str[i];
     return h;
+}
+
+static void add_gc_object_to_runtime(LCRuntime* rt, LCGCObject* obj) {
+    obj->header.prev = rt->gc_object_last;
+    obj->header.next = NULL;
+
+    if (rt->gc_object_last) {
+        rt->gc_object_last->header.next = obj;
+    }
+    rt->gc_object_last = obj;
+}
+
+static void remove_gc_object_from_runtime(LCRuntime* rt, LCGCObject* obj) {
+    if (rt->gc_object_head == obj) {
+        rt->gc_object_head = obj->header.next;
+    }
+    if (rt->gc_object_last == obj) {
+        rt->gc_object_last = obj->header.prev;
+    }
+
+    if (obj->header.prev) {
+        obj->header.prev->header.next = obj->header.next;
+    }
+
+    if (obj->header.next) {
+        obj->header.next->header.prev = obj->header.prev;
+    }
+}
+
+static force_inline void init_gc_object(LCRuntime* rt, LCGCObject* obj) {
+    obj->header.count = 1;
+    obj->header.class_id = 0;
+    add_gc_object_to_runtime(rt, obj);
+}
+
+void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCGCObject* obj) {
+    obj->header.count = 1;
+    obj->header.class_id = cls_id;
+    add_gc_object_to_runtime(rt, obj);
 }
 
 // -511 - 512 is the range in the pool
@@ -252,6 +293,7 @@ static inline void LCFreeLambda(LCRuntime* rt, LCValue val) {
         LCRelease(rt, lambda->captured_values[i]);
     }
 
+    remove_gc_object_from_runtime(rt, (LCGCObject*)lambda);
     lc_free(rt, lambda);
 }
 
@@ -259,13 +301,15 @@ static inline void LCFreeLambda(LCRuntime* rt, LCValue val) {
  * extract the finalizer from the class definition
  */
 static void LCFreeClassObject(LCRuntime* rt, LCValue val) {
-    LCGCObject* clsObj = (LCGCObject*)val.ptr_val;
-    LCClassID cls_id = clsObj->header.class_id;
+    LCGCObject* cls_obj = (LCGCObject*)val.ptr_val;
+    LCClassID cls_id = cls_obj->header.class_id;
     LCClassMeta* meta = &rt->cls_meta_data[cls_id];
     LCFinalizer finalizer = meta->cls_def->finalizer;
     if (finalizer) {
         finalizer(rt, val);
     }
+
+    remove_gc_object_from_runtime(rt, (LCGCObject*)cls_obj);
     lc_free(rt, val.ptr_val);
 }
 
@@ -277,6 +321,7 @@ static inline void LCFreeTuple(LCRuntime* rt, LCValue val) {
         LCRelease(rt, tuple->data[i]);
     }
 
+    remove_gc_object_from_runtime(rt, (LCGCObject*)tuple);
     lc_free(rt, tuple);
 }
 
@@ -290,12 +335,16 @@ static inline void LCFreeArray(LCRuntime* rt, LCValue val) {
         lc_free(rt, arr->data);
         arr->data = NULL;
     }
+
+    remove_gc_object_from_runtime(rt, (LCGCObject*)arr);
     lc_free(rt, arr);
 }
 
 static inline void LCFreeRefCell(LCRuntime* rt, LCValue val) {
     LCRefCell* cell = (LCRefCell*)val.ptr_val;
     LCRelease(rt, cell->value);
+
+    remove_gc_object_from_runtime(rt, (LCGCObject*)cell);
     lc_free(rt, cell);
 }
 
@@ -307,6 +356,7 @@ static inline void LCFreeUnionObject(LCRuntime* rt, LCValue val) {
         LCRelease(rt, union_obj->value[i]);
     }
 
+    remove_gc_object_from_runtime(rt, (LCGCObject*)union_obj);
     lc_free(rt, union_obj);
 }
 
@@ -472,6 +522,8 @@ LCRuntime* LCNewRuntime() {
     runtime->cls_meta_cap = LC_INIT_CLASS_META_CAP;
     runtime->cls_meta_size = 0;
     runtime->cls_meta_data = lc_malloc(runtime, sizeof(LCClassMeta) * runtime->cls_meta_cap);
+
+    runtime->gc_object_head = runtime->gc_object_last = NULL;
 
     // the ancester of all classes
     LCClassID object_cls_id = LCDefineClass(runtime, &Object_def);
@@ -931,16 +983,6 @@ LCValue LCRefCellGetValue(LCValue cell) {
     return ref->value;
 }
 
-static inline void init_gc_object(LCRuntime* rt, LCGCObject* obj) {
-    obj->header.count = 1;
-    obj->header.class_id = 0;
-}
-
-void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCGCObject* obj) {
-    obj->header.count = 1;
-    obj->header.class_id = cls_id;
-}
-
 LCValue LCNewUnionObject(LCRuntime* rt, int tag, int size, LCValue* args) {
     size_t malloc_size = sizeof(LCUnionObject) + size * sizeof(LCValue);
     LCUnionObject* union_obj = (LCUnionObject*)lc_mallocz(rt, malloc_size);
@@ -1034,8 +1076,7 @@ void LCLambdaSetRefValue(LCRuntime* rt, LCValue lambda_val, int index, LCValue v
 
 LCArray* LCNewArrayWithCap(LCRuntime* rt, size_t cap) {
     LCArray* result = (LCArray*)lc_malloc(rt, sizeof(LCArray));
-    result->header.count = 1;
-    result->header.class_id = 0;
+    init_gc_object(rt, (LCGCObject*)result);
     result->capacity = cap;
     result->len = 0;
     result->data = (LCValue*)lc_mallocz(rt, sizeof(LCValue) * cap);
@@ -2297,6 +2338,7 @@ void lc_std_map_free(LCRuntime* rt, LCValue val) {
     }
 
 clean:
+    remove_gc_object_from_runtime(rt, (LCGCObject*)map);
     lc_free(rt, map);
 }
 
