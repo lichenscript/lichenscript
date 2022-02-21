@@ -408,12 +408,26 @@ static void LCFreeObject(LCRuntime* rt, LCValue val) {
     }
 }
 
+size_t lc_malloc_usable_size_platform(const void *ptr) {
+#if defined(__APPLE__)
+    return malloc_size(ptr);
+#elif defined(__linux__)
+    return malloc_usable_size((void*)ptr);
+#endif
+    return 0;
+}
+
+size_t lc_malloc_usable_size(LCRuntime *rt, const void *ptr) {
+    return lc_malloc_usable_size_platform(ptr);
+}
+
 void* lc_malloc(LCRuntime* rt, size_t size) {
     void* ptr = lc_raw_malloc(size);
     if (ptr == NULL) {
         return NULL;
     }
     rt->malloc_state.malloc_count++;
+    rt->malloc_state.malloc_size += lc_malloc_usable_size(rt, ptr);
     return ptr;
 }
 
@@ -430,20 +444,12 @@ void* lc_realloc(LCRuntime* rt, void* ptr, size_t size) {
     return lc_raw_realloc(ptr, size);
 }
 
-size_t lc_malloc_usable_size_platform(const void *ptr) {
-#if defined(__APPLE__)
-    return malloc_size(ptr);
-#endif
-    return 0;
-}
-
-size_t lc_malloc_usable_size(LCRuntime *rt, const void *ptr) {
-    return lc_malloc_usable_size_platform(ptr);
-}
-
 void *lc_realloc2(LCRuntime *rt, void *ptr, size_t size, size_t *pslack)
 {
+    size_t old_size;
     void *ret;
+
+    old_size = lc_malloc_usable_size(rt, ptr);
     ret = lc_realloc(rt, ptr, size);
     if (unlikely(!ret && size != 0)) {
         return NULL;
@@ -452,11 +458,13 @@ void *lc_realloc2(LCRuntime *rt, void *ptr, size_t size, size_t *pslack)
         size_t new_size = lc_malloc_usable_size(rt, ret);
         *pslack = (new_size > size) ? new_size - size : 0;
     }
+    rt->malloc_state.malloc_size += lc_malloc_usable_size(rt, ret) - old_size;
     return ret;
 }
 
 void lc_free(LCRuntime* rt, void* ptr) {
     rt->malloc_state.malloc_count--;
+    rt->malloc_state.malloc_size -= lc_malloc_usable_size(rt, ptr);
     lc_raw_free(ptr);
 }
 
@@ -541,7 +549,7 @@ void LCFreeRuntime(LCRuntime* rt) {
 
 #ifdef LSC_DEBUG
     if (rt->malloc_state.malloc_count != 1) {
-        fprintf(stderr, "[LichenScript] memory leaks %zu\n", rt->malloc_state.malloc_count);
+        fprintf(stderr, "[LichenScript] memory leaks, count: %zu, size: %zu\n", rt->malloc_state.malloc_count, rt->malloc_state.malloc_size);
         lc_raw_free(rt);
         exit(1);
     }
