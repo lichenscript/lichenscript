@@ -172,7 +172,7 @@ typedef struct LCRuntime {
 } LCRuntime;
 
 typedef struct LCArray {
-    LC_OBJ_HEADER
+    LCGCObjectHeader header;
     uint32_t len;
     uint32_t capacity;
     LCValue* data;
@@ -259,7 +259,7 @@ static inline void LCFreeLambda(LCRuntime* rt, LCValue val) {
  * extract the finalizer from the class definition
  */
 static void LCFreeClassObject(LCRuntime* rt, LCValue val) {
-    LCObject* clsObj = (LCObject*)val.ptr_val;
+    LCGCObject* clsObj = (LCGCObject*)val.ptr_val;
     LCClassID cls_id = clsObj->header.class_id;
     LCClassMeta* meta = &rt->cls_meta_data[cls_id];
     LCFinalizer finalizer = meta->cls_def->finalizer;
@@ -595,29 +595,29 @@ void LCUpdateValue(LCRuntime* rt, LCArithmeticType op, LCValue* left, LCValue ri
 }
 
 void LCRetain(LCValue val) {
+    LCObject* obj;
     if (val.tag <= 0) {
         return;
     }
-    if (val.ptr_val->header.count == LC_NO_GC) {
+    obj = (LCObject*)val.ptr_val;
+    if (obj->header.count == LC_NO_GC) {
         return;
     }
-    val.ptr_val->header.count++;
+    obj->header.count++;
 }
 
 void LCRelease(LCRuntime* rt, LCValue val) {
+    LCObject* obj;
     if (val.tag <= 0) {
         return;
     }
-    if (val.ptr_val->header.count == LC_NO_GC) {
+    obj = (LCObject*)val.ptr_val;
+    if (obj->header.count == LC_NO_GC) {
         return;
     }
-    if (--val.ptr_val->header.count == 0) {
+    if (--obj->header.count == 0) {
         LCFreeObject(rt, val);
     }
-}
-
-void LCInitObject(LCObjectHeader* header, LCObjectType obj_type) {
-    header->count = 1;
 }
 
 /* Note: the string contents are uninitialized */
@@ -793,7 +793,7 @@ static LCValue lc_new_string8(LCRuntime* rt, const unsigned char* buf, uint32_t 
     uint32_t acquire_len = sizeof(LCString) + buf_len + 1;
     LCString* result = lc_mallocz(rt, acquire_len);
 
-    LCInitObject(&result->header, LC_TY_STRING);
+    result->header.count = 1;
 
     if (buf_len > 0) {
         memcpy(result->u.str8, buf, buf_len);
@@ -931,11 +931,21 @@ LCValue LCRefCellGetValue(LCValue cell) {
     return ref->value;
 }
 
+static inline void init_gc_object(LCRuntime* rt, LCGCObject* obj) {
+    obj->header.count = 1;
+    obj->header.class_id = 0;
+}
+
+void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCGCObject* obj) {
+    obj->header.count = 1;
+    obj->header.class_id = cls_id;
+}
+
 LCValue LCNewUnionObject(LCRuntime* rt, int tag, int size, LCValue* args) {
     size_t malloc_size = sizeof(LCUnionObject) + size * sizeof(LCValue);
     LCUnionObject* union_obj = (LCUnionObject*)lc_mallocz(rt, malloc_size);
 
-    LCInitObject(&union_obj->header, LC_TY_STRING);
+    init_gc_object(rt, (LCGCObject*)union_obj);
 
     union_obj->tag = tag;
     union_obj->size = size;
@@ -1094,7 +1104,6 @@ LCValue LCNewTuple(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args) 
 LCValue LCNewI64(LCRuntime* rt, int64_t val) {
     LCBox64* ptr = (LCBox64*)lc_malloc(rt, sizeof(LCBox64));
 
-    ptr->header.class_id = 0;
     ptr->header.count = 1;
     ptr->u.i64 = val;
 
@@ -1155,7 +1164,6 @@ LCValue LCI64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue ri
 LCValue LCNewF64(LCRuntime* rt, double val) {
     LCBox64* ptr = (LCBox64*)lc_malloc(rt, sizeof(LCBox64));
 
-    ptr->header.class_id = 0;
     ptr->header.count = 1;
     ptr->u.f64 = val;
 
@@ -1324,7 +1332,7 @@ LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_le
         lc_panic_internal();
     }
 
-    LCObject* obj = (LCObject*)this.ptr_val;
+    LCGCObject* obj = (LCGCObject*)this.ptr_val;
     LCClassID class_id = obj->header.class_id;
     LCClassMeta* meta = rt->cls_meta_data + class_id;
 
@@ -1345,11 +1353,6 @@ LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_le
 LCValue LCEvalLambda(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     LCLambda* lambda = (LCLambda*)this.ptr_val;
     return lambda->c_fun(rt, this, argc, args);
-}
-
-void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCObject* obj) {
-    obj->header.count = 1;
-    obj->header.class_id = cls_id;
 }
 
 LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
@@ -1832,7 +1835,7 @@ LCValue lc_std_char_to_string(LCRuntime* rt, LCValue this, int arg_len, LCValue*
     uint32_t acquire_len = sizeof(LCString) + 2;
     LCString* result = lc_mallocz(rt, acquire_len);
 
-    LCInitObject(&result->header, LC_TY_STRING);
+    result->header.count = 1;
 
     result->is_wide_char = 1;
     result->length = 1;
@@ -2003,7 +2006,7 @@ LCValue lc_std_string_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* a
         acquire_len = sizeof(LCString) + need_len + 1;
         result = lc_mallocz(rt, acquire_len);
 
-        LCInitObject(&result->header, LC_TY_STRING);
+        result->header.count = 1;
 
         memcpy(result->u.str8, s->u.str8 + begin, need_len);
         result->u.str8[need_len] = 0;
@@ -2016,7 +2019,8 @@ LCValue lc_std_string_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* a
     }
 
     acquire_len = sizeof(LCString) + need_len * 2;
-    LCInitObject(&result->header, LC_TY_STRING);
+    result = lc_mallocz(rt, acquire_len);
+    result->header.count = 1;
     memcpy(result->u.str16, s->u.str16 + begin, need_len * 2);
     result->length = need_len;
     result->is_wide_char = 1;

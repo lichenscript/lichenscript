@@ -234,7 +234,7 @@ and codegen_declaration env decl =
 
     with_indent env (fun () -> 
       print_indents env;
-      ps env "LC_OBJ_HEADER";
+      ps env "LCGCObjectHeader header;";
       endl env;
 
       List.iter
@@ -287,7 +287,7 @@ and codegen_declaration env decl =
       print_indents env;
       ps env (Format.sprintf "%s* obj = lc_mallocz(rt, sizeof(%s));\n" name name);
       print_indents env;
-      ps env (Format.sprintf "lc_init_object(rt, %s_class_id, (LCObject*)obj);\n" name);
+      ps env (Format.sprintf "lc_init_object(rt, %s_class_id, (LCGCObject*)obj);\n" name);
       print_indents env;
       ps env "return MK_CLASS_OBJ(obj);\n";
     );
