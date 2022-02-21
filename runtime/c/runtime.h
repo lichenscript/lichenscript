@@ -76,16 +76,25 @@ typedef enum LCCmpType {
     LC_CMP_GTEQ,
 } LCCmpType;
 
-#define LC_OBJ_HEADER LCObjectHeader header;
+typedef struct LCObject LCObject;
+typedef struct LCGCObject LCGCObject;
 
-typedef struct LCObjectHeader {
-    uint32_t     count;
-    uint32_t     class_id;
-} LCObjectHeader;
+typedef struct LCRefCountHeader {
+    int       count;
+} LCRefCountHeader;
 
-typedef struct LCObject {
-    LC_OBJ_HEADER
-} LCObject;
+typedef struct LCGCObjectHeader {
+    int      count;
+    uint32_t class_id;
+} LCGCObjectHeader;
+
+struct LCObject {
+    LCRefCountHeader header;
+};
+
+struct LCGCObject {
+    LCGCObjectHeader header;
+};
 
 // #if INTPTR_MAX >= INT64_MAX
 // #define LC_PTR64
@@ -112,9 +121,9 @@ typedef struct LCValue {
 // int64_t and double are encoded in the value
 typedef struct LCValue {
     union {
-        int       int_val;  // bool
-        float     float_val;
-        LCObject* ptr_val;
+        int    int_val;  // bool
+        float  float_val;
+        void*  ptr_val;
     };
     int64_t tag;
 } LCValue;
@@ -166,7 +175,7 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 #endif
 
 typedef struct LCString {
-    LC_OBJ_HEADER
+    LCRefCountHeader header;
     uint32_t length: 31;
     uint8_t is_wide_char : 1;
 
@@ -183,19 +192,19 @@ typedef struct LCSymbolBucket {
 } LCSymbolBucket;
 
 typedef struct LCRefCell {
-    LC_OBJ_HEADER
+    LCGCObjectHeader header;
     LCValue value;
 } LCRefCell;
 
 typedef struct LCUnionObject {
-    LC_OBJ_HEADER
+    LCGCObjectHeader header;
     int tag;
     size_t size;
     LCValue value[];
 } LCUnionObject;
 
 typedef struct LCBox64 {
-    LC_OBJ_HEADER
+    LCRefCountHeader header;
     union {
         int64_t  i64;
         uint64_t u64;
@@ -212,7 +221,7 @@ typedef struct LCMallocState {
 typedef struct LCRuntime LCRuntime;
 
 typedef struct LCTuple {
-    LC_OBJ_HEADER
+    LCGCObjectHeader header;
     size_t  len;
     LCValue data[];
 } LCTuple;
@@ -255,7 +264,7 @@ void LCUpdateValue(LCRuntime* rt, LCArithmeticType op, LCValue* left, LCValue ri
 void LCRetain(LCValue obj);
 void LCRelease(LCRuntime* rt, LCValue obj);
 typedef struct LCLambda {
-    LC_OBJ_HEADER
+    LCGCObjectHeader header;
     LCCFunction c_fun;
     LCValue     captured_this;
     size_t      captured_values_size;
@@ -309,7 +318,7 @@ LCValue LCEvalLambda(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 // TODO: dynamic dispatch by ATOM
 
 LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
-void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCObject* obj);
+void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCGCObject* obj);
 
 LCValue lc_std_array_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 LCValue lc_std_array_resize(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
@@ -332,7 +341,7 @@ typedef struct LCMapTuple LCMapTuple;
 typedef struct LCMapBucket LCMapBucket;
 
 typedef struct LCMap {
-    LC_OBJ_HEADER
+    LCGCObjectHeader header;
     int key_ty;
     int size: 31;
     int is_small: 1;
