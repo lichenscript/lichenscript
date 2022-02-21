@@ -52,6 +52,9 @@ public class Char {
     @external("lc_std_char_code")
     declare code(): i32;
 
+    @external("lc_std_char_to_string")
+    declare toString(): string;
+
 }
 
 @builtin()

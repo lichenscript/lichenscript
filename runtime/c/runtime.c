@@ -1803,6 +1803,28 @@ LCValue lc_std_char_code(LCRuntime* rt, LCValue this, int arg_len, LCValue* args
     return MK_I32(this.int_val);
 }
 
+LCValue lc_std_char_to_string(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    unsigned char buf[4];
+    int len;
+
+    if (this.int_val < 128) {
+        buf[0] = this.int_val;
+        return lc_new_string8(rt, buf, 1);
+    }
+
+    uint32_t acquire_len = sizeof(LCString) + 2;
+    LCString* result = lc_mallocz(rt, acquire_len);
+
+    LCInitObject(&result->header, LC_TY_STRING);
+
+    result->is_wide_char = 1;
+    result->length = 1;
+    result->hash = 0;
+    result->u.str16[0] = this.int_val;
+    
+    return MK_STRING(result);
+}
+
 static void copy_str16(uint16_t *dst, const LCString *p, int offset, int len)
 {
     if (p->is_wide_char) {
