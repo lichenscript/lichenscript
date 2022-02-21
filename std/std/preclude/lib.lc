@@ -47,6 +47,14 @@ public class Array<T> {
 }
 
 @builtin()
+public class Char {
+
+    @external("lc_std_char_code")
+    declare code(): i32;
+
+}
+
+@builtin()
 public class String {
 
     @external("lc_std_string_get_length")

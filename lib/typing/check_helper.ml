@@ -489,8 +489,8 @@ let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
   *
   *)
 and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) option =
-  let type_expr = Type_context.deref_type ctx type_expr in
-  match type_expr with
+  let type_expr' = Type_context.deref_type ctx type_expr in
+  match type_expr' with
   | Ctor(type_expr, type_vars) -> (
     let type_expr = Type_context.deref_type ctx type_expr in
     let open TypeDef in
@@ -516,7 +516,20 @@ and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) op
       )
     )
 
-    | _ -> None
+    | _ -> (
+      if is_char ctx type_expr' then (
+        let ty_int_opt = scope#find_type_symbol "Char" in
+        match ty_int_opt with
+        | Some ty_int -> (
+          let array_node = Type_context.get_node ctx ty_int in
+          (* building type Array<T> *)
+          let ctor_type = TypeExpr.Ctor(array_node.value, []) in
+          find_member_of_type ctx ~scope ctor_type member_name
+        )
+        | None -> failwith "Can not find Char type in current scope"
+      ) else
+        None
+    )
   )
 
   (* it's type def itself, find the static member *)

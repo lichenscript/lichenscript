@@ -1,0 +1,9 @@
+
+function main() {
+    print('a'.code());
+    print('z'.code());
+    print('A'.code());
+    print('Z'.code());
+    print('0'.code());
+    print('9'.code());
+}
