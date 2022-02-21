@@ -320,6 +320,7 @@ LCValue lc_std_array_filter(LCRuntime* rt, LCValue this, int arg_len, LCValue* a
 LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 
 LCValue lc_std_char_code(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
+LCValue lc_std_char_to_string(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 
 LCValue lc_std_string_concat(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 LCValue lc_std_string_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);

@@ -6,4 +6,5 @@ function main() {
     print('Z'.code());
     print('0'.code());
     print('9'.code());
+    print('$'.toString());
 }
