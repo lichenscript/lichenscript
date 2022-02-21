@@ -1799,6 +1799,10 @@ LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* arg
     return MK_NULL();
 }
 
+LCValue lc_std_char_code(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    return MK_I32(this.int_val);
+}
+
 static void copy_str16(uint16_t *dst, const LCString *p, int offset, int len)
 {
     if (p->is_wide_char) {
