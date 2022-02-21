@@ -44,6 +44,8 @@ module Bin = struct
     | BitOr -> "LC_I32_BIT_OR"
     | Xor -> "LC_I32_XOR"
     | BitAnd -> "LC_I32_BIT_AND"
+    | And -> "LC_AND"
+    | Or -> "LC_OR"
 
   let to_arithmetic_op (op: Asttypes.BinaryOp.t) =
     match op with

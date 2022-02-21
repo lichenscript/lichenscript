@@ -1,0 +1,9 @@
+
+function main() {
+  let index = 0;
+  const content = "Hello world";
+  if index >= content.length || content[index] != 'r' {
+    return;
+  }
+
+}

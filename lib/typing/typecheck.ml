@@ -683,6 +683,17 @@ and check_expression env expr =
         Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
       )
 
+    | BinaryOp.And
+    | BinaryOp.Or
+      -> (
+        if (not (Check_helper.is_boolean ctx left_node.value)) || (not (Check_helper.is_boolean ctx right_node.value)) then (
+          let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+          raise (Type_error.Error err)
+        );
+        let bool_ty = ty_boolean env in
+        Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
+      )
+
     | _ -> (
         if not (Check_helper.type_logic_compareable ctx left_node.value right_node.value) then (
           let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in

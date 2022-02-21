@@ -147,6 +147,9 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 #define LC_I32_BIT_OR(l, r) MK_I32((l).int_val | (r).int_val)
 #define LC_I32_BIT_AND(l, r) MK_I32((l).int_val & (r).int_val)
 
+#define LC_AND(l, r) (((l).int_val && (r).int_val) ? LCTrue : LCFalse)
+#define LC_OR(l, r) (((l).int_val || (r).int_val) ? LCTrue : LCFalse)
+
 #define LC_F32_EQ(l, r) MK_BOOL((l).float_val == (r).float_val)
 #define LC_F32_NOT_EQ(l, r) MK_BOOL((l).float_val != (r).float_val)
 #define LC_F32_LT(l, r) MK_BOOL((l).float_val < (r).float_val)
