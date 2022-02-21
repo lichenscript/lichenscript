@@ -267,7 +267,7 @@ static void free_i64_pool(LCRuntime* rt) {
 }
 
 static force_inline void lc_panic_internal() {
-#if defined(__APPLE__)
+#if defined(__APPLE__) || defined(__linux__)
     fprintf(stderr, "[LichenScript] Panic stack:\n");
     void* callstack[128];
     int i, frames = backtrace(callstack, 128);
