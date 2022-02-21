@@ -44,7 +44,7 @@ module%gen rec Decl : sig
     name: string;
     original_name: string;
     finalizer: class_finalizer option;
-    properties: string list;
+    properties: (string * int) list;
   }
   [@@deriving show]
 
