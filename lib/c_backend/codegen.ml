@@ -276,9 +276,11 @@ and codegen_declaration env decl =
       | Some finalizer ->
         ps env finalizer.finalizer_name
       | None ->
-        ps env "MK_NULL()"
+        ps env "NULL"
       );
       ps env ",\n";
+      print_indents env;
+      ps env "NULL,\n";
     );
     ps env "};\n";
 

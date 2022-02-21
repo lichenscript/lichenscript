@@ -78,6 +78,8 @@ typedef enum LCCmpType {
 
 typedef struct LCObject LCObject;
 typedef struct LCGCObject LCGCObject;
+typedef struct LCRuntime LCRuntime;
+typedef struct LCValue LCValue;
 
 typedef struct LCRefCountHeader {
     int       count;
@@ -97,6 +99,10 @@ struct LCObject {
 struct LCGCObject {
     LCGCObjectHeader header;
 };
+
+typedef void LCMarkFunc(LCRuntime *rt, LCGCObjectHeader *gp);
+typedef void (*LCClassGCMark)(LCRuntime *rt, LCValue val,
+                           LCMarkFunc *mark_func);
 
 // #if INTPTR_MAX >= INT64_MAX
 // #define LC_PTR64
@@ -121,14 +127,14 @@ typedef struct LCValue {
 
 // in 64bit mode, LCValue is 128bit
 // int64_t and double are encoded in the value
-typedef struct LCValue {
+struct LCValue {
     union {
         int    int_val;  // bool
         float  float_val;
         void*  ptr_val;
     };
     int64_t tag;
-} LCValue;
+};
 
 static LCValue LCTrue = { { .int_val = 1 }, LC_TY_BOOL };
 static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
@@ -220,8 +226,6 @@ typedef struct LCMallocState {
     size_t malloc_limit;
 } LCMallocState;
 
-typedef struct LCRuntime LCRuntime;
-
 typedef struct LCTuple {
     LCGCObjectHeader header;
     size_t  len;
@@ -307,6 +311,7 @@ typedef struct LCClassMethodDef {
 typedef struct LCClassDef {
     const char* name;  // class name
     LCFinalizer finalizer;
+    LCClassGCMark gc_mark;
 } LCClassDef;
 
 typedef uint32_t LCClassID;
