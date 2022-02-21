@@ -238,7 +238,7 @@ and codegen_declaration env decl =
       endl env;
 
       List.iter
-        ~f:(fun prop_name ->
+        ~f:(fun (prop_name, _) ->
           print_indents env;
           ps env (Format.sprintf "LCValue %s;" prop_name);
           endl env;

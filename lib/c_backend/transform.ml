@@ -161,7 +161,7 @@ type cls_meta = {
   cls_fields_map: (string, string) Hashtbl.t;
 
   (* all generating fields, including ancester's *)
-  cls_fields: string list;
+  cls_fields: (string * int) list;
 }
 
 let create_cls_meta cls_id cls_gen_name cls_fields : cls_meta = {
@@ -1809,7 +1809,7 @@ and transform_spreading_init env tmp_id spread_ty_var spread_expr =
 
   cls_meta.cls_fields
   |> List.map
-    ~f:(fun field_name ->
+    ~f:(fun (field_name, _) ->
     let left_value = (
       C_op.Expr.GetField(
         (Temp tmp_id),
@@ -1932,8 +1932,8 @@ and generate_cls_meta env cls_id gen_name =
       List.filter_map
         ~f:(fun (elm_name, elm) ->
           match elm with
-          | Cls_elm_prop _ -> 
-            Some elm_name
+          | Cls_elm_prop (_, ty_var, _) -> 
+            Some (elm_name, ty_var)
           | _ -> None
         )
         cls_def.tcls_elements;
@@ -1956,7 +1956,7 @@ and generate_cls_meta env cls_id gen_name =
   let result = create_cls_meta cls_id gen_name prop_names in
 
   List.iter
-    ~f:(fun field_name -> Hashtbl.set result.cls_fields_map ~key:field_name ~data:field_name)
+    ~f:(fun (field_name, _) -> Hashtbl.set result.cls_fields_map ~key:field_name ~data:field_name)
     result.cls_fields;
 
   result
@@ -2095,12 +2095,18 @@ and generate_finalizer env name (type_def: Core_type.TypeDef.t) =
   let generate_release_statements_by_cls_meta type_def =
     let open Core_type.TypeDef in
     let cls_meta = Hashtbl.find_exn env.cls_meta_map type_def.id in
-    List.map
-      ~f:(fun field_name -> {
-        C_op.Stmt.
-        spec = Release (C_op.Expr.GetField(this_expr, cls_meta.cls_gen_name, field_name));
-        loc = Loc.none;
-      })
+    List.filter_map
+      ~f:(fun (field_name, ty_var) ->
+        let field_type = Type_context.deref_node_type env.ctx ty_var in
+        if Check_helper.type_should_not_release env.ctx field_type then
+          None
+        else
+          Some {
+            C_op.Stmt.
+            spec = Release (C_op.Expr.GetField(this_expr, cls_meta.cls_gen_name, field_name));
+            loc = Loc.none;
+          }
+      )
       cls_meta.cls_fields
   in
 
