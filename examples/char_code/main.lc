@@ -7,5 +7,8 @@ function main() {
     print('0'.code());
     print('9'.code());
     print('陈'.code());
+    print('\n'.code());
+    print('\r'.code());
+    print('\t'.code());
     print('$'.toString());
 }
