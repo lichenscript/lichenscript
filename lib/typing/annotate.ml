@@ -115,8 +115,9 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       | Literal _
       | Array _
       | EnumCtor _ -> (
-        let err = Type_error.(make_error (Env.ctx env) binding_loc (CannotBindingOfPattern "enum")) in
-        raise (Type_error.Error err)
+        let open Type_error in
+        let err = Diagnosis.(make_error (Env.ctx env) binding_loc (CannotBindingOfPattern "enum")) in
+        raise (Diagnosis.Error err)
       )
     )
 
@@ -197,8 +198,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       match ty_var_opt with
       | Some variable -> (
         if not !(variable.var_init) then (
-          let err = Type_error.(make_error (Env.ctx env) expr.loc (CannotAccessBeforeInit id.pident_name)) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error (Env.ctx env) expr.loc (CannotAccessBeforeInit id.pident_name)) in
+          raise (Diagnosis.Error err)
         );
         (*
          * it's class or enum, create a ref to it,
@@ -220,8 +221,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
       | _ ->
         let err_spec = Type_error.CannotFindName id.pident_name in
-        let err = Type_error.make_error (Env.ctx env) id.pident_loc err_spec in
-        raise (Type_error.Error err)
+        let err = Diagnosis.make_error (Env.ctx env) id.pident_loc err_spec in
+        raise (Diagnosis.Error err)
     )
 
     | Lambda lambda -> (
@@ -409,8 +410,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
               attributes = [];
             }
           | None -> (
-            let err = Type_error.(make_error ctx loc (CannotFindName id.pident_name)) in
-            raise (Type_error.Error err)
+            let err = Diagnosis.(make_error ctx loc (CannotFindName id.pident_name)) in
+            raise (Diagnosis.Error err)
           )
         )
 
@@ -419,8 +420,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           annotate_expression ~prev_deps:[expr.ty_var] env left
 
         | _ -> (
-          let err = Type_error.(make_error ctx loc InvalidAssign) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error ctx loc InvalidAssign) in
+          raise (Diagnosis.Error err)
         )
       in
       let unit_type = Env.ty_unit env in
@@ -477,8 +478,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
               | _ ->
                 let err_spec = Type_error.CannotFindName key_name in
-                let err = Type_error.make_error (Env.ctx env) init_entry_key.pident_loc err_spec in
-                raise (Type_error.Error err)
+                let err = Diagnosis.make_error (Env.ctx env) init_entry_key.pident_loc err_spec in
+                raise (Diagnosis.Error err)
 
             )
           in
@@ -506,8 +507,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         } 
       )
       | None -> (
-        let err = Type_error.(make_error ctx init_loc (CannotFindName init_name.pident_name)) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error ctx init_loc (CannotFindName init_name.pident_name)) in
+        raise (Diagnosis.Error err)
       )
 
     )
@@ -653,8 +654,8 @@ and prescan_pattern_for_scope ~kind ~(scope: Scope.scope) env pat =
       let id = Type_context.new_id (Env.ctx env) node in
       (match scope#new_var_symbol pident_name ~id ~kind ~loc:pident_loc with
       | `Duplicate -> (
-        let err = Type_error.(make_error (Env.ctx env) pident_loc (Redefinition pident_name)) in
-        raise Type_error.(Error err)
+        let err = Diagnosis.(make_error (Env.ctx env) pident_loc (Redefinition pident_name)) in
+        raise Diagnosis.(Error err)
       )
       | _ -> ());
     )
@@ -805,7 +806,7 @@ and annotate_declaration env decl : T.Declaration.t =
             Type_context.set_external_symbol (Env.ctx env) ty_id ext_name
 
           | _ ->
-            let open Type_error in
+            let open Diagnosis in
             let err = make_error (Env.ctx env) loc DeclareFunctionShouldSpecificExternal in
             raise (Error err)
           );
@@ -917,8 +918,8 @@ and annotate_class env cls =
         |> Option.is_some
     in
     if exist then (
-      let err = Type_error.(make_error (Env.ctx env) loc (ClassPropRedefinition(cls.cls_id.pident_name, name))) in
-      raise (Type_error.Error err)
+      let err = Diagnosis.(make_error (Env.ctx env) loc (ClassPropRedefinition(cls.cls_id.pident_name, name))) in
+      raise (Diagnosis.Error err)
     );
     tcls_elements := elm::(!tcls_elements)
   in
@@ -931,8 +932,8 @@ and annotate_class env cls =
       |> Option.is_some
     in
     if exist then (
-      let err = Type_error.(make_error (Env.ctx env) loc (ClassPropRedefinition(cls.cls_id.pident_name, name))) in
-      raise (Type_error.Error err)
+      let err = Diagnosis.(make_error (Env.ctx env) loc (ClassPropRedefinition(cls.cls_id.pident_name, name))) in
+      raise (Diagnosis.Error err)
     );
     tcls_static_elements := elm::(!tcls_static_elements)
   in
@@ -1108,7 +1109,7 @@ and annotate_class env cls =
             Type_context.set_external_symbol (Env.ctx env) declare_id ext_name
 
           | _ ->
-            let open Type_error in
+            let open Diagnosis in
             let err = make_error (Env.ctx env) cls_decl_method_loc DeclareFunctionShouldSpecificExternal in
             raise (Error err)
           );
@@ -1282,8 +1283,8 @@ and annotate_function_param env ident =
   let scope = Env.peek_scope env in
   (match scope#new_var_symbol ~id ~kind:Pvar_const ~loc:pident_loc pident_name  with
   | `Duplicate -> (
-    let err = Type_error.(make_error (Env.ctx env) pident_loc (Redefinition pident_name)) in
-    raise Type_error.(Error err)
+    let err = Diagnosis.(make_error (Env.ctx env) pident_loc (Redefinition pident_name)) in
+    raise Diagnosis.(Error err)
   )
   | _ -> ());
   scope#init_symbol pident_name;
@@ -1310,8 +1311,8 @@ and annotate_pattern ~pat_id env pat : (T.Pattern.t * int list) =
 
         let ctor_var = scope#find_var_symbol ident.pident_name in
         if Option.is_none ctor_var then (
-          let err = Type_error.(make_error (Env.ctx env) ident.pident_loc (NotAEnumConstructor ident.pident_name)) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error (Env.ctx env) ident.pident_loc (NotAEnumConstructor ident.pident_name)) in
+          raise (Diagnosis.Error err)
         );
         let ctor = Option.value_exn ctor_var in
         deps := List.append !deps [ctor.var_id];
@@ -1327,8 +1328,8 @@ and annotate_pattern ~pat_id env pat : (T.Pattern.t * int list) =
     | EnumCtor(id, pat) -> (
       let ctor_var = scope#find_var_symbol id.pident_name in
       if Option.is_none ctor_var then (
-        let err = Type_error.(make_error (Env.ctx env) loc (CannotFindName id.pident_name)) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error (Env.ctx env) loc (CannotFindName id.pident_name)) in
+        raise (Diagnosis.Error err)
       );
       let ctor_var = Option.value_exn ctor_var in
 
@@ -1397,8 +1398,8 @@ and annotate_type env ty : (TypeExpr.t * int list) =
 
     if scope#is_generic_type_symbol pident_name then (
       if not (List.is_empty params) then (
-        let err = Type_error.(make_error (Env.ctx env) loc (IsNotGeneric pident_name)) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error (Env.ctx env) loc (IsNotGeneric pident_name)) in
+        raise (Diagnosis.Error err)
       );
       TypeExpr.TypeSymbol pident_name, !deps
     ) else (
@@ -1413,8 +1414,8 @@ and annotate_type env ty : (TypeExpr.t * int list) =
         (Env.peek_scope env)#print_type_symbols;
         let ctx = Env.ctx env in
         let err_spec = Type_error.CannotFindName pident_name in
-        let err = Type_error.make_error ctx pident_loc err_spec in
-        raise (Type_error.Error err)
+        let err = Diagnosis.make_error ctx pident_loc err_spec in
+        raise (Diagnosis.Error err)
       )
     )
 
@@ -1480,8 +1481,8 @@ and annotate_function_params env params : T.Function.params * TypeExpr.params * 
     params_content
     |> List.mapi ~f:(fun index param ->
       if param.param_rest && (index <> params_len - 1) then (
-        let err = Type_error.(make_error (Env.ctx env) param.param_loc RestParamsMustAtLast) in
-        raise Type_error.(Error err)
+        let err = Diagnosis.(make_error (Env.ctx env) param.param_loc RestParamsMustAtLast) in
+        raise Diagnosis.(Error err)
       );
 
       let t, type_tuple, dep_id = annoate_param param in
@@ -1605,8 +1606,8 @@ and annotate_enum env enum =
 
       let first_char = String.get case_name.pident_name 0 in
       if not (Char.is_uppercase first_char) then (
-        let err = Type_error.(make_error ctx case_name.pident_loc (CapitalizedEnumMemeber case_name.pident_name)) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error ctx case_name.pident_loc (CapitalizedEnumMemeber case_name.pident_name)) in
+        raise (Diagnosis.Error err)
       );
 
       let ctor_ty_def = {
