@@ -2,6 +2,9 @@
 function main() {
   let index = 0;
   const content = "Hello world";
+  const a = 1 - 2 - 3;
+  print(a);
+
   if index >= content.length || content[index] != 'r' {
     return;
   }

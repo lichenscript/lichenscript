@@ -1135,6 +1135,7 @@ and parse_binary_expression env : Expression.t =
             attributes = [];
           }
         in
+        Eat.token env;
         parse_binary_enhance env binary right_token
       )
     ) else (
