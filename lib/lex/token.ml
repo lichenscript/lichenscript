@@ -8,7 +8,7 @@ type t =
       kind: bigint_type;
       raw: string;
     }
-  | T_CHAR of (Loc.t * char * string)
+  | T_CHAR of (Loc.t * int * string)
   | T_STRING of (Loc.t * string * string * bool) (* loc, value, raw, octal *)
   | T_TEMPLATE_PART of (Loc.t * template_part * bool) (* loc, value, is_tail *)
   | T_IDENTIFIER of {

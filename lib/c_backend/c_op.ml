@@ -131,7 +131,7 @@ and Expr : sig
   | NewString of string
   | NewInt of string
   | NewFloat of string
-  | NewChar of char 
+  | NewChar of int
   | NewLambda of (string * t * symbol array)
   | NewBoolean of bool
   | NewRef of t

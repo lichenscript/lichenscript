@@ -375,9 +375,9 @@ and codegen_expression (env: t) (expr: Expr.t) =
   )
 
   | NewChar ch -> (
-    ps env "MK_CHAR('";
-    ps env (Char.to_string ch);
-    ps env "')";
+    ps env "MK_CHAR(";
+    ps env (Int.to_string ch);
+    ps env ")";
   )
 
   | NewString value -> (

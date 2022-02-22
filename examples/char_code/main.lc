@@ -6,5 +6,6 @@ function main() {
     print('Z'.code());
     print('0'.code());
     print('9'.code());
+    print('陈'.code());
     print('$'.toString());
 }
