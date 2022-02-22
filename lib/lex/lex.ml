@@ -697,7 +697,7 @@ let token (env : Lex_env.t) lexbuf : result =
     Buffer.add_string raw quote;
     let env, ch, raw, _end = char_quote env raw lexbuf in
     let loc = { Loc.source = Lex_env.source env; start; _end } in
-    Token (env, T_CHAR (loc, String.get ch 0, Buffer.contents raw))
+    Token (env, T_CHAR (loc, Encoding.get_utf16_code ch, Buffer.contents raw))
 
   | '"' ->
     let quote = lexeme lexbuf in
@@ -1542,7 +1542,7 @@ let type_token env lexbuf =
     let raw = Buffer.create 4 in
     let env, ch, raw, _end = char_quote env raw lexbuf in
     let loc = { Loc.source = Lex_env.source env; start; _end } in
-    Token (env, T_CHAR (loc, String.get ch 0, Buffer.contents raw))
+    Token (env, T_CHAR (loc, Encoding.get_utf16_code ch, Buffer.contents raw))
 
   | '"' ->
     let quote = lexeme lexbuf in

@@ -24,7 +24,13 @@ module%gen rec Literal : sig
   type t =
     | Unit
     | Integer of string * char option
-    | Char of char
+
+    (*
+     * `char` is representing a 8-bit char in OCaml,
+     * but char is UTF-16 in LichenScript
+     *)
+    | Char of int
+
     (* 'c' *)
     | String of string * Loc.t * string option
     | Float of string * char option
