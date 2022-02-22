@@ -251,8 +251,10 @@ and codegen_declaration env decl =
 
     (match finalizer with
     | Some finalizer -> (
-      ps env (Format.sprintf "void %s(LCRuntime* rt, LCValue this) {\n" finalizer.finalizer_name);
+      ps env (Format.sprintf "void %s(LCRuntime* rt, LCGCObject* gc_obj) {\n" finalizer.finalizer_name);
       with_indent env (fun () ->
+        print_indents env;
+        ps env (Format.sprintf "%s* ptr = (%s*)gc_obj;\n" name name);
         List.iter
         ~f:(fun stmt ->
           print_indents env;
@@ -661,6 +663,12 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env cls_name;
     ps env "*";
     ps env ")->";
+    ps env field_name
+  )
+
+  | RawGetField(ptr_name, field_name) -> (
+    ps env ptr_name;
+    ps env "->";
     ps env field_name
   )
 

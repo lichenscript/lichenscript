@@ -54,6 +54,16 @@ typedef enum LCObjectType {
     LC_TY_MAX = 127,
 } LCObjectType;
 
+typedef enum LCGCObjectType {
+    LC_GC_UNION_OBJECT = 1,
+    LC_GC_REFCELL,
+    LC_GC_LAMBDA,
+    LC_GC_CLASS_OBJECT,
+    LC_GC_TUPLE,
+    LC_GC_ARRAY,
+    LC_GC_MAP,
+} LCGCObjectType;
+
 typedef enum LCArithmeticType {
     LC_ARTH_PLUS = 1,
     LC_ARTH_MINUS,
@@ -86,10 +96,12 @@ typedef struct LCRefCountHeader {
 } LCRefCountHeader;
 
 typedef struct LCGCObjectHeader {
-    int      count;
-    uint32_t class_id;
+    int         count;
+    uint32_t    class_id;
     LCGCObject* prev;
     LCGCObject* next;
+    uint8_t     mark;
+    uint8_t     gc_ty;
 } LCGCObjectHeader;
 
 struct LCObject {
@@ -100,7 +112,7 @@ struct LCGCObject {
     LCGCObjectHeader header;
 };
 
-typedef void LCMarkFunc(LCRuntime *rt, LCGCObjectHeader *gp);
+typedef void LCMarkFunc(LCRuntime *rt, LCGCObject* gc_obj);
 typedef void (*LCClassGCMark)(LCRuntime *rt, LCValue val,
                            LCMarkFunc *mark_func);
 
@@ -239,7 +251,7 @@ LCValue LCNewTuple(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args);
 typedef struct LCArray LCArray;
 
 typedef LCValue (*LCCFunction)(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args);
-typedef void (*LCFinalizer)(LCRuntime* rt, LCValue obj);
+typedef void (*LCFinalizer)(LCRuntime* rt, LCGCObject*);
 
 typedef struct LCProgram {
     LCRuntime* runtime;
@@ -258,6 +270,8 @@ LCValue LCRunMain(LCProgram* program);
 
 LCRuntime* LCNewRuntime();
 void LCFreeRuntime(LCRuntime* rt);
+
+void LCRunGC(LCRuntime* rt);
 
 void* lc_malloc(LCRuntime* rt, size_t size);
 void* lc_mallocz(LCRuntime* rt, size_t size);
