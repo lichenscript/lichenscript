@@ -500,7 +500,7 @@ let string_escape env lexbuf =
     (env, str, codes, false)
   | _ -> failwith "unreachable"
 
-let char_end env raw c lexbuf =
+let char_end env raw (c: int) lexbuf =
   match%sedlex lexbuf with
   | "'" ->
     let x = lexeme lexbuf in
@@ -511,7 +511,7 @@ let char_end env raw c lexbuf =
     let c = lexeme lexbuf in
     let loc = loc_of_lexbuf env lexbuf in
     let env = unexpected_error env loc c in
-    (env, c, raw, end_pos_of_lexbuf env lexbuf)
+    (env, Encoding.get_utf16_code c, raw, end_pos_of_lexbuf env lexbuf)
   )
 
   | _ -> failwith "unreachable"
@@ -522,25 +522,31 @@ let char_quote env raw lexbuf =
     let c = lexeme lexbuf in
     let loc = loc_of_lexbuf env lexbuf in
     let env = unexpected_error env loc c in
-    (env, c, raw, end_pos_of_lexbuf env lexbuf)
+    (env, Encoding.get_utf16_code c, raw, end_pos_of_lexbuf env lexbuf)
+
+  | '\\' ->
+    Buffer.add_string raw "\\";
+    let (env, str, codes, _) = string_escape env lexbuf in
+    Buffer.add_string raw str;
+    char_end env raw (Array.get codes 0) lexbuf
 
   | '\n' ->
     let x = lexeme lexbuf in
     Buffer.add_string raw x;
     let env = illegal env (loc_of_lexbuf env lexbuf) in
     let env = new_line env lexbuf in
-    (env, x, raw, end_pos_of_lexbuf env lexbuf)
+    (env, Encoding.get_utf16_code x, raw, end_pos_of_lexbuf env lexbuf)
 
   | eof ->
     let x = lexeme lexbuf in
     Buffer.add_string raw x;
     let env = illegal env (loc_of_lexbuf env lexbuf) in
-    (env, x, raw, end_pos_of_lexbuf env lexbuf)
+    (env, Encoding.get_utf16_code x, raw, end_pos_of_lexbuf env lexbuf)
 
   | any ->
     let c = lexeme lexbuf in
     Buffer.add_string raw c;
-    char_end env raw c lexbuf
+    char_end env raw (Encoding.get_utf16_code c) lexbuf
 
   | _ -> failwith "unreachable"
 
@@ -697,7 +703,7 @@ let token (env : Lex_env.t) lexbuf : result =
     Buffer.add_string raw quote;
     let env, ch, raw, _end = char_quote env raw lexbuf in
     let loc = { Loc.source = Lex_env.source env; start; _end } in
-    Token (env, T_CHAR (loc, Encoding.get_utf16_code ch, Buffer.contents raw))
+    Token (env, T_CHAR (loc, ch, Buffer.contents raw))
 
   | '"' ->
     let quote = lexeme lexbuf in
@@ -1542,7 +1548,7 @@ let type_token env lexbuf =
     let raw = Buffer.create 4 in
     let env, ch, raw, _end = char_quote env raw lexbuf in
     let loc = { Loc.source = Lex_env.source env; start; _end } in
-    Token (env, T_CHAR (loc, Encoding.get_utf16_code ch, Buffer.contents raw))
+    Token (env, T_CHAR (loc, ch, Buffer.contents raw))
 
   | '"' ->
     let quote = lexeme lexbuf in
