@@ -175,12 +175,18 @@ and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platf
     )
 
     | TypeCheckError errors ->
+      let open Diagnosis in
       List.iter
         ~f:(fun err ->
-          let { Type_error. spec; loc; ctx } = err in
+          let { spec; loc; ctx } = err in
           print_loc_title ~prefix:"type error" loc;
           let start = loc.start in
-          Format.printf "%d:%d %a\n" start.line start.column (Type_error.PP.error_spec ~ctx) spec
+          match spec with
+          | Dg_error err_spec -> (
+            Format.printf "%d:%d %a\n" start.line start.column (Diagnosis.PP.error_spec ~ctx) err_spec
+          )
+          | Dg_warning _ -> ()
+
         )
         errors;
       ignore (exit 2);

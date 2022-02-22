@@ -135,8 +135,8 @@ and check_function_return_type env fun_return_ty (block: T.Block.t) =
   in
 
   if not (is_last_stmt_return block) && not (Check_helper.type_assinable env.ctx fun_return_ty block_return_type) then (
-    let open Type_error in
-    let spec = CannotReturn(fun_return_ty, block_return_type) in
+    let open Diagnosis in
+    let spec = Type_error.CannotReturn(fun_return_ty, block_return_type) in
     let err = make_error env.ctx block.loc spec in
     raise (Error err)
   );
@@ -147,8 +147,8 @@ and check_function_return_type env fun_return_ty (block: T.Block.t) =
   List.iter
     ~f:(fun (return_ty, return_loc) ->
       if not (Check_helper.type_assinable env.ctx fun_return_ty return_ty) then (
-        let open Type_error in
-        let spec = CannotReturn(fun_return_ty, return_ty) in
+        let open Diagnosis in
+        let spec = Type_error.CannotReturn(fun_return_ty, return_ty) in
         let err = make_error env.ctx return_loc spec in
         raise (Error err)
       )
@@ -187,8 +187,8 @@ and check_statement env stmt =
     check_expression env while_test;
     let test_type = Type_context.deref_node_type env.ctx while_test.ty_var in
     if not (Check_helper.is_boolean env.ctx test_type) then (
-      let open Type_error in
-      let spec = WhileTestShouldBeBoolean test_type in
+      let open Diagnosis in
+      let spec = Type_error.WhileTestShouldBeBoolean test_type in
       let err = make_error env.ctx while_test.loc spec in
       raise (Error err)
     );
@@ -233,8 +233,8 @@ and check_expression_if env if_spec =
 
   let test_type = Type_context.deref_node_type env.ctx if_test.ty_var in
   if not (Check_helper.is_boolean env.ctx test_type) then (
-    let open Type_error in
-    let spec = IfTestShouldBeBoolean test_type in
+    let open Diagnosis in
+    let spec = Type_error.IfTestShouldBeBoolean test_type in
     let err = make_error env.ctx if_test.loc spec in
     raise (Error err)
   );
@@ -254,8 +254,8 @@ and check_expression_if env if_spec =
       else if Check_helper.type_assinable env.ctx node.value blk_ty then
         blk_ty
       else (
-        let err = Type_error.(make_error env.ctx blk.loc (NotAssignable(node.value, blk_ty))) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error env.ctx blk.loc (NotAssignable(node.value, blk_ty))) in
+        raise (Diagnosis.Error err)
       )
     )
     | Some (If_alt_if desc) -> (
@@ -267,8 +267,8 @@ and check_expression_if env if_spec =
       else if Check_helper.type_assinable env.ctx node.value alt_ty then
         alt_ty
       else (
-        let err = Type_error.(make_error env.ctx desc.if_loc (NotAssignable(node.value, alt_ty))) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error env.ctx desc.if_loc (NotAssignable(node.value, alt_ty))) in
+        raise (Diagnosis.Error err)
       )
     )
     (*
@@ -278,8 +278,8 @@ and check_expression_if env if_spec =
       let ty_unit = ty_unit env in
       let result = TypeExpr.Ctor(Ref ty_unit, []) in
       if not (Check_helper.type_assinable env.ctx result node.value) then (
-        let err = Type_error.(make_error env.ctx if_loc (NotAssignable(result, node.value))) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error env.ctx if_loc (NotAssignable(result, node.value))) in
+        raise (Diagnosis.Error err)
       );
 
       result
@@ -331,8 +331,8 @@ and check_expression env expr =
             else if Check_helper.type_assinable env.ctx item_type acc then
               item_type
             else (
-              let err = Type_error.(make_error env.ctx expr.loc (NotAssignable(acc, item_type))) in
-              raise (Type_error.Error err)
+              let err = Diagnosis.(make_error env.ctx expr.loc (NotAssignable(acc, item_type))) in
+              raise (Diagnosis.Error err)
             )
           )
         )
@@ -382,8 +382,8 @@ and check_expression env expr =
             | Ast.Literal.Float _ ->  *)
             | _ ->
               let ty = TypeExpr.Ref(ty_f32 env) in
-              let err = Type_error.(make_error env.ctx entry.map_entry_loc (CannotUsedAsKeyOfMap ty)) in
-              raise (Type_error.Error err)
+              let err = Diagnosis.(make_error env.ctx entry.map_entry_loc (CannotUsedAsKeyOfMap ty)) in
+              raise (Diagnosis.Error err)
           in
           let node_type = Type_context.deref_node_type env.ctx entry.map_entry_value.ty_var in
           let value_ty =
@@ -395,8 +395,8 @@ and check_expression env expr =
               else if Check_helper.type_assinable env.ctx node_type acc_value then
                 node_type
               else (
-                let err = Type_error.(make_error env.ctx entry.map_entry_loc (NotAssignable(acc_value, node_type))) in
-                raise (Type_error.Error err)
+                let err = Diagnosis.(make_error env.ctx entry.map_entry_loc (NotAssignable(acc_value, node_type))) in
+                raise (Diagnosis.Error err)
               )
           in
           (key_ty, value_ty)
@@ -422,16 +422,16 @@ and check_expression env expr =
       for i = 0 to ((Array.length expected_params) - 1) do
         let expect_param_name, expect_param = Array.get expected_params i in
         if i >= (Array.length pass_params) then (
-          let err = Type_error.(make_error env.ctx expr_loc (ParamDoesNotProvided expect_param_name)) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error env.ctx expr_loc (ParamDoesNotProvided expect_param_name)) in
+          raise (Diagnosis.Error err)
         );
         let pass_param = Array.get pass_params i in
         let pass_param_type = Type_context.deref_node_type env.ctx pass_param.ty_var in
         let test_map, test_result = Check_helper.type_assinable_with_maps env.ctx !symbol_map expect_param pass_param_type in
         symbol_map := test_map;
         if not test_result then (
-          let err = Type_error.(make_error env.ctx expr_loc (CannotPassParam(expect_param_name, expect_param, pass_param_type))) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error env.ctx expr_loc (CannotPassParam(expect_param_name, expect_param, pass_param_type))) in
+          raise (Diagnosis.Error err)
         )
       done;
       if (Array.length pass_params) > (Array.length expected_params) then (
@@ -440,8 +440,8 @@ and check_expression env expr =
           let array_content = match Check_helper.try_unwrap_array env.ctx rest_ty with
             | Some v -> v
             | None -> (
-              let err = Type_error.(make_error env.ctx expr_loc RestShouldBeArray) in
-              raise (Type_error.Error err)
+              let err = Diagnosis.(make_error env.ctx expr_loc RestShouldBeArray) in
+              raise (Diagnosis.Error err)
             )
           in
           let pass_rest = Array.slice pass_params (Array.length expected_params) (Array.length pass_params) in
@@ -449,8 +449,8 @@ and check_expression env expr =
             ~f:(fun param ->
               let pass_param_type = Type_context.deref_node_type env.ctx param.ty_var in
               if not (Check_helper.type_assinable env.ctx array_content pass_param_type) then (
-                let err = Type_error.(make_error env.ctx expr_loc (CannotPassParam(rest_name, array_content, pass_param_type))) in
-                raise (Type_error.Error err)
+                let err = Diagnosis.(make_error env.ctx expr_loc (CannotPassParam(rest_name, array_content, pass_param_type))) in
+                raise (Diagnosis.Error err)
               )
             )
             pass_rest
@@ -459,8 +459,8 @@ and check_expression env expr =
         | _ ->
           let expected = Array.length expected_params in
           let actual = Array.length pass_params in
-          let err = Type_error.(make_error env.ctx expr_loc (UnexpectedParams(expected, actual))) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error env.ctx expr_loc (UnexpectedParams(expected, actual))) in
+          raise (Diagnosis.Error err)
       );
       !symbol_map
     in
@@ -482,13 +482,13 @@ and check_expression env expr =
         | _ ->
           let expect_param_name = Int.to_string i in
           if i >= (Array.length pass_params) then (
-            let err = Type_error.(make_error env.ctx expr_loc (ParamDoesNotProvided expect_param_name)) in
-            raise (Type_error.Error err)
+            let err = Diagnosis.(make_error env.ctx expr_loc (ParamDoesNotProvided expect_param_name)) in
+            raise (Diagnosis.Error err)
           );
           let pass_param_type = Type_context.deref_node_type env.ctx pass_param.ty_var in
           if not (Check_helper.type_assinable env.ctx expect_param pass_param_type) then (
-            let err = Type_error.(make_error env.ctx expr_loc (CannotPassParam(expect_param_name, expect_param, pass_param_type))) in
-            raise (Type_error.Error err)
+            let err = Diagnosis.(make_error env.ctx expr_loc (CannotPassParam(expect_param_name, expect_param, pass_param_type))) in
+            raise (Diagnosis.Error err)
           )
       done;
 
@@ -540,8 +540,8 @@ and check_expression env expr =
         )
 
         | _ -> (
-          let err = Type_error.(make_error ctx expr_loc (NotCallable deref_type_expr)) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error ctx expr_loc (NotCallable deref_type_expr)) in
+          raise (Diagnosis.Error err)
         )
       end
 
@@ -568,8 +568,8 @@ and check_expression env expr =
       Type_context.update_node_type env.ctx expr.ty_var ty_expr
 
     | None ->
-      let err = Type_error.(make_error env.ctx expr_loc (CannotReadMember(name.pident_name, expr_node.value))) in
-      raise (Type_error.Error err)
+      let err = Diagnosis.(make_error env.ctx expr_loc (CannotReadMember(name.pident_name, expr_node.value))) in
+      raise (Diagnosis.Error err)
 
   )
 
@@ -592,8 +592,8 @@ and check_expression env expr =
           Type_context.update_node_type env.ctx expr.ty_var t
 
         | None -> (
-          let err = Type_error.(make_error env.ctx expr_loc (CannotGetIndex node_type)) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error env.ctx expr_loc (CannotGetIndex node_type)) in
+          raise (Diagnosis.Error err)
         )
       end
   )
@@ -602,8 +602,8 @@ and check_expression env expr =
     check_expression env child;
     let node_type = Type_context.deref_node_type env.ctx child.ty_var in
     let raise_err () =
-      let err = Type_error.(make_error env.ctx expr_loc (CannotApplyUnary(op, node_type))) in
-      raise (Type_error.Error err)
+      let err = Diagnosis.(make_error env.ctx expr_loc (CannotApplyUnary(op, node_type))) in
+      raise (Diagnosis.Error err)
     in
     match op with
     | Asttypes.UnaryOp.Not -> (
@@ -644,8 +644,8 @@ and check_expression env expr =
 
       (match variable.var_kind with
       | Ast.Pvar_const -> (
-        let err = Type_error.(make_error ctx expr_loc CannotAssignToConstVar) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error ctx expr_loc CannotAssignToConstVar) in
+        raise (Diagnosis.Error err)
       )
       | _ -> ());
     )
@@ -656,8 +656,8 @@ and check_expression env expr =
       match member_opt with
       | Some _ -> ()
       | None -> (
-        let err = Type_error.(make_error ctx expr_loc (CannotReadMember(name.pident_name, main_expr_type))) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error ctx expr_loc (CannotReadMember(name.pident_name, main_expr_type))) in
+        raise (Diagnosis.Error err)
       )
     )
 
@@ -665,12 +665,12 @@ and check_expression env expr =
       let main_expr_type = Type_context.deref_node_type ctx main_expr.ty_var in
       let value_type = Type_context.deref_node_type ctx value_expr.ty_var in
       if not (Check_helper.is_array ctx main_expr_type) then (
-        let err = Type_error.(make_error ctx main_expr.loc OnlyAssignArrayIndexAlpha) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error ctx main_expr.loc OnlyAssignArrayIndexAlpha) in
+        raise (Diagnosis.Error err)
       );
       if not (Check_helper.is_i32 ctx value_type) then (
-        let err = Type_error.(make_error ctx value_expr.loc OnlyI32InIndexAlpha) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error ctx value_expr.loc OnlyI32InIndexAlpha) in
+        raise (Diagnosis.Error err)
       )
     )
 
@@ -682,8 +682,8 @@ and check_expression env expr =
       let sym_node = Type_context.get_node ctx left.ty_var in
       let expr_node = Type_context.get_node ctx right.ty_var in
       if not (Check_helper.type_assinable ctx sym_node.value expr_node.value) then (
-        let err = Type_error.(make_error ctx expr_loc (NotAssignable(sym_node.value, expr_node.value))) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error ctx expr_loc (NotAssignable(sym_node.value, expr_node.value))) in
+        raise (Diagnosis.Error err)
       )
     )
 
@@ -726,8 +726,8 @@ and check_expression env expr =
           let expected_type = PropMap.find_exn type_map init_entry_key.pident_name in
           let actual_type = Type_context.deref_node_type env.ctx init_entry_value.ty_var in
           if not (Check_helper.type_assinable env.ctx expected_type actual_type) then (
-            let err = Type_error.(make_error env.ctx expr_loc (ClassInitNotAssignable(cls_name, init_entry_key.pident_name, expected_type, actual_type))) in
-            raise Type_error.(Error err)
+            let err = Diagnosis.(make_error env.ctx expr_loc (ClassInitNotAssignable(cls_name, init_entry_key.pident_name, expected_type, actual_type))) in
+            raise Diagnosis.(Error err)
           );
           let init_flag = PropMap.find_exn init_map init_entry_key.pident_name in
           init_flag := true
@@ -742,8 +742,8 @@ and check_expression env expr =
     PropMap.iteri
       ~f:(fun ~key ~data ->
         if not !data then (
-          let err = Type_error.(make_error env.ctx expr_loc (ClassPropNotInit(cls_name, key))) in
-          raise Type_error.(Error err)
+          let err = Diagnosis.(make_error env.ctx expr_loc (ClassPropNotInit(cls_name, key))) in
+          raise Diagnosis.(Error err)
         )
       )
       init_map
@@ -761,46 +761,46 @@ and check_expression env expr =
 
       | Literal Ast.Literal.Unit -> (
         if not (Check_helper.is_unit env.ctx expr_type) then (
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("unit", expr_type))) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error env.ctx pat.loc (UnexpectedPatternType("unit", expr_type))) in
+          raise (Diagnosis.Error err)
         )
       )
 
       | Literal (Ast.Literal.Boolean _) -> (
         if not (Check_helper.is_boolean env.ctx expr_type) then (
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("boolean", expr_type))) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error env.ctx pat.loc (UnexpectedPatternType("boolean", expr_type))) in
+          raise (Diagnosis.Error err)
         )
       )
       | Literal (Ast.Literal.Char _) -> (
         if not (Check_helper.is_char env.ctx expr_type) then (
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("char", expr_type))) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error env.ctx pat.loc (UnexpectedPatternType("char", expr_type))) in
+          raise (Diagnosis.Error err)
         )
       )
       | Literal (Ast.Literal.Float _) -> (
         if not (Check_helper.is_f32 env.ctx expr_type) then (
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("float", expr_type))) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error env.ctx pat.loc (UnexpectedPatternType("float", expr_type))) in
+          raise (Diagnosis.Error err)
         )
       )
       | Literal (Ast.Literal.Integer _) -> (
         if not (Check_helper.is_i32 env.ctx expr_type) then (
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("number", expr_type))) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error env.ctx pat.loc (UnexpectedPatternType("number", expr_type))) in
+          raise (Diagnosis.Error err)
         )
       )
       | Literal (Ast.Literal.String _) -> (
         match expr_type with
         | TypeExpr.String -> ()
         | _ ->
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("string", expr_type))) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error env.ctx pat.loc (UnexpectedPatternType("string", expr_type))) in
+          raise (Diagnosis.Error err)
       )
       | EnumCtor((ctor_name, ctor_id), child_pat) -> (
         let raise_err () =
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType(ctor_name, expr_type))) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error env.ctx pat.loc (UnexpectedPatternType(ctor_name, expr_type))) in
+          raise (Diagnosis.Error err)
         in
         let enum_ctor_typedef =
           match Type_context.deref_node_type env.ctx ctor_id with
@@ -821,8 +821,8 @@ and check_expression env expr =
       )
       | Tuple children -> (
         let raise_err () =
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("tuple", expr_type))) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error env.ctx pat.loc (UnexpectedPatternType("tuple", expr_type))) in
+          raise (Diagnosis.Error err)
         in
         match expr_type with
         | TypeExpr.Tuple children_types -> (
@@ -842,8 +842,8 @@ and check_expression env expr =
       )
       | Array { elements; rest } -> (
         let raise_err () =
-          let err = Type_error.(make_error env.ctx pat.loc (UnexpectedPatternType("array", expr_type))) in
-          raise (Type_error.Error err)
+          let err = Diagnosis.(make_error env.ctx pat.loc (UnexpectedPatternType("array", expr_type))) in
+          raise (Diagnosis.Error err)
         in
         match expr_type with
         | TypeExpr.Array child_type -> (
@@ -889,12 +889,12 @@ and check_expression env expr =
               | (TypeExpr.TypeDef left_sym, TypeExpr.TypeDef right_sym) -> (
                 if TypeDef.(left_sym == right_sym) then ()
                 else
-                  let err = Type_error.(make_error env.ctx match_loc (NotAllTheCasesReturnSameType(c1_def, c2_def))) in
-                  raise (Type_error.Error err)
+                  let err = Diagnosis.(make_error env.ctx match_loc (NotAllTheCasesReturnSameType(c1_def, c2_def))) in
+                  raise (Diagnosis.Error err)
               )
               | _ -> (
-                let err = Type_error.(make_error env.ctx match_loc (NotAllTheCasesReturnSameType(c2_def, c2_def))) in
-                raise (Type_error.Error err)
+                let err = Diagnosis.(make_error env.ctx match_loc (NotAllTheCasesReturnSameType(c2_def, c2_def))) in
+                raise (Diagnosis.Error err)
               ));
 
               acc
@@ -926,8 +926,8 @@ and check_binary_op env op expr left right =
   match op with
   | BinaryOp.Plus -> (
     if not (Check_helper.type_addable ctx left_node.value right_node.value) then (
-      let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-      raise (Type_error.Error err)
+      let err = Diagnosis.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+      raise (Diagnosis.Error err)
     );
     Type_context.update_node_type ctx id left_node.value;
   )
@@ -937,8 +937,8 @@ and check_binary_op env op expr left right =
   | BinaryOp.Div
     -> (
     if not (Check_helper.type_arithmetic ctx left_node.value right_node.value) then (
-      let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-      raise (Type_error.Error err)
+      let err = Diagnosis.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+      raise (Diagnosis.Error err)
     );
     Type_context.update_node_type ctx id left_node.value;
   )
@@ -949,8 +949,8 @@ and check_binary_op env op expr left right =
   | BinaryOp.BitOr
     -> (
     if not (Check_helper.type_arithmetic_integer ctx left_node.value right_node.value) then (
-      let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-      raise (Type_error.Error err)
+      let err = Diagnosis.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+      raise (Diagnosis.Error err)
     );
     Type_context.update_node_type ctx id left_node.value;
   )
@@ -963,8 +963,8 @@ and check_binary_op env op expr left right =
   | BinaryOp.GreaterThanEqual
     -> (
       if not (Check_helper.type_logic_compareable ctx left_node.value right_node.value) then (
-        let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+        raise (Diagnosis.Error err)
       );
       let bool_ty = ty_boolean env in
       Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
@@ -974,8 +974,8 @@ and check_binary_op env op expr left right =
   | BinaryOp.Or
     -> (
       if (not (Check_helper.is_boolean ctx left_node.value)) || (not (Check_helper.is_boolean ctx right_node.value)) then (
-        let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+        raise (Diagnosis.Error err)
       );
       let bool_ty = ty_boolean env in
       Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
@@ -983,8 +983,8 @@ and check_binary_op env op expr left right =
 
   | _ -> (
       if not (Check_helper.type_logic_compareable ctx left_node.value right_node.value) then (
-        let err = Type_error.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
+        raise (Diagnosis.Error err)
       );
   )
 
@@ -1120,8 +1120,8 @@ and check_match_exhausted env _match =
         items;
 
       if not (Hash_set.is_empty visited_map) then (
-        let err = Type_error.(make_error env.ctx _match.match_loc PatternNotExausted) in
-        raise (Type_error.Error err)
+        let err = Diagnosis.(make_error env.ctx _match.match_loc PatternNotExausted) in
+        raise (Diagnosis.Error err)
       )
     )
 
@@ -1132,8 +1132,8 @@ and check_match_exhausted env _match =
     )
 
     | _ -> (
-      let err = Type_error.(make_error env.ctx _match.match_loc PatternNotExausted) in
-      raise (Type_error.Error err)
+      let err = Diagnosis.(make_error env.ctx _match.match_loc PatternNotExausted) in
+      raise (Diagnosis.Error err)
     )
   in
 
@@ -1157,8 +1157,8 @@ and check_lambda env lambda =
   let expr_type = Type_context.deref_node_type env.ctx lambda_body.ty_var in
 
   if not (Check_helper.type_assinable env.ctx lambda_return_ty expr_type) then (
-    let open Type_error in
-    let spec = CannotReturn(lambda_return_ty, expr_type) in
+    let open Diagnosis in
+    let spec = Type_error.CannotReturn(lambda_return_ty, expr_type) in
     let err = make_error env.ctx lambda_body.loc spec in
     raise (Error err)
   );
@@ -1167,8 +1167,8 @@ and check_lambda env lambda =
   List.iter
     ~f:(fun (return_ty, return_loc) ->
       if not (Check_helper.type_assinable env.ctx lambda_return_ty return_ty) then (
-        let open Type_error in
-        let spec = CannotReturn(lambda_return_ty, return_ty) in
+        let open Diagnosis in
+        let spec = Type_error.CannotReturn(lambda_return_ty, return_ty) in
         let err = make_error env.ctx return_loc spec in
         raise (Error err)
       )
@@ -1209,8 +1209,8 @@ and check_class env cls =
               unwrap_class.tcls_elements
             in
             if Option.is_none test_method then (
-              let err = Type_error.(make_error env.ctx loc (MissingMethodForInterface(intf_name, method_name))) in
-              raise (Type_error.Error err)
+              let err = Diagnosis.(make_error env.ctx loc (MissingMethodForInterface(intf_name, method_name))) in
+              raise (Diagnosis.Error err)
             )
           )
           | _ -> ()
@@ -1218,8 +1218,8 @@ and check_class env cls =
         intf_methods
     )
     | _ ->
-      let open Type_error in
-      let spec = CannotImplement impl_expr in
+      let open Diagnosis in
+      let spec = Type_error.CannotImplement impl_expr in
       let err = make_error env.ctx loc spec in
       raise (Error err)
   in

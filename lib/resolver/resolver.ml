@@ -19,7 +19,7 @@ open Lichenscript_typing
 open Lichenscript_parsing
 
 exception ParseError of Parse_error.t list
-exception TypeCheckError of Type_error.t list
+exception TypeCheckError of Diagnosis.t list
 
 type t = {
   (* absolute path => module *)
@@ -371,7 +371,7 @@ let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~platform ~verbose en
     write_makefiles
       ~bin_name ~runtime_dir ~platform build_dir [ (mod_name, output_path) ]
   with
-    | Type_error.Error e ->
+    | Diagnosis.Error e ->
       raise (TypeCheckError [e])
 
     | Parse_error.Error errors ->

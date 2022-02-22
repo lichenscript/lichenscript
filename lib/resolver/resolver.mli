@@ -2,7 +2,7 @@ open Lichenscript_parsing
 open Lichenscript_typing
 
 exception ParseError of Parse_error.t list
-exception TypeCheckError of Type_error.t list
+exception TypeCheckError of Diagnosis.t list
 
 type profile = {
   profile_name: string;
