@@ -2090,8 +2090,6 @@ and transform_class env cls loc: C_op.Decl.t list =
  * If a class has ancesters, generate the ancesters's statements first.
  *)
 and generate_finalizer env name (type_def: Core_type.TypeDef.t) =
-  let this_expr = C_op.Expr.Ident SymThis in
-
   let generate_release_statements_by_cls_meta type_def =
     let open Core_type.TypeDef in
     let cls_meta = Hashtbl.find_exn env.cls_meta_map type_def.id in
@@ -2103,7 +2101,7 @@ and generate_finalizer env name (type_def: Core_type.TypeDef.t) =
         else
           Some {
             C_op.Stmt.
-            spec = Release (C_op.Expr.GetField(this_expr, cls_meta.cls_gen_name, field_name));
+            spec = Release (C_op.Expr.RawGetField("ptr", field_name));
             loc = Loc.none;
           }
       )

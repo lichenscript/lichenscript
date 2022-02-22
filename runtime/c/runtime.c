@@ -171,6 +171,8 @@ typedef struct LCRuntime {
     LCClassMeta* cls_meta_data;
     LCGCObject* gc_object_head;
     LCGCObject* gc_object_last;
+    LCGCObject* tmp_obj_head;
+    LCGCObject* tmp_obj_last;
 } LCRuntime;
 
 typedef struct LCArray {
@@ -179,6 +181,19 @@ typedef struct LCArray {
     uint32_t capacity;
     LCValue* data;
 } LCArray;
+
+struct LCMapTuple {
+    LCMapTuple* prev;
+    LCMapTuple* next;
+    LCValue key;
+    LCValue value;
+};
+
+typedef struct LCMapBucket {
+    uint32_t hash;
+    struct LCMapBucket* next;
+    LCMapTuple* data;
+} LCMapBucket;
 
 static inline uint32_t hash_int(int i, uint32_t seed) {
     return seed * 263 + i;
@@ -230,15 +245,17 @@ static void remove_gc_object_from_runtime(LCRuntime* rt, LCGCObject* obj) {
     }
 }
 
-static force_inline void init_gc_object(LCRuntime* rt, LCGCObject* obj) {
+static force_inline void init_gc_object(LCRuntime* rt, LCGCObject* obj, LCGCObjectType gc_ty) {
     obj->header.count = 1;
     obj->header.class_id = 0;
+    obj->header.gc_ty = gc_ty;
     add_gc_object_to_runtime(rt, obj);
 }
 
 void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCGCObject* obj) {
     obj->header.count = 1;
     obj->header.class_id = cls_id;
+    obj->header.gc_ty = LC_GC_CLASS_OBJECT;
     add_gc_object_to_runtime(rt, obj);
 }
 
@@ -283,8 +300,7 @@ static force_inline void lc_panic_internal() {
 
 static void LCFreeObject(LCRuntime* rt, LCValue val);
 
-static inline void LCFreeLambda(LCRuntime* rt, LCValue val) {
-    LCLambda* lambda = (LCLambda*)val.ptr_val; 
+static inline void LCFreeLambda(LCRuntime* rt, LCLambda* lambda) {
     size_t i;
 
     LCRelease(rt, lambda->captured_this);
@@ -300,22 +316,20 @@ static inline void LCFreeLambda(LCRuntime* rt, LCValue val) {
 /**
  * extract the finalizer from the class definition
  */
-static void LCFreeClassObject(LCRuntime* rt, LCValue val) {
-    LCGCObject* cls_obj = (LCGCObject*)val.ptr_val;
+static void LCFreeClassObject(LCRuntime* rt, LCGCObject* cls_obj) {
     LCClassID cls_id = cls_obj->header.class_id;
     LCClassMeta* meta = &rt->cls_meta_data[cls_id];
     LCFinalizer finalizer = meta->cls_def->finalizer;
     if (finalizer) {
-        finalizer(rt, val);
+        finalizer(rt, cls_obj);
     }
 
     remove_gc_object_from_runtime(rt, (LCGCObject*)cls_obj);
-    lc_free(rt, val.ptr_val);
+    lc_free(rt, cls_obj);
 }
 
-static inline void LCFreeTuple(LCRuntime* rt, LCValue val) {
+static inline void LCFreeTuple(LCRuntime* rt, LCTuple* tuple) {
     size_t i;
-    LCTuple* tuple = (LCTuple*)val.ptr_val;
 
     for (i = 0; i < tuple->len; i++) {
         LCRelease(rt, tuple->data[i]);
@@ -325,8 +339,7 @@ static inline void LCFreeTuple(LCRuntime* rt, LCValue val) {
     lc_free(rt, tuple);
 }
 
-static inline void LCFreeArray(LCRuntime* rt, LCValue val) {
-    LCArray* arr = (LCArray*)val.ptr_val;
+static inline void LCFreeArray(LCRuntime* rt, LCArray* arr) {
     uint32_t i;
     for (i = 0; i < arr->len; i++) {
         LCRelease(rt, arr->data[i]);
@@ -340,17 +353,14 @@ static inline void LCFreeArray(LCRuntime* rt, LCValue val) {
     lc_free(rt, arr);
 }
 
-static inline void LCFreeRefCell(LCRuntime* rt, LCValue val) {
-    LCRefCell* cell = (LCRefCell*)val.ptr_val;
+static inline void LCFreeRefCell(LCRuntime* rt, LCRefCell* cell) {
     LCRelease(rt, cell->value);
 
     remove_gc_object_from_runtime(rt, (LCGCObject*)cell);
     lc_free(rt, cell);
 }
 
-static inline void LCFreeUnionObject(LCRuntime* rt, LCValue val) {
-    LCUnionObject* union_obj = (LCUnionObject*)val.ptr_val;
-
+static inline void LCFreeUnionObject(LCRuntime* rt, LCUnionObject* union_obj) {
     int i;
     for (i = 0; i < union_obj->size; i++) {
         LCRelease(rt, union_obj->value[i]);
@@ -360,38 +370,54 @@ static inline void LCFreeUnionObject(LCRuntime* rt, LCValue val) {
     lc_free(rt, union_obj);
 }
 
-void lc_std_map_free(LCRuntime* rt, LCValue val);
+void lc_std_map_free(LCRuntime* rt, LCMap* map);
+
+static void LCFreeGCObject(LCRuntime* rt, LCGCObject* gc_obj) {
+    switch (gc_obj->header.gc_ty) {
+        case LC_GC_UNION_OBJECT:
+            LCFreeUnionObject(rt, (LCUnionObject*)gc_obj);
+            break;
+
+        case LC_GC_REFCELL:
+            LCFreeRefCell(rt, (LCRefCell*)gc_obj);
+            break;
+
+        case LC_GC_LAMBDA:
+            LCFreeLambda(rt, (LCLambda*)gc_obj);
+            break;
+
+        case LC_GC_CLASS_OBJECT:
+            LCFreeClassObject(rt, gc_obj);
+            break;
+
+        case LC_GC_TUPLE:
+            LCFreeTuple(rt, (LCTuple*)gc_obj);
+            break;
+
+        case LC_GC_ARRAY:
+            LCFreeArray(rt, (LCArray*)gc_obj);
+            break;
+
+        case LC_GC_MAP:
+            lc_std_map_free(rt, (LCMap*)gc_obj);
+            break;
+
+    }
+
+}
 
 static void LCFreeObject(LCRuntime* rt, LCValue val) {
     switch (val.tag) {
     case LC_TY_UNION_OBJECT:
-        LCFreeUnionObject(rt, val);
-        break;
-
     case LC_TY_REFCELL:
-        LCFreeRefCell(rt, val);
-        break;
-
     case LC_TY_LAMBDA:
-        LCFreeLambda(rt, val);
-        break;
-
     case LC_TY_CLASS_OBJECT:
-        LCFreeClassObject(rt, val);
-        break;
-
     case LC_TY_TUPLE:
-        LCFreeTuple(rt, val);
-        break;
-
     case LC_TY_ARRAY:
-        LCFreeArray(rt, val);
+    case LC_TY_MAP:
+        LCFreeGCObject(rt, (LCGCObject*)val.ptr_val);
         break;
 
-    case LC_TY_MAP:
-        lc_std_map_free(rt, val);
-        break;
-        
     case LC_TY_STRING:
     case LC_TY_SYMBOL:
     case LC_TY_CLASS_OBJECT_META:
@@ -556,6 +582,198 @@ void LCFreeRuntime(LCRuntime* rt) {
 #endif
 
     lc_raw_free(rt);
+}
+
+static void lc_add_gc_obj_to_tmp(LCRuntime* rt, LCGCObject* obj) {
+    obj->header.next = NULL;
+
+    if (rt->tmp_obj_last) {  // list is not empty
+        rt->tmp_obj_last->header.next = obj;
+        obj->header.prev = rt->tmp_obj_last;
+    } else {  // list is empty
+        obj->header.prev = NULL;
+        rt->tmp_obj_head = obj;
+    }
+
+    rt->tmp_obj_last = obj;
+}
+
+/**
+ * iterate all the gc objects, deref their ref count,
+ * if ref count decrested to 0, add to tmp objects;
+ */
+static void lc_deref_all_gc_objects(LCRuntime* rt) {
+    LCGCObject *gc_obj, *tmp;
+    gc_obj = rt->gc_object_head;
+
+    while (gc_obj != NULL) {
+        tmp = gc_obj->header.next;
+
+        if (--gc_obj->header.count <= 0) {
+            remove_gc_object_from_runtime(rt, gc_obj);
+            lc_add_gc_obj_to_tmp(rt, gc_obj);
+        }
+        gc_obj->header.mark = 1;
+
+        gc_obj = tmp;
+    }
+}
+
+void lc_mark_obj_incr(LCRuntime *rt, LCGCObject *obj);
+
+static void lc_mark_val_incr(LCRuntime *rt, LCValue val) {
+    switch (val.tag) {
+        case LC_TY_UNION_OBJECT:
+        case LC_TY_REFCELL:
+        case LC_TY_LAMBDA:
+        case LC_TY_CLASS_OBJECT:
+        case LC_TY_TUPLE:
+        case LC_TY_ARRAY:
+        case LC_TY_MAP:
+            lc_mark_obj_incr(rt, (LCGCObject*)val.ptr_val);
+            break;
+        
+        default:
+            break;
+    }
+}
+
+static void lc_mark_union_object(LCRuntime* rt, LCUnionObject* union_obj) {
+    size_t i;
+
+    for (i = 0; i < union_obj->size; i++) {
+        lc_mark_val_incr(rt, union_obj->value[i]);
+    }
+}
+
+static force_inline void lc_mark_refcell(LCRuntime* rt, LCRefCell* ref_cell) {
+    lc_mark_val_incr(rt, ref_cell->value);
+}
+
+static void lc_mark_lambda(LCRuntime* rt, LCLambda* lambda) {
+    size_t i;
+
+    for (i = 0; i < lambda->captured_values_size; i++) {
+        lc_mark_val_incr(rt, lambda->captured_values[i]);
+    }
+}
+
+static void lc_mark_class_object(LCRuntime* rt, LCGCObject* gc_obj) {
+    uint32_t cls_id = gc_obj->header.class_id;
+    LCClassMeta* meta = &rt->cls_meta_data[cls_id];
+
+    if (meta->cls_def->gc_mark) {
+        meta->cls_def->gc_mark(rt, MK_CLASS_OBJ(gc_obj), lc_mark_obj_incr);
+    }
+}
+
+static force_inline void lc_mark_tuple(LCRuntime* rt, LCTuple* tuple) {
+    size_t i;
+
+    for (i = 0; i < tuple->len; i++) {
+        lc_mark_val_incr(rt, tuple->data[i]);
+    }
+}
+
+static force_inline void lc_mark_array(LCRuntime* rt, LCArray* arr) {
+    size_t i;
+
+    for (i = 0; i < arr->len; i++) {
+        lc_mark_val_incr(rt, arr->data[i]);
+    }
+}
+
+static void lc_mark_map(LCRuntime* rt, LCMap* map) {
+    LCMapTuple *tuple, *tmp;
+    tuple = map->head;
+
+    while (tuple != NULL) {
+        tmp = tuple->next;
+
+        // no need to mark key of tuple
+        // the key may be int, string, something is impossible
+        // to be a GCObject
+        lc_mark_val_incr(rt, tuple->value);
+
+        tuple = tmp;
+    }
+}
+
+void lc_mark_obj_incr(LCRuntime *rt, LCGCObject *obj) {
+    if (obj->header.mark == 0) {
+        return;
+    }
+    obj->header.count++;
+    obj->header.mark = 0;
+
+    switch (obj->header.gc_ty)
+    {
+        case LC_GC_UNION_OBJECT:
+            lc_mark_union_object(rt, (LCUnionObject*)obj);
+            break;
+
+        case LC_GC_REFCELL:
+            lc_mark_refcell(rt, (LCRefCell*)obj);
+            break;
+
+        case LC_GC_LAMBDA:
+            lc_mark_lambda(rt, (LCLambda*)obj);
+            break;
+
+        case LC_GC_CLASS_OBJECT:
+            lc_mark_class_object(rt, obj);
+            break;
+            
+        case LC_GC_TUPLE:
+            lc_mark_tuple(rt, (LCTuple*)obj);
+            break;
+
+        case LC_GC_ARRAY:
+            lc_mark_array(rt, (LCArray*)obj);
+            break;
+
+        case LC_GC_MAP:
+            lc_mark_map(rt, (LCMap*)obj);
+            break;
+    }
+
+}
+
+static void lc_gc_scan(LCRuntime* rt) {
+    LCGCObject *gc_obj, *tmp;
+    gc_obj = rt->gc_object_head;
+
+    while (gc_obj != NULL) {
+        tmp = gc_obj->header.next;
+
+        lc_mark_obj_incr(rt, gc_obj);
+
+        gc_obj = tmp;
+    }
+}
+
+static void lc_remove_all_tmp_objects(LCRuntime* rt) {
+    LCGCObject *gc_obj, *tmp;
+    gc_obj = rt->gc_object_head;
+
+    while (gc_obj != NULL) {
+        tmp = gc_obj->header.next;
+
+        LCFreeGCObject(rt, gc_obj);
+
+        gc_obj = tmp;
+    }
+
+    rt->tmp_obj_head = NULL;
+    rt->tmp_obj_last = NULL;
+}
+
+void LCRunGC(LCRuntime* rt) {
+    lc_deref_all_gc_objects(rt);
+
+    lc_gc_scan(rt);
+
+    lc_remove_all_tmp_objects(rt);
 }
 
 void LCUpdateValue(LCRuntime* rt, LCArithmeticType op, LCValue* left, LCValue right) {
@@ -973,7 +1191,7 @@ LCValue LCNewStringFromCString(LCRuntime* rt, const unsigned char* content) {
 
 LCValue LCNewRefCell(LCRuntime* rt, LCValue value) {
     LCRefCell* cell = (LCRefCell*)lc_mallocz(rt, sizeof(LCRefCell));
-    cell->header.count = 1;
+    init_gc_object(rt, (LCGCObject*)cell, LC_GC_REFCELL);
     LCRetain(value);
     cell->value = value;
     return (LCValue){ { .ptr_val = (LCObject*)cell }, LC_TY_REFCELL };
@@ -995,7 +1213,7 @@ LCValue LCNewUnionObject(LCRuntime* rt, int tag, int size, LCValue* args) {
     size_t malloc_size = sizeof(LCUnionObject) + size * sizeof(LCValue);
     LCUnionObject* union_obj = (LCUnionObject*)lc_mallocz(rt, malloc_size);
 
-    init_gc_object(rt, (LCGCObject*)union_obj);
+    init_gc_object(rt, (LCGCObject*)union_obj, LC_GC_UNION_OBJECT);
 
     union_obj->tag = tag;
     union_obj->size = size;
@@ -1028,7 +1246,9 @@ int LCUnionGetType(LCValue val) {
 LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, LCValue this, int argc, LCValue* args) {
     size_t size = sizeof(LCLambda) + argc * sizeof(LCValue);
     LCLambda* lambda = (LCLambda*)lc_mallocz(rt, size);
-    lambda->header.count = 1;
+
+    init_gc_object(rt, (LCGCObject*)lambda, LC_GC_LAMBDA);
+
     lambda->c_fun = c_fun;
     lambda->captured_values_size = argc;
 
@@ -1084,7 +1304,7 @@ void LCLambdaSetRefValue(LCRuntime* rt, LCValue lambda_val, int index, LCValue v
 
 LCArray* LCNewArrayWithCap(LCRuntime* rt, size_t cap) {
     LCArray* result = (LCArray*)lc_malloc(rt, sizeof(LCArray));
-    init_gc_object(rt, (LCGCObject*)result);
+    init_gc_object(rt, (LCGCObject*)result, LC_GC_ARRAY);
     result->capacity = cap;
     result->len = 0;
     result->data = (LCValue*)lc_mallocz(rt, sizeof(LCValue) * cap);
@@ -1138,8 +1358,8 @@ LCValue LCNewTuple(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args) 
 
     LCTuple* tuple = (LCTuple*)lc_malloc(rt, size);
 
-    tuple->header.count = 1;
-    tuple->header.class_id = 0;
+    init_gc_object(rt, (LCGCObject*)tuple, LC_GC_TUPLE);
+
     tuple->len = arg_len;
 
     for (i = 0; i < arg_len; i++) {
@@ -2091,22 +2311,11 @@ LCValue lc_std_string_get_char(LCRuntime* rt, LCValue this, int arg_len, LCValue
     return MK_CHAR(str->u.str8[index]);
 }
 
-typedef struct LCMapTuple {
-    LCMapTuple* prev;
-    LCMapTuple* next;
-    LCValue key;
-    LCValue value;
-} LCMapTuple;
-
-typedef struct LCMapBucket {
-    uint32_t hash;
-    struct LCMapBucket* next;
-    LCMapTuple* data;
-} LCMapBucket;
-
 LCValue lc_std_map_new(LCRuntime* rt, int key_ty, int init_size) {
     LCMap* map = (LCMap*)lc_mallocz(rt, sizeof (LCMap));
-    map->header.count = 1;
+
+    init_gc_object(rt, (LCGCObject*)map, LC_GC_MAP);
+
     map->key_ty = key_ty;
     if (init_size >= 0 && init_size < 8) {
         map->is_small = 1;
@@ -2309,8 +2518,7 @@ static inline void lc_free_map_tuple(LCRuntime* rt, LCMapTuple* tuple) {
     lc_free(rt, tuple);
 }
 
-void lc_std_map_free(LCRuntime* rt, LCValue val) {
-    LCMap* map = (LCMap*)val.ptr_val;
+void lc_std_map_free(LCRuntime* rt, LCMap* map) {
     LCMapTuple *ptr, *tmp;
     LCMapBucket *bucket, *bp;
 
