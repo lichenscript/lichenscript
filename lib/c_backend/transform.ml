@@ -2149,19 +2149,23 @@ and generate_gc_marker env name (type_def: Core_type.TypeDef.t) : C_op.Decl.gc_m
 
 and transform_enum env enum =
   let open Enum in
-  let { cases; _ } = enum in
+  let { elements; _ } = enum in
   List.mapi
-    ~f:(fun index case ->
-      let case_name, case_name_id = case.case_name in
-      let new_name = distribute_name env case_name in
-      Hashtbl.set env.global_name_map ~key:case_name_id ~data:(SymLocal new_name);
-      C_op.Decl.EnumCtor {
-        enum_ctor_name = new_name;
-        enum_ctor_tag_id = index;
-        enum_cotr_params_size = List.length case.case_fields;
-      }
+    ~f:(fun index elm ->
+      match elm with
+      | Typedtree.Enum.Case case -> (
+        let case_name, case_name_id = case.case_name in
+        let new_name = distribute_name env case_name in
+        Hashtbl.set env.global_name_map ~key:case_name_id ~data:(SymLocal new_name);
+        C_op.Decl.EnumCtor {
+          enum_ctor_name = new_name;
+          enum_ctor_tag_id = index;
+          enum_cotr_params_size = List.length case.case_fields;
+        }
+      )
+      | Typedtree.Enum.Method _ -> failwith "unimplemented enum method"
     )
-    cases
+    elements
 
 and transform_lambda env ~lambda_name content _ty_var =
   let prev_fun_meta = env.current_fun_meta in
