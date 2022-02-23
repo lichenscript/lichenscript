@@ -289,68 +289,7 @@ and parse_declaration env : Declaration.t =
           }
         end
 
-      | Token.T_ENUM ->
-        let parse_case env =
-          let start_loc = Peek.loc env in
-          Expect.token env Token.T_CASE;
-          let case_name = parse_identifier env in
-          let { Identifier. pident_name; pident_loc; _ } = case_name in
-          Parser_env.add_top_level env ~name:pident_name ~loc:pident_loc ~visibility;
-          let fields =
-            if (Peek.token env) == Token.T_LPAREN then (
-              let result = ref [] in
-              Eat.token env;
-
-              while (Peek.token env) <> Token.T_RPAREN do
-                let ty = parse_type env in
-                result := ty::(!result);
-                if (Peek.token env) <> Token.T_RPAREN then (
-                  Expect.token env Token.T_COMMA
-                )
-              done;
-
-              Expect.token env Token.T_RPAREN;
-              List.rev !result
-            ) else
-              []
-          in
-
-          { Enum.
-            case_name;
-            case_fields = fields;
-            case_loc = with_start_loc env start_loc;
-          }
-        in
-        let start_loc = Peek.loc env in
-        Eat.token env;
-        let name = parse_identifier env in
-
-        let type_vars =
-          if Peek.token env = Token.T_LESS_THAN then
-            parse_type_vars env
-          else
-            []
-        in
-
-        let elements = ref [] in
-        Expect.token env Token.T_LCURLY;
-
-        while (Peek.token env) <> Token.T_RCURLY && (Peek.token env) <> Token.T_EOF do
-          let _case = parse_case env in
-          elements := (Enum.Case _case)::(!elements);
-        done;
-
-        Expect.token env Token.T_RCURLY;
-
-        Parser_env.add_top_level env ~name:(name.pident_name) ~loc:name.pident_loc ~visibility;
-
-        Enum { Enum.
-          visibility;
-          name;
-          type_vars;
-          elements = List.rev !elements;
-          loc = with_start_loc env start_loc;
-        }
+      | Token.T_ENUM -> Enum (parse_enum env ~visibility)
 
       | _ ->
         let lex_error = Lichenscript_lex.Lex_error.Unexpected (Token.value_of_token (Peek.token env)) in
@@ -368,6 +307,105 @@ and parse_declaration env : Declaration.t =
     spec;
     loc = with_start_loc env start_loc;
     attributes;
+  }
+
+and parse_enum env ~visibility =
+  let parse_case env =
+    let start_loc = Peek.loc env in
+    Expect.token env Token.T_CASE;
+    let case_name = parse_identifier env in
+    let { Identifier. pident_name; pident_loc; _ } = case_name in
+    Parser_env.add_top_level env ~name:pident_name ~loc:pident_loc ~visibility;
+    let fields =
+      if (Peek.token env) == Token.T_LPAREN then (
+        let result = ref [] in
+        Eat.token env;
+
+        while (Peek.token env) <> Token.T_RPAREN do
+          let ty = parse_type env in
+          result := ty::(!result);
+          if (Peek.token env) <> Token.T_RPAREN then (
+            Expect.token env Token.T_COMMA
+          )
+        done;
+
+        Expect.token env Token.T_RPAREN;
+        List.rev !result
+      ) else
+        []
+    in
+
+    { Enum.
+      case_name;
+      case_fields = fields;
+      case_loc = with_start_loc env start_loc;
+    }
+  in
+
+  let parse_method env : Declaration.class_method =
+    let start_loc = Peek.loc env in
+    let attributes =
+      if (Peek.token env) = Token.T_AT then
+        parse_attributes env
+      else
+        []
+    in
+    let cls_method_visibility = parse_visibility env in
+    let cls_method_name = parse_identifier env in
+    let params = parse_params env in
+    let cls_method_return_ty =
+      if Peek.token env = Token.T_COLON then (
+        Eat.token env;
+        Some (parse_type env)
+      ) else
+        None
+    in
+    let cls_method_body = parse_block env in
+    { Declaration.
+      cls_method_attributes = attributes;
+      cls_method_modifier = None;  (* do NOT support modifier currently *)
+      cls_method_visibility;
+      cls_method_name;
+      cls_method_params = params;
+      cls_method_body;
+      cls_method_loc = with_start_loc env start_loc;
+      cls_method_return_ty;
+    }
+  in
+
+  let start_loc = Peek.loc env in
+  Eat.token env;
+  let name = parse_identifier env in
+
+  let type_vars =
+    if Peek.token env = Token.T_LESS_THAN then
+      parse_type_vars env
+    else
+      []
+  in
+
+  let elements = ref [] in
+  Expect.token env Token.T_LCURLY;
+
+  while (Peek.token env) <> Token.T_RCURLY && (Peek.token env) <> Token.T_EOF do
+    let elm =
+      match (Peek.token env) with 
+      | Token.T_CASE -> Enum.Case (parse_case env)
+      | _ -> Enum.Method (parse_method env)
+    in
+    elements := elm::(!elements);
+  done;
+
+  Expect.token env Token.T_RCURLY;
+
+  Parser_env.add_top_level env ~name:(name.pident_name) ~loc:name.pident_loc ~visibility;
+
+  { Enum.
+    visibility;
+    name;
+    type_vars;
+    elements = List.rev !elements;
+    loc = with_start_loc env start_loc;
   }
 
 and parse_visibility env = 
