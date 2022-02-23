@@ -226,7 +226,7 @@ and codegen_declaration env decl =
   )
 
   | Class cls -> (
-    let { name; properties; original_name; finalizer; _ } = cls in
+    let { name; properties; original_name; finalizer; gc_marker; _ } = cls in
     let class_id_var_name = name ^ "_class_id" in
     ps env (Format.sprintf "static LCClassID %s;\n" class_id_var_name);
     ps env (Format.sprintf "typedef struct %s {" name);
@@ -268,6 +268,26 @@ and codegen_declaration env decl =
     | None -> ()
     );
 
+    (match gc_marker with
+    | Some marker -> (
+      ps env (Format.sprintf "void %s(LCRuntime* rt, LCValue val, LCMarkFunc* mark_fun) {\n" marker.gc_marker_name);
+
+      with_indent env (fun () ->
+        print_indents env;
+        ps env (Format.sprintf "%s* ptr = (%s*)val.ptr_val;\n" name name);
+        List.iter
+        ~f:(fun field_name ->
+          print_indents env;
+          ps env ("mark_fun(rt, (LCGCObject*)ptr->" ^ field_name ^ ".ptr_val);");
+          endl env
+        )
+        marker.gc_marker_field_names
+      );
+
+      ps env "}\n";
+    )
+    | None -> ());
+
     let class_def_name = name ^ "_def" in
     ps env (Format.sprintf "static LCClassDef %s = {\n" class_def_name);
     with_indent env (fun () ->
@@ -282,7 +302,11 @@ and codegen_declaration env decl =
       );
       ps env ",\n";
       print_indents env;
-      ps env "NULL,\n";
+      (match gc_marker with
+      | Some gc_marker -> ps env gc_marker.gc_marker_name
+      | None -> ps env "NULL"
+      );
+      ps env ",\n";
     );
     ps env "};\n";
 

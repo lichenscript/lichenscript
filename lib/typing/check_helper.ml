@@ -231,6 +231,24 @@ let type_should_not_release ctx expr =
     | _ -> false
   )
 
+let type_is_not_gc ctx expr =
+  match expr with
+  | TypeExpr.String -> true
+  | _ ->
+    begin
+      let group = [| "unit"; "i32"; "u32"; "f32"; "char"; "boolean"; "i64"; "f64" |] in
+      let expr = Type_context.deref_type ctx expr in
+      let expr_def_opt = find_construct_of ctx expr in
+      (match expr_def_opt with
+        | Some(def, []) -> (
+          let open TypeDef in
+          def.builtin &&
+          (Array.mem group ~equal:String.equal def.name)
+        )
+        | _ -> false
+      )
+    end
+
 let type_addable ctx left right =
   let left = Type_context.deref_type ctx left in
   let right = Type_context.deref_type ctx right in
