@@ -1,0 +1,2 @@
+ok
+error: first is not 'A'
