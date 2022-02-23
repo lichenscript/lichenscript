@@ -1967,6 +1967,7 @@ and transform_class env cls loc: C_op.Decl.t list =
   let original_name, cls_name_id = cls_id in
   let fun_name = distribute_name env original_name in
   let finalizer_name = fun_name ^ "_finalizer" in
+  let gc_marker_name = fun_name ^ "_marker" in
 
   env.current_fun_meta <- Some (create_current_fun_meta original_name);
 
@@ -2072,12 +2073,14 @@ and transform_class env cls loc: C_op.Decl.t list =
   let cls_type = Type_context.deref_node_type env.ctx cls_id' in
   let cls_typedef = Check_helper.find_typedef_of env.ctx cls_type in
   let finalizer = generate_finalizer env finalizer_name (Option.value_exn cls_typedef) in
+  let gc_marker = generate_gc_marker env gc_marker_name (Option.value_exn cls_typedef) in
 
   let cls = {
     C_op.Decl.
     name = fun_name;
     original_name;
-    finalizer = Some finalizer;
+    finalizer;
+    gc_marker;
     properties = cls_meta.cls_fields;
   } in
 
@@ -2089,7 +2092,7 @@ and transform_class env cls loc: C_op.Decl.t list =
  * Generate finalizer statements for a class:
  * If a class has ancesters, generate the ancesters's statements first.
  *)
-and generate_finalizer env name (type_def: Core_type.TypeDef.t) =
+and generate_finalizer env name (type_def: Core_type.TypeDef.t) : C_op.Decl.class_finalizer option =
   let generate_release_statements_by_cls_meta type_def =
     let open Core_type.TypeDef in
     let cls_meta = Hashtbl.find_exn env.cls_meta_map type_def.id in
@@ -2110,10 +2113,39 @@ and generate_finalizer env name (type_def: Core_type.TypeDef.t) =
 
   let finalizer_content = generate_release_statements_by_cls_meta type_def in
 
-  {
-    finalizer_name = name;
-    finalizer_content;
-  }
+  if List.is_empty finalizer_content then
+    None
+  else
+    Some {
+      finalizer_name = name;
+      finalizer_content;
+    }
+
+and generate_gc_marker env name (type_def: Core_type.TypeDef.t) : C_op.Decl.gc_marker option =
+  let generate_marker_fields type_def =
+    let open Core_type.TypeDef in
+    let cls_meta = Hashtbl.find_exn env.cls_meta_map type_def.id in
+    List.filter_map
+      ~f:(fun (field_name, ty_var) ->
+        let field_type = Type_context.deref_node_type env.ctx ty_var in
+        if Check_helper.type_is_not_gc env.ctx field_type then
+          None
+        else
+          Some field_name
+          
+      )
+      cls_meta.cls_fields
+  in
+
+  let fields = generate_marker_fields type_def in
+  
+  if List.is_empty fields then
+    None
+  else
+    Some {
+      gc_marker_name = name;
+      gc_marker_field_names = fields;
+    }
 
 and transform_enum env enum =
   let open Enum in

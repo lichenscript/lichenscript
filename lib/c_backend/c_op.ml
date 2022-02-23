@@ -40,10 +40,17 @@ module%gen rec Decl : sig
   }
   [@@deriving show]
 
+  type gc_marker = {
+    gc_marker_name: string;
+    gc_marker_field_names: string list;
+  }
+  [@@deriving show]
+
   type _class = {
     name: string;
     original_name: string;
     finalizer: class_finalizer option;
+    gc_marker: gc_marker option;
     properties: (string * int) list;
   }
   [@@deriving show]
