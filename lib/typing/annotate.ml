@@ -1658,11 +1658,13 @@ and annotate_enum env enum =
       |> List.unzip
     in
 
+    let enum_methods = ref [] in
+
     let annotate_method _method : (T.Declaration.class_method * int) =
       let open Ast.Declaration in
       let method_scope = new function_scope ~prev:(Env.peek_scope env) () in
       let { cls_method_attributes; cls_method_visibility; cls_method_modifier; cls_method_name; cls_method_params; cls_method_loc; cls_method_body; cls_method_return_ty; _ } = _method in
-      let _type_visibility = annotate_visibility cls_method_visibility in
+      let type_visibility = annotate_visibility cls_method_visibility in
       Env.with_new_scope env method_scope (fun env ->
         let cls_method_params, method_params, cls_method_params_deps = annotate_function_params env cls_method_params in
 
@@ -1672,7 +1674,7 @@ and annotate_enum env enum =
 
         this_deps := Typedtree.Block.(cls_method_body.return_ty)::(!this_deps);
 
-        let method_return, _return_ty_deps =
+        let method_return, return_ty_deps =
           match cls_method_return_ty with
           | Some ty -> annotate_type env ty
           | None -> (
@@ -1696,13 +1698,16 @@ and annotate_enum env enum =
           };
         } in
 
+        enum_methods := (type_visibility, new_type)::(!enum_methods);
+
         let typedef = TypeExpr.TypeDef new_type in
         ignore (Type_context.new_id ctx
           { Core_type.
-            deps = List.concat [ List.rev !this_deps; cls_method_params_deps ]
-            |> List.filter
-              ~f:(fun id -> id <> variable.var_id)
-            ;
+            deps =
+              [ List.rev !this_deps; cls_method_params_deps; return_ty_deps ]
+              |> List.concat
+              |> List.filter
+                ~f:(fun id -> id <> variable.var_id);
             loc = _method.cls_method_loc;
             value = typedef;
           }
@@ -1746,6 +1751,7 @@ and annotate_enum env enum =
       TypeDef.
       enum_members = List.rev !enum_members;
       enum_params;
+      enum_methods = List.rev !enum_methods;
     } in
 
     Type_context.map_node
