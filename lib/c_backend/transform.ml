@@ -288,10 +288,8 @@ let rec transform_declaration env decl =
     List.append lambdas bodys
   )
 
-  | Enum enum -> (
-    let specs = transform_enum env enum in
-    List.map ~f:(fun spec -> { C_op.Decl. spec; loc }) specs
-  )
+  | Enum enum -> transform_enum env enum loc
+
   | Interface _ -> []
 
   | Declare declare -> (
@@ -1961,6 +1959,69 @@ and generate_cls_meta env cls_id gen_name =
 
   result
 
+and transform_class_method env _method : (C_op.Decl.t list * C_op.Decl.class_method_tuple option) =
+  let open Declaration in
+  let { cls_method_name; cls_method_params; cls_method_body; cls_method_scope; _ } = _method in
+
+  env.tmp_vars_count <- 0;
+
+  let origin_method_name, method_id = cls_method_name in
+  let new_name =
+    match Hashtbl.find_exn env.global_name_map method_id with
+    | C_op.SymLocal name -> name
+    | _ -> failwith "unrechable"
+  in
+
+  let open Core_type in
+  let node_type = Type_context.deref_node_type env.ctx method_id in
+  let is_virtual =
+    match node_type with
+    | TypeExpr.TypeDef { spec = TypeDef.ClassMethod { method_is_virtual = true; _ }; _ } ->
+      true
+    | _ -> false
+  in
+
+  let tuple =
+    if is_virtual then
+      Some { C_op.Decl.
+        class_method_name = origin_method_name;
+        class_method_gen_name = new_name;
+      }
+    else
+      None
+  in
+
+  let _fun = { C_op.Decl.
+    spec = (transform_function_impl env
+      ~name:new_name
+      ~params:cls_method_params
+      ~scope:(Option.value_exn cls_method_scope)
+      ~body:cls_method_body
+      ~comments:[]);
+    loc = _method.cls_method_loc;
+  } in
+
+  let lambdas = env.lambdas in
+  env.lambdas <- [];
+
+  (* will be reversed in the future *)
+  (_fun::lambdas), tuple
+
+and distribute_name_to_class_method env cls_original_name _method =
+  let open Declaration in
+  let { cls_method_name; _ } = _method in
+  let origin_method_name, method_id = cls_method_name in
+  let new_name = cls_original_name ^ "_" ^ origin_method_name in
+  let new_name = distribute_name env new_name in
+
+  let pre_declare = { C_op.Decl.
+    spec = FuncDecl (SymLocal new_name);
+    loc = Loc.none;
+  } in
+  env.prepends_decls <- pre_declare::(env.prepends_decls);
+
+  Hashtbl.set env.global_name_map ~key:method_id ~data:(SymLocal new_name)
+
 and transform_class env cls loc: C_op.Decl.t list =
   let open Declaration in
   let { cls_id; cls_body; _ } = cls in
@@ -1987,20 +2048,7 @@ and transform_class env cls loc: C_op.Decl.t list =
   List.iter
     ~f:(fun elm->
       match elm with
-      | Cls_method _method -> (
-        let { cls_method_name; _ } = _method in
-        let origin_method_name, method_id = cls_method_name in
-        let new_name = original_name ^ "_" ^ origin_method_name in
-        let new_name = distribute_name env new_name in
-
-        let pre_declare = { C_op.Decl.
-          spec = FuncDecl (SymLocal new_name);
-          loc = Loc.none;
-        } in
-        env.prepends_decls <- pre_declare::(env.prepends_decls);
-
-        Hashtbl.set env.global_name_map ~key:method_id ~data:(SymLocal new_name);
-      )
+      | Cls_method _method -> distribute_name_to_class_method env original_name _method
       | _ -> ()
     )
     cls_body.cls_body_elements;
@@ -2013,48 +2061,16 @@ and transform_class env cls loc: C_op.Decl.t list =
       ~f:(fun acc elm ->
         match elm with
         | Cls_method _method -> (
-          let { cls_method_name; cls_method_params; cls_method_body; cls_method_scope; _ } = _method in
+          let stmts, tuple_opt = transform_class_method env _method in
 
-          env.tmp_vars_count <- 0;
-
-          let origin_method_name, method_id = cls_method_name in
-          let new_name =
-            match Hashtbl.find_exn env.global_name_map method_id with
-            | C_op.SymLocal name -> name
-            | _ -> failwith "unrechable"
-          in
-
-          let open Core_type in
-          let node_type = Type_context.deref_node_type env.ctx method_id in
-          let is_virtual =
-            match node_type with
-            | TypeExpr.TypeDef { spec = TypeDef.ClassMethod { method_is_virtual = true; _ }; _ } ->
-              true
-            | _ -> false
-          in
-
-          if is_virtual then (
-            class_methods := { C_op.Decl.
-              class_method_name = origin_method_name;
-              class_method_gen_name = new_name;
-            }::!class_methods
+          (match tuple_opt with
+          | Some tuple ->
+            class_methods := tuple::!class_methods
+          | None -> ()
           );
 
-          let _fun = { C_op.Decl.
-            spec = (transform_function_impl env
-              ~name:new_name
-              ~params:cls_method_params
-              ~scope:(Option.value_exn cls_method_scope)
-              ~body:cls_method_body
-              ~comments:[]);
-            loc = _method.cls_method_loc;
-          } in
-
-          let lambdas = env.lambdas in
-          env.lambdas <- [];
-
           (* will be reversed in the future *)
-          List.append (_fun::lambdas) acc
+          List.append stmts acc
         )
         | Cls_property _
         | Cls_declare _ -> acc
@@ -2147,25 +2163,40 @@ and generate_gc_marker env name (type_def: Core_type.TypeDef.t) : C_op.Decl.gc_m
       gc_marker_field_names = fields;
     }
 
-and transform_enum env enum =
+and transform_enum env enum loc : C_op.Decl.t list =
   let open Enum in
-  let { elements; _ } = enum in
-  List.mapi
-    ~f:(fun index elm ->
-      match elm with
-      | Typedtree.Enum.Case case -> (
-        let case_name, case_name_id = case.case_name in
-        let new_name = distribute_name env case_name in
-        Hashtbl.set env.global_name_map ~key:case_name_id ~data:(SymLocal new_name);
-        C_op.Decl.EnumCtor {
-          enum_ctor_name = new_name;
-          enum_ctor_tag_id = index;
-          enum_cotr_params_size = List.length case.case_fields;
-        }
-      )
-      | Typedtree.Enum.Method _ -> failwith "unimplemented enum method"
-    )
+  let { elements; name = (enum_original_name, _); _ } = enum in
+
+  env.current_fun_meta <- Some (create_current_fun_meta enum_original_name);
+
+  let result =
     elements
+    |> List.mapi
+      ~f:(fun index elm ->
+        match elm with
+        | Typedtree.Enum.Case case -> (
+          let case_name, case_name_id = case.case_name in
+          let new_name = distribute_name env case_name in
+          Hashtbl.set env.global_name_map ~key:case_name_id ~data:(SymLocal new_name);
+          let spec = C_op.Decl.EnumCtor {
+            enum_ctor_name = new_name;
+            enum_ctor_tag_id = index;
+            enum_cotr_params_size = List.length case.case_fields;
+          } in
+          [{ C_op.Decl. spec; loc }]
+        )
+        | Typedtree.Enum.Method _method ->
+          distribute_name_to_class_method env enum_original_name _method;
+          let stmts, _ = transform_class_method env _method in
+          stmts
+
+      )
+    |> List.concat
+  in
+
+  env.current_fun_meta <- None;
+
+  result
 
 and transform_lambda env ~lambda_name content _ty_var =
   let prev_fun_meta = env.current_fun_meta in
