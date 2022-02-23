@@ -1,0 +1,36 @@
+
+class SomeError {
+
+    msg: string
+
+}
+
+function isFirstCharA(str: string): Result<unit, SomeError> {
+    if str.length == 0 {
+        return Error(SomeError{
+            msg: "length == 0"
+        });
+    }
+
+    const firstChar = str[0];
+    if firstChar != 'A' {
+        return Error(SomeError{
+            msg: "first is not 'A'"
+        });
+    }
+
+    Ok(())
+}
+
+function main() {
+    let test = isFirstCharA("A");
+    match test {
+        case Error(err) => print("error: ", err.msg)
+        case _ => print("ok")
+    }
+    test = isFirstCharA("B");
+    match test {
+        case Error(err) => print("error: ", err.msg)
+        case _ => print("ok")
+    }
+}

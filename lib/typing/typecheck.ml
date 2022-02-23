@@ -807,17 +807,43 @@ and check_expression env expr =
           | TypeDef { TypeDef. spec = EnumCtor enum_ctor ; _ } -> enum_ctor
           | _ -> failwith "unrechable"
         in
+        let contruct_type_vars_map params args = 
+          let tmp =
+            List.fold2
+            ~init:Check_helper.TypeVarMap.empty
+            ~f:(fun acc item item2 ->
+              Check_helper.TypeVarMap.set acc ~key:item ~data:item2
+            )
+            params args
+          in
+          match tmp with
+          | List.Or_unequal_lengths.Ok t -> t
+          | List.Or_unequal_lengths.Unequal_lengths -> raise_err ()
+        in
         let ctor_opt = Check_helper.find_construct_of env.ctx expr_type in
         match ctor_opt with
-        | Some({ TypeDef. id = enum_id;  spec = Enum _; _ }, [arg]) -> (
-          (* TODO: check args *)
+        | Some({ TypeDef. id = enum_id;  spec = Enum { enum_params; _}; _ }, args) -> (
           if enum_id <> enum_ctor_typedef.enum_ctor_super_id then (
             raise_err ()
           );
-          check_clause_pattern arg child_pat
+          let enum_ctor_typedef =
+            match Type_context.deref_node_type env.ctx ctor_id with
+            | TypeDef { TypeDef. spec = EnumCtor c; _ } -> c
+            | _ -> failwith "unrechable"
+          in
+          let type_vars_map = contruct_type_vars_map enum_params args in
+          match enum_ctor_typedef.enum_ctor_params with
+          | [arg] ->
+            check_clause_pattern
+              (Check_helper.replace_type_vars_with_maps env.ctx type_vars_map arg)
+              child_pat
+
+          | _ -> raise_err ()
+
         )
 
-        | _ -> raise_err ()
+        | _ ->
+          raise_err ()
       )
       | Tuple children -> (
         let raise_err () =
