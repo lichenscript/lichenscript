@@ -99,8 +99,20 @@ and check_declaration env decl =
   | Function_ _fun -> check_function env _fun
   | Interface intf -> check_interface env intf
   | Declare _ -> ()
-  | Enum _ ->  ()
+  | Enum enum -> check_enum env enum
   | Import _ -> ()
+
+and check_enum env enum =
+  let open T.Enum in
+  let { elements; _ } = enum in
+
+  List.iter
+    ~f:(fun elm ->
+      match elm with
+      | Method _method -> check_class_method env _method
+      | _ -> ()
+    )
+    elements
 
 and check_interface _env _intf =
   (* failwith "intf" *)
@@ -1255,43 +1267,43 @@ and check_class env cls =
   List.iter
     ~f:(fun elm ->
       match elm with
-      | Cls_property _ -> ()
-
-      | Cls_method { cls_method_name = _, name_id; cls_method_scope; cls_method_body; cls_method_modifier; _ } -> (
-        with_scope env (Option.value_exn cls_method_scope) (fun env ->
-          check_block env cls_method_body;
-
-          let is_static =
-            match cls_method_modifier with
-            | (Some Cls_modifier_static) -> true
-            | _ -> false
-          in
-
-          if is_static then (
-            let type_node = Type_context.get_node env.ctx name_id in
-            let typedef = Option.value_exn (Check_helper.find_typedef_of env.ctx type_node.value) in
-            let unwrap_function =
-              match typedef with
-              | { TypeDef. spec = Function _fun; _ } -> _fun
-              | _ -> failwith "unwrap class method failed"
-            in
-
-            check_function_return_type env unwrap_function.fun_return cls_method_body
-          ) else (
-            let type_node = Type_context.get_node env.ctx name_id in
-            let typedef = Option.value_exn (Check_helper.find_typedef_of env.ctx type_node.value) in
-            let unwrap_method =
-              match typedef with
-              | { TypeDef. spec = ClassMethod _method; _ } -> _method
-              | _ -> failwith "unwrap class method failed"
-            in
-
-            check_function_return_type env unwrap_method.method_return cls_method_body
-          )
-        )
-      )
-
+      | Cls_method _method -> check_class_method env _method
+      | Cls_property _
       | Cls_declare _ -> ()
-
     )
     cls_body_elements
+
+and check_class_method env _method =
+  let open T.Declaration in
+  let { cls_method_name = _, name_id; cls_method_scope; cls_method_body; cls_method_modifier; _ } = _method in
+  with_scope env (Option.value_exn cls_method_scope) (fun env ->
+    check_block env cls_method_body;
+
+    let is_static =
+      match cls_method_modifier with
+      | (Some Cls_modifier_static) -> true
+      | _ -> false
+    in
+
+    if is_static then (
+      let type_node = Type_context.get_node env.ctx name_id in
+      let typedef = Option.value_exn (Check_helper.find_typedef_of env.ctx type_node.value) in
+      let unwrap_function =
+        match typedef with
+        | { TypeDef. spec = Function _fun; _ } -> _fun
+        | _ -> failwith "unwrap class method failed"
+      in
+
+      check_function_return_type env unwrap_function.fun_return cls_method_body
+    ) else (
+      let type_node = Type_context.get_node env.ctx name_id in
+      let typedef = Option.value_exn (Check_helper.find_typedef_of env.ctx type_node.value) in
+      let unwrap_method =
+        match typedef with
+        | { TypeDef. spec = ClassMethod _method; _ } -> _method
+        | _ -> failwith "unwrap class method failed"
+      in
+
+      check_function_return_type env unwrap_method.method_return cls_method_body
+    )
+  )
