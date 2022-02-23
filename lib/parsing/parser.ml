@@ -332,12 +332,12 @@ and parse_declaration env : Declaration.t =
             []
         in
 
-        let cases = ref [] in
+        let elements = ref [] in
         Expect.token env Token.T_LCURLY;
 
         while (Peek.token env) <> Token.T_RCURLY && (Peek.token env) <> Token.T_EOF do
           let _case = parse_case env in
-          cases := _case::(!cases);
+          elements := (Enum.Case _case)::(!elements);
         done;
 
         Expect.token env Token.T_RCURLY;
@@ -348,7 +348,7 @@ and parse_declaration env : Declaration.t =
           visibility;
           name;
           type_vars;
-          cases = List.rev !cases;
+          elements = List.rev !elements;
           loc = with_start_loc env start_loc;
         }
 

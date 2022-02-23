@@ -1579,7 +1579,7 @@ and annotate_function env fun_ =
 
 and annotate_enum env enum =
   let open Ast.Enum in
-  let { visibility; name; loc; cases; type_vars } = enum in
+  let { visibility; name; loc; elements; type_vars } = enum in
   let ctx = Env.ctx env in
   let scope = Env.peek_scope env in
   let variable = Option.value_exn (scope#find_var_symbol name.pident_name) in
@@ -1644,7 +1644,18 @@ and annotate_enum env enum =
       }, member_var.var_id 
     in
 
-    let cases, _cases_deps = List.mapi ~f:annotate_case cases |> List.unzip in
+    let elements, _cases_deps =
+      elements
+      |> List.mapi ~f:(fun index elm ->
+        match elm with
+        | Ast.Enum.Case case -> (
+          let case, deps = annotate_case index case in
+          (Typedtree.Enum.Case case), deps
+        )
+        | Ast.Enum.Method _ -> failwith "unimplemented enum method"
+      )
+      |> List.unzip
+    in
 
     let enum_params =
       List.map
@@ -1679,7 +1690,7 @@ and annotate_enum env enum =
       visibility;
       name = (name.pident_name, variable.var_id);
       type_vars = type_vars_names;
-      cases;
+      elements;
       loc;
     }
   )

@@ -220,11 +220,16 @@ and Enum : sig
   }
   [@@deriving show]
 
+  type element =
+  | Case of case
+  | Method of Declaration.class_method
+  [@@deriving show]
+
   type t = {
     visibility: Asttypes.visibility option;
     name: identifier;
     type_vars: string list;  (* generic vars *)
-    cases: case list;
+    elements: element list;
     loc: Loc.t;
   }
   [@@deriving show]
