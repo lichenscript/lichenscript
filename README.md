@@ -53,7 +53,7 @@ Check [Examples](./examples/).
 
 # VSCode Extension
 
-Intall [lichenscript-vscode](https://github.com/vincentdchan/lichenscript-vscode) from the extension store.
+Install [lichenscript-vscode](https://github.com/vincentdchan/lichenscript-vscode) from the extension store.
 
 # Roadmap
 

@@ -6,7 +6,7 @@
     "email": "okcdz@diverse.space"
   },
   "version": "0.0.14",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "preferUnplugged": false,
   "os": [
     "linux"
