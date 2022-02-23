@@ -155,6 +155,47 @@ int unicode_from_utf8(const uint8_t *p, int max_len, const uint8_t **pp)
     return c;
 }
 
+typedef struct GCObjectList {
+    LCGCObject* head;
+    LCGCObject* last;
+} GCObjectList;
+
+typedef enum LCGCPhase {
+    LC_GC_PHASE_DONE = 0,
+    LC_GC_PHASE_REMOVING_CYCLES,
+} LCGCPhase;
+
+static force_inline void lc_gc_objs_list_init(GCObjectList* list) {
+    list->head = list->last = NULL;
+}
+
+static void lc_gc_objs_list_add(GCObjectList* list, LCGCObject* obj) {
+    obj->header.prev = list->last;
+    obj->header.next = NULL;
+
+    if (list->last) {
+        list->last->header.next = obj;
+    }
+    list->last = obj;
+}
+
+static void lc_gc_objs_list_remove(GCObjectList* list, LCGCObject* obj) {
+    if (list->head == obj) {
+        list->head = obj->header.next;
+    }
+    if (list->last == obj) {
+        list->last = obj->header.prev;
+    }
+
+    if (obj->header.prev) {
+        obj->header.prev->header.next = obj->header.next;
+    }
+
+    if (obj->header.next) {
+        obj->header.next->header.prev = obj->header.prev;
+    }
+}
+
 typedef struct LCClassMeta {
     LCClassDef* cls_def;
     LCClassMethodDef* cls_method;
@@ -169,10 +210,9 @@ typedef struct LCRuntime {
     uint32_t cls_meta_cap;
     uint32_t cls_meta_size;
     LCClassMeta* cls_meta_data;
-    LCGCObject* gc_object_head;
-    LCGCObject* gc_object_last;
-    LCGCObject* tmp_obj_head;
-    LCGCObject* tmp_obj_last;
+    uint8_t      gc_phase;
+    GCObjectList gc_objs;
+    GCObjectList tmp_objs;
 } LCRuntime;
 
 typedef struct LCArray {
@@ -218,45 +258,18 @@ static inline uint32_t hash_string16(const uint16_t *str,
     return h;
 }
 
-static void add_gc_object_to_runtime(LCRuntime* rt, LCGCObject* obj) {
-    obj->header.prev = rt->gc_object_last;
-    obj->header.next = NULL;
-
-    if (rt->gc_object_last) {
-        rt->gc_object_last->header.next = obj;
-    }
-    rt->gc_object_last = obj;
-}
-
-static void remove_gc_object_from_runtime(LCRuntime* rt, LCGCObject* obj) {
-    if (rt->gc_object_head == obj) {
-        rt->gc_object_head = obj->header.next;
-    }
-    if (rt->gc_object_last == obj) {
-        rt->gc_object_last = obj->header.prev;
-    }
-
-    if (obj->header.prev) {
-        obj->header.prev->header.next = obj->header.next;
-    }
-
-    if (obj->header.next) {
-        obj->header.next->header.prev = obj->header.prev;
-    }
-}
-
 static force_inline void init_gc_object(LCRuntime* rt, LCGCObject* obj, LCGCObjectType gc_ty) {
     obj->header.count = 1;
     obj->header.class_id = 0;
     obj->header.gc_ty = gc_ty;
-    add_gc_object_to_runtime(rt, obj);
+    lc_gc_objs_list_add(&rt->gc_objs, obj);
 }
 
 void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCGCObject* obj) {
     obj->header.count = 1;
     obj->header.class_id = cls_id;
     obj->header.gc_ty = LC_GC_CLASS_OBJECT;
-    add_gc_object_to_runtime(rt, obj);
+    lc_gc_objs_list_add(&rt->gc_objs, obj);
 }
 
 // -511 - 512 is the range in the pool
@@ -309,7 +322,9 @@ static inline void LCFreeLambda(LCRuntime* rt, LCLambda* lambda) {
         LCRelease(rt, lambda->captured_values[i]);
     }
 
-    remove_gc_object_from_runtime(rt, (LCGCObject*)lambda);
+    if (rt->gc_phase != LC_GC_PHASE_REMOVING_CYCLES) {
+        lc_gc_objs_list_remove(&rt->gc_objs, (LCGCObject*)lambda);
+    }
     lc_free(rt, lambda);
 }
 
@@ -324,7 +339,9 @@ static void LCFreeClassObject(LCRuntime* rt, LCGCObject* cls_obj) {
         finalizer(rt, cls_obj);
     }
 
-    remove_gc_object_from_runtime(rt, (LCGCObject*)cls_obj);
+    if (rt->gc_phase != LC_GC_PHASE_REMOVING_CYCLES) {
+        lc_gc_objs_list_remove(&rt->gc_objs, (LCGCObject*)cls_obj);
+    }
     lc_free(rt, cls_obj);
 }
 
@@ -335,7 +352,9 @@ static inline void LCFreeTuple(LCRuntime* rt, LCTuple* tuple) {
         LCRelease(rt, tuple->data[i]);
     }
 
-    remove_gc_object_from_runtime(rt, (LCGCObject*)tuple);
+    if (rt->gc_phase != LC_GC_PHASE_REMOVING_CYCLES) {
+        lc_gc_objs_list_remove(&rt->gc_objs, (LCGCObject*)tuple);
+    }
     lc_free(rt, tuple);
 }
 
@@ -349,14 +368,18 @@ static inline void LCFreeArray(LCRuntime* rt, LCArray* arr) {
         arr->data = NULL;
     }
 
-    remove_gc_object_from_runtime(rt, (LCGCObject*)arr);
+    if (rt->gc_phase != LC_GC_PHASE_REMOVING_CYCLES) {
+        lc_gc_objs_list_remove(&rt->gc_objs, (LCGCObject*)arr);
+    }
     lc_free(rt, arr);
 }
 
 static inline void LCFreeRefCell(LCRuntime* rt, LCRefCell* cell) {
     LCRelease(rt, cell->value);
 
-    remove_gc_object_from_runtime(rt, (LCGCObject*)cell);
+    if (rt->gc_phase != LC_GC_PHASE_REMOVING_CYCLES) {
+        lc_gc_objs_list_remove(&rt->gc_objs, (LCGCObject*)cell);
+    }
     lc_free(rt, cell);
 }
 
@@ -366,7 +389,9 @@ static inline void LCFreeUnionObject(LCRuntime* rt, LCUnionObject* union_obj) {
         LCRelease(rt, union_obj->value[i]);
     }
 
-    remove_gc_object_from_runtime(rt, (LCGCObject*)union_obj);
+    if (rt->gc_phase != LC_GC_PHASE_REMOVING_CYCLES) {
+        lc_gc_objs_list_remove(&rt->gc_objs, (LCGCObject*)union_obj);
+    }
     lc_free(rt, union_obj);
 }
 
@@ -557,7 +582,10 @@ LCRuntime* LCNewRuntime() {
     runtime->cls_meta_size = 0;
     runtime->cls_meta_data = lc_malloc(runtime, sizeof(LCClassMeta) * runtime->cls_meta_cap);
 
-    runtime->gc_object_head = runtime->gc_object_last = NULL;
+    runtime->gc_phase = LC_GC_PHASE_DONE;
+
+    lc_gc_objs_list_init(&runtime->gc_objs);
+    lc_gc_objs_list_init(&runtime->tmp_objs);
 
     // the ancester of all classes
     LCClassID object_cls_id = LCDefineClass(runtime, &Object_def);
@@ -584,25 +612,11 @@ void LCFreeRuntime(LCRuntime* rt) {
     lc_raw_free(rt);
 }
 
-static void lc_add_gc_obj_to_tmp(LCRuntime* rt, LCGCObject* obj) {
-    obj->header.next = NULL;
-
-    if (rt->tmp_obj_last) {  // list is not empty
-        rt->tmp_obj_last->header.next = obj;
-        obj->header.prev = rt->tmp_obj_last;
-    } else {  // list is empty
-        obj->header.prev = NULL;
-        rt->tmp_obj_head = obj;
-    }
-
-    rt->tmp_obj_last = obj;
-}
-
 static void lc_deref_child(LCRuntime* rt, LCGCObject* gc_obj) {
     gc_obj->header.count--;
     if (gc_obj->header.count == 0 && gc_obj->header.mark == 1) {
-        remove_gc_object_from_runtime(rt, gc_obj);
-        lc_add_gc_obj_to_tmp(rt, gc_obj);
+        lc_gc_objs_list_remove(&rt->gc_objs, gc_obj);
+        lc_gc_objs_list_add(&rt->tmp_objs, gc_obj);
     }
 }
 
@@ -613,9 +627,9 @@ void lc_mark_children(LCRuntime* rt, LCGCObject* gc_obj, LCMarkFunc mark_fun);
  */
 static void lc_deref_gc_objects_children(LCRuntime* rt) {
     LCGCObject *gc_obj, *tmp;
-    gc_obj = rt->gc_object_head;
+    gc_obj = rt->gc_objs.head;
 
-    rt->tmp_obj_head = rt->tmp_obj_last = NULL;
+    lc_gc_objs_list_init(&rt->tmp_objs);
 
     while (gc_obj != NULL) {
         tmp = gc_obj->header.next;
@@ -624,8 +638,8 @@ static void lc_deref_gc_objects_children(LCRuntime* rt) {
         gc_obj->header.mark = 1;
 
         if (gc_obj->header.count == 0) {
-            remove_gc_object_from_runtime(rt, gc_obj);
-            lc_add_gc_obj_to_tmp(rt, gc_obj);
+            lc_gc_objs_list_remove(&rt->gc_objs, gc_obj);
+            lc_gc_objs_list_add(&rt->tmp_objs, gc_obj);
         }
 
         gc_obj = tmp;
@@ -739,14 +753,39 @@ void lc_mark_children(LCRuntime* rt, LCGCObject* obj, LCMarkFunc mark_fun) {
 
 }
 
+static void lc_gc_scan_incref_child(LCRuntime *rt, LCGCObject *gc_obj) {
+    gc_obj->header.count++;
+    if (gc_obj->header.count == 1) {
+        lc_gc_objs_list_remove(&rt->tmp_objs, gc_obj);
+        lc_gc_objs_list_add(&rt->gc_objs, gc_obj);
+        gc_obj->header.mark = 0;  // reset the mark for the next GC call
+    }
+}
+
+static void lc_gc_scan_incref_child2(LCRuntime *rt, LCGCObject *gc_obj) {
+    gc_obj->header.count++;
+}
+
 static void lc_gc_scan(LCRuntime* rt) {
     LCGCObject *gc_obj, *tmp;
-    gc_obj = rt->gc_object_head;
+    gc_obj = rt->gc_objs.head;
 
     while (gc_obj != NULL) {
         tmp = gc_obj->header.next;
 
-        // lc_mark_obj_incr(rt, gc_obj);
+        lc_mark_children(rt, gc_obj, lc_gc_scan_incref_child);
+        gc_obj->header.mark = 0;
+
+        gc_obj = tmp;
+    }
+
+    gc_obj = rt->tmp_objs.head;
+
+    // restore the refcount of the objects to be deleted.
+    while (gc_obj != NULL) {
+        tmp = gc_obj->header.next;
+
+        lc_mark_children(rt, gc_obj, lc_gc_scan_incref_child2);
 
         gc_obj = tmp;
     }
@@ -754,8 +793,10 @@ static void lc_gc_scan(LCRuntime* rt) {
 
 static void lc_remove_all_tmp_objects(LCRuntime* rt) {
     LCGCObject *gc_obj, *tmp;
-    gc_obj = rt->gc_object_head;
 
+    rt->gc_phase = LC_GC_PHASE_REMOVING_CYCLES;
+
+    gc_obj = rt->gc_objs.head;
     while (gc_obj != NULL) {
         tmp = gc_obj->header.next;
 
@@ -764,8 +805,9 @@ static void lc_remove_all_tmp_objects(LCRuntime* rt) {
         gc_obj = tmp;
     }
 
-    rt->tmp_obj_head = NULL;
-    rt->tmp_obj_last = NULL;
+    rt->gc_phase = LC_GC_PHASE_DONE;
+
+    lc_gc_objs_list_init(&rt->tmp_objs);
 }
 
 void LCRunGC(LCRuntime* rt) {
@@ -2554,7 +2596,9 @@ void lc_std_map_free(LCRuntime* rt, LCMap* map) {
     }
 
 clean:
-    remove_gc_object_from_runtime(rt, (LCGCObject*)map);
+    if (rt->gc_phase != LC_GC_PHASE_REMOVING_CYCLES) {
+        lc_gc_objs_list_remove(&rt->gc_objs, (LCGCObject*)map);
+    }
     lc_free(rt, map);
 }
 
