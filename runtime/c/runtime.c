@@ -598,30 +598,41 @@ static void lc_add_gc_obj_to_tmp(LCRuntime* rt, LCGCObject* obj) {
     rt->tmp_obj_last = obj;
 }
 
+static void lc_deref_child(LCRuntime* rt, LCGCObject* gc_obj) {
+    gc_obj->header.count--;
+    if (gc_obj->header.count == 0 && gc_obj->header.mark == 1) {
+        remove_gc_object_from_runtime(rt, gc_obj);
+        lc_add_gc_obj_to_tmp(rt, gc_obj);
+    }
+}
+
+void lc_mark_children(LCRuntime* rt, LCGCObject* gc_obj, LCMarkFunc mark_fun);
+
 /**
- * iterate all the gc objects, deref their ref count,
- * if ref count decrested to 0, add to tmp objects;
+ * iterate all the gc objects, deref the count of their children
  */
-static void lc_deref_all_gc_objects(LCRuntime* rt) {
+static void lc_deref_gc_objects_children(LCRuntime* rt) {
     LCGCObject *gc_obj, *tmp;
     gc_obj = rt->gc_object_head;
+
+    rt->tmp_obj_head = rt->tmp_obj_last = NULL;
 
     while (gc_obj != NULL) {
         tmp = gc_obj->header.next;
 
-        if (--gc_obj->header.count <= 0) {
+        lc_mark_children(rt, gc_obj, lc_deref_child);
+        gc_obj->header.mark = 1;
+
+        if (gc_obj->header.count == 0) {
             remove_gc_object_from_runtime(rt, gc_obj);
             lc_add_gc_obj_to_tmp(rt, gc_obj);
         }
-        gc_obj->header.mark = 1;
 
         gc_obj = tmp;
     }
 }
 
-void lc_mark_obj_incr(LCRuntime *rt, LCGCObject *obj);
-
-static void lc_mark_val_incr(LCRuntime *rt, LCValue val) {
+static void lc_mark_val(LCRuntime *rt, LCValue val, LCMarkFunc mark_fun) {
     switch (val.tag) {
         case LC_TY_UNION_OBJECT:
         case LC_TY_REFCELL:
@@ -630,7 +641,7 @@ static void lc_mark_val_incr(LCRuntime *rt, LCValue val) {
         case LC_TY_TUPLE:
         case LC_TY_ARRAY:
         case LC_TY_MAP:
-            lc_mark_obj_incr(rt, (LCGCObject*)val.ptr_val);
+            mark_fun(rt, (LCGCObject*)val.ptr_val);
             break;
         
         default:
@@ -638,52 +649,48 @@ static void lc_mark_val_incr(LCRuntime *rt, LCValue val) {
     }
 }
 
-static void lc_mark_union_object(LCRuntime* rt, LCUnionObject* union_obj) {
+static void lc_mark_union_object(LCRuntime* rt, LCUnionObject* union_obj, LCMarkFunc mark_fun) {
     size_t i;
 
     for (i = 0; i < union_obj->size; i++) {
-        lc_mark_val_incr(rt, union_obj->value[i]);
+        lc_mark_val(rt, union_obj->value[i], mark_fun);
     }
 }
 
-static force_inline void lc_mark_refcell(LCRuntime* rt, LCRefCell* ref_cell) {
-    lc_mark_val_incr(rt, ref_cell->value);
-}
-
-static void lc_mark_lambda(LCRuntime* rt, LCLambda* lambda) {
+static void lc_mark_lambda(LCRuntime* rt, LCLambda* lambda, LCMarkFunc mark_fun) {
     size_t i;
 
     for (i = 0; i < lambda->captured_values_size; i++) {
-        lc_mark_val_incr(rt, lambda->captured_values[i]);
+        lc_mark_val(rt, lambda->captured_values[i], mark_fun);
     }
 }
 
-static void lc_mark_class_object(LCRuntime* rt, LCGCObject* gc_obj) {
+static void lc_mark_class_object(LCRuntime* rt, LCGCObject* gc_obj, LCMarkFunc mark_func) {
     uint32_t cls_id = gc_obj->header.class_id;
     LCClassMeta* meta = &rt->cls_meta_data[cls_id];
 
     if (meta->cls_def->gc_mark) {
-        meta->cls_def->gc_mark(rt, MK_CLASS_OBJ(gc_obj), lc_mark_obj_incr);
+        meta->cls_def->gc_mark(rt, MK_CLASS_OBJ(gc_obj), mark_func);
     }
 }
 
-static force_inline void lc_mark_tuple(LCRuntime* rt, LCTuple* tuple) {
+static force_inline void lc_mark_tuple(LCRuntime* rt, LCTuple* tuple, LCMarkFunc mark_fun) {
     size_t i;
 
     for (i = 0; i < tuple->len; i++) {
-        lc_mark_val_incr(rt, tuple->data[i]);
+        lc_mark_val(rt, tuple->data[i], mark_fun);
     }
 }
 
-static force_inline void lc_mark_array(LCRuntime* rt, LCArray* arr) {
+static force_inline void lc_mark_array(LCRuntime* rt, LCArray* arr, LCMarkFunc mark_fun) {
     size_t i;
 
     for (i = 0; i < arr->len; i++) {
-        lc_mark_val_incr(rt, arr->data[i]);
+        lc_mark_val(rt, arr->data[i], mark_fun);
     }
 }
 
-static void lc_mark_map(LCRuntime* rt, LCMap* map) {
+static void lc_mark_map(LCRuntime* rt, LCMap* map, LCMarkFunc mark_fun) {
     LCMapTuple *tuple, *tmp;
     tuple = map->head;
 
@@ -693,47 +700,40 @@ static void lc_mark_map(LCRuntime* rt, LCMap* map) {
         // no need to mark key of tuple
         // the key may be int, string, something is impossible
         // to be a GCObject
-        lc_mark_val_incr(rt, tuple->value);
+        lc_mark_val(rt, tuple->value, mark_fun);
 
         tuple = tmp;
     }
 }
 
-void lc_mark_obj_incr(LCRuntime *rt, LCGCObject *obj) {
-    if (obj->header.mark == 0) {
-        return;
-    }
-    obj->header.count++;
-    obj->header.mark = 0;
-
-    switch (obj->header.gc_ty)
-    {
+void lc_mark_children(LCRuntime* rt, LCGCObject* obj, LCMarkFunc mark_fun) {
+    switch (obj->header.gc_ty) {
         case LC_GC_UNION_OBJECT:
-            lc_mark_union_object(rt, (LCUnionObject*)obj);
+            lc_mark_union_object(rt, (LCUnionObject*)obj, mark_fun);
             break;
 
         case LC_GC_REFCELL:
-            lc_mark_refcell(rt, (LCRefCell*)obj);
+            lc_mark_val(rt, ((LCRefCell*)obj)->value, mark_fun);
             break;
 
         case LC_GC_LAMBDA:
-            lc_mark_lambda(rt, (LCLambda*)obj);
+            lc_mark_lambda(rt, (LCLambda*)obj, mark_fun);
             break;
 
         case LC_GC_CLASS_OBJECT:
-            lc_mark_class_object(rt, obj);
+            lc_mark_class_object(rt, obj, mark_fun);
             break;
             
         case LC_GC_TUPLE:
-            lc_mark_tuple(rt, (LCTuple*)obj);
+            lc_mark_tuple(rt, (LCTuple*)obj, mark_fun);
             break;
 
         case LC_GC_ARRAY:
-            lc_mark_array(rt, (LCArray*)obj);
+            lc_mark_array(rt, (LCArray*)obj, mark_fun);
             break;
 
         case LC_GC_MAP:
-            lc_mark_map(rt, (LCMap*)obj);
+            lc_mark_map(rt, (LCMap*)obj, mark_fun);
             break;
     }
 
@@ -746,7 +746,7 @@ static void lc_gc_scan(LCRuntime* rt) {
     while (gc_obj != NULL) {
         tmp = gc_obj->header.next;
 
-        lc_mark_obj_incr(rt, gc_obj);
+        // lc_mark_obj_incr(rt, gc_obj);
 
         gc_obj = tmp;
     }
@@ -769,7 +769,7 @@ static void lc_remove_all_tmp_objects(LCRuntime* rt) {
 }
 
 void LCRunGC(LCRuntime* rt) {
-    lc_deref_all_gc_objects(rt);
+    lc_deref_gc_objects_children(rt);
 
     lc_gc_scan(rt);
 
