@@ -71,6 +71,21 @@ public class String {
 public enum Option<A> {
     case Some(A)
     case None
+
+    public isSome(): boolean {
+        match this {
+            case Some(_) => true
+            case _ => false
+        }
+    }
+
+    public isNone(): boolean {
+        match this {
+            case None => true
+            case Some(_) => false
+        }
+    }
+
 }
 
 public enum Result<A, B> {
