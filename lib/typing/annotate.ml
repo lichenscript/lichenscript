@@ -1584,7 +1584,8 @@ and annotate_enum env enum =
   let scope = Env.peek_scope env in
   let variable = Option.value_exn (scope#find_var_symbol name.pident_name) in
 
-  let scope = new scope ~prev:scope () in
+  let this_expr = TypeExpr.Ctor(Ref variable.var_id, List.map ~f:Identifier.(fun id -> TypeExpr.TypeSymbol id.pident_name) type_vars) in
+  let scope = new class_scope ~prev:scope variable.var_id this_expr in
 
   let type_vars_names =
     List.map
@@ -1644,15 +1645,93 @@ and annotate_enum env enum =
       }, member_var.var_id 
     in
 
-    let elements, _cases_deps =
+    let case_elements, cases_deps =
       elements
-      |> List.mapi ~f:(fun index elm ->
+      |> List.filter_mapi ~f:(fun index elm ->
         match elm with
         | Ast.Enum.Case case -> (
           let case, deps = annotate_case index case in
-          (Typedtree.Enum.Case case), deps
+          Some ((Typedtree.Enum.Case case), deps)
         )
-        | Ast.Enum.Method _ -> failwith "unimplemented enum method"
+        | Ast.Enum.Method _ -> None
+      )
+      |> List.unzip
+    in
+
+    let annotate_method _method : (T.Declaration.class_method * int) =
+      let open Ast.Declaration in
+      let method_scope = new function_scope ~prev:(Env.peek_scope env) () in
+      let { cls_method_attributes; cls_method_visibility; cls_method_modifier; cls_method_name; cls_method_params; cls_method_loc; cls_method_body; cls_method_return_ty; _ } = _method in
+      let _type_visibility = annotate_visibility cls_method_visibility in
+      Env.with_new_scope env method_scope (fun env ->
+        let cls_method_params, method_params, cls_method_params_deps = annotate_function_params env cls_method_params in
+
+        let cls_method_body = annotate_block_impl ~prev_deps:[variable.var_id] env cls_method_body in
+
+        let this_deps = ref cases_deps in
+
+        this_deps := Typedtree.Block.(cls_method_body.return_ty)::(!this_deps);
+
+        let method_return, _return_ty_deps =
+          match cls_method_return_ty with
+          | Some ty -> annotate_type env ty
+          | None -> (
+            let unit_type = Env.ty_unit env in
+            TypeExpr.(Ctor (Ref unit_type, [])), [unit_type]
+          )
+        in
+
+        let method_id = Type_context.size (Env.ctx env) in
+
+        let new_type = { TypeDef.
+          id = method_id;
+          builtin = false;
+          name = cls_method_name.pident_name;
+          spec = ClassMethod {
+            method_cls_id = variable.var_id;
+            method_get_set = None;
+            method_is_virtual = false;
+            method_params = method_params;
+            method_return;
+          };
+        } in
+
+        let typedef = TypeExpr.TypeDef new_type in
+        ignore (Type_context.new_id ctx
+          { Core_type.
+            deps = List.concat [ List.rev !this_deps; cls_method_params_deps ]
+            |> List.filter
+              ~f:(fun id -> id <> variable.var_id)
+            ;
+            loc = _method.cls_method_loc;
+            value = typedef;
+          }
+        );
+
+        let _method = { T.Declaration.
+          cls_method_attributes;
+          cls_method_visibility;
+          cls_method_modifier;
+          cls_method_params;
+          cls_method_name = (cls_method_name.pident_name, method_id);
+          cls_method_scope = Some method_scope;
+          cls_method_body;
+          cls_method_loc;
+        } in
+
+        _method, method_id
+      )
+    in
+
+    let method_elements, method_deps =
+      elements
+      |> List.filter_map ~f:(fun elm ->
+        match elm with
+        | Ast.Enum.Method _method ->
+          let _method, deps = annotate_method _method in
+          Some ((Typedtree.Enum.Method _method), deps)
+
+        | _ -> None
       )
       |> List.unzip
     in
@@ -1673,8 +1752,7 @@ and annotate_enum env enum =
       ctx
       ~f:(fun _ ->
         {
-          (* deps = cases_deps; *)
-          deps = [];
+          deps = List.append cases_deps method_deps;
           loc;
           value = (TypeExpr.TypeDef {
             id = variable.var_id;
@@ -1690,7 +1768,7 @@ and annotate_enum env enum =
       visibility;
       name = (name.pident_name, variable.var_id);
       type_vars = type_vars_names;
-      elements;
+      elements = List.append case_elements method_elements;
       loc;
     }
   )

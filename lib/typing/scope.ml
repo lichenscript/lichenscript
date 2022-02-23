@@ -172,6 +172,9 @@ class scope ?prev () = object(self)
 
 end
 
+(*
+ * a enum is also using a class_scope
+ *)
 class class_scope ?prev cls_id this_expr = object
   inherit scope ?prev ()
 
