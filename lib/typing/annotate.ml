@@ -515,6 +515,18 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
     | Match _match -> annotate_expression_match ~prev_deps env _match
 
+    | Try expr -> (
+      let expr' = annotate_expression ~prev_deps env expr in
+      let node = {
+        value = TypeExpr.Unknown;
+        loc;
+        deps = [expr'.ty_var];
+      } in
+
+      let node_id = Type_context.new_id (Env.ctx env) node in
+      node_id, (T.Expression.Try expr')
+    )
+
     | This -> (
       let scope = Env.peek_scope env in
       let this_expr = scope#this_expr in
