@@ -9,4 +9,6 @@ function main() {
             print("None")
         }
     }
+    print(a.isSome());
+    print(a.isNone());
 }

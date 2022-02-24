@@ -1698,7 +1698,7 @@ and annotate_enum env enum =
           };
         } in
 
-        enum_methods := (type_visibility, new_type)::(!enum_methods);
+        enum_methods := (cls_method_name.pident_name, type_visibility, new_type)::(!enum_methods);
 
         let typedef = TypeExpr.TypeDef new_type in
         ignore (Type_context.new_id ctx
