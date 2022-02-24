@@ -174,7 +174,7 @@ and TypeDef : sig
   and enum_type = {
     enum_members: (string * t) list;
     enum_params: string list;
-    enum_methods: (Visibility.t * t) list;
+    enum_methods: (string * Visibility.t * t) list;
   }
 
   and _function = {
@@ -258,7 +258,7 @@ end = struct
   and enum_type = {
     enum_members: (string * t) list;
     enum_params: string list;
-    enum_methods: (Visibility.t * t) list;
+    enum_methods: (string * Visibility.t * t) list;
   }
 
   and _function = {

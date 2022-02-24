@@ -432,6 +432,48 @@ let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
   let type_expr = Type_context.deref_type ctx type_expr in
   let open TypeDef in
   match type_expr with
+  | TypeDef { id = enum_id; spec = Enum enum; _ } -> (
+    let test_scope = scope#test_class_scope in
+    let outside_finder = (
+      fun (elm_name, visibility, _) ->
+        String.equal elm_name member_name && (Visibility.access_in_module visibility)
+      )
+    in
+    let finder =
+      match test_scope with
+      | Some id -> (
+        (* in the current class *)
+        if id = enum_id then
+          (fun (elm_name, _, _) -> String.equal elm_name member_name)
+        else
+          outside_finder
+      )
+      | None -> outside_finder
+    in
+    let result = List.find ~f:finder enum.enum_methods in
+
+    let types_map =
+      List.fold2_exn
+        ~init:TypeVarMap.empty
+        ~f:(fun acc def_var given_var ->
+          TypeVarMap.set acc ~key:def_var ~data:given_var
+        )
+        enum.enum_params type_vars
+    in
+    let open Option in
+
+    result >>= fun (_name, _vis, elm) ->
+    match elm with
+    | ({ TypeDef. id = member_id; spec = ClassMethod { method_params; method_return; _ }; _ } as def) -> (
+        let params = replace_params_with_type ctx types_map method_params in
+        let rt = replace_type_vars_with_maps ctx types_map method_return in
+        let expr = TypeExpr.Method(def, params, rt) in
+        Some (expr, member_id)
+    )
+
+    | _ -> None
+  )
+
   | TypeDef { id = cls_id; spec = Class cls; _ } -> (
     let test_scope = scope#test_class_scope in
     let outside_finder = (
@@ -491,7 +533,7 @@ let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
       find_member_of_type ctx ~scope ancester member_name
     )
   )
-  | _ -> failwith "unrechable"
+  | _ -> None
 
 (*
   * TODO: namespace
@@ -513,6 +555,7 @@ and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) op
     let type_expr = Type_context.deref_type ctx type_expr in
     let open TypeDef in
     match type_expr with
+    | TypeDef { spec = Enum _; _ }
     | TypeDef { spec = Class _; _ } ->
       find_member_of_class ctx ~scope type_expr member_name type_vars
 

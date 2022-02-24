@@ -1,1 +1,3 @@
 Some
+true
+false
