@@ -1355,9 +1355,44 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         C_op.Expr.Ident SymThis
     )
 
-    | Try _expr -> failwith "unimplemented: try"
+    | Try try_expr -> (
+      let expr_result = transform_expression ~is_move:true env try_expr in
 
-    | Super -> failwith "not implemented: super"
+      let expr' = prepend_expr env ~prepend_stmts ~append_stmts expr_result in
+
+      let tmp_id = env.tmp_vars_count in
+      env.tmp_vars_count <- env.tmp_vars_count + 1;
+      let tmp_var = "t[" ^ (Int.to_string tmp_id) ^ "]" in
+
+      let stmt = { C_op.Stmt.
+        spec = If {
+          if_test = C_op.Expr.TagEqual (expr', 1);  (* 1 represent error *)
+          if_consequent =
+            List.append
+            expr_result.append_stmts
+            [{ C_op.Stmt.
+                spec = Return (Some expr');
+                loc = Loc.none;
+            }];
+          if_alternate = None;
+        };
+        loc = expr.loc;
+      } in
+
+      let union_get_expr = C_op.Expr.UnionGet(expr', 0) in
+
+      let assign_stmt = { C_op.Stmt.
+        spec = Expr (C_op.Expr.(Assign (Ident (C_op.SymLocal tmp_var), union_get_expr)));
+        loc = expr.loc;
+      } in
+
+      prepend_stmts := List.concat [ !prepend_stmts; expr_result.prepend_stmts; [stmt; assign_stmt] ];
+      append_stmts := List.append expr_result.append_stmts !append_stmts;
+
+      Temp tmp_id
+    )
+
+    | Super -> failwith "unrechable"
 
     | Index(expr, index) -> (
       let expr' = transform_expression ~is_borrow:true env expr in

@@ -1,11 +1,15 @@
 
 class MyError {
 
+	msg: string
+
 }
 
 function test2(content: string): Result<i32, MyError> {
 	if content.length == 0 {
-		const err: Result<i32, Error> = Error(MyError{});
+		const err: Result<i32, Error> = Error(MyError{
+			msg: "null string"
+		});
 		err
 	} else {
 		Ok(0)
@@ -20,4 +24,9 @@ function test1(content: string): Result<unit, MyError> {
 
 function main() {
 	test1("some");
+	const result2 = test1("");
+	match result2 {
+		case Error(myErr) => print(myErr.msg)
+		case _ => print("no error")
+	}
 }
