@@ -24,6 +24,9 @@
 #if defined(__APPLE__)
 #include <malloc/malloc.h>
 #include <execinfo.h>
+#elif defined(__linux__)
+#include <malloc.h>
+#include <execinfo.h>
 #endif
 
 #define LC_INIT_SYMBOL_BUCKET_SIZE 128
