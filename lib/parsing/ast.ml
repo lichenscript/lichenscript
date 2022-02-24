@@ -116,6 +116,7 @@ and Expression : sig
     | Block of Block.t
     | Init of init
     | Match of _match
+    | Try of t
     | This
     | Super
 

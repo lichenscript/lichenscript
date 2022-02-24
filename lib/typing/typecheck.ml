@@ -951,6 +951,10 @@ and check_expression env expr =
     Type_context.update_node_type env.ctx expr.ty_var ty
   )
 
+  | Try expr -> (
+    check_expression env expr;
+  )
+
   | This
   | Super -> ()
 

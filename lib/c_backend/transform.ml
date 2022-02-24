@@ -1355,6 +1355,8 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         C_op.Expr.Ident SymThis
     )
 
+    | Try _expr -> failwith "unimplemented: try"
+
     | Super -> failwith "not implemented: super"
 
     | Index(expr, index) -> (

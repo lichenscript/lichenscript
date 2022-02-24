@@ -1309,6 +1309,20 @@ and parse_left_handside_expression_allow_call env : Expression.t =
       in
       loop env expr
 
+    | Token.T_PLING ->
+      begin
+        Eat.token env;
+        let spec = Try expr in
+        let expr =
+          {
+            spec;
+            loc = with_start_loc env start_pos;
+            attributes = [];
+          }
+        in
+        loop env expr
+      end
+
     (* | Token.T_LCURLYBAR *)
 
     | _ -> expr
