@@ -1,0 +1,23 @@
+
+class MyError {
+
+}
+
+function test2(content: string): Result<i32, MyError> {
+	if content.length == 0 {
+		const err: Result<i32, Error> = Error(MyError{});
+		err
+	} else {
+		Ok(0)
+	}
+}
+
+function test1(content: string): Result<unit, MyError> {
+	const num = test2(content)?;
+	print(num);
+	Ok(())
+}
+
+function main() {
+	test1("some");
+}

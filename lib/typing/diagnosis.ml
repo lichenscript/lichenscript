@@ -166,6 +166,9 @@ module PP = struct
 
     | IfTestShouldBeBoolean ty ->
       Format.fprintf formatter "The type of expression after if should be 'boolean', but got '%s'." (pp_ty ty)
+    
+    | CannotUsedForTryExpression ty ->
+      Format.fprintf formatter "The type '%s' can not be used in a try expression." (pp_ty ty)
 
   let error ~ctx formatter diagnosis =
     let { spec; loc; _ } = diagnosis in

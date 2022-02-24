@@ -951,8 +951,41 @@ and check_expression env expr =
     Type_context.update_node_type env.ctx expr.ty_var ty
   )
 
-  | Try expr -> (
-    check_expression env expr;
+  | Try try_expr -> (
+    check_expression env try_expr;
+    let try_expr_type = Type_context.deref_node_type env.ctx try_expr.ty_var in
+    let ctor_opt = Check_helper.find_construct_of env.ctx try_expr_type in
+    let raise_err () =
+      let err = Diagnosis.(make_error env.ctx expr_loc (CannotUsedForTryExpression try_expr_type)) in
+      raise (Diagnosis.Error err)
+    in
+    match ctor_opt with
+    | Some ({ TypeDef. name = "Result"; spec = Enum { enum_params; _ } ; _ }, args) -> (
+      let tmp =
+        List.fold2
+        ~init:Check_helper.TypeVarMap.empty
+        ~f:(fun acc item item2 ->
+          Check_helper.TypeVarMap.set acc ~key:item ~data:item2
+        )
+        enum_params args
+      in
+      let type_maps=
+        match tmp with
+        | List.Or_unequal_lengths.Ok t -> t
+        | List.Or_unequal_lengths.Unequal_lengths -> raise_err ()
+      in
+      let ok_type = Check_helper.TypeVarMap.find_exn type_maps "A" in
+      Type_context.update_node_type env.ctx expr.ty_var ok_type;
+
+      let error_type = Check_helper.TypeVarMap.find_exn type_maps "B" in
+
+      (* TODO: do NOT find result in current scope, will have name conflict *)
+      let error_ty_var = Option.value_exn (env.scope#find_type_symbol "Result") in
+      let return_type = TypeExpr.Ctor(Ref error_ty_var, [TypeSymbol "A"; error_type]) in
+      add_return_type env (return_type, expr_loc);
+    )
+
+    |_ -> raise_err ()
   )
 
   | This
