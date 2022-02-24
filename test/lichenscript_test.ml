@@ -70,7 +70,7 @@ let rec main () =
       begin
         if !index >= (Array.length args) then (
           Format.printf "not enough args for %s\n" item;
-          ignore (exit 1)
+          ignore (exit 2)
         );
         compiler_path := (Array.get args !index); 
         index := !index + 1
@@ -80,7 +80,7 @@ let rec main () =
       begin
         if !index >= (Array.length args) then (
           Format.printf "not enough args for %s\n" item;
-          ignore (exit 1)
+          ignore (exit 2)
         );
         suite_name := Some (Array.get args !index);
         index := !index + 1
@@ -94,7 +94,7 @@ let rec main () =
 
     | _ ->
       Format.eprintf "unknown option: %s\n" item;
-      ignore (exit 1);
+      ignore (exit 2);
 
   done;
   let env = create  ~compiler_path:!compiler_path ~rest_args:!rest_args () in
@@ -175,7 +175,10 @@ and print_statistics env =
   else
     Format.printf "%s[FAILED]%s " TermColor.green TermColor.reset
   ;
-  Format.printf "Totally: %d, finished: %d, failed: %d\n" env.totoal_files env.finished_files env.error_files
+  Format.printf "Totally: %d, finished: %d, failed: %d\n" env.totoal_files env.finished_files env.error_files;
+  if env.error_files > 0 then (
+    ignore (exit 2)
+  )
 
 and handle_negative_exit env suite code =
   let dirname = Filename.dirname suite.test_file in
