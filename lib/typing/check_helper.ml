@@ -135,8 +135,10 @@ let rec type_assinable_with_maps ctx var_maps left right =
           ~init:(var_maps, true)
           ~f:(fun acc left right ->
             let var_names, acc' = acc in
-            match right with
-            | TypeSymbol _ -> acc
+            match (left, right) with
+            | (TypeSymbol _, _)
+            | (_, TypeSymbol _)
+              -> acc
             | _ -> (
               if (not acc') then
                 acc

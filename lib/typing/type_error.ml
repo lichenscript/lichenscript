@@ -40,3 +40,4 @@ type t =
   | PatternNotExausted
   | WhileTestShouldBeBoolean of TypeExpr.t
   | IfTestShouldBeBoolean of TypeExpr.t
+  | CannotUsedForTryExpression of TypeExpr.t
