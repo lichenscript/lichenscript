@@ -15,7 +15,8 @@
  *)
 open Lichenscript_codegen_utils
 open Lichenscript_typing
-open C_op
+open Lichenscript_ir.C_op
+open Lichenscript_ir
 open Core_kernel
 
 let main_snippet ?init_name main_name = {|
@@ -170,7 +171,7 @@ let rec codegen_statement (env: t) stmt =
 
 
 and codegen_expression_if env if_spec =
-  let open C_op.Stmt in
+  let open Stmt in
   let { if_test; if_consequent; if_alternate } = if_spec in
   ps env "if (";
   codegen_expression env if_test;
@@ -370,7 +371,6 @@ and codegen_declaration env decl =
   )
 
 and codegen_symbol env sym =
-  let open C_op in
   match sym with
   | SymLocal name -> ps env name
   | SymParam param_index ->
@@ -615,7 +615,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env " = ";
     codegen_expression env right
 
-  | Update (op, C_op.Expr.Ident symbol, expr) -> (
+  | Update (op, Expr.Ident symbol, expr) -> (
     ps env "LCUpdateValue(rt, ";
     ps env (Primitives.Assign.to_arithmetic_op op);
     ps env ", ";
