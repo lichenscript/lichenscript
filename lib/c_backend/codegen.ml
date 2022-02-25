@@ -147,7 +147,8 @@ let rec codegen_statement (env: t) stmt =
     codegen_expression env expr;
     ps env ");"
 
-  | Label label ->
+  | WithLabel(label, stmts) ->
+    List.iter ~f:(codegen_statement env) stmts;
     ps env label;
     ps env ":"
 
@@ -462,7 +463,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
     codegen_expression env expr;
     ps env ")"
 
-  | GetRef ref ->
+  | GetRef (ref, _) ->
     ps env "LCRefCellGetValue(";
     codegen_symbol env ref;
     ps env ")"
@@ -498,6 +499,16 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ")"
   )
 
+  | ArraySetValue (arr, index, value) -> (
+    ps env "LCArraySetValue(rt, ";
+    codegen_expression env arr;
+    ps env ", 2, (LCValue[]) {";
+    codegen_expression env index;
+    ps env ", ";
+    codegen_expression env value;
+    ps env "})"
+  )
+
   | Ident value -> codegen_symbol env value
 
   | ExternalCall (fun_name, ths, params) -> (
@@ -531,7 +542,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
     )
   )
 
-  | InitCall sym -> (
+  | InitCall(sym, _) -> (
     codegen_symbol env sym;
     ps env "(rt)"
   )
@@ -781,9 +792,7 @@ and codegen_function_block (env: t) block =
   let { body; _ } = block in
   List.iter
     ~f:(fun stmt ->
-      (match stmt.spec with
-      | Label _ -> ()
-      | _ -> print_indents env);
+      print_indents env;
       codegen_statement env stmt;
       endl env;
     )

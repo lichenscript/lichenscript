@@ -50,20 +50,21 @@ module%gen rec Decl : sig
   }
   [@@deriving show]
 
+  type class_init = {
+    class_name: string;
+    class_id_name: string;
+    class_def_name: string;
+    class_methods: class_method_tuple list;
+  }
+  [@@deriving show]
+
   type _class = {
     name: string;
     original_name: string;
     finalizer: class_finalizer option;
     gc_marker: gc_marker option;
     properties: (string * int) list;
-  }
-  [@@deriving show]
-
-  type class_init = {
-    class_name: string;
-    class_id_name:  string;
-    class_def_name: string;
-    class_methods:  class_method_tuple list;
+    init: class_init;
   }
   [@@deriving show]
 
@@ -121,12 +122,12 @@ and Stmt : sig
   | Break
   | Retain of Expr.t
   | Release of Expr.t
-  | Label of string
+  | WithLabel of string * t list
   | Goto of string
   | Return of Expr.t option
   [@@deriving show]
 
-  type t = {
+  and t = {
     spec: spec;
     loc: Loc.t;
   }
@@ -146,12 +147,13 @@ and Expr : sig
   | NewLambda of (string * t * symbol array)
   | NewBoolean of bool
   | NewRef of t
-  | GetRef of symbol
+  | GetRef of (symbol * string)  (* deref symbol, original_name *)
   | NewArray of int
   | NewMap of int
   | Not of t
   | TupleGetValue of (t * int)
   | ArrayGetValue of (t * t)
+  | ArraySetValue of (t * t * t)
   | I32Binary of Asttypes.BinaryOp.t * t * t
   | F32Binary of Asttypes.BinaryOp.t * t * t
   | I64Binary of Asttypes.BinaryOp.t * t * t
@@ -162,7 +164,7 @@ and Expr : sig
   | Assign of t * t
   | Update of Asttypes.AssignOp.t * t * t
   | ExternalCall of symbol * t option * t list
-  | InitCall of symbol
+  | InitCall of (symbol * symbol)  (* init call function, meta name *)
   | Ident of symbol
   | TagEqual of t * int
   | UnionGet of t * int
