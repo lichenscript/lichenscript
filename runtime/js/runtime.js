@@ -56,6 +56,14 @@ function i32_mod(a, b) {
   return (a % b)|0;
 }
 
+function lc_std_char_code() {
+  return String.prototype.charCodeAt.call(this);
+}
+
+function lc_std_char_to_string() {
+  return this[0];
+}
+
 function lc_std_print(...args) {
   let content = '';
   for (let i = 0; i < args.length; i++) {
@@ -70,5 +78,13 @@ function lc_std_exit(code) {
 }
 
 function lc_std_string_slice() {
-  return String.prototype.slice.call(this, ...arguments);
+  return String.prototype.slice.apply(this, arguments);
+}
+
+function lc_std_array_get_length() {
+  return this.length;
+}
+
+function lc_std_panic(message) {
+  throw new Error("panic: " + message);
 }

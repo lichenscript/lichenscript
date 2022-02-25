@@ -842,7 +842,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         let sym = find_variable env name in
         let id_expr =
           if should_var_captured variable then
-            Ir.Expr.GetRef sym
+            Ir.Expr.GetRef (sym, name)
           else
             Ir.Expr.Ident sym
         in
@@ -963,13 +963,10 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         ~f:(fun index expr ->
           { Ir.Stmt.
             spec = Expr (
-              Ir.Expr.ExternalCall(
-                SymLocal "LCArraySetValue",
-                Some (Ident tmp_sym),
-                [
-                  (NewInt (Int.to_string index));
-                  expr.expr
-                ]
+              Ir.Expr.ArraySetValue(
+                (Ident tmp_sym),
+                (NewInt (Int.to_string index)),
+                expr.expr
               );
             );
             loc = Loc.none;
@@ -1412,7 +1409,8 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       (* logical name -> real name *)
 
       let fun_name = find_variable env init_name in
-      let init_call = Ir.Expr.InitCall((Ir.map_symbol ~f:(fun fun_name -> fun_name ^ "_init") fun_name)) in
+      let init_call_name = Ir.map_symbol ~f:(fun fun_name -> fun_name ^ "_init") fun_name in
+      let init_call = Ir.Expr.InitCall(init_call_name, fun_name) in
       let init_cls_stmt = { Ir.Stmt.
         spec = Expr (
           Ir.Expr.Assign(
@@ -1577,7 +1575,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     append_stmts = !append_stmts;
   }
 
-and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _match =
+and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmts:out_append_stmts ~loc ~ty_var _match =
   let open Typedtree.Expression in
   let { match_expr; match_clauses; _ } = _match in
   let transformed_expr = transform_expression ~is_borrow:true env match_expr in
@@ -1585,17 +1583,20 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
     if is_identifier match_expr then
       transformed_expr.expr
     else
-      prepend_expr env ~prepend_stmts ~append_stmts (transform_expression ~is_borrow:true env match_expr)
+      prepend_expr env
+        ~prepend_stmts:out_prepend_stmts
+        ~append_stmts:out_append_stmts
+        (transform_expression ~is_borrow:true env match_expr)
   in
   let result_tmp = env.tmp_vars_count in
   env.tmp_vars_count <- env.tmp_vars_count + 1;
 
-  prepend_stmts := List.append !prepend_stmts
+  out_prepend_stmts := List.append !out_prepend_stmts
     [{
       Ir.Stmt.
       spec = Expr (
         Ir.Expr.Assign (
-          (Ident (Ir.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"))),
+          (Ident (Ir.SymTemp result_tmp)),
           Null
         );
       );
@@ -1604,6 +1605,7 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
 
   let tmp_counter = ref [] in
   let label_name = "done_" ^ (Int.to_string ty_var) in
+  let prepend_stmts = ref [] in
 
   let is_last_goto stmts =
     let last_opt = List.last stmts in
@@ -1952,7 +1954,7 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
         [{ Ir.Stmt.
           spec = Expr (
             Assign(
-              (Ident (Ir.SymLocal ("t[" ^ (Int.to_string result_tmp) ^ "]"))),
+              (Ident (Ir.SymTemp result_tmp)),
               body.expr
             )
           );
@@ -1977,10 +1979,10 @@ and transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _ma
   List.iter ~f:transform_clause match_clauses;
 
   let end_label = { Ir.Stmt.
-    spec = Label label_name;
+    spec = WithLabel(label_name, !prepend_stmts);
     loc;
   } in
-  prepend_stmts := List.append !prepend_stmts [end_label];
+  out_prepend_stmts := List.append !out_prepend_stmts [end_label];
 
   (* use the max tmp vars *)
   env.tmp_vars_count <- List.fold ~init:0 ~f:(fun acc item -> if item > acc then item else acc) !tmp_counter;
@@ -2273,12 +2275,14 @@ and transform_class env cls loc: Ir.Decl.t list =
       cls_body.cls_body_elements;
   in
 
-  env.class_inits <- { Ir.Decl.
+  let class_init = { Ir.Decl.
     class_name = fun_name;
     class_id_name = fun_name ^ "_class_id";
     class_def_name = fun_name ^ "_def";
     class_methods = List.rev !class_methods;
-  }::env.class_inits;
+  } in
+
+  env.class_inits <- class_init::env.class_inits;
 
   let _, cls_id' = cls_id in
   let cls_type = Type_context.deref_node_type env.ctx cls_id' in
@@ -2293,6 +2297,7 @@ and transform_class env cls loc: Ir.Decl.t list =
     finalizer;
     gc_marker;
     properties = cls_meta.cls_fields;
+    init = class_init;
   } in
 
   List.append

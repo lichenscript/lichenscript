@@ -89,9 +89,25 @@ let rec transpile_declaration env (delcaration: Ir.Decl.t) =
 
   | LambdaDef _ -> failwith "unimplement:lambda"
 
-  | EnumCtor _ -> failwith "unimplemented: enum ctor"
+  | EnumCtor enum_ctor -> (
+    ps env "function ";
+    ps env enum_ctor.enum_ctor_name;
+    ps env "() {\n";
+    ps env "  return [";
+    ps env (Int.to_string enum_ctor.enum_ctor_tag_id);
+    if enum_ctor.enum_cotr_params_size > 0 then (
+      ps env ", ";
+      for i = 0 to (enum_ctor.enum_cotr_params_size - 1) do (
+        ps env "arguments[";
+        ps env (Int.to_string i);
+        ps env "]"
+      ) done
+    );
+    ps env "];\n";
+    ps env "}\n";
+  )
 
-  | GlobalClassInit _ -> failwith "unimplemented: global class init"
+  | GlobalClassInit _
 
   | FuncDecl _ -> ()
 
@@ -128,26 +144,62 @@ and transpile_class env (cls: Ir.Decl._class) =
       cls.cls_body.cls_body_elements
   in *)
 
-  let names = [] in
-
   ps env ("const " ^ cls.name ^ " = {\n");
 
   List.iter
-    ~f:(fun (original_name, name) ->
-      ps env ("  " ^ original_name ^ ": " ^ name ^ ",\n");
+    ~f:(fun { class_method_name; class_method_gen_name } ->
+      ps env ("  " ^ class_method_name ^ ": " ^ class_method_gen_name ^ ",\n");
     )
-    names;
+    cls.init.class_methods;
 
   ps env "}\n"
+
+and transpile_if env if_spec =
+  let open Ir.Stmt in
+  let { if_test; if_consequent; if_alternate } = if_spec in
+  ps env "if (";
+  transpile_expression env if_test;
+  ps env ") {\n";
+  with_indents env (fun env ->
+    List.iter
+      ~f:(fun stmt ->
+        print_indents env;
+        transpile_statement env stmt
+      )
+      if_consequent
+  );
+  match if_alternate with
+  | Some (If_alt_if else_spec) -> (
+    print_indents env;
+    ps env "} else ";
+    transpile_if env else_spec
+  )
+  | Some (If_alt_block stmts) -> (
+    print_indents env;
+    ps env "} else {\n";
+    with_indents env (fun env ->
+      List.iter
+        ~f:(fun stmt ->
+          print_indents env;
+          transpile_statement env stmt
+        )
+        stmts
+    );
+    print_indents env;
+    ps env "}\n";
+  )
+  | None ->
+    print_indents env;
+    ps env "}\n"
 
 and transpile_statement env decl =
   let open Ir.Stmt in
   match decl.spec with
   | Expr expr ->
-    transpile_expression env expr;
+    transpile_expression ~parent_expr:false env expr;
     ps env ";\n"
 
-  | If _ -> failwith "unimplmented"
+  | If if_spec -> transpile_if env if_spec
 
   | While (while_test, while_block) -> (
     ps env "while (";
@@ -201,8 +253,28 @@ and transpile_statement env decl =
   | Retain _
   | Release _ -> ()
 
-  | Label _
-  | Goto _ -> failwith "unreachable"
+  | WithLabel(label, stmts) -> (
+    ps env "\n";
+    ps env label;
+    ps env ":\n";
+    print_indents env;
+    ps env "do {\n";
+
+    List.iter
+      ~f:(fun stmt ->
+        print_indents env;
+        transpile_statement env stmt
+      )
+      stmts;
+
+    print_indents env;
+    ps env "} while (false)";
+  )
+
+  | Goto label ->
+    ps env "break ";
+    ps env label;
+    ps env ";\n"
 
 
 and transpile_symbol env sym =
@@ -216,7 +288,7 @@ and transpile_symbol env sym =
     ps env "]"
 
   | SymParam param_index ->
-    ps env "args[";
+    ps env "arguments[";
     ps env (Int.to_string param_index);
     ps env "]"
 
@@ -231,7 +303,7 @@ and transpile_symbol env sym =
 
   | SymLambdaThis -> ps env "LC_LAMBDA_THIS(this)"
 
-and transpile_expression env expr =
+and transpile_expression ?(parent_expr=true)  env expr =
   let open Ir.Expr in
   match expr with
   | Null -> ps env "undefined"
@@ -250,10 +322,12 @@ and transpile_expression env expr =
   | NewBoolean bl ->
     ps env (if bl then "true" else "false")
 
-  | NewLambda _ -> failwith "unrechable"
+  | NewLambda _ -> failwith "unrechable lambda"
 
-  | NewRef _
-  | GetRef _ -> failwith "unimplemented"
+  | NewRef _ -> failwith "unimplemented new ref"
+
+  | GetRef(_, original_name) ->
+    ps env original_name
 
   | NewArray len -> (
     ps env "Array(";
@@ -280,6 +354,14 @@ and transpile_expression env expr =
     ps env "[";
     transpile_expression env index;
     ps env "]"
+
+  | ArraySetValue (expr, index, value) -> (
+    transpile_expression env expr;
+    ps env "[";
+    transpile_expression env index;
+    ps env "] = ";
+    transpile_expression env value;
+  )
 
   | I32Binary(Asttypes.BinaryOp.Plus, left, right) -> (
     ps env "i32_add(";
@@ -311,6 +393,7 @@ and transpile_expression env expr =
         | _ -> failwith "unreachable"
         );
 
+        ps env "(";
         transpile_expression env left;
         ps env ", ";
         transpile_expression env right;
@@ -343,7 +426,7 @@ and transpile_expression env expr =
         | BitAnd -> "&"
         | And -> "&&"
         | Or -> "||"
-        | _ -> failwith "unrechable");
+        | _ -> failwith "unrechable binary");
         transpile_expression env right;
         ps env ")"
       )
@@ -352,7 +435,7 @@ and transpile_expression env expr =
 
   | F32Binary _
   | I64Binary _
-  | F64Binary _ -> failwith "unimplemented"
+  | F64Binary _ -> failwith "unimplemented binary2"
 
   | CallLambda(expr, params) -> (
     transpile_expression env expr;
@@ -389,13 +472,19 @@ and transpile_expression env expr =
   )
 
   | Assign (left, right) -> (
+    if parent_expr then (
+      ps env "("
+    );
     transpile_expression env left;
     ps env " = ";
     transpile_expression env right;
+    if parent_expr then (
+      ps env ")"
+    );
   )
 
   | Update _ -> (
-    failwith "unrechable"
+    failwith "unrechable update"
   )
 
   | ExternalCall(name, this_opt, params) -> (
@@ -404,22 +493,24 @@ and transpile_expression env expr =
     (match this_opt with
     | Some this -> transpile_expression env this
     | None -> ps env "undefined");
-    ps env ", ";
     let params_len = List.length params in
-    List.iteri
-      ~f:(fun index param ->
-        transpile_expression env param;
-        if index <> (params_len - 1) then (
-          ps env ", "
+    if params_len > 0 then (
+      ps env ", ";
+      List.iteri
+        ~f:(fun index param ->
+          transpile_expression env param;
+          if index <> (params_len - 1) then (
+            ps env ", "
+          )
         )
-      )
-      params;
+        params
+    );
     ps env ")"
   )
 
-  | InitCall name -> (
+  | InitCall(_, proto_name) -> (
     ps env "{ __proto__: ";
-    transpile_symbol env name;
+    transpile_symbol env proto_name;
     ps env " }"
   )
 
@@ -453,7 +544,7 @@ and transpile_expression env expr =
     ps env field_name
   )
 
-  | RawGetField _ -> failwith "unrechable"
+  | RawGetField _ -> failwith "unrechable raw get field"
 
   | StringCmp (op, left, right) -> (
     transpile_expression env left;
@@ -466,7 +557,7 @@ and transpile_expression env expr =
     | GreaterThanEqual -> ">="
     | LessThan -> "<"
     | LessThanEqual -> "<="
-    | _ -> failwith "unrechable"
+    | _ -> failwith "unrechable string cmp"
     );
     ps env " ";
     transpile_expression env right;
@@ -481,7 +572,8 @@ and transpile_expression env expr =
     ps env "\"";
   )
 
-  | Retaining _ -> ()
+  | Retaining expr ->
+    transpile_expression env expr
 
 and transpile_function env _fun =
   let open Ir.Func in
@@ -492,6 +584,9 @@ and transpile_function env _fun =
   (* tranpile_function_params env _fun.header.params; *)
 
   ps env ") {\n";
+  if _fun.tmp_vars_count > 0 then (
+    ps env ("  var t = Array(" ^ (Int.to_string _fun.tmp_vars_count) ^ ");\n")
+  );
   transpile_function_body env _fun.body;
   ps env "}\n"
 
@@ -547,7 +642,7 @@ let transpile_program ~ctx ~preclude declarations =
 
   List.iter ~f:(transpile_declaration env) ir_tree.declarations;
 
-  ps env "main();\n";
+  ps env "LCC_main();\n";
   env
 
 let contents env = Buffer.contents env.buffer
