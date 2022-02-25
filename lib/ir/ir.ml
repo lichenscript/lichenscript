@@ -12,8 +12,10 @@ open Lichenscript_typing
 
 type symbol =
   | SymLocal of string
+  | SymTemp of int
   | SymParam of int
   | SymLambda of int
+  | SymRet
   | SymThis
   | SymLambdaThis
   [@@deriving show]
@@ -21,8 +23,10 @@ type symbol =
 let map_symbol ~f s =
   match s with
   | SymLocal name -> SymLocal (f name)
+  | SymTemp _
   | SymParam _
   | SymLambda _
+  | SymRet
   | SymThis
   | SymLambdaThis
     -> s
