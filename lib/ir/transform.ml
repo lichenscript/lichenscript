@@ -334,6 +334,8 @@ and transform_function env _fun =
 
   env.current_fun_meta <- Some (create_current_fun_meta original_name);
 
+  let node = Type_context.get_node env.ctx original_name_id in
+
   let fun_name = 
     match find_or_distribute_name env original_name_id original_name with
     | Ir.SymLocal l -> l
@@ -344,7 +346,12 @@ and transform_function env _fun =
     env.main_function_name <- Some fun_name
   );
 
-  let result = transform_function_impl env ~name:fun_name ~params:header.params ~scope ~body ~comments in
+  let result = transform_function_impl
+    env
+    ~name:(fun_name, node.loc)
+    ~params:header.params
+    ~scope ~body ~comments
+  in
 
   env.current_fun_meta <- None;
 
@@ -2160,7 +2167,8 @@ and transform_class_method env _method : (Ir.Decl.t list * Ir.Decl.class_method_
   in
 
   let open Core_type in
-  let node_type = Type_context.deref_node_type env.ctx method_id in
+  let node = Type_context.get_node env.ctx method_id in
+  let node_type = Type_context.deref_type env.ctx node.value in
   let is_virtual =
     match node_type with
     | TypeExpr.TypeDef { spec = TypeDef.ClassMethod { method_is_virtual = true; _ }; _ } ->
@@ -2180,7 +2188,7 @@ and transform_class_method env _method : (Ir.Decl.t list * Ir.Decl.class_method_
 
   let _fun = { Ir.Decl.
     spec = (transform_function_impl env
-      ~name:new_name
+      ~name:(new_name, node.loc)
       ~params:cls_method_params
       ~scope:(Option.value_exn cls_method_scope)
       ~body:cls_method_body
@@ -2407,7 +2415,7 @@ and transform_lambda env ~lambda_name content _ty_var =
   } in
 
   let _fun = transform_function_impl env
-    ~name:lambda_gen_name
+    ~name:(lambda_gen_name, Loc.none)
     ~params:content.lambda_params
     ~scope:content.lambda_scope
     ~body:fake_block

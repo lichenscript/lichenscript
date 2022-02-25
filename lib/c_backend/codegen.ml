@@ -795,7 +795,8 @@ and codegen_function_block (env: t) block =
 and codegen_function env (_fun: Func.t) =
   let open Func in
   ps env "LCValue ";
-  ps env _fun.name;
+  let fun_name, _ = _fun.name in
+  ps env fun_name;
   ps env "(LCRuntime* rt, LCValue this, int arg_len, LCValue* args)";
   ps env " {";
   endl env;
