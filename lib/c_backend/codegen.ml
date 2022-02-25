@@ -13,7 +13,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  *)
-open Lichenscript_codegen_utils
 open Lichenscript_typing
 open Lichenscript_ir.Ir
 open Lichenscript_ir

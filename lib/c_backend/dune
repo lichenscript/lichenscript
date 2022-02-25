@@ -5,7 +5,6 @@
   lichenscript_typing
   lichenscript_lex
   lichenscript_parsing
-  lichenscript_codegen_utils
   lichenscript_ir
   core_kernel
  )
