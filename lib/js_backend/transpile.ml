@@ -213,9 +213,9 @@ and transpile_expression env expr =
   match expr.spec with
   | Constant (Ast.Literal.Unit) -> ps env "undefined"
   | Constant (Ast.Literal.Char ch) -> (
-    ps env "'";
-    ps env (Char.to_string ch);
-    ps env "'"
+    ps env "String.fromCharCode(";
+    ps env (Int.to_string ch);
+    ps env ")"
   )
   | Constant (Ast.Literal.Integer (raw, _)) -> ps env raw
   | Constant (Ast.Literal.Float (raw, _)) -> ps env raw
@@ -411,6 +411,8 @@ and transpile_expression env expr =
     | BitOr -> "|"
     | Xor -> "^"
     | BitAnd -> "&"
+    | And -> "&&"
+    | Or -> "||"
     );
     ps env " ";
     transpile_expression env right
@@ -471,6 +473,8 @@ and transpile_expression env expr =
     print_indents env;
     ps env "}"
   )
+
+  | Try _ -> failwith "unrechable"
 
   | Match _ -> ()
   | This -> ps env "this"
