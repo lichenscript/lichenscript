@@ -217,7 +217,7 @@ and transpile_expression env expr =
     ps env (Int.to_string ch);
     ps env ")"
   )
-  | Constant (Ast.Literal.Integer (raw, _)) -> ps env raw
+  | Constant (Ast.Literal.Integer value) -> ps env (Int32.to_string value)
   | Constant (Ast.Literal.Float (raw, _)) -> ps env raw
   | Constant (Ast.Literal.String(content, _, _)) ->
     ps env "\"";
