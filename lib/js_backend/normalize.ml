@@ -90,6 +90,7 @@ module ControlFlow = struct
     | Match _
     | Identifier _
     | Constant _
+    | Try _
     | This
     | Super ->
       false
@@ -128,6 +129,7 @@ let normalize_expr expr : Statement.t list * Expression.t =
   | Match _
   | Identifier _
   | Constant _
+  | Try _
   | This
   | Super -> [], expr
 
