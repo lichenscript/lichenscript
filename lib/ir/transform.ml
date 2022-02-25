@@ -493,8 +493,8 @@ and transform_statement ?ret env stmt =
   let { spec; loc; _ } = stmt in
   let transform_return_expr ?ret expr =
     let tmp = transform_expression ~is_move:true env expr in
-    let ret = Option.value ~default:"ret" ret in
-    let assign = Ir.Expr.Assign(Ident (Ir.SymLocal ret), tmp.expr) in
+    let ret = Option.value ~default:(Ir.SymRet) ret in
+    let assign = Ir.Expr.Assign(Ident ret, tmp.expr) in
     (*
      * It's returning the function directly, it's not need to retain,
      * because it's directly assining to "ret" variable.
@@ -619,9 +619,9 @@ and transform_statement ?ret env stmt =
     let cleanup = generate_finalize_stmts_function env.scope in
     match ret_opt with
     | Some ret ->
-      let ret = transform_return_expr ~ret:"ret" ret in
+      let ret = transform_return_expr ~ret:(Ir.SymRet) ret in
       let ret_stmt = { Ir.Stmt.
-        spec = Return (Some (Ir.Expr.Ident (Ir.SymLocal "ret")));
+        spec = Return (Some (Ir.Expr.Ident Ir.SymRet));
         loc;
       } in
       List.concat [
@@ -654,7 +654,7 @@ and auto_release_expr env ?(is_move=false) ~append_stmts ty_var expr =
     env.tmp_vars_count <- env.tmp_vars_count + 1;
 
     let assign_expr = Ir.Expr.Assign(
-      (Ident (Ir.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"))), expr)
+      (Ident (Ir.SymTemp tmp_id)), expr)
     in
 
     append_stmts := (gen_release_temp tmp_id)::!append_stmts;
@@ -667,7 +667,7 @@ and prepend_expr env ~prepend_stmts ~append_stmts (expr: expr_result) =
   env.tmp_vars_count <- env.tmp_vars_count + 1;
 
   let assign_expr = Ir.Expr.Assign(
-    (Ident (Ir.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]"))),
+    (Ident (Ir.SymTemp tmp_id)),
     expr.expr
   ) in
 
@@ -892,11 +892,11 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     | If if_desc ->
       let tmp_id = env.tmp_vars_count in
       env.tmp_vars_count <- env.tmp_vars_count + 1;
-      let tmp_var = "t[" ^ (Int.to_string tmp_id) ^ "]" in
+      let tmp_var = Ir.SymTemp tmp_id in
 
       if Check_helper.is_unit env.ctx (Type_context.deref_node_type env.ctx ty_var) then (
         let init_stmt = { Ir.Stmt.
-          spec = Expr(Ir.Expr.Assign(Ident (Ir.SymLocal tmp_var), Null));
+          spec = Expr(Ir.Expr.Assign(Ident tmp_var, Null));
           loc = Loc.none;
         } in
 
@@ -933,7 +933,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       env.tmp_vars_count <- env.tmp_vars_count + 1;
       let arr_len = List.length arr_list in
 
-      let tmp_sym = Ir.SymLocal ("t[" ^ (Int.to_string tmp_id) ^ "]") in
+      let tmp_sym = Ir.SymTemp tmp_id in
 
       let init_stmt = {
         Ir.Stmt.
@@ -1476,12 +1476,12 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     | Block block ->
       let tmp_id = env.tmp_vars_count in
       env.tmp_vars_count <- env.tmp_vars_count + 1;
-      let tmp_var = "t[" ^ (Int.to_string tmp_id) ^ "]" in
+      let tmp_var = Ir.SymTemp tmp_id in
 
       let init = { Ir.Stmt.
         spec = Expr (
           Ir.Expr.Assign (
-            (Ident (Ir.SymLocal tmp_var)),
+            (Ident tmp_var),
             Null
           )
         );

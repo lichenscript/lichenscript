@@ -372,6 +372,12 @@ and codegen_declaration env decl =
 and codegen_symbol env sym =
   match sym with
   | SymLocal name -> ps env name
+
+  | SymTemp id ->
+    ps env "t[";
+    ps env (Int.to_string id);
+    ps env "]"
+
   | SymParam param_index ->
     ps env "args[";
     ps env (Int.to_string param_index);
@@ -381,6 +387,8 @@ and codegen_symbol env sym =
     ps env "LCLambdaGetValue(rt, this, ";
     ps env (Int.to_string index);
     ps env ")"
+
+  | SymRet -> ps env "ret"
 
   | SymThis -> ps env "this"
 
@@ -589,6 +597,13 @@ and codegen_expression (env: t) (expr: Expr.t) =
       ps env " = ";
       codegen_expression env right
 
+    | SymTemp tmp_id ->
+      ps env "t[";
+      ps env (Int.to_string tmp_id);
+      ps env "]";
+      ps env " = ";
+      codegen_expression env right
+
     | SymParam param_index ->
       ps env "args[";
       ps env (Int.to_string param_index);
@@ -602,6 +617,11 @@ and codegen_expression (env: t) (expr: Expr.t) =
       ps env ", ";
       codegen_expression env right;
       ps env ")"
+
+    | SymRet ->
+      ps env "ret";
+      ps env " = ";
+      codegen_expression env right
 
     | SymThis
     | SymLambdaThis
@@ -628,10 +648,17 @@ and codegen_expression (env: t) (expr: Expr.t) =
       ps env (Int.to_string param_index);
       ps env "]"
 
+    | SymTemp tmp_id ->
+      ps env "&t[";
+      ps env (Int.to_string tmp_id);
+      ps env "]"
+
     | SymLambda index ->
       ps env "LCLambdaGetValuePointer(rt, this, ";
       ps env (Int.to_string index);
       ps env ")"
+
+    | SymRet -> ps env "ret"
 
     | SymThis
     | SymLambdaThis
