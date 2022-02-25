@@ -17,10 +17,43 @@ function i32_add(a, b) {
 function i32_sub(a, b) {
   a = a|0;  // give hinting to v8
   b = b|0;
+  return (a - b)|0;
+}
 
-  let tmp = a - b;
+function i32_mult(a, b) {
+  a = a|0;  // give hinting to v8
+  b = b|0;
+  return (a * b)|0;
+}
 
-  return tmp|0;
+function i32_div(a, b) {
+  a = a|0;  // give hinting to v8
+  b = b|0;
+  return (a / b)|0;
+}
+
+function i32_lshift(a, b) {
+  a = a|0;  // give hinting to v8
+  b = b|0;
+  return (a << b)|0;
+}
+
+function i32_rshift(a, b) {
+  a = a|0;  // give hinting to v8
+  b = b|0;
+  return (a >> b)|0;
+}
+
+function i32_mod(a, b) {
+  a = a|0;  // give hinting to v8
+  b = b|0;
+  return (a % b)|0;
+}
+
+function i32_mod(a, b) {
+  a = a|0;  // give hinting to v8
+  b = b|0;
+  return (a % b)|0;
 }
 
 function lc_std_print(...args) {

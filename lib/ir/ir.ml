@@ -181,7 +181,7 @@ end
 and Func : sig
 
   type t = {
-    name: string;
+    name: (string * Loc.t);
     tmp_vars_count: int;
     body: Block.t;
     comments: Loc.t Lichenscript_lex.Comment.t list;

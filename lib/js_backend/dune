@@ -4,6 +4,7 @@
   lichenscript_typing
   lichenscript_lex
   lichenscript_parsing
+  lichenscript_ir
   core_kernel
  )
  (preprocess (pps ppx_deriving.show)))
