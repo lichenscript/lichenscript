@@ -2,7 +2,7 @@ open Lichenscript_typing
 
 type result = {
   main_function_name: string option;
-  declarations: C_op.Decl.t list;
+  declarations: Ir.Decl.t list;
   global_class_init: string option;
 }
 

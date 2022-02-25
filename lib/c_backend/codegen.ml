@@ -15,7 +15,7 @@
  *)
 open Lichenscript_codegen_utils
 open Lichenscript_typing
-open Lichenscript_ir.C_op
+open Lichenscript_ir.Ir
 open Lichenscript_ir
 open Core_kernel
 
@@ -751,7 +751,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
 
 (* return the number of temp values *)
 and codegen_function_block (env: t) block =
-  let open C_op.Block in
+  let open Block in
   let { body; _ } = block in
   List.iter
     ~f:(fun stmt ->
