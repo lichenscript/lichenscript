@@ -685,6 +685,100 @@ and prepend_expr env ~prepend_stmts ~append_stmts (expr: expr_result) =
 
   result
 
+and try_folding_literals op left right original_expr =
+  let open Expression in
+
+  let do_integer_folding int_op left_int right_int =
+    let new_int =
+      (* TODO: i64 support *)
+      let open Int32 in
+      match int_op with
+      | BinaryOp.Minus -> left_int - right_int
+      | BinaryOp.Plus -> left_int + right_int
+      | BinaryOp.Div -> left_int / right_int
+      | BinaryOp.Mult -> left_int * right_int
+      | _ -> failwith "unsupported binary op between integer"
+    in
+    Constant(Literal.Integer(new_int))
+  in
+
+  let do_float_folding float_op left_str right_str =
+    let new_float =
+      let open Float in
+      let left_f = Float.of_string left_str in
+      let right_f = Float.of_string right_str in
+      match float_op with
+      | BinaryOp.Minus -> left_f - right_f
+      | BinaryOp.Plus -> left_f + right_f
+      | BinaryOp.Div -> left_f / right_f
+      | BinaryOp.Mult -> left_f * right_f
+      | _ -> failwith "unsupported binary op between float"
+    in
+    Constant(Literal.Float(Float.to_string new_float, None))
+  in
+
+  match (left.spec, right.spec) with
+  | (Constant(Integer left_int), Constant(Integer right_int)) -> (
+    match op with
+    | BinaryOp.Plus
+    | BinaryOp.Minus
+    | BinaryOp.Div
+    | BinaryOp.Mult -> (
+      let new_spec = do_integer_folding op left_int right_int in
+      Some { left with spec = new_spec }
+    )
+    | _ -> None
+  )
+  | (Constant(Float(left_f_str, _)), Constant(Float(right_f_str, _))) -> (
+    match op with
+    | BinaryOp.Plus
+    | BinaryOp.Minus
+    | BinaryOp.Div
+    | BinaryOp.Mult -> (
+      let new_spec = do_float_folding op left_f_str right_f_str in
+      Some { left with spec = new_spec }
+    )
+    | _ -> None
+  )
+  | (Constant(String(left_str, _, _)), Constant(String(right_str, _, _))) -> (
+    match op with 
+    | BinaryOp.Plus -> (
+      let concated = String.concat [left_str; right_str] in
+      let new_spec = Constant(Literal.String(concated, left.loc, None)) in
+      Some { left with spec = new_spec }
+    )
+    | _ -> None
+  )
+  | (Binary(_, _, _), _) -> (
+    let open Option in
+    let res = try_folding_binary_expression left in
+    res >>= fun left' ->
+    (* if left being folded, try rec folding left' with right *)
+    try_folding_literals op left' right { original_expr with spec = Binary(op, left', right) }
+  )
+  | (_, Binary(_, _, _)) -> (
+    let open Option in
+    let res = try_folding_binary_expression right in
+    res >>= fun right' ->
+    (* if right being folded, try rec folding left with right' *)
+    try_folding_literals op left right' { original_expr with spec = Binary(op, left, right) }
+  )
+  | _ -> None
+
+and try_folding_binary_expression expr: Expression.t option =
+  let open Expression in
+
+  match expr.spec with
+  | Binary (op, left, right) -> (
+    (* here, we try fold binary expression to constant expression like: 
+       input: Expression { spec: BinaryAdd(Constant(Literal.Integer(1)), Constant(Literal.Integer(2))) })
+       output: Some(Expression { spec: Constant(Literal.Integer(3)) })
+       
+       if can't be folded, None will be returned *)
+    try_folding_literals op left right expr
+  )
+  | _ -> None
+
 and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
   let open Expression in
   let { spec; loc; ty_var; _ } = expr in
@@ -1118,42 +1212,95 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     )
 
     | Binary (op, left, right) -> (
-      let left' = transform_expression ~is_borrow:true env left in
-      let right' = transform_expression ~is_borrow:true env right in
+      let gen_c_op left right =
+        let left' = transform_expression ~is_borrow:true env left in
+        let right' = transform_expression ~is_borrow:true env right in
 
-      prepend_stmts := List.concat [!prepend_stmts; left'.prepend_stmts; right'.prepend_stmts];
-      append_stmts := List.concat [!append_stmts; left'.append_stmts; right'.append_stmts];
+        prepend_stmts := List.concat [!prepend_stmts; left'.prepend_stmts; right'.prepend_stmts];
+        append_stmts := List.concat [!append_stmts; left'.append_stmts; right'.append_stmts];
 
-      let left_type = Type_context.deref_node_type env.ctx left.ty_var in
+        let left_type = Type_context.deref_node_type env.ctx left.ty_var in
 
-      let open Core_type in
-      match (left_type, op) with
-      | (TypeExpr.String, BinaryOp.Plus) ->
-        let spec = auto_release_expr ~is_move env ~append_stmts ty_var
-          (C_op.Expr. ExternalCall(SymLocal "lc_std_string_concat", None, [left'.expr; right'.expr]))
-        in
-        spec
+        let open Core_type in
+        match (left_type, op) with
+        | (TypeExpr.String, BinaryOp.Plus) ->
+          let spec = auto_release_expr ~is_move env ~append_stmts ty_var
+            (C_op.Expr. ExternalCall(SymLocal "lc_std_string_concat", None, [left'.expr; right'.expr]))
+          in
+          spec
 
-      | (TypeExpr.String, BinaryOp.Equal)
-      | (TypeExpr.String, BinaryOp.NotEqual)
-      | (TypeExpr.String, BinaryOp.LessThan)
-      | (TypeExpr.String, BinaryOp.LessThanEqual)
-      | (TypeExpr.String, BinaryOp.GreaterThan)
-      | (TypeExpr.String, BinaryOp.GreaterThanEqual)
-        ->
-        let spec = auto_release_expr ~is_move env ~append_stmts ty_var (C_op.Expr.StringCmp(op, left'.expr, right'.expr)) in
-        spec
+        | (TypeExpr.String, BinaryOp.Equal)
+        | (TypeExpr.String, BinaryOp.NotEqual)
+        | (TypeExpr.String, BinaryOp.LessThan)
+        | (TypeExpr.String, BinaryOp.LessThanEqual)
+        | (TypeExpr.String, BinaryOp.GreaterThan)
+        | (TypeExpr.String, BinaryOp.GreaterThanEqual)
+          ->
+          let spec = auto_release_expr ~is_move env ~append_stmts ty_var (C_op.Expr.StringCmp(op, left'.expr, right'.expr)) in
+          spec
 
-      | _ -> (
-        (* let node_type = Type_context.deref_node_type env.ctx ty_var in *)
-        if Check_helper.is_i64 env.ctx left_type then
-          C_op.Expr.I64Binary(op, left'.expr, right'.expr)
-        else if Check_helper.is_f64 env.ctx left_type then
-          C_op.Expr.F64Binary(op, left'.expr, right'.expr)
-        else if Check_helper.is_f32 env.ctx left_type then
-          C_op.Expr.F32Binary(op, left'.expr, right'.expr)
-        else
-          C_op.Expr.I32Binary(op, left'.expr, right'.expr)
+        | _ -> (
+          (* let node_type = Type_context.deref_node_type env.ctx ty_var in *)
+          if Check_helper.is_i64 env.ctx left_type then
+            C_op.Expr.I64Binary(op, left'.expr, right'.expr)
+          else if Check_helper.is_f64 env.ctx left_type then
+            C_op.Expr.F64Binary(op, left'.expr, right'.expr)
+          else if Check_helper.is_f32 env.ctx left_type then
+            C_op.Expr.F32Binary(op, left'.expr, right'.expr)
+          else
+            C_op.Expr.I32Binary(op, left'.expr, right'.expr)
+        )
+      in
+
+      let is_constant expression =
+        match expression.spec with
+        | Constant _ -> true
+        | _ -> false
+      in
+
+      if is_constant left && is_constant right then
+        (* if left and right are constants, try folding.
+           if expr does not transformed by folding then
+            generate c op directly by current left and right
+           else
+            try recursive transform new_expr *)
+        let new_expr = try_folding_literals op left right expr in
+        match new_expr with
+        | Some(folded_expr) -> (
+          let result = transform_expression ~is_borrow:true env folded_expr in
+          result.expr
+          )
+        | None -> gen_c_op left right
+      else (
+        let left_res = try_folding_binary_expression left in
+        let right_res = try_folding_binary_expression right in
+        match (left_res, right_res) with
+        | (None, None) ->
+          (* if both left and right can't be fold, gen c op here  *)
+            gen_c_op left right
+        | _ -> (
+          (* if `left` or `right` or both of them being transformed,
+           we should do literal folding with updated expr too. *)
+          let left_expr =
+            match left_res with
+            | Some(left') -> left'
+            | None -> left
+          in
+          let right_expr =
+            match right_res with
+            | Some(right') -> right'
+            | None -> right
+          in
+          let temp_expr = { expr with spec = Binary(op, left_expr, right_expr) } in
+          let maybe_folded_expr = try_folding_literals op left_expr right_expr temp_expr in
+          let expr =
+            match maybe_folded_expr with
+            | None -> temp_expr
+            | Some(folded_expr) -> folded_expr
+          in
+          let result = transform_expression ~is_borrow:true env expr in
+          result.expr
+        )
       )
     )
 
