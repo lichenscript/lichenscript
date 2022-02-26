@@ -297,9 +297,9 @@ and transpile_symbol env sym =
 
   | SymRet -> ps env "ret"
 
-  | SymThis -> ps env "this"
-
-  | SymLambdaThis -> ps env "LC_LAMBDA_THIS(this)"
+  | SymThis
+  | SymLambdaThis
+    -> ps env "this"
 
 and transpile_expression ?(parent_expr=true) env expr =
   let open Ir.Expr in
@@ -310,8 +310,12 @@ and transpile_expression ?(parent_expr=true) env expr =
     ps env (Int.to_string ch);
     ps env ")"
   )
-  | NewInt raw
-  | NewFloat raw -> ps env raw
+  | NewInt raw -> ps env raw
+  | NewFloat raw ->
+    ps env "Math.fround(";
+    ps env raw;
+    ps env ")"
+
   | NewString content ->
     ps env "\"";
     ps env content;
@@ -322,7 +326,9 @@ and transpile_expression ?(parent_expr=true) env expr =
 
   | NewLambda lambda -> (
     let { lambda_decl; _ } = lambda in
-    transpile_declaration env lambda_decl
+    ps env "(";
+    transpile_declaration env lambda_decl;
+    ps env ").bind(this)"
   )
 
   | NewRef expr ->
@@ -337,6 +343,20 @@ and transpile_expression ?(parent_expr=true) env expr =
     ps env ")"
   )
 
+  | NewTuple exprs -> (
+    ps env "[tupleSym, ";
+    let exprs_len = List.length exprs in
+    List.iteri
+      ~f:(fun index expr ->
+        transpile_expression env expr;
+        if index < (exprs_len - 1) then (
+          ps env ", "
+        )
+      )
+      exprs;
+    ps env "]"
+  )
+
   | NewMap _ -> ps env "new Map()"
 
   | Not expr ->
@@ -348,7 +368,7 @@ and transpile_expression ?(parent_expr=true) env expr =
   | TupleGetValue (expr, index) ->
     transpile_expression env expr;
     ps env "[";
-    ps env (Int.to_string index);
+    ps env (Int.to_string (index + 1));
     ps env "]"
 
   | ArrayGetValue(expr, index) ->
@@ -376,13 +396,15 @@ and transpile_expression ?(parent_expr=true) env expr =
   | I32Binary(op, left, right) ->
     transpile_i32_binary env op left right
 
-  | F32Binary _
+  | F32Binary(op, left, right) ->
+    transpile_f32_binary env op left right
+
   | I64Binary _
   | F64Binary _ -> failwith "unimplemented binary2"
 
   | CallLambda(expr, params) -> (
     transpile_expression env expr;
-    ps env ".call(undefined, ";
+    ps env "(";
     let params_len = List.length params in
     List.iteri
       ~f:(fun index param ->
@@ -540,6 +562,65 @@ and transpile_i32_binary env op left right =
       transpile_expression env right;
       ps env ")"
     )
+
+  | Equal
+  | NotEqual
+  | LessThan
+  | LessThanEqual
+  | GreaterThan
+  | GreaterThanEqual
+  | BitOr
+  | Xor
+  | BitAnd
+  | And
+  | Or
+    -> (
+      ps env "(";
+      transpile_expression env left;
+      ps env (match op with
+      | Equal -> "==="
+      | NotEqual -> "!=="
+      | LessThan -> "<"
+      | LessThanEqual -> "<="
+      | GreaterThan -> ">"
+      | GreaterThanEqual -> ">="
+      | BitOr -> "|"
+      | Xor -> "^"
+      | BitAnd -> "&"
+      | And -> "&&"
+      | Or -> "||"
+      | _ -> failwith "unrechable binary");
+      transpile_expression env right;
+      ps env ")"
+    )
+  )
+
+and transpile_f32_binary env op left right =
+  let open Asttypes.BinaryOp in
+  (match op with
+  | Plus
+  | Minus
+  | Mult
+  | Div
+    -> (
+      ps env (match op with
+      | Plus -> "f32_add"
+      | Minus -> "f32_sub"
+      | Mult -> "f32_mult"
+      | Div -> "f32_div"
+      | _ -> failwith "unreachable"
+      );
+
+      ps env "(";
+      transpile_expression env left;
+      ps env ", ";
+      transpile_expression env right;
+      ps env ")"
+    )
+
+  | LShift
+  | RShift
+  | Mod -> failwith "unrechable"
 
   | Equal
   | NotEqual

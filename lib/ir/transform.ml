@@ -939,7 +939,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           )
           children
       in
-      Ir.Expr.Call(Ir.SymLocal "LCNewTuple", None, children_expr)
+      Ir.Expr.NewTuple children_expr
 
     | Array arr_list -> (
       let tmp_id = env.tmp_vars_count in

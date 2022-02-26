@@ -2145,8 +2145,50 @@ static no_inline int lc_std_string_cmp_slow(LCString* s1, LCString* s2) {
     return result;
 }
 
+static int memcmp16_8(const uint16_t *src1, const uint8_t *src2, int len)
+{
+    int c, i;
+    for(i = 0; i < len; i++) {
+        c = src1[i] - src2[i];
+        if (c != 0)
+            return c;
+    }
+    return 0;
+}
+
+static int memcmp16(const uint16_t *src1, const uint16_t *src2, int len)
+{
+    int c, i;
+    for(i = 0; i < len; i++) {
+        c = src1[i] - src2[i];
+        if (c != 0)
+            return c;
+    }
+    return 0;
+}
+
+static int lc_string_memcmp(const LCString* s1, const LCString* s2, int len) {
+    int res;
+
+    if (likely(!s1->is_wide_char)) {
+        if (likely(!s2->is_wide_char)) {
+            res = memcmp(s1->u.str8, s2->u.str8, len);
+        } else {
+            res = -memcmp16_8(s2->u.str16, s1->u.str8, len);
+        }
+    } else {
+        if (!s2->is_wide_char) {
+            res = memcmp16_8(s1->u.str16, s2->u.str8, len);
+        } else {
+            res = memcmp16(s1->u.str16, s2->u.str16, len);
+        }
+    }
+
+    return res;
+}
+
 LCValue lc_std_string_cmp(LCRuntime* rt, LCCmpType cmp_type, LCValue left, LCValue right) {
-    int cmp_result, hash1, hash2;
+    int cmp_result, hash1, hash2, len;
     LCString* s1 = (LCString*)(left.ptr_val);
     LCString* s2 = (LCString*)(right.ptr_val);
 
@@ -2167,15 +2209,16 @@ LCValue lc_std_string_cmp(LCRuntime* rt, LCCmpType cmp_type, LCValue left, LCVal
         }
     }
 
-    cmp_result = s1->length - s2->length;
-    if (cmp_result != 0) {
-        goto cmp;
-    }
-
-    if (!s1->is_wide_char && !s2->is_wide_char) {
-        cmp_result = strcmp((const char*)s1->u.str8, (const char *)s2->u.str8);
-    } else {
-        cmp_result = lc_std_string_cmp_slow(s1, s2);
+    len = min_int(s1->length, s2->length);
+    cmp_result = lc_string_memcmp(s1, s2, len);
+    if (cmp_result == 0) {
+        if (s1->length == s2->length) {
+            cmp_result = 0;
+        } else if (s1->length < s2->length) {
+            cmp_result = -1;
+        } else {
+            cmp_result = 1;
+        }
     }
 
 cmp:

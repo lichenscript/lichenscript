@@ -169,7 +169,9 @@ and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platf
           )
           profiles
     in
-    run_make_in_dir profile.profile_dir;
+    if not (String.equal platform "js") then (
+      run_make_in_dir profile.profile_dir
+    );
     Some profile.profile_exe_path
   with
     | Unix.Unix_error (_, err, err_s) -> (

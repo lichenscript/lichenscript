@@ -157,6 +157,7 @@ and Expr : sig
   | NewRef of t
   | GetRef of (symbol * string)  (* deref symbol, original_name *)
   | NewArray of int
+  | NewTuple of t list
   | NewMap of int
   | Not of t
   | TupleGetValue of (t * int)
