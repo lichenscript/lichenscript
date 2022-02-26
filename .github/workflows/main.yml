@@ -31,6 +31,10 @@ jobs:
         with:
           ocaml-version: 4.13.0
 
+      - uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
       # Runs a set of commands using the runners shell
       - name: Install Deps
         run: |
@@ -41,3 +45,5 @@ jobs:
           eval $(opam env)
           dune build
           ./test.sh
+          echo "Test JavaScript"
+          FLAGS="--platform js" ./test.sh
