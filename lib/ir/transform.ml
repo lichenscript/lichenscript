@@ -1215,98 +1215,8 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       | _ -> failwith "not implement"
     )
 
-    | Binary (op, left, right) -> (
-      let gen_c_op left right =
-        let left' = transform_expression ~is_borrow:true env left in
-        let right' = transform_expression ~is_borrow:true env right in
-
-        prepend_stmts := List.concat [!prepend_stmts; left'.prepend_stmts; right'.prepend_stmts];
-        append_stmts := List.concat [!append_stmts; left'.append_stmts; right'.append_stmts];
-
-        let left_type = Type_context.deref_node_type env.ctx left.ty_var in
-
-        let open Core_type in
-        match (left_type, op) with
-        | (TypeExpr.String, BinaryOp.Plus) ->
-          let spec = auto_release_expr ~is_move env ~append_stmts ty_var
-            (Ir.Expr. ExternalCall(SymLocal "lc_std_string_concat", None, [left'.expr; right'.expr]))
-          in
-          spec
-
-        | (TypeExpr.String, BinaryOp.Equal)
-        | (TypeExpr.String, BinaryOp.NotEqual)
-        | (TypeExpr.String, BinaryOp.LessThan)
-        | (TypeExpr.String, BinaryOp.LessThanEqual)
-        | (TypeExpr.String, BinaryOp.GreaterThan)
-        | (TypeExpr.String, BinaryOp.GreaterThanEqual)
-          ->
-          let spec = auto_release_expr ~is_move env ~append_stmts ty_var (Ir.Expr.StringCmp(op, left'.expr, right'.expr)) in
-          spec
-
-        | _ -> (
-          (* let node_type = Type_context.deref_node_type env.ctx ty_var in *)
-          if Check_helper.is_i64 env.ctx left_type then
-            Ir.Expr.I64Binary(op, left'.expr, right'.expr)
-          else if Check_helper.is_f64 env.ctx left_type then
-            Ir.Expr.F64Binary(op, left'.expr, right'.expr)
-          else if Check_helper.is_f32 env.ctx left_type then
-            Ir.Expr.F32Binary(op, left'.expr, right'.expr)
-          else
-            Ir.Expr.I32Binary(op, left'.expr, right'.expr)
-        )
-      in
-
-      let is_constant expression =
-        match expression.spec with
-        | Constant _ -> true
-        | _ -> false
-      in
-
-      if is_constant left && is_constant right then
-        (* if left and right are constants, try folding.
-           if expr does not transformed by folding then
-            generate c op directly by current left and right
-           else
-            try recursive transform new_expr *)
-        let new_expr = try_folding_literals op left right expr in
-        match new_expr with
-        | Some(folded_expr) -> (
-          let result = transform_expression ~is_borrow:true env folded_expr in
-          result.expr
-          )
-        | None -> gen_c_op left right
-      else (
-        let left_res = try_folding_binary_expression left in
-        let right_res = try_folding_binary_expression right in
-        match (left_res, right_res) with
-        | (None, None) ->
-          (* if both left and right can't be fold, gen c op here  *)
-            gen_c_op left right
-        | _ -> (
-          (* if `left` or `right` or both of them being transformed,
-           we should do literal folding with updated expr too. *)
-          let left_expr =
-            match left_res with
-            | Some(left') -> left'
-            | None -> left
-          in
-          let right_expr =
-            match right_res with
-            | Some(right') -> right'
-            | None -> right
-          in
-          let temp_expr = { expr with spec = Binary(op, left_expr, right_expr) } in
-          let maybe_folded_expr = try_folding_literals op left_expr right_expr temp_expr in
-          let expr =
-            match maybe_folded_expr with
-            | None -> temp_expr
-            | Some(folded_expr) -> folded_expr
-          in
-          let result = transform_expression ~is_borrow:true env expr in
-          result.expr
-        )
-      )
-    )
+    | Binary (op, left, right) ->
+      transform_binary_expr env ~is_move ~append_stmts ~prepend_stmts expr op left right
 
     (*
      * There are a lot of cases of assignment.
@@ -1321,29 +1231,44 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
      *   - setter of a class
      *   - Assign to this property: this.xxx = expr
      *)
-    | Assign (op_opt, left_expr, expr) -> (
-      let expr' = transform_expression ~is_move:true env expr in
-
-      prepend_stmts := List.concat [ !prepend_stmts; expr'.prepend_stmts ];
-      append_stmts := List.concat [ !append_stmts; expr'.append_stmts ];
-
+    | Assign (op_opt, left_expr, right_expr) -> (
       let assign_or_update main_expr ty_id =
         let node_type = Type_context.deref_node_type env.ctx ty_id in
         let need_release = not (Check_helper.type_should_not_release env.ctx node_type) in
+        if need_release then (
+          let tmp_id = env.tmp_vars_count in
+          env.tmp_vars_count <- tmp_id + 1;
+
+          let assign_stmt = { Ir.Stmt.
+            spec = Expr (Ir.Expr.Assign (Ir.Expr.Ident (SymTemp tmp_id), main_expr));
+            loc = Loc.none;
+          } in
+
+          let release_stmt = { Ir.Stmt.
+            spec = Release (Ir.Expr.Ident (Ir.SymTemp tmp_id));
+            loc = Loc.none;
+          } in
+
+          prepend_stmts := List.append !prepend_stmts [assign_stmt];
+          append_stmts := List.append [release_stmt] !append_stmts
+        );
         match op_opt with
         | None -> (
-          if need_release then (
-            let release_stmt = { Ir.Stmt.
-              spec = Release main_expr;
-              loc = Loc.none;
-            } in
-            prepend_stmts := List.append !prepend_stmts [release_stmt]
-          );
+          let expr' = transform_expression ~is_move:true env right_expr in
+
+          prepend_stmts := List.concat [ !prepend_stmts; expr'.prepend_stmts ];
+          append_stmts := List.concat [ !append_stmts; expr'.append_stmts ];
+
           Ir.Expr.Assign(main_expr, expr'.expr)
         )
 
-        | Some op ->
-          Ir.Expr.Update(op, main_expr, expr'.expr)
+        | Some op -> (
+          let binary_op = AssignOp.to_binary op in
+
+          let binary_ir = transform_binary_expr env ~is_move:true ~append_stmts ~prepend_stmts expr binary_op left_expr right_expr in
+
+          Ir.Expr.Assign(main_expr, binary_ir)
+        )
       in
 
       match (left_expr, op_opt) with
@@ -1382,6 +1307,11 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       )
 
       | ({ spec = Typedtree.Expression.Index (main_expr, value); _ }, None) -> (
+        let expr' = transform_expression ~is_move:true env right_expr in
+
+        prepend_stmts := List.concat [ !prepend_stmts; expr'.prepend_stmts ];
+        append_stmts := List.concat [ !append_stmts; expr'.append_stmts ];
+
         let transform_main_expr = transform_expression ~is_borrow:true env main_expr in
 
         (* let boxed_main_expr = prepend_expr env ~prepend_stmts ~append_stmts transform_main_expr.expr in *)
@@ -2027,6 +1957,100 @@ and transform_spreading_init env tmp_id spread_ty_var spread_expr =
     }]
   )
   |> List.concat
+
+and transform_binary_expr env ~is_move ~append_stmts ~prepend_stmts expr op left right =
+  let open Expression in
+  let { ty_var; _ } = expr in
+  let gen_c_op left right =
+    let left' = transform_expression ~is_borrow:true env left in
+    let right' = transform_expression ~is_borrow:true env right in
+
+    prepend_stmts := List.concat [!prepend_stmts; left'.prepend_stmts; right'.prepend_stmts];
+    append_stmts := List.concat [!append_stmts; left'.append_stmts; right'.append_stmts];
+
+    let left_type = Type_context.deref_node_type env.ctx left.ty_var in
+
+    let open Core_type in
+    match (left_type, op) with
+    | (TypeExpr.String, BinaryOp.Plus) ->
+      let spec = auto_release_expr ~is_move env ~append_stmts ty_var
+        (Ir.Expr. ExternalCall(SymLocal "lc_std_string_concat", None, [left'.expr; right'.expr]))
+      in
+      spec
+
+    | (TypeExpr.String, BinaryOp.Equal)
+    | (TypeExpr.String, BinaryOp.NotEqual)
+    | (TypeExpr.String, BinaryOp.LessThan)
+    | (TypeExpr.String, BinaryOp.LessThanEqual)
+    | (TypeExpr.String, BinaryOp.GreaterThan)
+    | (TypeExpr.String, BinaryOp.GreaterThanEqual)
+      ->
+      let spec = auto_release_expr ~is_move env ~append_stmts ty_var (Ir.Expr.StringCmp(op, left'.expr, right'.expr)) in
+      spec
+
+    | _ -> (
+      (* let node_type = Type_context.deref_node_type env.ctx ty_var in *)
+      if Check_helper.is_i64 env.ctx left_type then
+        Ir.Expr.I64Binary(op, left'.expr, right'.expr)
+      else if Check_helper.is_f64 env.ctx left_type then
+        Ir.Expr.F64Binary(op, left'.expr, right'.expr)
+      else if Check_helper.is_f32 env.ctx left_type then
+        Ir.Expr.F32Binary(op, left'.expr, right'.expr)
+      else
+        Ir.Expr.I32Binary(op, left'.expr, right'.expr)
+    )
+  in
+
+  let is_constant expression =
+    match expression.spec with
+    | Constant _ -> true
+    | _ -> false
+  in
+
+  if is_constant left && is_constant right then
+    (* if left and right are constants, try folding.
+        if expr does not transformed by folding then
+        generate c op directly by current left and right
+        else
+        try recursive transform new_expr *)
+    let new_expr = try_folding_literals op left right expr in
+    match new_expr with
+    | Some(folded_expr) -> (
+      let result = transform_expression ~is_borrow:true env folded_expr in
+      result.expr
+      )
+    | None -> gen_c_op left right
+  else (
+    let left_res = try_folding_binary_expression left in
+    let right_res = try_folding_binary_expression right in
+    match (left_res, right_res) with
+    | (None, None) ->
+      (* if both left and right can't be fold, gen c op here  *)
+        gen_c_op left right
+    | _ -> (
+      (* if `left` or `right` or both of them being transformed,
+        we should do literal folding with updated expr too. *)
+      let left_expr =
+        match left_res with
+        | Some(left') -> left'
+        | None -> left
+      in
+      let right_expr =
+        match right_res with
+        | Some(right') -> right'
+        | None -> right
+      in
+      let temp_expr = { expr with spec = Binary(op, left_expr, right_expr) } in
+      let maybe_folded_expr = try_folding_literals op left_expr right_expr temp_expr in
+      let expr =
+        match maybe_folded_expr with
+        | None -> temp_expr
+        | Some(folded_expr) -> folded_expr
+      in
+      let result = transform_expression ~is_borrow:true env expr in
+      result.expr
+    )
+  )
 
 and transform_expression_if env ?ret ~prepend_stmts ~append_stmts loc if_desc =
   let open Typedtree.Expression in
