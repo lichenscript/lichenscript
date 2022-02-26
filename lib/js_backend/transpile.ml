@@ -268,7 +268,7 @@ and transpile_statement env decl =
       stmts;
 
     print_indents env;
-    ps env "} while (false)";
+    ps env "} while (false);\n";
   )
 
   | Goto label ->
@@ -371,67 +371,8 @@ and transpile_expression ?(parent_expr=true)  env expr =
     ps env ")"
   )
 
-  | I32Binary(op, left, right) -> (
-    let open Asttypes.BinaryOp in
-    (match op with
-    | Plus
-    | Minus
-    | Mult
-    | Div
-    | LShift
-    | RShift
-    | Mod
-      -> (
-        ps env (match op with
-        | Plus -> "i32_add"
-        | Minus -> "i32_sub"
-        | Mult -> "i32_mult"
-        | Div -> "i32_div"
-        | LShift -> "i32_lshift"
-        | RShift -> "i32_rshift"
-        | Mod -> "i32_mod"
-        | _ -> failwith "unreachable"
-        );
-
-        ps env "(";
-        transpile_expression env left;
-        ps env ", ";
-        transpile_expression env right;
-        ps env ")"
-      )
-
-    | Equal
-    | NotEqual
-    | LessThan
-    | LessThanEqual
-    | GreaterThan
-    | GreaterThanEqual
-    | BitOr
-    | Xor
-    | BitAnd
-    | And
-    | Or
-      -> (
-        ps env "(";
-        transpile_expression env left;
-        ps env (match op with
-        | Equal -> "==="
-        | NotEqual -> "!=="
-        | LessThan -> "<"
-        | LessThanEqual -> "<="
-        | GreaterThan -> ">"
-        | GreaterThanEqual -> ">="
-        | BitOr -> "|"
-        | Xor -> "^"
-        | BitAnd -> "&"
-        | And -> "&&"
-        | Or -> "||"
-        | _ -> failwith "unrechable binary");
-        transpile_expression env right;
-        ps env ")"
-      )
-    )
-  )
+  | I32Binary(op, left, right) ->
+    transpile_i32_binary env op left right
 
   | F32Binary _
   | I64Binary _
@@ -483,8 +424,17 @@ and transpile_expression ?(parent_expr=true)  env expr =
     );
   )
 
-  | Update _ -> (
-    failwith "unrechable update"
+  | Update(op, left, right) -> (
+    if parent_expr then (
+      ps env "("
+    );
+    transpile_expression env left;
+    ps env " = ";
+    let binary_op = Asttypes.AssignOp.to_binary op in
+    transpile_i32_binary env binary_op left right;
+    if parent_expr then (
+      ps env ")"
+    );
   )
 
   | ExternalCall(name, this_opt, params) -> (
@@ -526,7 +476,7 @@ and transpile_expression ?(parent_expr=true)  env expr =
   | UnionGet (expr, tag) -> (
     transpile_expression env expr;
     ps env "[";
-    ps env (Int.to_string tag);
+    ps env (Int.to_string (tag + 1));
     ps env "]"
   )
 
@@ -574,6 +524,67 @@ and transpile_expression ?(parent_expr=true)  env expr =
 
   | Retaining expr ->
     transpile_expression env expr
+
+and transpile_i32_binary env op left right =
+  let open Asttypes.BinaryOp in
+  (match op with
+  | Plus
+  | Minus
+  | Mult
+  | Div
+  | LShift
+  | RShift
+  | Mod
+    -> (
+      ps env (match op with
+      | Plus -> "i32_add"
+      | Minus -> "i32_sub"
+      | Mult -> "i32_mult"
+      | Div -> "i32_div"
+      | LShift -> "i32_lshift"
+      | RShift -> "i32_rshift"
+      | Mod -> "i32_mod"
+      | _ -> failwith "unreachable"
+      );
+
+      ps env "(";
+      transpile_expression env left;
+      ps env ", ";
+      transpile_expression env right;
+      ps env ")"
+    )
+
+  | Equal
+  | NotEqual
+  | LessThan
+  | LessThanEqual
+  | GreaterThan
+  | GreaterThanEqual
+  | BitOr
+  | Xor
+  | BitAnd
+  | And
+  | Or
+    -> (
+      ps env "(";
+      transpile_expression env left;
+      ps env (match op with
+      | Equal -> "==="
+      | NotEqual -> "!=="
+      | LessThan -> "<"
+      | LessThanEqual -> "<="
+      | GreaterThan -> ">"
+      | GreaterThanEqual -> ">="
+      | BitOr -> "|"
+      | Xor -> "^"
+      | BitAnd -> "&"
+      | And -> "&&"
+      | Or -> "||"
+      | _ -> failwith "unrechable binary");
+      transpile_expression env right;
+      ps env ")"
+    )
+  )
 
 and transpile_function env _fun =
   let open Ir.Func in

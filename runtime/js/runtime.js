@@ -85,6 +85,14 @@ function lc_std_array_get_length() {
   return this.length;
 }
 
+function lc_std_string_get_length() {
+  return this.length;
+}
+
+function lc_std_string_get_char(index) {
+  return this[index];
+}
+
 function lc_std_panic(message) {
   throw new Error("panic: " + message);
 }
