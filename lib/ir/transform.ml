@@ -393,9 +393,10 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
     params.params_content;
 
   let capturing_variables = scope#capturing_variables in
+
   Scope.CapturingVarMap.iteri
     ~f:(fun ~key:name ~data:idx ->
-      TScope.set_name fun_scope ~key:name ~data:(SymLambda idx);
+      TScope.set_name fun_scope ~key:name ~data:(SymLambda(idx, name));
       Hash_set.add params_set name;
     )
     capturing_variables;
@@ -831,7 +832,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         | Some({ TypeDef. id = ctor_id; spec = EnumCtor _; _ }, _) ->
           let generate_name = Hashtbl.find_exn env.global_name_map ctor_id in
           (* let sym = find_variable env name in *)
-          Ir.Expr.ExternalCall(generate_name, None, [])
+          Ir.Expr.Call(generate_name, None, [])
 
         | _ ->
           let id_ty = Type_context.print_type_value env.ctx node_type in
@@ -892,7 +893,12 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           Null
       in
 
-      let expr = Ir.Expr.NewLambda(lambda_fun_name, this_expr, capturing_names) in
+      let expr = Ir.Expr.NewLambda {
+        lambda_name = lambda_fun_name;
+        lambda_this = this_expr;
+        lambda_capture_symbols = capturing_names;
+        lambda_decl = lambda;
+      } in
       auto_release_expr env ~is_move ~append_stmts ty_var expr
     )
 
@@ -933,7 +939,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           )
           children
       in
-      Ir.Expr.ExternalCall(Ir.SymLocal "LCNewTuple", None, children_expr)
+      Ir.Expr.Call(Ir.SymLocal "LCNewTuple", None, children_expr)
 
     | Array arr_list -> (
       let tmp_id = env.tmp_vars_count in
@@ -1020,7 +1026,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
                 failwith "unimplemented"
             in
             let expr = transform_expression env entry.map_entry_value in
-            let set_expr = Ir.Expr.ExternalCall(
+            let set_expr = Ir.Expr.Call(
               Ir.SymLocal "lc_std_map_set",
               Some (Ir.Expr.Temp tmp_id),
               [key_expr; expr.expr]
@@ -1070,7 +1076,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           | Some ext_name -> (
 
             (* external method *)
-            Ir.Expr.ExternalCall((Ir.SymLocal ext_name), None, params)
+            Ir.Expr.Call((Ir.SymLocal ext_name), None, params)
           )
 
           (* it's a local function *)
@@ -1090,7 +1096,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
               let ctor_opt = Check_helper.find_typedef_of env.ctx node.value in
               let ctor_name = Option.value_exn ctor_opt in
               let name = find_variable env ctor_name.name in
-              Ir.Expr.ExternalCall(name, None, params)
+              Ir.Expr.Call(name, None, params)
           )
 
         )
@@ -1118,7 +1124,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
               match Type_context.find_external_symbol env.ctx method_id with
               | Some ext_name -> (
                 (* external method *)
-                Ir.Expr.ExternalCall((Ir.SymLocal ext_name), Some this_expr.expr, params)
+                Ir.Expr.Call((Ir.SymLocal ext_name), Some this_expr.expr, params)
               )
               | _ ->
                 let callee_node = Type_context.get_node env.ctx method_id in
@@ -1126,7 +1132,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
                 let ctor = Option.value_exn ~message:"Cannot find typedef of class" ctor_opt in
                 let ctor_ty_id = ctor.id in
                 let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
-                Ir.Expr.ExternalCall(global_name, Some this_expr.expr, params)
+                Ir.Expr.Call(global_name, Some this_expr.expr, params)
             )
 
             (* it's a static function *)
@@ -1136,7 +1142,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
               let ctor = Option.value_exn ctor_opt in
               let ctor_ty_id = ctor.id in
               let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
-              Ir.Expr.ExternalCall(global_name, None, params)
+              Ir.Expr.Call(global_name, None, params)
             )
             | _ -> failwith "unrechable"
 
@@ -1148,7 +1154,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           let ctor = Option.value_exn ctor_opt in
           let ctor_ty_id = ctor.id in
           let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
-          Ir.Expr.ExternalCall(global_name, None, params)
+          Ir.Expr.Call(global_name, None, params)
         )
       in
       auto_release_expr ~is_move env ~append_stmts ty_var call_expr
@@ -1168,13 +1174,13 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       | Some (Method ({ Core_type.TypeDef. id = def_int; spec = ClassMethod { method_get_set = Some _; _ }; _ }, _params, _rt), _) -> (
         let ext_sym_opt = Type_context.find_external_symbol env.ctx def_int in
         let ext_sym = Option.value_exn ext_sym_opt in
-        Ir.Expr.ExternalCall(SymLocal ext_sym, Some expr_result.expr, [])
+        Ir.Expr.Call(SymLocal ext_sym, Some expr_result.expr, [])
       )
 
       | Some (Core_type.TypeExpr.TypeDef { id = method_id; spec = ClassMethod { method_get_set = Some Getter; _ }; _ }, _) -> (
         let ext_sym_opt = Type_context.find_external_symbol env.ctx method_id in
         let ext_sym = Option.value_exn ext_sym_opt in
-        Ir.Expr.ExternalCall(SymLocal ext_sym, Some expr_result.expr, [])
+        Ir.Expr.Call(SymLocal ext_sym, Some expr_result.expr, [])
       )
 
       (* it's a property *) 
@@ -1320,7 +1326,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         prepend_stmts := List.concat [ !prepend_stmts; value_expr.prepend_stmts; transform_main_expr.prepend_stmts ];
         append_stmts := List.concat [ transform_main_expr.append_stmts; value_expr.append_stmts; !append_stmts; ];
 
-        Ir.Expr.ExternalCall(SymLocal "LCArraySetValue", Some transform_main_expr.expr, [value_expr.expr; expr'.expr])
+        Ir.Expr.ArraySetValue(transform_main_expr.expr, value_expr.expr, expr'.expr)
       )
 
       | _ ->
@@ -1489,7 +1495,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       match node_type with
       | String ->
-        Ir.Expr.ExternalCall(Ir.SymLocal "lc_std_string_get_char", Some expr'.expr, [index.expr])
+        Ir.Expr.Call(Ir.SymLocal "lc_std_string_get_char", Some expr'.expr, [index.expr])
 
       | _ -> (
         let result = Ir.Expr.ArrayGetValue(expr'.expr, (Ir.Expr.IntValue index.expr)) in
@@ -1764,13 +1770,13 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
         | Some _ ->
           Expr.I32Binary(
             BinaryOp.GreaterThanEqual,
-            Expr.ExternalCall(SymLocal "lc_std_array_get_length", Some match_expr, []),
+            Expr.Call(SymLocal "lc_std_array_get_length", Some match_expr, []),
             Expr.NewInt (Int.to_string elm_len))
 
         | None ->
           Expr.I32Binary(
             BinaryOp.Equal,
-            Expr.ExternalCall(SymLocal "lc_std_array_get_length", Some match_expr, []),
+            Expr.Call(SymLocal "lc_std_array_get_length", Some match_expr, []),
             Expr.NewInt (Int.to_string elm_len))
       )
 
@@ -1809,10 +1815,10 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
           let assign_stmt = { Ir.Stmt.
             spec = Expr(Assign(
               Temp match_tmp,
-              ExternalCall(
+              Call(
                 SymLocal "lc_std_array_slice",
                 Some match_expr,
-                [Expr.NewInt (Int.to_string elm_len); Expr.ExternalCall(SymLocal "lc_std_array_get_length", Some match_expr, [])])));
+                [Expr.NewInt (Int.to_string elm_len); Expr.Call(SymLocal "lc_std_array_get_length", Some match_expr, [])])));
             loc = Loc.none;
           } in
 
@@ -1974,7 +1980,7 @@ and transform_binary_expr env ~is_move ~append_stmts ~prepend_stmts expr op left
     match (left_type, op) with
     | (TypeExpr.String, BinaryOp.Plus) ->
       let spec = auto_release_expr ~is_move env ~append_stmts ty_var
-        (Ir.Expr. ExternalCall(SymLocal "lc_std_string_concat", None, [left'.expr; right'.expr]))
+        (Ir.Expr. Call(SymLocal "lc_std_string_concat", None, [left'.expr; right'.expr]))
       in
       spec
 

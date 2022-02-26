@@ -292,10 +292,8 @@ and transpile_symbol env sym =
     ps env (Int.to_string param_index);
     ps env "]"
 
-  | SymLambda index ->
-    ps env "LCLambdaGetValue(rt, this, ";
-    ps env (Int.to_string index);
-    ps env ")"
+  | SymLambda (_, name) ->
+    ps env name
 
   | SymRet -> ps env "ret"
 
@@ -303,7 +301,7 @@ and transpile_symbol env sym =
 
   | SymLambdaThis -> ps env "LC_LAMBDA_THIS(this)"
 
-and transpile_expression ?(parent_expr=true)  env expr =
+and transpile_expression ?(parent_expr=true) env expr =
   let open Ir.Expr in
   match expr with
   | Null -> ps env "undefined"
@@ -322,9 +320,13 @@ and transpile_expression ?(parent_expr=true)  env expr =
   | NewBoolean bl ->
     ps env (if bl then "true" else "false")
 
-  | NewLambda _ -> failwith "unrechable lambda"
+  | NewLambda lambda -> (
+    let { lambda_decl; _ } = lambda in
+    transpile_declaration env lambda_decl
+  )
 
-  | NewRef _ -> failwith "unimplemented new ref"
+  | NewRef expr ->
+    transpile_expression env expr
 
   | GetRef(_, original_name) ->
     ps env original_name
@@ -393,8 +395,6 @@ and transpile_expression ?(parent_expr=true)  env expr =
     ps env ")"
   )
 
-  | Call _ -> failwith "call"
-
   | Invoke(expr, name, params) -> (
     transpile_expression env expr;
     ps env ".";
@@ -424,7 +424,7 @@ and transpile_expression ?(parent_expr=true)  env expr =
     );
   )
 
-  | ExternalCall(name, this_opt, params) -> (
+  | Call(name, this_opt, params) -> (
     transpile_symbol env name;
     ps env ".call(";
     (match this_opt with
@@ -576,7 +576,7 @@ and transpile_i32_binary env op left right =
 and transpile_function env _fun =
   let open Ir.Func in
   ps env "function ";
-  tranpile_id env _fun.name;
+  transpile_id env _fun.name;
   ps env "(";
 
   (* tranpile_function_params env _fun.header.params; *)
@@ -594,7 +594,7 @@ and transpile_function env _fun =
   List.iteri
     ~f:(fun index param ->
       let name = param.param_name in
-      tranpile_id env name param.param_loc;
+      transpile_id env name param.param_loc;
       if index <> (params_len - 1) then (
         ps env ", "
       )
@@ -628,7 +628,7 @@ and transpile_function_body env (body: Ir.Block.t) =
       body.body;
   );
 
-and tranpile_id env (name, loc) =
+and transpile_id env (name, loc) =
   env.sourcemap#add_location env.col 0 loc.start.line loc.start.column;
   ps env name
 

@@ -384,7 +384,7 @@ and codegen_symbol env sym =
     ps env (Int.to_string param_index);
     ps env "]"
 
-  | SymLambda index ->
+  | SymLambda(index, _) ->
     ps env "LCLambdaGetValue(rt, this, ";
     ps env (Int.to_string index);
     ps env ")"
@@ -433,7 +433,8 @@ and codegen_expression (env: t) (expr: Expr.t) =
   | NewBoolean false ->
     ps env Primitives.Constant._false
 
-  | NewLambda (c_name, this, params) ->
+  | NewLambda lambda ->
+    let { lambda_name = c_name; lambda_this = this; lambda_capture_symbols = params; _ } = lambda in
     ps env "LCNewLambda(rt, ";
     ps env c_name;
     ps env ", ";
@@ -511,7 +512,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
 
   | Ident value -> codegen_symbol env value
 
-  | ExternalCall (fun_name, ths, params) -> (
+  | Call (fun_name, ths, params) -> (
     codegen_symbol env fun_name;
     let params_len = List.length params in
     ps env "(rt, ";
@@ -546,8 +547,6 @@ and codegen_expression (env: t) (expr: Expr.t) =
     codegen_symbol env sym;
     ps env "(rt)"
   )
-
-  | Call _ -> failwith "call"
 
   | CallLambda (callee, _params) -> (
     ps env "LCEvalLambda(rt, ";
@@ -622,10 +621,10 @@ and codegen_expression (env: t) (expr: Expr.t) =
       ps env " = ";
       codegen_expression env right
 
-    | SymLambda index ->
-      ps env "LCLambdaSetRefValue(rt, this, ";
-      ps env (Int.to_string index);
-      ps env ", ";
+    | SymLambda (_, name) ->
+      ps env "(";
+      ps env name;
+      ps env " = ";
       codegen_expression env right;
       ps env ")"
 
