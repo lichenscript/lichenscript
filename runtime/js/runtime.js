@@ -77,12 +77,55 @@ function lc_std_exit(code) {
   process.exit(code);
 }
 
-function lc_std_string_slice() {
-  return String.prototype.slice.apply(this, arguments);
-}
-
 function lc_std_array_get_length() {
   return this.length;
+}
+
+function lc_std_array_push(elm) {
+  Array.prototype.push.call(this, elm);
+}
+
+function lc_std_array_resize(size, value) {
+  if (size === this.length) {
+    return;
+  }
+
+  if (size < this.length) {
+    this.length = size;
+    return;
+  }
+
+  for (let i = this.length; i < size; i++) {
+    this.push(value);
+  }
+}
+
+function lc_std_map_get(key, value) {
+  const tmp = Map.prototype.get.call(this, key, value);
+  if (tmp) {
+    return [0, tmp];
+  }
+  return [1];
+}
+
+function lc_std_map_set(key, value) {
+  Map.prototype.set.call(this, key, value);
+}
+
+function lc_std_map_remove(key, value) {
+  const tmp = Map.prototype.delete.call(this, key, value);
+  if (tmp) {
+    return [0, tmp];
+  }
+  return [1];
+}
+
+function lc_std_map_size() {
+  return this.size;
+}
+
+function lc_std_string_slice() {
+  return String.prototype.slice.apply(this, arguments);
 }
 
 function lc_std_string_get_length() {
