@@ -279,8 +279,6 @@ void* lc_realloc(LCRuntime* rt, void*, size_t size);
 void* lc_realloc2(LCRuntime *ctx, void *ptr, size_t size, size_t *pslack);
 void lc_free(LCRuntime* rt, void *);
 
-void LCUpdateValue(LCRuntime* rt, LCArithmeticType op, LCValue* left, LCValue right);
-
 void LCRetain(LCValue obj);
 void LCRelease(LCRuntime* rt, LCValue obj);
 typedef struct LCLambda {

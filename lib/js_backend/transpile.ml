@@ -424,19 +424,6 @@ and transpile_expression ?(parent_expr=true)  env expr =
     );
   )
 
-  | Update(op, left, right) -> (
-    if parent_expr then (
-      ps env "("
-    );
-    transpile_expression env left;
-    ps env " = ";
-    let binary_op = Asttypes.AssignOp.to_binary op in
-    transpile_i32_binary env binary_op left right;
-    if parent_expr then (
-      ps env ")"
-    );
-  )
-
   | ExternalCall(name, this_opt, params) -> (
     transpile_symbol env name;
     ps env ".call(";

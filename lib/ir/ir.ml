@@ -162,7 +162,6 @@ and Expr : sig
   | Call of int * t list
   | Invoke of t * string * t list
   | Assign of t * t
-  | Update of Asttypes.AssignOp.t * t * t
   | ExternalCall of symbol * t option * t list
   | InitCall of (symbol * symbol)  (* init call function, meta name *)
   | Ident of symbol

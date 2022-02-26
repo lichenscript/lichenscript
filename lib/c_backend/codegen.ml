@@ -645,55 +645,6 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env " = ";
     codegen_expression env right
 
-  | Update (op, Expr.Ident symbol, expr) -> (
-    ps env "LCUpdateValue(rt, ";
-    ps env (Primitives.Assign.to_arithmetic_op op);
-    ps env ", ";
-    (match symbol with
-    | SymLocal name ->
-      ps env "&";
-      ps env name
-
-    | SymParam param_index ->
-      ps env "&args[";
-      ps env (Int.to_string param_index);
-      ps env "]"
-
-    | SymTemp tmp_id ->
-      ps env "&t[";
-      ps env (Int.to_string tmp_id);
-      ps env "]"
-
-    | SymLambda index ->
-      ps env "LCLambdaGetValuePointer(rt, this, ";
-      ps env (Int.to_string index);
-      ps env ")"
-
-    | SymRet -> ps env "ret"
-
-    | SymThis
-    | SymLambdaThis
-      -> failwith "impossible to updating this"
-
-    );
-    ps env ", ";
-    codegen_expression env expr;
-    ps env ")"
-  )
-
-  | Update (op, left, expr) -> (
-    ps env "LCUpdateValue(rt, ";
-    ps env (Primitives.Assign.to_arithmetic_op op);
-    ps env ", ";
-    ps env "&(";
-    codegen_expression env left;
-    ps env ")";
-    ps env ", ";
-    codegen_expression env expr;
-    ps env ")"
-
-  )
-
   | TagEqual (expr, tag) -> (
     ps env "LCUnionGetType(";
     codegen_expression env expr;
