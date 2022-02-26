@@ -474,6 +474,24 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env (Int.to_string len);
     ps env ")"
 
+  | NewTuple exprs -> (
+    ps env "LCNewTuple(rt, MK_NULL(), ";
+    let exprs_len = List.length exprs in
+    ps env (Int.to_string exprs_len);
+    ps env ", (LCValue[]) {";
+
+    List.iteri
+      ~f:(fun index expr ->
+        codegen_expression env expr;
+        if index < (exprs_len - 1) then (
+          ps env ", "
+        )
+      )
+      exprs;
+
+    ps env "})"
+  )
+
   | NewMap init_size ->
     ps env "lc_std_map_new(rt, LC_TY_STRING, ";
     ps env (Int.to_string init_size);
@@ -621,10 +639,10 @@ and codegen_expression (env: t) (expr: Expr.t) =
       ps env " = ";
       codegen_expression env right
 
-    | SymLambda (_, name) ->
-      ps env "(";
-      ps env name;
-      ps env " = ";
+    | SymLambda (index, _) ->
+      ps env "LCLambdaSetRefValue(rt, this, ";
+      ps env (Int.to_string index);
+      ps env ", ";
       codegen_expression env right;
       ps env ")"
 

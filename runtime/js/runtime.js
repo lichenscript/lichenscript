@@ -2,6 +2,8 @@
 const i32_max = 0x7FFFFFFF;
 const i32_min = 0x7FFFFFFF * -1 + 1;
 
+const tupleSym = Symbol("tuple")
+
 function i32_add(a, b) {
   a = a|0;  // give hinting to v8
   b = b|0;
@@ -56,6 +58,22 @@ function i32_mod(a, b) {
   return (a % b)|0;
 }
 
+function f32_add(a, b) {
+  return Math.fround(a + b);
+}
+
+function f32_sub(a, b) {
+  return Math.fround(a - b);
+}
+
+function f32_mult(a, b) {
+  return Math.fround(a * b);
+}
+
+function f32_div(a, b) {
+  return Math.fround(a / b);
+}
+
 function lc_std_char_code() {
   return String.prototype.charCodeAt.call(this);
 }
@@ -67,7 +85,35 @@ function lc_std_char_to_string() {
 function lc_std_print(...args) {
   let content = '';
   for (let i = 0; i < args.length; i++) {
-    content += args[i];
+    if (Array.isArray(args[i])) {
+      if (args[i][0] === tupleSym) {
+        let tmp = '(';
+
+        for (let j = 1; j < args[i].length; j++) {
+          tmp += args[i][j];
+          if (j < args[i].length - 1) {
+            tmp += ", "
+          }
+        }
+
+        tmp += ')'
+        content += tmp;
+      } else {
+        let tmp = '[';
+
+        for (let j = 0; j < args[i].length; j++) {
+          tmp += args[i][j];
+          if (j < args[i].length - 1) {
+            tmp += ", "
+          }
+        }
+
+        tmp += ']'
+        content += tmp;
+      }
+    } else {
+      content += args[i];
+    }
   }
   console.log(content);
 }
@@ -98,6 +144,22 @@ function lc_std_array_resize(size, value) {
   for (let i = this.length; i < size; i++) {
     this.push(value);
   }
+}
+
+function lc_std_array_filter(filter) {
+  return Array.prototype.filter.call(this, filter);
+}
+
+function lc_std_array_slice(start, end) {
+  return Array.prototype.slice.call(this, start, end);
+}
+
+function lc_std_array_map(f) {
+  return Array.prototype.map.call(this, f);
+}
+
+function lc_std_array_sort(cmp) {
+  return Array.prototype.sort.call(this, cmp);
 }
 
 function lc_std_map_get(key, value) {
@@ -136,6 +198,11 @@ function lc_std_string_get_char(index) {
   return this[index];
 }
 
+function lc_std_string_concat(a, b) {
+  return a + b;
+}
+
 function lc_std_panic(message) {
+  console.log("panic");
   throw new Error("panic: " + message);
 }
