@@ -1,4 +1,4 @@
-open Core
+open Core_kernel
 
 type entry = {
   entry_name: string;

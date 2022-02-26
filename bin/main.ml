@@ -153,10 +153,25 @@ and build_command args index : string option =
       build_entry (Option.value_exn !entry) std !buildDir runtimeDir !mode !verbose !platform
 
 and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platform: string option =
-  let open Resolver in
+  let module R = Resolver.S (struct
+
+    let is_directory path = Sys.is_directory_exn path
+
+    let is_file path = Sys.is_file_exn path
+
+    let get_realpath = Filename.realpath
+
+    let ls_dir = Sys.ls_dir
+
+    let mkdir_p path = Unix.mkdir_p path
+
+    let file_exists path = Sys.file_exists_exn path
+    
+  end) in
+  let open R in
   try
     let entry_full_path = Filename.realpath entry in
-    let profiles = Resolver.compile_file_path
+    let profiles = compile_file_path
       ~std_dir ~build_dir ~runtime_dir ~verbose ~platform entry_full_path
     in
     let profile =
