@@ -88,7 +88,7 @@ Install [lichenscript-vscode](https://github.com/vincentdchan/lichenscript-vscod
 | ------ | ------ |
 | Compiled to C (macOS/Linux) | ✅ |
 | Compiled to C (Emscripten/WASM) | ✅ |
-| Compiled to JavaScript | 🔨 |
+| Compiled to JavaScript | ✅ |
 
 # FAQ
 
