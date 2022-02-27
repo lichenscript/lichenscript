@@ -14,3 +14,7 @@
  (preprocess
   (pps js_of_ocaml-ppx))
 )
+
+(rule
+ (targets runtime.ml)
+ (action (run ../file_packer/file_packer.exe ../runtime/ --base .. -o runtime.ml)))
