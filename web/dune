@@ -1,0 +1,16 @@
+(executable
+ (name lichenscript_web)
+ (modes js)
+ (libraries
+  js_of_ocaml
+  core_kernel
+  lichenscript_lex
+  lichenscript_parsing
+  lichenscript_typing
+  lichenscript_c
+  lichenscript_resolver
+  lichenscript_common
+ )
+ (preprocess
+  (pps js_of_ocaml-ppx))
+)
