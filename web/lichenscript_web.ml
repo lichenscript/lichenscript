@@ -96,6 +96,6 @@ let _ =
       | e ->
         let msg = (Exn.to_string e) |> Js.string in
         let js_err = new%js Js.error_constr msg in
-        Js.raise_js_error js_err
+        Js_error.raise_ (Js_error.of_error js_err)
 
     end)
