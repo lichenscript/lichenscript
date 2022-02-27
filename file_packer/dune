@@ -1,0 +1,5 @@
+(executable
+ (name file_packer)
+ (libraries
+  lichenscript_common
+  core))

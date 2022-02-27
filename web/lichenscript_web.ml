@@ -66,13 +66,20 @@ module JsFS : Resolver.FSProvider = struct
 end
 
 let _ =
+  List.iter
+    ~f:(fun (path, item) -> (
+      match item with
+      | `File file ->
+        Hashtbl.set global_fs ~key:path ~data:(FS_file file)
+      
+      | `Dir content ->
+        Hashtbl.set global_fs ~key:path ~data:(FS_dir content)
+      
+    ))
+    Runtime.contents;
+
   Js.export_all
     (object%js
-
-    method write_file_content path data =
-      let oc_path = Js.to_string path in
-      let oc_data = Js.to_string data in
-      FileMap.set global_fs ~key:oc_path ~data:(FS_file oc_data)
 
     method compile str =
       let module R = Resolver.S (JsFS) in
