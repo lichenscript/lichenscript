@@ -32,6 +32,10 @@ module type FSProvider = sig
 
   val file_exists: string -> bool
 
+  val read_file_content: string -> string
+
+  val write_file_content: string -> data:string -> unit
+
 end
 
 module S (FS: FSProvider) = struct
@@ -168,7 +172,7 @@ module S (FS: FSProvider) = struct
     )
 
   let rec compile_file_to_path ~ctx ~mod_path env _mod path =
-    let file_content = In_channel.read_all path in
+    let file_content = FS.read_file_content path in
     let file_key = File_key.LibFile path in
     let ast =
       match Parser.parse_string (Some file_key) file_content with
@@ -395,7 +399,7 @@ module S (FS: FSProvider) = struct
 
       | "js" -> (
         let js_runtime_preclude_file = Filename.(concat (concat runtime_dir "js") "runtime.js") in
-        let preclude = In_channel.read_all js_runtime_preclude_file in
+        let preclude = FS.read_file_content js_runtime_preclude_file in
         let output = Lichenscript_js.codegen ~ctx ~preclude declarations in
         let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
         let build_dir = get_build_dir () in
@@ -421,7 +425,7 @@ module S (FS: FSProvider) = struct
       FS.mkdir_p build_dir
     );
     let output_file_path = Filename.concat build_dir (mod_name ^ ext) in
-    Out_channel.write_all output_file_path ~data:content;
+    FS.write_file_content output_file_path ~data:content;
     output_file_path
 
   and write_makefiles ~bin_name ~runtime_dir ~platform build_dir mods: profile list =
@@ -517,6 +521,6 @@ module S (FS: FSProvider) = struct
       "CC=" ^ cc ^ "\n" ^
       flags ^
       to_string entries in
-    Out_channel.write_all output_path ~data
+    FS.write_file_content output_path ~data
   
 end

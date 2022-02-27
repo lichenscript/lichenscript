@@ -166,7 +166,11 @@ and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platf
     let mkdir_p path = Unix.mkdir_p path
 
     let file_exists path = Sys.file_exists_exn path
-    
+
+    let read_file_content = In_channel.read_all
+
+    let write_file_content = Out_channel.write_all
+
   end) in
   let open R in
   try
