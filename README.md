@@ -29,7 +29,7 @@ It's designed to be lightweight, easy to compile to target platform with very sm
 - Reference counting
 - Use the library of C/C++/Rust through C-ABI
 
-**Target JavaScript(WIP):**
+**Target JavaScript:**
 
 - Readable
 - Small overhead

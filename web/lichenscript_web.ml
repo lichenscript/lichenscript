@@ -93,6 +93,16 @@ let _ =
         let js_content = JsFS.read_file_content profile_path in
         Js.string js_content
       with
+      | R.TypeCheckError _errors -> (
+        let js_err = new%js Js.error_constr (Js.string "TypeCheckError") in
+        Js_error.raise_ (Js_error.of_error js_err)
+      )
+
+      | R.ParseError _ -> (
+        let js_err = new%js Js.error_constr (Js.string "ParseError") in
+        Js_error.raise_ (Js_error.of_error js_err)
+      )
+
       | e ->
         let msg = (Exn.to_string e) |> Js.string in
         let js_err = new%js Js.error_constr msg in
