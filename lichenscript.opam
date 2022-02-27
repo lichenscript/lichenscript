@@ -7,8 +7,8 @@ bug-reports: "https://github.com/vincentdchan/LichenScript/issues"
 depends: [
   "ocaml" {>= "4.12.0"}
   "dune" {>= "1.11.0"}
-  "js_of_ocaml"
-  "js_of_ocaml-ppx"
+  "js_of_ocaml" {>= "4.0.0"}
+  "js_of_ocaml-ppx" {>= "4.0.0"}
   "ppx_deriving"
   "ppx_gen_rec"
   "core"
