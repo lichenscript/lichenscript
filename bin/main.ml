@@ -43,6 +43,7 @@ lsc build <entry> [<args>]
   --platform <platform>  native/wasm32/js, default: native
   --mode <debug|release> Choose the mode of debug/release
   --verbose, -V          Print verbose log
+  --search-paths         Show the search paths
   -h, --help             Show help message
 
 |} ^ TermColor.bold ^ "Environment:" ^ TermColor.reset ^ {|
@@ -83,8 +84,6 @@ and build_command args index : string option =
     None
   ) else 
     let entry = ref None in
-    let std = Sys.getenv_exn "LSC_STD" in
-    let runtimeDir = Sys.getenv_exn "LSC_RUNTIME" in
     let buildDir = ref None in
     let mode = ref "debug" in
     let verbose = ref false in
@@ -113,6 +112,14 @@ and build_command args index : string option =
 
       | "-V" | "--verbose" ->
         verbose := true
+
+      | "--search-paths" -> (
+        let paths = Search_path.get_search_path_from_node () in
+        List.iter
+          ~f:(fun path -> printf "%s\n" path)
+          paths;
+        ignore (exit 0)
+      )
 
       | "--build-dir" | "-D" -> (
         if !index >= (Array.length args) then (
@@ -149,8 +156,11 @@ and build_command args index : string option =
       Format.printf "Error: no input files\n";
       ignore (exit 2);
       None
-    ) else 
+    ) else (
+      let std = Sys.getenv_exn "LSC_STD" in
+      let runtimeDir = Sys.getenv_exn "LSC_RUNTIME" in
       build_entry (Option.value_exn !entry) std !buildDir runtimeDir !mode !verbose !platform
+    )
 
 and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platform: string option =
   let module R = Resolver.S (struct
@@ -256,7 +266,7 @@ and run_make_in_dir build_dir =
   | `In_the_parent pid -> (
     Unix.close pipe_write;
 
-    let std_out_content = read_all_into_buffer pipe_read in
+    let std_out_content = Utils.read_all_into_buffer pipe_read in
 
     let result = Unix.waitpid pid in
 
@@ -264,34 +274,6 @@ and run_make_in_dir build_dir =
     | Ok _ -> ()
     | Error _ -> Out_channel.print_string std_out_content
   )
-
-and read_all_into_buffer pipe =
-  let buffer = Buffer.create 1024 in
-
-  let rec handle_message fd =
-    try
-      let content_bytes = Bytes.make 1024 (Char.of_int_exn 0) in
-      let read_bytes = Unix.read ~len:1024 ~buf:content_bytes fd in
-
-      if read_bytes = 0 then (
-        ()
-      ) else (
-        Buffer.add_subbytes buffer content_bytes ~pos:0 ~len:read_bytes;
-        handle_message fd
-      )
-    with exn -> 
-      match exn with
-      | Stdlib.End_of_file ->
-        ()
-
-      | _->
-        ()
-
-  in
-
-  handle_message pipe;
-
-  Buffer.contents buffer
 
 and print_loc_title ~prefix loc_opt =
   Loc. (
