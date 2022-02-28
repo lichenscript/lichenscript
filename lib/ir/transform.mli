@@ -9,6 +9,7 @@ type result = {
 type config = {
   (* automatic reference counting *)
   arc: bool;
+  prepend_lambda: bool;
 }
 
 val transform_declarations: config:config -> Type_context.t -> Typedtree.Declaration.t list -> result
