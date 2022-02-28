@@ -357,7 +357,7 @@ module S (FS: FSProvider) = struct
 
       let main_mod = Option.value_exn (Linker.get_module env.linker (Option.value_exn entry_full_path)) in
       if List.is_empty (Module.files main_mod) then (
-        Format.printf "No files should be compiled\n";
+        printf "No files should be compiled.\n";
         ignore (exit 0)
       );
       let file = List.hd_exn (Module.files main_mod) in
@@ -366,7 +366,7 @@ module S (FS: FSProvider) = struct
 
       let main_fun_id = typed_tree.tprogram_scope#find_type_symbol "main" in
       if Option.is_none main_fun_id then (
-        Format.printf "main function is not found, nothing to output";
+        printf "\"main\" function is not found, nothing to output.\n";
         ignore (exit 0)
       );
 

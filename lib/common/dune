@@ -1,4 +1,4 @@
 (library
  (name lichenscript_common)
- (libraries core)
+ (libraries core_kernel)
 )
