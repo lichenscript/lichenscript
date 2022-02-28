@@ -137,6 +137,7 @@ let _ =
           raw_errors;
 
         let js_err = new%js Js.error_constr (Js.string "TypeCheckError") in
+        Js.Unsafe.set js_err (Js.string "errors") error_list;
         Js_error.raise_ (Js_error.of_error js_err)
       )
 
