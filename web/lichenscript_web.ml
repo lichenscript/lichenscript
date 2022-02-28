@@ -108,13 +108,62 @@ let _ =
         let js_content = JsFS.read_file_content profile_path in
         Js.string js_content
       with
-      | R.TypeCheckError _errors -> (
+      | R.TypeCheckError raw_errors -> (
+        let open Lichenscript_typing in
+        let error_list = Js.array [||] in
+
+        List.iteri
+          ~f:(fun index err ->
+            let err_content =
+              match err.spec with
+              | Diagnosis.Dg_error dg_err ->
+                Format.asprintf "%a" (Diagnosis.PP.error_spec ~ctx:err.ctx) dg_err
+              | _ -> ""
+            in
+            let err_obj = object%js
+              val line = err.loc.start.line
+              val column = err.loc.start.column
+              val source =
+                match err.loc.source with
+                | Some source ->
+                  let source_str = Format.asprintf "%a" Lichenscript_lex.File_key.pp source in
+                  Js.string source_str
+                | None -> Js.string ""
+              val content = Js.string err_content
+
+            end in
+            Js.array_set error_list index err_obj
+          )
+          raw_errors;
+
         let js_err = new%js Js.error_constr (Js.string "TypeCheckError") in
         Js_error.raise_ (Js_error.of_error js_err)
       )
 
-      | R.ParseError _ -> (
+      | R.ParseError raw_errors -> (
+        let error_list = Js.array [||] in
+
+        List.iteri
+          ~f:(fun index err ->
+            let err_content = Format.asprintf "%a" Lichenscript_parsing.Parse_error.PP.error err in
+            let err_obj = object%js
+              val line = err.perr_loc.start.line
+              val column = err.perr_loc.start.column
+              val source =
+                match err.perr_loc.source with
+                | Some source ->
+                  let source_str = Format.asprintf "%a" Lichenscript_lex.File_key.pp source in
+                  Js.string source_str
+                | None -> Js.string ""
+              val content = Js.string err_content
+
+            end in
+            Js.array_set error_list index err_obj
+          )
+          raw_errors;
+
         let js_err = new%js Js.error_constr (Js.string "ParseError") in
+        Js.Unsafe.set js_err (Js.string "errors") error_list;
         Js_error.raise_ (Js_error.of_error js_err)
       )
 
