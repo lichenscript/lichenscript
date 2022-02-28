@@ -1,0 +1,4 @@
+(executable
+ (name js_output_wrapper)
+ (libraries core re)
+)
