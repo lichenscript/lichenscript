@@ -188,6 +188,7 @@ let create_current_fun_meta fun_name = {
 type config = {
   (* automatic reference counting *)
   arc: bool;
+  prepend_lambda: bool;
 }
 
 type t = {
@@ -897,7 +898,9 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       let lambda = transform_lambda env ~lambda_name lambda_content ty_var in
 
-      env.lambdas <- lambda::env.lambdas;
+      if env.config.prepend_lambda then (
+        env.lambdas <- lambda::env.lambdas
+      );
 
       let this_expr =
         if TScope.is_in_class env.scope then

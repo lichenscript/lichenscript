@@ -719,6 +719,7 @@ let transpile_program ~ctx ~preclude declarations =
 
   let transform_config = { Transform.
     arc = false;
+    prepend_lambda = false;
   } in
   let ir_tree = Transform.transform_declarations ~config:transform_config ctx declarations in
 

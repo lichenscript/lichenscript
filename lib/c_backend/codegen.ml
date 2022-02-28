@@ -803,6 +803,7 @@ let codegen_program ?indent ~ctx (declarations: Typedtree.Declaration.t list) =
 
   let transform_config = { Transform.
     arc = true;
+    prepend_lambda = true;
   } in
   let c_decls = Transform.transform_declarations ~config:transform_config ctx declarations in
 
