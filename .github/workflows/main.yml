@@ -47,3 +47,8 @@ jobs:
           ./test.sh
           echo "Test JavaScript"
           FLAGS="--platform js" ./test.sh
+          ./prepublish.sh
+          npm install -g pnpm
+          cd npm/lichenscript-web
+          pnpm install
+          pnpm run test
