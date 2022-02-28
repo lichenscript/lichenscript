@@ -13,8 +13,17 @@
  )
  (preprocess
   (pps js_of_ocaml-ppx))
+ ; (js_of_ocaml
+ ;  (javascript_files
+ ;   caml_thread_initialize.js
+ ;   caml_mutex_new.js
+ ;   spawn_is_osx.js))
 )
 
 (rule
  (targets runtime.ml)
  (action (run ../file_packer/file_packer.exe ../runtime/ --base .. -o runtime.ml)))
+
+(rule
+ (targets preclude.ml)
+ (action (run ../file_packer/file_packer.exe ../std/ --base .. -o preclude.ml)))

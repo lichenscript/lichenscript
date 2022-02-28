@@ -66,17 +66,17 @@ module JsFS : Resolver.FSProvider = struct
 end
 
 let _ =
-  List.iter
-    ~f:(fun (path, item) -> (
+  let adder (path, item) =
       match item with
       | `File file ->
         Hashtbl.set global_fs ~key:path ~data:(FS_file file)
       
       | `Dir content ->
         Hashtbl.set global_fs ~key:path ~data:(FS_dir content)
-      
-    ))
-    Runtime.contents;
+  in
+
+  List.iter ~f:adder Runtime.contents;
+  List.iter ~f:adder Preclude.contents;
 
   Js.export_all
     (object%js
@@ -87,9 +87,17 @@ let _ =
         let dummy_path = "/usr/admin/main.lc" in
         let oc_string = Js.to_string str in
         JsFS.write_file_content dummy_path ~data:oc_string;
+
+        Hashtbl.set
+          global_fs
+          ~key:"/usr/admin"
+          ~data:(FS_dir [
+            "main.lc";
+          ]);
+
         let profiles = R.compile_file_path
-          ~std_dir:"/usr/std"
-          ~runtime_dir:"/usr/runtime"
+          ~std_dir:"/std"
+          ~runtime_dir:"/runtime"
           ~build_dir:(Some "/usr/build")
           ~platform:"js"
           ~verbose:false

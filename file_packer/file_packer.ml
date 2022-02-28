@@ -112,7 +112,12 @@ and build_ml traverse_dir base_dir output =
         List.iter
           ~f:(fun path_content ->
             Buffer.add_string buf "    \"";
-            Buffer.add_string buf (normalize_path path_content);
+            let real_base = Filename.realpath item.file_path in
+            let realpath = Filename.realpath path_content in
+            let relactive = 
+              String.slice realpath (String.length real_base) (String.length realpath)
+            in
+            Buffer.add_string buf relactive;
             Buffer.add_string buf "\";\n";
           )
           children;
