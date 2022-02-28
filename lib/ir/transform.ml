@@ -185,8 +185,14 @@ let create_current_fun_meta fun_name = {
   def_local_names = [];
 }
 
+type config = {
+  (* automatic reference counting *)
+  arc: bool;
+}
+
 type t = {
   ctx: Type_context.t;
+  config: config;
   mutable scope: TScope.t;
   mutable tmp_vars_count: int;
   mutable main_function_name: string option;
@@ -246,11 +252,12 @@ type expr_result = {
   append_stmts: Ir.Stmt.t list;
 }
 
-let create ctx =
+let create ~config ctx =
   let scope = TScope.create None in
   let global_name_map = Hashtbl.create (module Int) in
   let cls_meta_map = Hashtbl.create (module Int) in
   {
+    config;
     ctx;
     scope;
     tmp_vars_count = 0;
@@ -570,7 +577,10 @@ and transform_statement ?ret env stmt =
     let init_expr = transform_expression ~is_move:true env binding.binding_init in
 
     let node_type = Type_context.deref_node_type env.ctx name_id in
-    let need_release = not (Check_helper.type_should_not_release env.ctx node_type) in
+    let need_release =
+      env.config.arc &&
+      not (Check_helper.type_should_not_release env.ctx node_type)
+    in
     (*
      * if a variable is captured, it will be upgraded into a RefCell.
      * Whatevet type it is, it should be released.
@@ -655,7 +665,7 @@ and gen_release_temp id =
 
 and auto_release_expr env ?(is_move=false) ~append_stmts ty_var expr =
   let node_type = Type_context.deref_node_type env.ctx ty_var in
-  if is_move || Check_helper.type_should_not_release env.ctx node_type then (
+  if (not env.config.arc) || is_move || Check_helper.type_should_not_release env.ctx node_type then (
     expr
   ) else (
     let tmp_id = env.tmp_vars_count in
@@ -849,7 +859,10 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         in
 
         let node_type = Type_context.deref_node_type env.ctx variable.var_id in
-        let need_release = not (Check_helper.type_should_not_release env.ctx node_type) in
+        let need_release =
+          env.config.arc &&
+          not (Check_helper.type_should_not_release env.ctx node_type)
+        in
 
         if is_move && need_release then (
           (* TScope.remove_release_var env.scope sym;
@@ -1240,7 +1253,10 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     | Assign (op_opt, left_expr, right_expr) -> (
       let assign_or_update main_expr ty_id =
         let node_type = Type_context.deref_node_type env.ctx ty_id in
-        let need_release = not (Check_helper.type_should_not_release env.ctx node_type) in
+        let need_release =
+          env.config.arc &&
+          not (Check_helper.type_should_not_release env.ctx node_type)
+        in
         if need_release then (
           let tmp_id = env.tmp_vars_count in
           env.tmp_vars_count <- tmp_id + 1;
@@ -2474,8 +2490,8 @@ type result = {
   global_class_init: string option;
 }
 
-let transform_declarations ctx declarations =
-  let env = create ctx in
+let transform_declarations ~config ctx declarations =
+  let env = create ~config ctx in
 
   let declarations =
     List.map ~f:(transform_declaration env) declarations

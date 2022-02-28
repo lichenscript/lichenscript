@@ -6,4 +6,9 @@ type result = {
   global_class_init: string option;
 }
 
-val transform_declarations: Type_context.t -> Typedtree.Declaration.t list -> result
+type config = {
+  (* automatic reference counting *)
+  arc: bool;
+}
+
+val transform_declarations: config:config -> Type_context.t -> Typedtree.Declaration.t list -> result
