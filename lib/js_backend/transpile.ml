@@ -717,7 +717,10 @@ let transpile_program ~ctx ~preclude declarations =
   let env = create ~ctx () in
   ps env preclude;
 
-  let ir_tree = Transform.transform_declarations ctx declarations in
+  let transform_config = { Transform.
+    arc = false;
+  } in
+  let ir_tree = Transform.transform_declarations ~config:transform_config ctx declarations in
 
   List.iter ~f:(transpile_declaration env) ir_tree.declarations;
 

@@ -801,7 +801,10 @@ let codegen_program ?indent ~ctx (declarations: Typedtree.Declaration.t list) =
 #include "runtime.h"
 |};
 
-  let c_decls = Transform.transform_declarations ctx declarations in
+  let transform_config = { Transform.
+    arc = true;
+  } in
+  let c_decls = Transform.transform_declarations ~config:transform_config ctx declarations in
 
   List.iter ~f:(codegen_declaration env) c_decls.declarations;
 
