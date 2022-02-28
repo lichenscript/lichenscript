@@ -12,3 +12,6 @@ cp ./README.md npm/lichenscript/README.md
 rm -rf npm/lichenscript-web/dist
 mkdir -p npm/lichenscript-web/dist
 cp _build/default/web/lichenscript_web.bc.js npm/lichenscript-web/dist
+
+rm -f npm/lichenscript-web/README.md
+cp ./README.md npm/lichenscript-web/README.md
