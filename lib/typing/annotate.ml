@@ -82,7 +82,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
 
       let binding_init = annotate_expression ~prev_deps env binding_init in
 
-      let binding_pat, pat_deps = annotate_pattern ~pat_id:0 env binding_pat in
+      let binding_pat, pat_deps = annotate_pattern env binding_pat in
       let open T.Pattern in
       match binding_pat.spec with
       | Underscore -> (
@@ -564,7 +564,7 @@ and annotate_expression_match ~prev_deps env _match =
     Env.with_new_scope env scope (fun env ->
       let { clause_pat; clause_consequent; clause_loc } = clause in
       prescan_pattern_for_scope ~kind:Ast.Pvar_const ~scope env clause_pat;
-      let clause_pat, clause_deps = annotate_pattern ~pat_id:0 env clause_pat in
+      let clause_pat, clause_deps = annotate_pattern env clause_pat in
       let clause_consequent = annotate_expression ~prev_deps:clause_deps env clause_consequent in
       { T.Expression.
         clause_pat;
@@ -1306,7 +1306,7 @@ and is_name_enum_or_class name =
   let first_char = String.get name 0 in
   Char.is_uppercase first_char
 
-and annotate_pattern ~pat_id env pat : (T.Pattern.t * int list) =
+and annotate_pattern env pat : (T.Pattern.t * int list) =
   let open Ast.Pattern in
   let { spec; loc } = pat in
   let scope = Env.peek_scope env in
@@ -1345,7 +1345,7 @@ and annotate_pattern ~pat_id env pat : (T.Pattern.t * int list) =
       );
       let ctor_var = Option.value_exn ctor_var in
 
-      let param_pat, param_deps = annotate_pattern ~pat_id:(pat_id + 1) env pat in
+      let param_pat, param_deps = annotate_pattern env pat in
       deps := List.concat [ param_deps; !deps; [ctor_var.var_id]];
 
       (T.Pattern.EnumCtor (
@@ -1357,7 +1357,7 @@ and annotate_pattern ~pat_id env pat : (T.Pattern.t * int list) =
     | Tuple children -> (
       let elements, element_deps =
         children
-        |> List.map ~f:(annotate_pattern ~pat_id:(pat_id + 1) env)
+        |> List.map ~f:(annotate_pattern env)
         |> List.unzip
       in
 
@@ -1371,14 +1371,14 @@ and annotate_pattern ~pat_id env pat : (T.Pattern.t * int list) =
       
       let elements, element_deps =
         elements
-        |> List.map ~f:(annotate_pattern ~pat_id:(pat_id + 1) env)
+        |> List.map ~f:(annotate_pattern env)
         |> List.unzip
       in
 
       let rest, rest_deps =
         match rest with
         | Some rest_elm ->
-          let rest, rest_deps = annotate_pattern ~pat_id:(pat_id + 1) env rest_elm in
+          let rest, rest_deps = annotate_pattern env rest_elm in
           (Some rest), rest_deps
 
         | None -> None, []
@@ -1390,7 +1390,7 @@ and annotate_pattern ~pat_id env pat : (T.Pattern.t * int list) =
     )
 
   in
-  { T.Pattern. spec; loc; pat_id }, List.rev !deps
+  { T.Pattern. spec; loc }, List.rev !deps
 
 (* only collect deps, construct value in type check *)
 and annotate_type env ty : (TypeExpr.t * int list) =

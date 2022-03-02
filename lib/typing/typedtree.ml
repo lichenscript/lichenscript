@@ -15,11 +15,6 @@ module Pattern = struct
   and t = {
     spec: spec;
     loc: Loc.t;
-    (*
-     * a unique id in a pattern expression
-     * used for type checking
-     *)
-    pat_id: int;
   }
 
   and spec =
