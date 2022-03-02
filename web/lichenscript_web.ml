@@ -111,6 +111,29 @@ let _ =
         let js_content = JsFS.read_file_content profile_path in
         Js.string js_content
       with
+      | ResolveError err -> (
+        let err_content = Format.asprintf "%a" Resolve_error.pp_spec err.spec in
+
+        let err_obj = object%js
+          val line = err.loc.start.line
+          val column = err.loc.start.column
+          val source =
+            match err.loc.source with
+            | Some source ->
+              let source_str = Format.asprintf "%a" Lichenscript_lex.File_key.pp source in
+              Js.string source_str
+            | None -> Js.string ""
+          val content = Js.string err_content
+
+        end in
+
+        let error_list = Js.array [| err_obj |] in
+
+        let js_err = new%js Js.error_constr (Js.string "TypeCheckError") in
+        Js.Unsafe.set js_err (Js.string "errors") error_list;
+        Js_error.raise_ (Js_error.of_error js_err)
+      )
+
       | TypeCheckError raw_errors -> (
         let open Lichenscript_typing in
         let error_list = Js.array [||] in
