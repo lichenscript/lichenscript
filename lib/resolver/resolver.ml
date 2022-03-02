@@ -340,6 +340,7 @@ module S (FS: FSProvider) = struct
     runtime_dir: string;
     platform: string;
     verbose: bool;
+    wasm_standalone: bool;
   }
 
   (*
@@ -352,7 +353,7 @@ module S (FS: FSProvider) = struct
   * Annotated parsed tree remain the "holes" to type check
   *)
   let rec compile_file_path ~config entry_file_path : profile list =
-    let { find_paths; build_dir; runtime_dir; platform; verbose } = config in
+    let { find_paths; build_dir; runtime_dir; platform; verbose; wasm_standalone } = config in
     try
       (* ctx is a typing context for all modules *)
       let ctx = Lichenscript_typing.Type_context.create () in
@@ -403,7 +404,7 @@ module S (FS: FSProvider) = struct
         let output_path = write_to_file build_dir mod_name ~ext:".c" output in
         let bin_name = entry_file_path |> last_piece_of_path |> (Filename.chop_extension) in
         write_makefiles
-          ~bin_name ~runtime_dir ~platform build_dir [ (mod_name, output_path) ]
+          ~bin_name ~runtime_dir ~platform ~wasm_standalone build_dir [ (mod_name, output_path) ]
       )
 
       | "js" -> (
@@ -437,7 +438,7 @@ module S (FS: FSProvider) = struct
     FS.write_file_content output_file_path ~data:content;
     output_file_path
 
-  and write_makefiles ~bin_name ~runtime_dir ~platform build_dir mods: profile list =
+  and write_makefiles ~bin_name ~runtime_dir ~platform ~wasm_standalone build_dir mods: profile list =
     let debug_dir =
       match platform with
       | "native" -> Filename.concat build_dir "debug"
@@ -451,9 +452,10 @@ module S (FS: FSProvider) = struct
       | _ -> failwith  ("unsupport platform: " ^ platform)
     in
     let bin_name =
-      match platform with
-      | "native" -> bin_name
-      | "wasm32" -> bin_name ^ ".js"
+      match (platform, wasm_standalone) with
+      | ("native", _) -> bin_name
+      | ("wasm32", false) -> bin_name ^ ".js"
+      | ("wasm32", true) -> bin_name ^ ".wasm"
       | _ -> failwith  ("unsupport platform: " ^ platform)
     in
     FS.mkdir_p debug_dir;

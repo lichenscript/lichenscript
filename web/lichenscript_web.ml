@@ -101,6 +101,7 @@ let _ =
           build_dir = Some "/usr/build";
           platform = "js";
           verbose = false;
+          wasm_standalone = false;
         } in
         let profiles = R.compile_file_path ~config dummy_path
         in
