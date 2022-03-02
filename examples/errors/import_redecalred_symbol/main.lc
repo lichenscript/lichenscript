@@ -1,0 +1,9 @@
+import "anotherLib";
+
+function test() {
+	print("my test");
+}
+
+function main () {
+	test();
+}

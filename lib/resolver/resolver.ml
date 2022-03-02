@@ -20,6 +20,7 @@ open Lichenscript_parsing
 
 exception ParseError of Parse_error.t list
 exception TypeCheckError of Diagnosis.t list
+exception ResolveError of Resolve_error.t
 
 module type FSProvider = sig
 
@@ -325,12 +326,27 @@ module S (FS: FSProvider) = struct
       )
       env.linker
 
-  let import_checker env file (import: Ast.Declaration.import) =
+  let import_checker env _mod file (import: Ast.Declaration.import) =
     let { Module. imports_map; _ } = file in
     let module_full_path = Hashtbl.find_exn imports_map import.source in
     let _module = Option.value_exn (Linker.get_module env.linker module_full_path) in
-    let _exports = Module.exports _module in
-    ()
+    let exports = Module.exports _module in
+    let module_scope = Module.module_scope _mod in
+
+    List.iter
+      ~f:(fun (export_name, _) -> 
+        let test_variable = module_scope#find_var_symbol export_name in
+        match test_variable with
+        | Some _variable ->
+          let err = { Resolve_error.
+            spec = Redeclared export_name;
+            (* loc = variable.var_loc; *)
+            loc = import.source_loc;
+          } in
+          raise (ResolveError err)
+        | None -> ()
+      )
+      exports
 
   let typecheck_all_modules ~ctx ~verbose env =
     annotate_all_modules env;
@@ -343,7 +359,7 @@ module S (FS: FSProvider) = struct
           let tree = Option.value_exn file.typed_tree in
           Typecheck.typecheck_module
             ~verbose ctx
-            ~import_checker:(import_checker env file)
+            ~import_checker:(import_checker env m file)
             tree
         )
         files;
