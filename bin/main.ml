@@ -245,6 +245,13 @@ and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platf
       None
     )
 
+    | ResolveError err ->
+      print_loc_title ~prefix:"resolve error" err.loc;
+      let start = err.loc.start in
+      Format.printf "%d:%d %a\n" start.line start.column Resolve_error.pp_spec err.spec;
+      ignore (exit 2);
+      None
+
     | TypeCheckError errors ->
       let open Diagnosis in
       List.iter
