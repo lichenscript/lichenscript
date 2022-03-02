@@ -15,6 +15,7 @@
  *)
 open Core_kernel
 open Lichenscript_resolver
+open Lichenscript_resolver.Resolver
 open Js_of_ocaml
 
 type fs_item =
@@ -110,7 +111,7 @@ let _ =
         let js_content = JsFS.read_file_content profile_path in
         Js.string js_content
       with
-      | R.TypeCheckError raw_errors -> (
+      | TypeCheckError raw_errors -> (
         let open Lichenscript_typing in
         let error_list = Js.array [||] in
 
@@ -143,7 +144,7 @@ let _ =
         Js_error.raise_ (Js_error.of_error js_err)
       )
 
-      | R.ParseError raw_errors -> (
+      | ParseError raw_errors -> (
         let error_list = Js.array [||] in
 
         List.iteri

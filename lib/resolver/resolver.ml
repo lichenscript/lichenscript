@@ -18,6 +18,9 @@ open Lichenscript_lex
 open Lichenscript_typing
 open Lichenscript_parsing
 
+exception ParseError of Parse_error.t list
+exception TypeCheckError of Diagnosis.t list
+
 module type FSProvider = sig
 
   val is_directory: string -> bool
@@ -40,9 +43,6 @@ end
 
 module S (FS: FSProvider) = struct
 
-  exception ParseError of Parse_error.t list
-  exception TypeCheckError of Diagnosis.t list
-
   type t = {
     (* absolute path => module *)
     linker: Linker.t;
@@ -62,11 +62,15 @@ module S (FS: FSProvider) = struct
       find_paths;
     }
 
-  class[@warning "-unused-ancestor"] module_scope ~prev () = object
-    inherit Scope.scope ~prev () as super
+  class module_scope ~prev () = object
+    inherit Scope.scope ~prev ()
 
   end
 
+  (*
+   * extern_modules are absolute path of external modules
+   * the absolute path of module's folder is the unique id of the module
+   *)
   class file_scope ~prev env extern_modules = object
     inherit Scope.scope ~prev () as super
 
@@ -327,7 +331,10 @@ module S (FS: FSProvider) = struct
         ~f:(fun file ->
           let open Module in
           let tree = Option.value_exn file.typed_tree in
-          Typecheck.typecheck_module ~verbose ctx tree
+          let import_checker (_import: Ast.Declaration.import) =
+            ()
+          in
+          Typecheck.typecheck_module ~verbose ctx ~import_checker tree
         )
         files;
         (* Typecheck.typecheck_module ctx m. *)

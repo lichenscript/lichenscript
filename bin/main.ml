@@ -17,6 +17,7 @@ open Lichenscript_lex
 open Lichenscript_parsing
 open Lichenscript_typing
 open Lichenscript_resolver
+open Lichenscript_resolver.Resolver
 open Lichenscript_common.Cli_utils
 open Core
 

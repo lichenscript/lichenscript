@@ -21,6 +21,8 @@ open Lichenscript_parsing
 module IntHash = Hashtbl.Make(Int)
 module T = Typedtree
 
+type import_checker = Ast.Declaration.import -> unit
+
 (*
  * Type check deeply, check every expressions
  **)
@@ -33,6 +35,15 @@ type env = {
    * a function can have multiple return
    *)
   mutable return_types: (TypeExpr.t * Loc.t) list;
+
+  (*
+  * Check all the import symbols if they conflict with
+  * the symbol in this package
+  *
+  * But it needs the relationship with other modules,
+  * only the resolver has that informations.
+  *)
+  import_checker: import_checker;
 }
 
 let add_return_type env ret = env.return_types <- ret::env.return_types
@@ -74,13 +85,14 @@ let with_scope env scope cb =
   env.scope <- prev;
   result
 
-let rec typecheck_module ctx ~verbose (typedtree: T.program) =
+let rec typecheck_module ctx ~import_checker ~verbose (typedtree: T.program) =
   try
     let { T. tprogram_declarations; tprogram_scope; _ } = typedtree in
     let env = {
       ctx;
       scope = tprogram_scope;
       return_types = [];
+      import_checker;
     } in
     List.iter ~f:(check_declaration env) tprogram_declarations;
     if verbose then (
@@ -100,7 +112,7 @@ and check_declaration env decl =
   | Interface intf -> check_interface env intf
   | Declare _ -> ()
   | Enum enum -> check_enum env enum
-  | Import _ -> ()
+  | Import import -> env.import_checker import
 
 and check_enum env enum =
   let open T.Enum in
@@ -114,6 +126,10 @@ and check_enum env enum =
     )
     elements
 
+(*
+ * TODO: check if the use of the type is safe
+ * maybe it reference some illegal type
+ *)
 and check_interface _env _intf =
   (* failwith "intf" *)
   ()
