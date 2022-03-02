@@ -1,0 +1,5 @@
+import "xxx"
+
+function main() {
+	const tiger = Tiger{};
+}

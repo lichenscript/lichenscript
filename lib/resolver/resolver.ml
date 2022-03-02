@@ -212,7 +212,7 @@ module S (FS: FSProvider) = struct
     List.iter
       ~f:(fun import ->
         let open Ast.Declaration in
-        let { source; _ } = import in
+        let { source; source_loc } = import in
         let find_paths = env.find_paths in
         let result =
           List.fold
@@ -237,8 +237,13 @@ module S (FS: FSProvider) = struct
           Hashtbl.set imports_map ~key:source ~data:path;
           extern_modules := path::!extern_modules;
         )
-        | None ->
-          failwith (Format.sprintf "can not find module %s" source)
+        | None -> (
+          let err = { Resolve_error.
+            spec = CannotResolve source;
+            loc = source_loc
+          } in
+          raise (ResolveError err)
+        )
       )
       imports;
 
