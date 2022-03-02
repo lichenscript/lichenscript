@@ -24,6 +24,9 @@ type file = {
 	typed_env: Env.t;
   typed_tree: Typedtree.program option;
 	extern_modules: string list;  (* full id *)
+
+  (* relative_map -> absolute map *)
+  imports_map: (string, string) Hashtbl.t;
 }
 
 type export = {
@@ -86,3 +89,6 @@ let finalize_module_exports env =
 
 let find_export env ~name =
   Hashtbl.find env.exports name
+
+let exports env =
+  Hashtbl.to_alist env.exports

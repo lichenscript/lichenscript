@@ -1,3 +1,4 @@
+open Core_kernel
 open Lichenscript_lex
 open Lichenscript_parsing
 open Lichenscript_typing
@@ -9,6 +10,9 @@ type file = {
   typed_env: Env.t;
   typed_tree: Typedtree.program option;
   extern_modules: string list;  (* full id *)
+
+  (* relative_map -> absolute map *)
+  imports_map: (string, string) Hashtbl.t;
 }
 
 type export = {
@@ -34,3 +38,5 @@ val set_files: t -> file list -> unit
 val finalize_module_exports: t -> unit
 
 val find_export: t -> name: string -> export option
+
+val exports: t -> (string * export) list
