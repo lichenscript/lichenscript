@@ -206,6 +206,7 @@ module S (FS: FSProvider) = struct
     ) in
 
     let extern_modules = ref [] in
+    let imports_map = Hashtbl.create (module String) in
 
     List.iter
       ~f:(fun import ->
@@ -232,6 +233,7 @@ module S (FS: FSProvider) = struct
         match result with
         | Some (path, source) -> (
           ignore (parse_module_by_dir ~ctx env ~real_path:path source);
+          Hashtbl.set imports_map ~key:source ~data:path;
           extern_modules := path::!extern_modules;
         )
         | None ->
@@ -258,6 +260,7 @@ module S (FS: FSProvider) = struct
         typed_env;
         typed_tree = None;
         extern_modules;
+        imports_map;
       }
     in
     insert_moudule_file env ~mod_path file
@@ -322,6 +325,13 @@ module S (FS: FSProvider) = struct
       )
       env.linker
 
+  let import_checker env file (import: Ast.Declaration.import) =
+    let { Module. imports_map; _ } = file in
+    let module_full_path = Hashtbl.find_exn imports_map import.source in
+    let _module = Option.value_exn (Linker.get_module env.linker module_full_path) in
+    let _exports = Module.exports _module in
+    ()
+
   let typecheck_all_modules ~ctx ~verbose env =
     annotate_all_modules env;
     Linker.iter_modules
@@ -331,10 +341,10 @@ module S (FS: FSProvider) = struct
         ~f:(fun file ->
           let open Module in
           let tree = Option.value_exn file.typed_tree in
-          let import_checker (_import: Ast.Declaration.import) =
-            ()
-          in
-          Typecheck.typecheck_module ~verbose ctx ~import_checker tree
+          Typecheck.typecheck_module
+            ~verbose ctx
+            ~import_checker:(import_checker env file)
+            tree
         )
         files;
         (* Typecheck.typecheck_module ctx m. *)
