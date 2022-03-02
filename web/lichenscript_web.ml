@@ -95,13 +95,14 @@ let _ =
             "main.lc";
           ]);
 
-        let profiles = R.compile_file_path
-          ~find_paths:["/std"]
-          ~runtime_dir:"/runtime"
-          ~build_dir:(Some "/usr/build")
-          ~platform:"js"
-          ~verbose:false
-          dummy_path
+        let config = { R.
+          find_paths = ["/std"];
+          runtime_dir = "/runtime";
+          build_dir = Some "/usr/build";
+          platform = "js";
+          verbose = false;
+        } in
+        let profiles = R.compile_file_path ~config dummy_path
         in
         let profile = List.hd_exn profiles in
         let profile_path = profile.profile_exe_path in

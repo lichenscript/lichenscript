@@ -334,6 +334,14 @@ module S (FS: FSProvider) = struct
       )
       env.linker
 
+  type config = {
+    find_paths: string list;
+    build_dir: string option;
+    runtime_dir: string;
+    platform: string;
+    verbose: bool;
+  }
+
   (*
   * 1. parse all in the entry dir
   * 2. annotate all files
@@ -343,7 +351,8 @@ module S (FS: FSProvider) = struct
   * because cyclic dependencies is allowed.
   * Annotated parsed tree remain the "holes" to type check
   *)
-  let rec compile_file_path ~find_paths ~build_dir ~runtime_dir ~platform ~verbose entry_file_path : profile list =
+  let rec compile_file_path ~config entry_file_path : profile list =
+    let { find_paths; build_dir; runtime_dir; platform; verbose } = config in
     try
       (* ctx is a typing context for all modules *)
       let ctx = Lichenscript_typing.Type_context.create () in
