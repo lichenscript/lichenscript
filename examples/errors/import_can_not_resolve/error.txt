@@ -1,0 +1,1 @@
+1:7 Can not resolve symbol 'xxx'
