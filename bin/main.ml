@@ -114,7 +114,8 @@ and build_command args index : string option =
         verbose := true
 
       | "--search-paths" -> (
-        let paths = Search_path.get_search_path_from_node () in
+        let current_dir = Unix.getcwd () in
+        let paths = Search_path.get_search_path_from_node current_dir in
         List.iter
           ~f:(fun path -> printf "%s\n" path)
           paths;
@@ -185,8 +186,13 @@ and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platf
   let open R in
   try
     let entry_full_path = Filename.realpath entry in
+    let entry_dir = Filename.dirname entry_full_path in
+    let find_paths = List.append
+      [Filename.realpath std_dir]
+      (Search_path.get_search_path_from_node entry_dir)
+    in
     let profiles = compile_file_path
-      ~std_dir ~build_dir ~runtime_dir ~verbose ~platform entry_full_path
+      ~find_paths ~build_dir ~runtime_dir ~verbose ~platform entry_full_path
     in
     let profile =
       if String.equal platform "js" then

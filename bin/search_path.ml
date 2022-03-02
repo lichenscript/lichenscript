@@ -21,9 +21,8 @@ module SearchPathGenerator = struct
     mutable parts: string list;
   }
 
-  let create () =
-    let path = Unix.getcwd () in
-    let parts = Filename.parts path in
+  let create entry_dir =
+    let parts = Filename.parts (Filename.realpath entry_dir) in
     { parts }
 
   let next env =
@@ -36,8 +35,8 @@ module SearchPathGenerator = struct
   
 end
 
-let get_search_path_from_node (): string list =
-  let generator = SearchPathGenerator.create () in
+let get_search_path_from_node entry_dir: string list =
+  let generator = SearchPathGenerator.create entry_dir in
   let ptr = ref (SearchPathGenerator.next generator) in
   let result = ref [] in
 
