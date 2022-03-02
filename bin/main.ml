@@ -35,16 +35,17 @@ let build_help_message = {|
 lsc build <entry> [<args>]
 
 |} ^ TermColor.bold ^ "Options:" ^ TermColor.reset ^ {|
-  --lib                  Build a library
-  --base <dir>           Base directory to resolve modules,
-                         default: current directory
-  --build-dir, -D <dir>  Specify a directory to build,
-                         a temp directory will be used if this is not specified.
-  --platform <platform>  native/wasm32/js, default: native
-  --mode <debug|release> Choose the mode of debug/release
-  --verbose, -V          Print verbose log
-  --search-paths         Show the search paths
-  -h, --help             Show help message
+  --lib                        Build a library
+  --base <dir>                 Base directory to resolve modules,
+                               default: current directory
+  --build-dir, -D <dir>        Specify a directory to build,
+                               a temp directory will be used if this is not specified.
+  --platform <platform>        native/wasm32/js, default: native
+  --mode <debug|release>       Choose the mode of debug/release
+  --verbose, -V                Print verbose log
+  --search-paths               Show the search paths
+  --standalone-wasm <executor> Build the standalone wasm, specify the executor
+  -h, --help                   Show help message
 
 |} ^ TermColor.bold ^ "Environment:" ^ TermColor.reset ^ {|
 LSC_RUNTIME              The directory of runtime.
@@ -85,6 +86,7 @@ and build_command args index : string option =
   ) else 
     let entry = ref None in
     let buildDir = ref None in
+    let standalone_wasm = ref None in
     let mode = ref "debug" in
     let verbose = ref false in
     let platform = ref "native" in
@@ -140,6 +142,15 @@ and build_command args index : string option =
         index := !index + 1;
       )
 
+      | "--standalone-wasm" -> (
+        if !index >= (Array.length args) then (
+          Format.printf "not enough args for --standalone-wasm\n";
+          ignore (exit 2)
+        );
+        standalone_wasm := Some (Array.get args !index);
+        index := !index + 1;
+      )
+
       | "--base" -> (
         if !index >= (Array.length args) then (
           Format.printf "not enough args for --base\n";
@@ -191,9 +202,14 @@ and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platf
       [Filename.realpath std_dir]
       (Search_path.get_search_path_from_node entry_dir)
     in
-    let profiles = compile_file_path
-      ~find_paths ~build_dir ~runtime_dir ~verbose ~platform entry_full_path
-    in
+    let config = {
+      find_paths;
+      build_dir;
+      runtime_dir;
+      verbose;
+      platform
+    } in
+    let profiles = compile_file_path ~config entry_full_path in
     let profile =
       if String.equal platform "js" then
         List.hd_exn profiles
