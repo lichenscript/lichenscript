@@ -343,11 +343,11 @@ module S (FS: FSProvider) = struct
   * because cyclic dependencies is allowed.
   * Annotated parsed tree remain the "holes" to type check
   *)
-  let rec compile_file_path ~std_dir ~build_dir ~runtime_dir ~platform ~verbose entry_file_path : profile list =
+  let rec compile_file_path ~find_paths ~build_dir ~runtime_dir ~platform ~verbose entry_file_path : profile list =
     try
       (* ctx is a typing context for all modules *)
       let ctx = Lichenscript_typing.Type_context.create () in
-      let env = create ~find_paths:[ std_dir ] ~ctx () in
+      let env = create ~find_paths ~ctx () in
 
       (* parse the entry dir *)
       let dir_of_entry = Filename.dirname entry_file_path in

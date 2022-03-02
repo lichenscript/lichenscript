@@ -96,7 +96,7 @@ let _ =
           ]);
 
         let profiles = R.compile_file_path
-          ~std_dir:"/std"
+          ~find_paths:["/std"]
           ~runtime_dir:"/runtime"
           ~build_dir:(Some "/usr/build")
           ~platform:"js"
