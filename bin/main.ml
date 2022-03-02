@@ -53,6 +53,11 @@ LSC_STD                  Specify the directorey of std library.
 
 |}
 
+type build_result = {
+  build_exe: string;
+  build_executor: string option;
+}
+
 let rec main () = 
   let index = ref 1 in
   let args = Sys.get_argv () in
@@ -78,7 +83,7 @@ and build_and_run args index =
 
   | None -> ()
 
-and build_command args index : string option =
+and build_command args index : build_result option =
   if !index >= (Array.length args) then (
     Format.printf "%s" build_help_message;
     ignore (exit 2);
@@ -86,7 +91,7 @@ and build_command args index : string option =
   ) else 
     let entry = ref None in
     let buildDir = ref None in
-    let standalone_wasm = ref None in
+    let wasm_standalone = ref None in
     let mode = ref "debug" in
     let verbose = ref false in
     let platform = ref "native" in
@@ -147,7 +152,7 @@ and build_command args index : string option =
           Format.printf "not enough args for --standalone-wasm\n";
           ignore (exit 2)
         );
-        standalone_wasm := Some (Array.get args !index);
+        wasm_standalone := Some (Array.get args !index);
         index := !index + 1;
       )
 
@@ -171,10 +176,10 @@ and build_command args index : string option =
     ) else (
       let std = Sys.getenv_exn "LSC_STD" in
       let runtimeDir = Sys.getenv_exn "LSC_RUNTIME" in
-      build_entry (Option.value_exn !entry) std !buildDir runtimeDir !mode !verbose !platform
+      build_entry (Option.value_exn !entry) std !buildDir runtimeDir !mode !verbose !platform !wasm_standalone
     )
 
-and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platform: string option =
+and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platform wasm_standalone: build_result option =
   let module R = Resolver.S (struct
 
     let is_directory path = Sys.is_directory_exn path
@@ -207,7 +212,8 @@ and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platf
       build_dir;
       runtime_dir;
       verbose;
-      platform
+      platform;
+      wasm_standalone = Option.is_some wasm_standalone;
     } in
     let profiles = compile_file_path ~config entry_full_path in
     let profile =
@@ -223,7 +229,14 @@ and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platf
     if not (String.equal platform "js") then (
       run_make_in_dir profile.profile_dir
     );
-    Some profile.profile_exe_path
+    Some {
+      build_exe = profile.profile_exe_path;
+      build_executor =
+        if String.equal platform "js" then
+          Some "node"
+        else
+          wasm_standalone;
+    }
   with
     | Unix.Unix_error (_, err, err_s) -> (
       Format.printf "Failed: %s: %s %s\n" entry err err_s;
@@ -320,18 +333,13 @@ and loc_to_string (loc_opt: Loc.t) =
   )
 
 (* replace current process *)
-and run_bin_path path =
-  if Filename.check_suffix path ".js" then
-    Unix.exec ~prog:"node" ~argv:["node"; path] ()
-  else
-    Unix.exec ~prog:path ~argv:[path] ()
-  (* match Unix.fork () with
-  | `In_the_child -> (
-    ignore (Unix.exec ~prog:path ~argv:[path] ())
-  )
-  | `In_the_parent pid -> (
-    Unix.waitpid_exn pid
-  ) *)
+and run_bin_path build_result =
+  let { build_exe; build_executor } = build_result in
+  match build_executor with
+  | Some executor ->
+    Unix.exec ~prog:executor ~argv:[executor; build_exe] ()
+
+  | None -> Unix.exec ~prog:build_exe ~argv:[build_exe] ()
 
 ;;
 
