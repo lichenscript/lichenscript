@@ -29,5 +29,22 @@ describe('Compiler', function () {
       }
     });
 
+    it('resolve error', function () {
+      try {
+        const result = lichenscript.compile(`
+        import "xxx";
+
+        function main() {
+          print("Hello World");
+        }
+        `);
+        const fun = new Function(result)
+        fun();
+      } catch (err) {
+        assert.strictEqual(Array.isArray(err.errors), true)
+        console.log(JSON.stringify(err.errors));
+      }
+    });
+
   });
 });
