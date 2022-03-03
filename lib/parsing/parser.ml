@@ -212,6 +212,47 @@ and parse_program env : program =
     pprogram_loc = with_start_loc env start_loc;
   }
 
+and parse_import env : Import.t =
+  let import_tail_with_spec spec =
+    let perr_loc = Peek.loc env in
+    let next = Peek.token env in
+    match next with 
+    | Token.T_STRING (loc, content, _, _) -> (
+      Eat.token env;
+      ignore (Eat.maybe env Token.T_SEMICOLON);
+      { Import.
+        spec;
+        source = content;
+        source_loc = loc;
+      }
+    )
+
+    | _ -> (
+      let perr_spec = Parser_env.get_unexpected_error next in
+      Parse_error.error {
+        perr_spec;
+        perr_loc;
+      }
+    )
+  in
+
+  Eat.token env;
+  let next = Peek.token env in
+  match next with
+  | Token.T_MULT -> (
+    Eat.token env;
+    Expect.token env Token.T_FROM;
+    import_tail_with_spec (Some ImportAll)
+  )
+
+  | Token.T_IDENTIFIER _ -> (
+    let id = parse_identifier env in
+    import_tail_with_spec (Some (ImportNamespace id))
+  )
+
+  | _ ->
+    import_tail_with_spec None
+
 and parse_declaration env : Declaration.t =
   let open Declaration in
   let start_loc = Peek.loc env in
@@ -220,26 +261,8 @@ and parse_declaration env : Declaration.t =
   let spec: Declaration.spec =
     match next with
     | Token.T_IMPORT -> (
-      Eat.token env;
-      let perr_loc = Peek.loc env in
-      let next = Peek.token env in
-      match next with
-      | Token.T_STRING (loc, content, _, _) -> (
-        Eat.token env;
-        ignore (Eat.maybe env Token.T_SEMICOLON);
-        Import {
-          source = content;
-          source_loc = loc;
-        }
-      )
-
-      | _ -> (
-        let perr_spec = Parser_env.get_unexpected_error next in
-        Parse_error.error {
-          perr_spec;
-          perr_loc;
-        }
-      )
+      let import = parse_import env in
+      Import import
     )
 
     | _ -> (

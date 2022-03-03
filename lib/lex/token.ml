@@ -62,6 +62,7 @@ type t =
   | T_MATCH
   | T_EXPORT
   | T_IMPORT
+  | T_FROM
   | T_SUPER
   | T_IMPLEMENTS
   | T_INTERFACE
@@ -213,6 +214,7 @@ let token_to_string = function
   | T_MATCH -> "T_MATCH"
   | T_EXPORT -> "T_EXPORT"
   | T_IMPORT -> "T_IMPORT"
+  | T_FROM -> "T_FROM"
   | T_SUPER -> "T_SUPER"
   | T_IMPLEMENTS -> "T_IMPLEMENTS"
   | T_INTERFACE -> "T_INTERFACE"
@@ -350,6 +352,7 @@ let value_of_token = function
   | T_MATCH -> "match"
   | T_EXPORT -> "export"
   | T_IMPORT -> "import"
+  | T_FROM -> "from"
   | T_SUPER -> "super"
   | T_IMPLEMENTS -> "implements"
   | T_INTERFACE -> "interface"

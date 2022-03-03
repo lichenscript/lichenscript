@@ -847,6 +847,7 @@ let token (env : Lex_env.t) lexbuf : result =
   | "extends" -> Token (env, T_EXTENDS)
   | "false" -> Token (env, T_FALSE)
   | "final" -> Token (env, T_FINAL)
+  | "from" -> Token (env, T_FROM)
   | "for" -> Token (env, T_FOR)
   | "function" -> Token (env, T_FUNCTION)
   | "if" -> Token (env, T_IF)

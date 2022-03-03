@@ -307,7 +307,7 @@ and Declaration : sig
     | Function_ of Function.t
     | Declare of declare
     | Enum of Enum.t
-    | Import of Ast.Declaration.import
+    | Import of Ast.Import.t
     [@@deriving show]
 
   type t =

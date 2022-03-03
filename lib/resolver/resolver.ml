@@ -198,8 +198,8 @@ module S (FS: FSProvider) = struct
         )
         ast.tree.pprogram_declarations
       in
-      let preclude = {
-        Ast.Declaration.
+      let preclude = { Ast.Import.
+        spec = None;
         source = "std/preclude";
         source_loc = Loc.none;
       } in
@@ -211,8 +211,8 @@ module S (FS: FSProvider) = struct
 
     List.iter
       ~f:(fun import ->
-        let open Ast.Declaration in
-        let { source; source_loc } = import in
+        let open Ast.Import in
+        let { source; source_loc; _ } = import in
         let find_paths = env.find_paths in
         let result =
           List.fold
@@ -331,7 +331,7 @@ module S (FS: FSProvider) = struct
       )
       env.linker
 
-  let import_checker env _mod file (import: Ast.Declaration.import) =
+  let import_checker env _mod file (import: Ast.Import.t) =
     let { Module. imports_map; _ } = file in
     let module_full_path = Hashtbl.find_exn imports_map import.source in
     let _module = Option.value_exn (Linker.get_module env.linker module_full_path) in
