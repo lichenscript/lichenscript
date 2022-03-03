@@ -367,11 +367,6 @@ and Declaration : sig
   }
   [@@deriving show]
 
-  type import = {
-    source: string;
-    source_loc: Loc.t;
-  }
-  [@@deriving show]
 
   type spec =
     | Class of _class
@@ -379,7 +374,7 @@ and Declaration : sig
     | Function_ of Function.t
     | Declare of declare
     | Enum of Enum.t
-    | Import of import
+    | Import of Import.t
     [@@deriving show]
 
   type t = {
@@ -391,6 +386,23 @@ and Declaration : sig
 
 end
   = Declaration
+
+and Import : sig
+
+  type spec =
+  | ImportAll
+  | ImportNamespace of Identifier.t
+  [@@deriving show]
+
+  type t = {
+    spec: spec option;
+    source: string;
+    source_loc: Loc.t;
+  }
+  [@@deriving show]
+
+end
+  =Import
 
 type program = {
   pprogram_top_level: Top_level.t;

@@ -21,7 +21,7 @@ open Lichenscript_parsing
 module IntHash = Hashtbl.Make(Int)
 module T = Typedtree
 
-type import_checker = Ast.Declaration.import -> unit
+type import_checker = Ast.Import.t -> unit
 
 (*
  * Type check deeply, check every expressions
