@@ -254,7 +254,11 @@ module S (FS: FSProvider) = struct
     (* parse and create env, do annotation when all files are parsed
     * because annotation stage needs all exported symbols are resolved
     *)
-    let typed_env = Lichenscript_typing.Env.create ~file_scope ctx in
+    let typed_env = Lichenscript_typing.Env.create
+      ~file_scope
+      ~external_resolver:(external_resolver env imports_map)
+      ctx
+    in
 
     (* add all top level symbols to typed_env *)
     Tree_helper.add_top_level_symbols_to_typed_env typed_env ast.tree;
@@ -305,6 +309,17 @@ module S (FS: FSProvider) = struct
     ) else
       None
 
+  and external_resolver env imports_map mod_id ~name =
+    let open Module in
+    let open Option in
+    let full_path_opt = Hashtbl.find imports_map mod_id in
+    full_path_opt >>= fun full_path ->
+    let mod_opt = Linker.get_module env.linker full_path in
+    mod_opt >>= fun _mod ->
+    let export_opt = Module.find_export _mod ~name in
+    export_opt >>| fun export ->
+    export.export_var.var_id
+
   let annotate_all_modules env =
     Linker.iter_modules
       ~f:(fun m ->
@@ -313,9 +328,9 @@ module S (FS: FSProvider) = struct
           List.map
             ~f:(fun file -> 
               let { Module. typed_env; ast; _ } = file in
-              let typed_tree =
-                Lichenscript_typing.Annotate.annotate_program
-                typed_env (Option.value_exn ast)
+              let typed_tree = Lichenscript_typing.Annotate.annotate_program
+                typed_env
+                (Option.value_exn ast)
               in
               { file with
                 (* clear the ast to released memory,
@@ -332,26 +347,30 @@ module S (FS: FSProvider) = struct
       env.linker
 
   let import_checker env _mod file (import: Ast.Import.t) =
-    let { Module. imports_map; _ } = file in
-    let module_full_path = Hashtbl.find_exn imports_map import.source in
-    let _module = Option.value_exn (Linker.get_module env.linker module_full_path) in
-    let exports = Module.exports _module in
-    let module_scope = Module.module_scope _mod in
+    match import.spec with
+    | Some Ast.Import.ImportAll -> (
+      let { Module. imports_map; _ } = file in
+      let module_full_path = Hashtbl.find_exn imports_map import.source in
+      let _module = Option.value_exn (Linker.get_module env.linker module_full_path) in
+      let exports = Module.exports _module in
+      let module_scope = Module.module_scope _mod in
 
-    List.iter
-      ~f:(fun (export_name, _) -> 
-        let test_variable = module_scope#find_var_symbol export_name in
-        match test_variable with
-        | Some _variable ->
-          let err = { Resolve_error.
-            spec = Redeclared export_name;
-            (* loc = variable.var_loc; *)
-            loc = import.source_loc;
-          } in
-          raise (ResolveError err)
-        | None -> ()
+      List.iter
+        ~f:(fun (export_name, _) -> 
+          let test_variable = module_scope#find_var_symbol export_name in
+          match test_variable with
+          | Some _variable ->
+            let err = { Resolve_error.
+              spec = Redeclared export_name;
+              (* loc = variable.var_loc; *)
+              loc = import.source_loc;
+            } in
+            raise (ResolveError err)
+          | None -> ()
+        )
+        exports
       )
-      exports
+    | _ -> ()
 
   let typecheck_all_modules ~ctx ~verbose env =
     annotate_all_modules env;
