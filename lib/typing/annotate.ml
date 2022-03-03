@@ -57,7 +57,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       let ty_var = T.Expression.(expr.ty_var) in
 
       let node = {
-        value = TypeExpr.Ctor(Ref (Env.ty_unit env), []);
+        value = TypeExpr.Unit;
         loc;
         deps = List.append prev_deps [ty_var];
       } in
@@ -157,8 +157,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let deps, value =
         match cnst with
         | Unit ->
-          let ty_var = Option.value_exn (root_scope#find_type_symbol "unit") in
-          [ty_var], TypeExpr.Ctor(Ref ty_var, [])
+          [], TypeExpr.Unit
 
         | Integer _ ->
           let ty_var = Option.value_exn (root_scope#find_type_symbol "i32") in
@@ -240,10 +239,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           | Some t ->
             let t, deps = annotate_type env t in
             t, deps
-          | None -> (
-            let none_type = Env.ty_unit env in
-            TypeExpr.Ctor(Ref none_type, []), []
-          )
+          | None -> TypeExpr.Unit, []
+
         in
 
         let lambda_body = annotate_expression ~prev_deps:(List.append deps ret_deps) env lambda_body in
@@ -424,8 +421,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           raise (Diagnosis.Error err)
         )
       in
-      let unit_type = Env.ty_unit env in
-      let value = (TypeExpr.Ctor (Ref unit_type, [])) in
+      let value = TypeExpr.Unit in
       let next_id = Type_context.new_id ctx {
         value;
         deps = [ expr.ty_var; left'.ty_var ];
@@ -789,10 +785,9 @@ and annotate_declaration env decl : T.Declaration.t =
             | Some ty -> (
               annotate_type env ty
             )
-            | None -> (
-              let unit_ty = Env.ty_unit env in
-              TypeExpr.Ctor(Ref unit_ty, []), []
-            )
+            | None ->
+              TypeExpr.Unit, []
+
           in
 
           let ty_def = {
@@ -1002,10 +997,8 @@ and annotate_class env cls =
             let method_return, return_ty_deps =
               match cls_method_return_ty with
               | Some ty -> annotate_type env ty
-              | None -> (
-                let unit_type = Env.ty_unit env in
-                TypeExpr.(Ctor (Ref unit_type, [])), [unit_type]
-              )
+              | None -> TypeExpr.Unit, []
+
             in
 
             let method_id = Type_context.size (Env.ctx env) in
@@ -1138,10 +1131,8 @@ and annotate_class env cls =
             let method_return, return_ty_deps =
               match cls_decl_method_return_ty with
               | Some ty -> annotate_type env ty
-              | None -> (
-                let unit_type = Env.ty_unit env in
-                TypeExpr.(Ctor (Ref unit_type, [])), [unit_type]
-              )
+              | None -> TypeExpr.Unit, []
+
             in
 
             let method_get_set =
@@ -1401,6 +1392,7 @@ and annotate_type env ty : (TypeExpr.t * int list) =
   match spec with
   | Ty_any -> TypeExpr.Any, []
   | Ty_ctor({ pident_name = "string"; _ }, []) -> TypeExpr.String, []
+  | Ty_ctor({ pident_name = "unit"; _ }, []) -> TypeExpr.Unit, []
   | Ty_ctor({ pident_name = "any"; _ }, []) -> TypeExpr.Any, []
   | Ty_ctor(ctor, params) -> (
     let { Identifier. pident_name; pident_loc } = ctor in
@@ -1546,9 +1538,8 @@ and annotate_function env fun_ =
       match header.return_ty with
       | Some type_expr ->
         annotate_type env type_expr
-      | None ->
-        let unit_type = Env.ty_unit env in
-        TypeExpr.Ctor(Ref unit_type, []), []
+      | None -> TypeExpr.Unit, []
+
     in
 
     fun_deps := List.append !fun_deps return_ty_deps;
@@ -1689,10 +1680,8 @@ and annotate_enum env enum =
         let method_return, return_ty_deps =
           match cls_method_return_ty with
           | Some ty -> annotate_type env ty
-          | None -> (
-            let unit_type = Env.ty_unit env in
-            TypeExpr.(Ctor (Ref unit_type, [])), [unit_type]
-          )
+          | None -> TypeExpr.Unit, []
+
         in
 
         let method_id = Type_context.size (Env.ctx env) in
@@ -1813,10 +1802,8 @@ and annotate_interface env intf: T.Declaration.intf =
       | Some t ->
         let t, deps = annotate_type env t in
         t, deps
-      | None -> (
-        let none_type = Env.ty_unit env in
-        TypeExpr.Ctor(Ref none_type, []), []
-      )
+      | None -> TypeExpr.Unit, []
+
     in
 
     let node_id = Type_context.size (Env.ctx env) in

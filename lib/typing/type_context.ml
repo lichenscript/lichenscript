@@ -26,7 +26,6 @@ let make_default_type_sym ctx scope =
   let open Core_type in
   let open Core_type.TypeDef in
   let names = [|
-    ("unit", Primitive);
     ("u32", Primitive);
     ("i32", Primitive);
     ("u64", Primitive);
@@ -108,6 +107,9 @@ and print_type_value ctx ty_value =
   match ty_value with
   | Unknown -> "unknown"
   | Any -> "any"
+
+  | Unit -> "unit"
+
   | Ctor (var, []) -> (
     let var = deref_type ctx var in
     match deref_type ctx var with
