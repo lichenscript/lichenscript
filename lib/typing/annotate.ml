@@ -330,17 +330,68 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       id, T.Expression.Tuple expressions
     )
 
-
     | Member (expr, name) -> (
-      let expr = annotate_expression ~prev_deps env expr in
-      let ctx = Env.ctx env in
-      let node = {
-        value = TypeExpr.Unknown;
-        loc;
-        deps = List.append prev_deps [expr.ty_var];
-      } in
-      let id = Type_context.new_id ctx node in
-      id, T.Expression.Member(expr, name)
+      let default_clause () =
+        let expr = annotate_expression ~prev_deps env expr in
+        let ctx = Env.ctx env in
+        let node = {
+          value = TypeExpr.Unknown;
+          loc;
+          deps = List.append prev_deps [expr.ty_var];
+        } in
+        let id = Type_context.new_id ctx node in
+        id, T.Expression.Member(expr, name)
+      in
+
+      match expr with
+      | { spec = Identifier id; _ } -> (
+        let scope = Env.peek_scope env in
+        let variable_opt = scope#find_var_symbol id.pident_name in
+        match variable_opt with
+        | Some variable -> (
+          let node_type = Type_context.deref_node_type (Env.ctx env) variable.var_id in
+          match node_type with
+          | TypeDef { Core_type.TypeDef. spec = Namespace ns_path; _} -> (
+            let resolver = Env.external_resolver env in
+            let resolve_result = resolver ns_path ~name:name.pident_name in
+            match resolve_result with
+            | Some ty_int ->
+              let id_expr = { T.Expression.
+                spec = Identifier(id.pident_name, variable.var_id);
+                attributes = [];
+                ty_var = variable.var_id;
+                loc = id.pident_loc;
+              } in
+              if is_name_enum_or_class name.pident_name then (
+                let node = {
+                  value = TypeExpr.Ref variable.var_id;
+                  loc = loc;
+                  deps = [ty_int];
+                } in
+                let ty_id = Type_context.new_id (Env.ctx env) node in
+                ty_id, T.Expression.Member(id_expr, name)
+              ) else (
+                ty_int, T.Expression.Member(id_expr, name)
+              )
+
+            | None ->
+              let err_spec = Type_error.CannotFindNameForImport(id.pident_name, name.pident_name) in
+              let err = Diagnosis.make_error (Env.ctx env) expr.loc err_spec in
+              raise (Diagnosis.Error err)
+
+          )
+
+          | _ -> default_clause ()
+
+        )
+
+        | None ->
+          default_clause ()
+
+      )
+
+      | _ -> default_clause ()
+
     )
 
     | Index(expr, index_expr) -> (
@@ -841,7 +892,9 @@ and annotate_declaration env decl : T.Declaration.t =
       let _, ty_var = T.Enum.(enum.name) in
       ty_var, T.Declaration.Enum enum
 
-    | Import import -> -1, T.Declaration.Import import
+    | Import import ->
+      annotate_import env import;
+      -1, T.Declaration.Import import
 
   in
   let result = { T.Declaration. spec; loc; attributes } in
@@ -1868,6 +1921,48 @@ and annotate_interface env intf: T.Declaration.intf =
     intf_type_vars;
     intf_methods;
   }
+
+and annotate_import env import =
+  let open Ast.Import in
+  let { spec; source; _ } = import in
+  match spec with
+  | Some (ImportNamespace local_name) -> (
+    let id = Type_context.size (Env.ctx env) in
+    let type_def = { Core_type.TypeDef.
+      id;
+      builtin = false;
+      name = local_name.pident_name;
+      spec = Namespace source;
+    } in
+
+    ignore (Type_context.new_id (Env.ctx env) { Core_type.
+      loc = local_name.pident_loc;
+      value = TypeExpr.TypeDef type_def;
+      deps = [];
+    });
+    let scope = Env.peek_scope env in
+    let result = scope#new_var_symbol
+      ~id
+      ~kind:Ast.Pvar_const
+      ~loc:local_name.pident_loc
+      local_name.pident_name
+    in
+
+    match result with
+    | `Duplicate -> 
+      let err = Diagnosis.(make_error
+        (Env.ctx env)
+        local_name.pident_loc
+        (Redefinition local_name.pident_name)
+      ) in
+      raise Diagnosis.(Error err)
+
+    | _ -> 
+      scope#init_symbol local_name.pident_name
+
+  )
+
+  | _ -> ()
 
 let annotate_program env (program: Ast.program) =
   let { Ast. pprogram_declarations; pprogram_top_level = _; pprogram_loc; _; } = program in

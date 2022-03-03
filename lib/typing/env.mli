@@ -26,6 +26,8 @@ val errors: t -> Type_error.t list
 
 val with_new_scope: t -> scope -> (t -> 'a) -> 'a
 
+val external_resolver: t -> external_resolver
+
 val ty_u32: t -> int
 
 val ty_i32: t -> int

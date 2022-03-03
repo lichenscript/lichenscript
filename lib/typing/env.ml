@@ -56,6 +56,8 @@ let with_new_scope env scope callback =
   env.current_scope <- prev_scope;
   result
 
+let external_resolver env = env.external_resolver
+
 let get_global_type_val env =
   let root_scope = Type_context.root_scope env.ctx in
   root_scope#find_type_symbol

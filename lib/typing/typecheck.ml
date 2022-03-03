@@ -570,28 +570,58 @@ and check_expression env expr =
   )
 
   | Member (main_expr, name) -> (
-    check_expression env main_expr;
-    let expr_node = Type_context.get_node env.ctx main_expr.ty_var in
-    let member_type_opt =
-      Check_helper.find_member_of_type env.ctx ~scope:env.scope expr_node.value name.pident_name
+    let handle_member_typpe expr_node member_type_opt =
+      let open Core_type.TypeExpr in
+      match member_type_opt with
+      | Some (Method({ TypeDef. spec = ClassMethod { method_get_set = Some _; method_return; _ }; _ }, _params, _rt), _) -> (
+        Type_context.update_node_type env.ctx expr.ty_var method_return
+      )
+
+      | Some (Method({ TypeDef. spec = ClassMethod { method_get_set = None; _ }; _ }, _params, _rt), _) -> (
+        let ty, _ = Option.value_exn member_type_opt in
+        Type_context.update_node_type env.ctx expr.ty_var ty
+      )
+
+      (* it's a property *) 
+      | Some (ty_expr, _) ->
+        Type_context.update_node_type env.ctx expr.ty_var ty_expr
+
+      | None ->
+        let err = Diagnosis.(make_error env.ctx expr_loc (CannotReadMember(name.pident_name, expr_node.value))) in
+        raise (Diagnosis.Error err)
+
     in
-    match member_type_opt with
-    | Some (Method({ TypeDef. spec = ClassMethod { method_get_set = Some _; method_return; _ }; _ }, _params, _rt), _) -> (
-      Type_context.update_node_type env.ctx expr.ty_var method_return
+
+    let default_clause () =
+      check_expression env main_expr;
+      let expr_node = Type_context.get_node env.ctx main_expr.ty_var in
+      let member_type_opt =
+        Check_helper.find_member_of_type env.ctx ~scope:env.scope expr_node.value name.pident_name
+      in
+      handle_member_typpe expr_node member_type_opt
+    in
+
+    match main_expr with
+    | { T.Expression. spec = Identifier _; ty_var; _ } -> (
+      let node_type = Type_context.deref_node_type env.ctx ty_var in
+      match node_type with
+      | TypeExpr.TypeDef { TypeDef. spec = Namespace _; _ } ->
+        (* let expr_node = Type_context.get_node env.ctx main_expr.ty_var in
+        let member_type_opt =
+          Check_helper.find_member_of_type env.ctx ~scope:env.scope expr_node.value name.pident_name
+        in
+        handle_member_typpe expr_node member_type_opt *)
+        ()
+
+        (* failwith "unimplemented" *)
+
+      | _ ->
+        default_clause ()
+
     )
 
-    | Some (Method({ TypeDef. spec = ClassMethod { method_get_set = None; _ }; _ }, _params, _rt), _) -> (
-      let ty, _ = Option.value_exn member_type_opt in
-      Type_context.update_node_type env.ctx expr.ty_var ty
-    )
-
-    (* it's a property *) 
-    | Some (ty_expr, _) ->
-      Type_context.update_node_type env.ctx expr.ty_var ty_expr
-
-    | None ->
-      let err = Diagnosis.(make_error env.ctx expr_loc (CannotReadMember(name.pident_name, expr_node.value))) in
-      raise (Diagnosis.Error err)
+    | _ ->
+      default_clause ()
 
   )
 

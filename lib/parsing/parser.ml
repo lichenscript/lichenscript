@@ -247,6 +247,7 @@ and parse_import env : Import.t =
 
   | Token.T_IDENTIFIER _ -> (
     let id = parse_identifier env in
+    Expect.token env Token.T_FROM;
     import_tail_with_spec (Some (ImportNamespace id))
   )
 

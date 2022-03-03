@@ -12,6 +12,7 @@ type t =
   | CannotUsedAsKeyOfMap of TypeExpr.t
   | CannotApplyUnary of UnaryOp.t * TypeExpr.t
   | CannotAccessBeforeInit of string
+  | CannotFindNameForImport of string * string  (* local_name, find_name *)
   | MissingMethodForInterface of string * string  (* interface_name, method_name *)
   | InvalidAssign
   | OnlyAssignArrayIndexAlpha

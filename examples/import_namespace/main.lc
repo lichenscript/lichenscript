@@ -1,0 +1,5 @@
+import Lib from "anotherLib";
+
+function main () {
+  Lib.test();
+}

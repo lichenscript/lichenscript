@@ -386,10 +386,6 @@ let rec replace_type_vars_with_maps ctx type_map type_expr =
     | None -> type_expr
   )
 
-  | Unknown
-  | Unit
-  | Any -> type_expr
-
   | Ctor (m, list) -> (
     let m = replace_type_vars_with_maps ctx type_map m in
     let list = List.map ~f:(replace_type_vars_with_maps ctx type_map) list in
@@ -415,8 +411,6 @@ let rec replace_type_vars_with_maps ctx type_map type_expr =
     Lambda ({ params_content; params_rest }, ret)
   )
 
-  | Method _ -> type_expr
-
   | Tuple children ->
     let children = List.map ~f:(replace_type_vars_with_maps ctx type_map) children in
     Tuple children
@@ -424,7 +418,11 @@ let rec replace_type_vars_with_maps ctx type_map type_expr =
   | Array arr ->
     Array (replace_type_vars_with_maps ctx type_map arr)
 
-  | String -> type_expr
+  | Unknown
+  | Unit
+  | Any
+  | Method _
+  | String
   | TypeDef _ -> type_expr
 
 and replace_params_with_type ctx type_map params =
@@ -485,6 +483,10 @@ let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
 
     result >>= fun (_name, _vis, elm) ->
     match elm with
+    | { TypeDef. id = _member_id; spec = Namespace _ns_path; _ } -> (
+      failwith "unimplemented"
+    )
+
     | ({ TypeDef. id = member_id; spec = ClassMethod { method_params; method_return; _ }; _ } as def) -> (
         let params = replace_params_with_type ctx types_map method_params in
         let rt = replace_type_vars_with_maps ctx types_map method_return in
