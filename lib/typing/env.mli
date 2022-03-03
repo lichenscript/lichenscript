@@ -2,7 +2,9 @@ open Scope
 
 type t
 
-val create: ?open_domains:(string array list) -> file_scope:scope -> Type_context.t -> t
+type external_resolver = string -> name:string -> int option
+
+val create: external_resolver:external_resolver -> file_scope:scope -> Type_context.t -> t
 
 val ctx : t -> Type_context.t
 

@@ -2,20 +2,22 @@ open Base
 open Core_kernel
 open Scope
 
+type external_resolver = string -> name:string -> int option
+
 type t = {
   ctx: Type_context.t;
   file_scope: scope;
-  open_domains: string array list;
+  external_resolver: external_resolver;
   mutable current_scope: scope;
   mutable errors: Type_error.t list;
   mutable scope_counter: int;
   mutable in_lambda: bool;
 }
 
-let create ?(open_domains=[]) ~file_scope ctx =
+let create ~external_resolver ~file_scope ctx =
   {
     ctx;
-    open_domains;
+    external_resolver;
     file_scope;
     current_scope = file_scope;
     errors = [];
