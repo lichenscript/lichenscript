@@ -251,7 +251,13 @@ and parse_import env : Import.t =
   )
 
   | _ ->
-    import_tail_with_spec None
+    let perr_spec = Parser_env.get_unexpected_error next in
+    let perr_loc = Peek.loc env in
+    Parse_error.error {
+      perr_spec;
+      perr_loc;
+    }
+    (* import_tail_with_spec None *)
 
 and parse_declaration env : Declaration.t =
   let open Declaration in

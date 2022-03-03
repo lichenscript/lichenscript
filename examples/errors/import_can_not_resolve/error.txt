@@ -1,1 +1,1 @@
-1:7 Can not resolve symbol 'xxx'
+1:14 Can not resolve symbol 'xxx'
