@@ -1,5 +1,5 @@
-import Lib from "anotherLib";
+import lib from "anotherLib";
 
 function main () {
-  Lib.test();
+  lib.test();
 }

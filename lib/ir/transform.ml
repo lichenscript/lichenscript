@@ -1084,6 +1084,19 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       prepend_stmts := List.append !prepend_stmts (List.concat prepend);
       append_stmts := List.append !append_stmts (List.concat append);
 
+      let test_namespace expr =
+        match expr with
+        | { spec = Identifier (_, id); _ } -> (
+          let expr_type = Type_context.deref_node_type env.ctx id in
+          match expr_type with
+          | TypeDef { Core_type.TypeDef. spec = Namespace _; _ } -> true
+
+          | _ -> false
+        )
+
+        | _ -> false
+      in
+
       let call_expr =
         match callee with
         | { spec = Identifier (_, id); _ } -> (
@@ -1119,49 +1132,59 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
         | { spec = Member(expr, id); _ } ->
           begin
-            let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
-            let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) expr_type id.pident_name in
-            match member with
-            | Some ((Method ({ spec = ClassMethod { method_is_virtual = true; _ }; _ }, _, _)), _) -> (
-              let this_expr = transform_expression ~is_borrow:true env expr in
-
-              prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
-              append_stmts := List.append !append_stmts this_expr.append_stmts;
-
-              Ir.Expr.Invoke(this_expr.expr, id.pident_name, params)
-            )
-            | Some ((Method ({ id = method_id; spec = ClassMethod { method_get_set = None; _ }; _ }, _, _)), _) -> (
-              (* only class method needs a this_expr, this is useless for a static function *)
-              let this_expr = transform_expression ~is_borrow:true env expr in
-
-              prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
-              append_stmts := List.append !append_stmts this_expr.append_stmts;
-
-              match Type_context.find_external_symbol env.ctx method_id with
-              | Some ext_name -> (
-                (* external method *)
-                Ir.Expr.Call((Ir.SymLocal ext_name), Some this_expr.expr, params)
-              )
-              | _ ->
-                let callee_node = Type_context.get_node env.ctx method_id in
-                let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
-                let ctor = Option.value_exn ~message:"Cannot find typedef of class" ctor_opt in
-                let ctor_ty_id = ctor.id in
-                let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
-                Ir.Expr.Call(global_name, Some this_expr.expr, params)
-            )
-
-            (* it's a static function *)
-            | Some (TypeDef { id = fun_id; spec = Function _; _ }, _) -> (
-              let callee_node = Type_context.get_node env.ctx fun_id in
+            if test_namespace expr then (
+              (* let callee_node = Type_context.get_node env.ctx ty_var in
               let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
               let ctor = Option.value_exn ctor_opt in
-              let ctor_ty_id = ctor.id in
-              let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
+              let ctor_ty_id = ctor.id in *)
+              let global_name = Hashtbl.find_exn env.global_name_map callee.ty_var in
               Ir.Expr.Call(global_name, None, params)
-            )
-            | _ -> failwith "unrechable"
+            ) else (
+              let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
+              let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) expr_type id.pident_name in
+              match member with
+              | Some ((Method ({ spec = ClassMethod { method_is_virtual = true; _ }; _ }, _, _)), _) -> (
+                let this_expr = transform_expression ~is_borrow:true env expr in
 
+                prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
+                append_stmts := List.append !append_stmts this_expr.append_stmts;
+
+                Ir.Expr.Invoke(this_expr.expr, id.pident_name, params)
+              )
+              | Some ((Method ({ id = method_id; spec = ClassMethod { method_get_set = None; _ }; _ }, _, _)), _) -> (
+                (* only class method needs a this_expr, this is useless for a static function *)
+                let this_expr = transform_expression ~is_borrow:true env expr in
+
+                prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
+                append_stmts := List.append !append_stmts this_expr.append_stmts;
+
+                match Type_context.find_external_symbol env.ctx method_id with
+                | Some ext_name -> (
+                  (* external method *)
+                  Ir.Expr.Call((Ir.SymLocal ext_name), Some this_expr.expr, params)
+                )
+                | _ ->
+                  let callee_node = Type_context.get_node env.ctx method_id in
+                  let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
+                  let ctor = Option.value_exn ~message:"Cannot find typedef of class" ctor_opt in
+                  let ctor_ty_id = ctor.id in
+                  let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
+                  Ir.Expr.Call(global_name, Some this_expr.expr, params)
+              )
+
+              (* it's a static function *)
+              | Some (TypeDef { id = fun_id; spec = Function _; _ }, _) -> (
+                let callee_node = Type_context.get_node env.ctx fun_id in
+                let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
+                let ctor = Option.value_exn ctor_opt in
+                let ctor_ty_id = ctor.id in
+                let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
+                Ir.Expr.Call(global_name, None, params)
+              )
+
+              | _ ->
+                failwith "unrechable"
+            )
           end
 
         | _ -> (
