@@ -72,5 +72,3 @@ let ty_f32 = unwrap_global_type "f32"
 let ty_char = unwrap_global_type "char"
 
 let ty_boolean = unwrap_global_type "boolean"
-
-let ty_unit = unwrap_global_type "unit"

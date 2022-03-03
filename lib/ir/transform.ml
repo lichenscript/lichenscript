@@ -923,7 +923,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       env.tmp_vars_count <- env.tmp_vars_count + 1;
       let tmp_var = Ir.SymTemp tmp_id in
 
-      if Check_helper.is_unit env.ctx (Type_context.deref_node_type env.ctx ty_var) then (
+      if Check_helper.is_unit (Type_context.deref_node_type env.ctx ty_var) then (
         let init_stmt = { Ir.Stmt.
           spec = Expr(Ir.Expr.Assign(Ident tmp_var, Null));
           loc = Loc.none;

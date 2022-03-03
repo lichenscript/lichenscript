@@ -75,9 +75,6 @@ let[@warning "-unused-value-declaration"]
 let[@warning "-unused-value-declaration"]
   ty_boolean = unwrap_global_type "boolean"
 
-let[@warning "-unused-value-declaration"]
-  ty_unit =unwrap_global_type "unit"
-
 let with_scope env scope cb =
   let prev = env.scope in
   env.scope <- scope;
@@ -198,8 +195,7 @@ and check_block env blk =
     )
 
     | _ -> (
-      let unit_type = ty_unit env in
-      Type_context.update_node_type env.ctx return_ty (TypeExpr.Ctor(Ref unit_type, []))
+      Type_context.update_node_type env.ctx return_ty (TypeExpr.Unit)
     )
   )
 
@@ -242,8 +238,7 @@ and check_statement env stmt =
   | Debugger -> ()
 
   | Return None -> (
-    let unit_ty = ty_unit env in
-    add_return_type env (TypeExpr.Ctor(Ref unit_ty, []), stmt.loc)
+    add_return_type env (TypeExpr.Unit, stmt.loc)
   )
 
   | Return (Some expr) -> (
@@ -303,8 +298,7 @@ and check_expression_if env if_spec =
      * if there is no alternative, this if expression is regarded as 'unit' type,
      *)
     | None -> (
-      let ty_unit = ty_unit env in
-      let result = TypeExpr.Ctor(Ref ty_unit, []) in
+      let result = TypeExpr.Unit in
       if not (Check_helper.type_assinable env.ctx result node.value) then (
         let err = Diagnosis.(make_error env.ctx if_loc (NotAssignable(result, node.value))) in
         raise (Diagnosis.Error err)
@@ -796,7 +790,7 @@ and check_expression env expr =
       )
 
       | Literal Ast.Literal.Unit -> (
-        if not (Check_helper.is_unit env.ctx expr_type) then (
+        if not (Check_helper.is_unit expr_type) then (
           let err = Diagnosis.(make_error env.ctx pat.loc (UnexpectedPatternType("unit", expr_type))) in
           raise (Diagnosis.Error err)
         )
@@ -929,8 +923,7 @@ and check_expression env expr =
 
     let ty =
       if List.is_empty match_clauses then (
-        let ty_unit = ty_unit env in
-        TypeExpr.Ctor(Ref ty_unit, [])
+        TypeExpr.Unit
       ) else (
         (* TODO: better way to check every clauses *)
         List.fold

@@ -48,6 +48,8 @@ module rec TypeExpr : sig
     | Unknown
     | Any
 
+    | Unit
+
     (*
      * Ctor represents `instance`, does not represent the type itself
      *
@@ -118,6 +120,7 @@ end = struct
   type t =
     | Unknown
     | Any
+    | Unit
     | Ctor of t * (t list)
     | Ref of int
     | Lambda of params * t
@@ -138,6 +141,8 @@ end = struct
     match t with
     | Unknown -> Format.fprintf formatter "unknown"
     | Any -> Format.fprintf formatter "any"
+
+    | Unit -> Format.fprintf formatter "unit"
 
     | Ctor(t, vars) ->
       Format.fprintf formatter "%a<%d>" pp t (List.length vars)
