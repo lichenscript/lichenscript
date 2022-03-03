@@ -235,6 +235,7 @@ and TypeDef : sig
     | Function of _function
     | Enum of enum_type
     | EnumCtor of enum_ctor
+    | Namespace of string
 
   and t = {
     id: int;
@@ -319,6 +320,7 @@ end = struct
     | Function of _function
     | Enum of enum_type
     | EnumCtor of enum_ctor
+    | Namespace of string
 
   and t = {
     id: int;

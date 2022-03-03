@@ -63,6 +63,9 @@ module PP = struct
     | CannotAccessBeforeInit var_name ->
       Format.fprintf formatter "Cannot access '%s' before initialization." var_name
 
+    | CannotFindNameForImport(local_name, find_name) ->
+      Format.fprintf formatter "Cannot find '%s' for module '%s'." find_name local_name
+
     | MissingMethodForInterface(intf_name, method_name) ->
       Format.fprintf formatter "Missing method '%s' for interface '%s'." method_name intf_name
 

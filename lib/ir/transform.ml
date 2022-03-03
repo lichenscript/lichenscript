@@ -1123,12 +1123,12 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
             let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) expr_type id.pident_name in
             match member with
             | Some ((Method ({ spec = ClassMethod { method_is_virtual = true; _ }; _ }, _, _)), _) -> (
-                let this_expr = transform_expression ~is_borrow:true env expr in
+              let this_expr = transform_expression ~is_borrow:true env expr in
 
-                prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
-                append_stmts := List.append !append_stmts this_expr.append_stmts;
+              prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
+              append_stmts := List.append !append_stmts this_expr.append_stmts;
 
-                Ir.Expr.Invoke(this_expr.expr, id.pident_name, params)
+              Ir.Expr.Invoke(this_expr.expr, id.pident_name, params)
             )
             | Some ((Method ({ id = method_id; spec = ClassMethod { method_get_set = None; _ }; _ }, _, _)), _) -> (
               (* only class method needs a this_expr, this is useless for a static function *)
