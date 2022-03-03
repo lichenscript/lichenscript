@@ -1,4 +1,4 @@
-import "xxx"
+import * from "xxx"
 
 function main() {
 	const tiger = Tiger{};
