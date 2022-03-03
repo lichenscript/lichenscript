@@ -121,12 +121,15 @@ module PP = struct
       Format.fprintf formatter "All the cases of match expression should return the same type, previous is %s, but got %s"
         (pp_ty prev) (pp_ty current)
 
-    | CapitalizedEnumMemeber name -> (
+    | CapitalizedEnumMember name -> (
       let first_char = String.get name 0 in
       let upper_char = Char.uppercase_ascii first_char in
       let new_name = String.mapi (fun index ch -> if index = 0 then upper_char else ch) name in
       Format.fprintf formatter "The name of the enum member '%s' must be capitalized, try '%s'" name new_name
     )
+
+    | LowercaseTheImportName import_name ->
+      Format.fprintf formatter "Lowercase the import name '%s'" import_name
 
     | NotAEnumConstructor name -> (
       Format.fprintf formatter "'%s' is not an enum constructor" name

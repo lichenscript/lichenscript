@@ -27,7 +27,8 @@ type t =
   | CannotResolveTypeOfExpression
   | DeclareFunctionShouldSpecificExternal
   | NotAllTheCasesReturnSameType of (TypeExpr.t * TypeExpr.t)
-  | CapitalizedEnumMemeber of string
+  | CapitalizedEnumMember of string
+  | LowercaseTheImportName of string
   | NotAEnumConstructor of string
   | RestParamsMustAtLast
   | ParamDoesNotProvided of string

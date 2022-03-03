@@ -1663,7 +1663,7 @@ and annotate_enum env enum =
 
       let first_char = String.get case_name.pident_name 0 in
       if not (Char.is_uppercase first_char) then (
-        let err = Diagnosis.(make_error ctx case_name.pident_loc (CapitalizedEnumMemeber case_name.pident_name)) in
+        let err = Diagnosis.(make_error ctx case_name.pident_loc (CapitalizedEnumMember case_name.pident_name)) in
         raise (Diagnosis.Error err)
       );
 
@@ -1928,6 +1928,17 @@ and annotate_import env import =
   match spec with
   | Some (ImportNamespace local_name) -> (
     let id = Type_context.size (Env.ctx env) in
+
+    let first_char = String.get local_name.pident_name 0 in
+    if Char.is_uppercase first_char then (
+      let err = Diagnosis.(make_error
+        (Env.ctx env)
+        local_name.pident_loc
+        (LowercaseTheImportName local_name.pident_name)
+      ) in
+      raise Diagnosis.(Error err)
+    );
+
     let type_def = { Core_type.TypeDef.
       id;
       builtin = false;
