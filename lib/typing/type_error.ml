@@ -29,6 +29,8 @@ type t =
   | NotAllTheCasesReturnSameType of (TypeExpr.t * TypeExpr.t)
   | CapitalizedEnumMember of string
   | LowercaseTheImportName of string
+  | LowercaseTheFunctionName of string
+  | LowercaseTheMethod of (string * string * string) (* class/enum, class name, method name *)
   | NotAEnumConstructor of string
   | RestParamsMustAtLast
   | ParamDoesNotProvided of string

@@ -1,0 +1,14 @@
+
+enum Num {
+  case One
+
+  Show() {
+
+  }
+
+}
+
+function main() {
+  const a = One;
+  a.Show();
+}

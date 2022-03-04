@@ -131,6 +131,12 @@ module PP = struct
     | LowercaseTheImportName import_name ->
       Format.fprintf formatter "Lowercase the first char of the import name '%s'" import_name
 
+    | LowercaseTheFunctionName fun_name ->
+      Format.fprintf formatter "Lowercase the first char of the function name '%s'" fun_name
+
+    | LowercaseTheMethod (cls_or_enum, cls_name, method_name) ->
+      Format.fprintf formatter "Lowercase the first char of the method name '%s' of the %s '%s'" method_name cls_or_enum cls_name
+
     | NotAEnumConstructor name -> (
       Format.fprintf formatter "'%s' is not an enum constructor" name
     )
