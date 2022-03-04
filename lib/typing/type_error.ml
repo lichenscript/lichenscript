@@ -13,6 +13,7 @@ type t =
   | CannotApplyUnary of UnaryOp.t * TypeExpr.t
   | CannotAccessBeforeInit of string
   | CannotFindNameForImport of string * string  (* local_name, find_name *)
+  | CannotResolverReference of string
   | MissingMethodForInterface of string * string  (* interface_name, method_name *)
   | InvalidAssign
   | OnlyAssignArrayIndexAlpha

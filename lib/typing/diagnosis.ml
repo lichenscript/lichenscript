@@ -82,7 +82,7 @@ module PP = struct
       Format.fprintf formatter "Currently you can only use i32 as index."
 
     | IsNotGeneric name ->
-      Format.fprintf formatter "%s is not generic." name
+      Format.fprintf formatter "'%s' is not generic." name
 
     | Redefinition name ->
       Format.fprintf formatter "Redefinition of '%s'" name
@@ -178,6 +178,9 @@ module PP = struct
 
     | IfTestShouldBeBoolean ty ->
       Format.fprintf formatter "The type of expression after if should be 'boolean', but got '%s'." (pp_ty ty)
+
+    | CannotResolverReference name ->
+      Format.fprintf formatter "Can not resolve reference '%s'." name
     
     | CannotUsedForTryExpression ty ->
       Format.fprintf formatter "The type '%s' can not be used in a try expression." (pp_ty ty)
