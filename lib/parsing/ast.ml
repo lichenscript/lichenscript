@@ -69,7 +69,7 @@ and Expression : sig
 
   and init = {
     init_loc: Loc.t;
-    init_name: Identifier.t;
+    init_name: Identifier.t list;
     init_elements: init_element list;
   }
 

@@ -490,7 +490,11 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     | Init init -> (
       let { init_loc; init_name; init_elements } = init in
       let ctx = Env.ctx env in
-      let type_int = (Env.peek_scope env)#find_type_symbol init_name.pident_name in
+      let init_name = match init_name with
+        | [init_name] -> init_name
+        | _ -> failwith "unimplemented"
+      in
+      let type_int =(Env.peek_scope env)#find_type_symbol init_name.pident_name in
       let deps = ref [] in
 
       let annotate_element elm =
@@ -1461,6 +1465,8 @@ and annotate_type env ty : (TypeExpr.t * int list) =
   | Ty_ctor(ids, params) -> (
     let ctx = Env.ctx env in
     match ids with
+    | [] -> failwith "unrechable"
+
     | [ctor] ->
       let { Identifier. pident_name; pident_loc } = ctor in
 
@@ -1488,7 +1494,7 @@ and annotate_type env ty : (TypeExpr.t * int list) =
         )
       )
 
-    | [namespace; cls_name] -> (
+    | namespace::cls_name::rest -> (
       let scope = Env.peek_scope env in
       let variable_opt = scope#find_var_symbol namespace.pident_name in
       let not_found_error () =
@@ -1507,6 +1513,14 @@ and annotate_type env ty : (TypeExpr.t * int list) =
           | Some ty_var -> (
             let params, params_deps = List.map ~f:(annotate_type env) params |> List.unzip in
             deps := List.concat (!deps::params_deps);
+
+            if not (List.is_empty rest) then (
+              let first = List.hd_exn rest in
+              let err_spec = Type_error.CannotResolverReference first.pident_name in
+              let err = Diagnosis.make_error (Env.ctx env) first.pident_loc err_spec in
+              raise (Diagnosis.Error err)
+            );
+
             TypeExpr.Ctor (Ref ty_var, params), ty_var::!deps
           )
 
@@ -1524,8 +1538,6 @@ and annotate_type env ty : (TypeExpr.t * int list) =
         raise (Diagnosis.Error err)
 
     )
-
-    | _ -> failwith "unreachable"
 
   )
 
