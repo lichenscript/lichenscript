@@ -76,11 +76,9 @@ type t =
   | T_DEBUGGER
   | T_DECLARE
   | T_TYPE
-  | T_OPAQUE
   | T_OF
   | T_ASYNC
   | T_AWAIT
-  | T_CHECKS
   (* Operators *)
   | T_RSHIFT_ASSIGN
   | T_LSHIFT_ASSIGN
@@ -228,11 +226,9 @@ let token_to_string = function
   | T_DEBUGGER -> "T_DEBUGGER"
   | T_DECLARE -> "T_DECLARE"
   | T_TYPE -> "T_TYPE"
-  | T_OPAQUE -> "T_OPAQUE"
   | T_OF -> "T_OF"
   | T_ASYNC -> "T_ASYNC"
   | T_AWAIT -> "T_AWAIT"
-  | T_CHECKS -> "T_CHECKS"
   | T_LCURLY -> "T_LCURLY"
   | T_RCURLY -> "T_RCURLY"
   | T_LPAREN -> "T_LPAREN"
@@ -366,11 +362,9 @@ let value_of_token = function
   | T_DEBUGGER -> "debugger"
   | T_DECLARE -> "declare"
   | T_TYPE -> "type"
-  | T_OPAQUE -> "opaque"
   | T_OF -> "of"
   | T_ASYNC -> "async"
   | T_AWAIT -> "await"
-  | T_CHECKS -> "%checks"
   | T_RSHIFT_ASSIGN -> ">>="
   | T_LSHIFT_ASSIGN -> "<<="
   | T_BIT_XOR_ASSIGN -> "^="
@@ -497,9 +491,7 @@ let is_keyword = function
   | T_DEBUGGER
   | T_DECLARE
   | T_TYPE
-  | T_OPAQUE
   | T_OF
   | T_ASYNC
-  | T_AWAIT
-  | T_CHECKS -> true
+  | T_AWAIT -> true
   | _ -> false

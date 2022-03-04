@@ -240,7 +240,7 @@ and Type : sig
 
   and spec =
     | Ty_any
-    | Ty_ctor of Identifier.t * t list
+    | Ty_ctor of Identifier.t list * t list
       (* List<int> *)
 
     | Ty_tuple of t list

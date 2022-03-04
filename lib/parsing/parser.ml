@@ -1672,7 +1672,7 @@ and parse_primary_type env =
             let open ReleaxedArrow in
             let param_name =
               match param.param_content.spec with
-              | Type.Ty_ctor(id, []) ->
+              | Type.Ty_ctor([id], []) ->
                 id
               | _ ->
                 failwith "use identifier as arrow functions's param"
@@ -1723,7 +1723,7 @@ and parse_primary_type env =
   )
 
   | _ -> (
-    let id = parse_identifier env in
+    let ids = parse_id_namespace env [] in
     let args = ref [] in
 
     if Peek.token env = Token.T_LESS_THAN then (
@@ -1741,11 +1741,22 @@ and parse_primary_type env =
     );
 
     let prefix = {
-      spec = Ty_ctor (id, List.rev !args);
+      spec = Ty_ctor (ids, List.rev !args);
       loc = with_start_loc env start_loc;
     } in
     parse_type_maybe_array env start_loc prefix
   )
+
+and parse_id_namespace env acc =
+  let id = parse_identifier env in
+  let next = id::acc in
+  match (Peek.token env) with
+  | Token.T_PERIOD ->
+    Eat.token env;
+    parse_id_namespace env next
+
+  | _ ->
+    List.rev next
 
 and parse_type_maybe_array env start_loc prev =
   let open Type in

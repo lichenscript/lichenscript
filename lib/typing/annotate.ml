@@ -351,6 +351,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         | Some variable -> (
           let node_type = Type_context.deref_node_type (Env.ctx env) variable.var_id in
           match node_type with
+          (* it's a namespace *)
           | TypeDef { Core_type.TypeDef. spec = Namespace ns_path; _} -> (
             let resolver = Env.external_resolver env in
             let resolve_result = resolver ns_path ~name:name.pident_name in
@@ -1454,37 +1455,77 @@ and annotate_type env ty : (TypeExpr.t * int list) =
   let scope = Env.peek_scope env in
   match spec with
   | Ty_any -> TypeExpr.Any, []
-  | Ty_ctor({ pident_name = "string"; _ }, []) -> TypeExpr.String, []
-  | Ty_ctor({ pident_name = "unit"; _ }, []) -> TypeExpr.Unit, []
-  | Ty_ctor({ pident_name = "any"; _ }, []) -> TypeExpr.Any, []
-  | Ty_ctor(ctor, params) -> (
-    let { Identifier. pident_name; pident_loc } = ctor in
+  | Ty_ctor([{ pident_name = "string"; _ }], []) -> TypeExpr.String, []
+  | Ty_ctor([{ pident_name = "unit"; _ }], []) -> TypeExpr.Unit, []
+  | Ty_ctor([{ pident_name = "any"; _ }], []) -> TypeExpr.Any, []
+  | Ty_ctor(ids, params) -> (
+    let ctx = Env.ctx env in
+    match ids with
+    | [ctor] ->
+      let { Identifier. pident_name; pident_loc } = ctor in
 
-    let params, params_deps = List.map ~f:(annotate_type env) params |> List.unzip in
-    deps := List.concat (!deps::params_deps);
+      let params, params_deps = List.map ~f:(annotate_type env) params |> List.unzip in
+      deps := List.concat (!deps::params_deps);
 
-    if scope#is_generic_type_symbol pident_name then (
-      if not (List.is_empty params) then (
-        let err = Diagnosis.(make_error (Env.ctx env) loc (IsNotGeneric pident_name)) in
-        raise (Diagnosis.Error err)
-      );
-      TypeExpr.TypeSymbol pident_name, !deps
-    ) else (
-      let ty_var_opt = (Env.peek_scope env)#find_type_symbol pident_name in
-      match ty_var_opt with
-      | Some ty_var -> (
-        (* TODO: find ctor in the scope *)
-        TypeExpr.Ctor (Ref ty_var, params), ty_var::!deps
+      if scope#is_generic_type_symbol pident_name then (
+        if not (List.is_empty params) then (
+          let err = Diagnosis.(make_error (Env.ctx env) loc (IsNotGeneric pident_name)) in
+          raise (Diagnosis.Error err)
+        );
+        TypeExpr.TypeSymbol pident_name, !deps
+      ) else (
+        let ty_var_opt = (Env.peek_scope env)#find_type_symbol pident_name in
+        match ty_var_opt with
+        | Some ty_var -> (
+          TypeExpr.Ctor (Ref ty_var, params), ty_var::!deps
+        )
+
+        | None -> (
+          (Env.peek_scope env)#print_type_symbols;
+          let err_spec = Type_error.CannotFindName pident_name in
+          let err = Diagnosis.make_error ctx pident_loc err_spec in
+          raise (Diagnosis.Error err)
+        )
       )
 
-      | None -> (
-        (Env.peek_scope env)#print_type_symbols;
-        let ctx = Env.ctx env in
-        let err_spec = Type_error.CannotFindName pident_name in
-        let err = Diagnosis.make_error ctx pident_loc err_spec in
+    | [namespace; cls_name] -> (
+      let scope = Env.peek_scope env in
+      let variable_opt = scope#find_var_symbol namespace.pident_name in
+      let not_found_error () =
+        let err_spec = Type_error.CannotFindNameForImport(namespace.pident_name, cls_name.pident_name) in
+        let err = Diagnosis.make_error (Env.ctx env) cls_name.pident_loc err_spec in
         raise (Diagnosis.Error err)
+      in
+      match variable_opt with
+      | Some variable -> (
+        let node_type = Type_context.deref_node_type ctx variable.var_id in
+        match node_type with
+        | TypeDef { Core_type.TypeDef. spec = Namespace ns_path; _ } -> (
+          let resolver = Env.external_resolver env in
+          let result = resolver ns_path ~name:cls_name.pident_name in
+          match result with
+          | Some ty_var -> (
+            let params, params_deps = List.map ~f:(annotate_type env) params |> List.unzip in
+            deps := List.concat (!deps::params_deps);
+            TypeExpr.Ctor (Ref ty_var, params), ty_var::!deps
+          )
+
+          | None -> not_found_error()
+
+        )
+
+        | _ -> not_found_error()
+
       )
+
+      | None ->
+        let err_spec = Type_error.CannotFindName namespace.pident_name in
+        let err = Diagnosis.make_error ctx namespace.pident_loc err_spec in
+        raise (Diagnosis.Error err)
+
     )
+
+    | _ -> failwith "unreachable"
 
   )
 
