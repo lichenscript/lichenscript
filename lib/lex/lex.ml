@@ -860,7 +860,6 @@ let token (env : Lex_env.t) lexbuf : result =
   | "override" -> Token (env, T_OVERRIDE)
   | "null" -> Token (env, T_NULL)
   | "of" -> Token (env, T_OF)
-  | "opaque" -> Token (env, T_OPAQUE)
   | "package" -> Token (env, T_PACKAGE)
   | "private" -> Token (env, T_PRIVATE)
   | "protected" -> Token (env, T_PROTECTED)
@@ -1710,7 +1709,6 @@ let type_token env lexbuf =
     let raw = lexeme lexbuf in
     let (env, value) = decode_identifier env raw in
     Token (env, T_IDENTIFIER { loc; value; raw })
-  | "%checks" -> Token (env, T_CHECKS)
   (* Syntax *)
   | "[" -> Token (env, T_LBRACKET)
   | "]" -> Token (env, T_RBRACKET)
