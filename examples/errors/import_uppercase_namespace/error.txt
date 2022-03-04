@@ -1,1 +1,1 @@
-1:7 Lowercase the import name 'Lib'
+1:7 Lowercase the first char of the import name 'Lib'

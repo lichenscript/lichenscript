@@ -129,7 +129,7 @@ module PP = struct
     )
 
     | LowercaseTheImportName import_name ->
-      Format.fprintf formatter "Lowercase the import name '%s'" import_name
+      Format.fprintf formatter "Lowercase the first char of the import name '%s'" import_name
 
     | NotAEnumConstructor name -> (
       Format.fprintf formatter "'%s' is not an enum constructor" name
