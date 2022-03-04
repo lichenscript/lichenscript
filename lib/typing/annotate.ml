@@ -1026,6 +1026,16 @@ and annotate_class env cls =
         | Cls_method _method -> (
           let method_scope = new function_scope ~prev:(Env.peek_scope env) () in
           let { cls_method_attributes; cls_method_visibility; cls_method_modifier; cls_method_name; cls_method_params; cls_method_loc; cls_method_body; cls_method_return_ty; _ } = _method in
+
+          let first_char = String.get cls_method_name.pident_name 0 in
+          if Char.is_uppercase first_char then (
+            let err = Diagnosis.(make_error
+              (Env.ctx env) cls_method_name.pident_loc
+              (LowercaseTheMethod ("class", cls.cls_id.pident_name, _method.cls_method_name.pident_name)))
+            in
+            raise (Diagnosis.Error err)
+          );
+
           let type_visibility = annotate_visibility cls_method_visibility in
           let is_static =
             match cls_method_modifier with
@@ -1568,6 +1578,15 @@ and annotate_function env fun_ =
   Env.with_new_scope env fun_scope (fun env ->
     let { visibility = _visibility; header; body; loc; comments; } = fun_ in
 
+    let first_char = String.get header.id.pident_name 0 in
+    if Char.is_uppercase first_char then (
+      let err = Diagnosis.(make_error
+        (Env.ctx env) header.id.pident_loc
+        (LowercaseTheFunctionName header.id.pident_name))
+      in
+      raise (Diagnosis.Error err)
+    );
+
     let fun_id_opt = prev_scope#find_var_symbol header.id.pident_name in
     if Option.is_none fun_id_opt then (
       failwith (Format.sprintf "unexpected: function id %s is not added in parsing stage" header.id.pident_name)
@@ -1720,6 +1739,16 @@ and annotate_enum env enum =
       let open Ast.Declaration in
       let method_scope = new function_scope ~prev:(Env.peek_scope env) () in
       let { cls_method_attributes; cls_method_visibility; cls_method_modifier; cls_method_name; cls_method_params; cls_method_loc; cls_method_body; cls_method_return_ty; _ } = _method in
+
+      let first_char = String.get cls_method_name.pident_name 0 in
+      if Char.is_uppercase first_char then (
+        let err = Diagnosis.(make_error
+          (Env.ctx env) cls_method_name.pident_loc
+          (LowercaseTheMethod ("enum", name.pident_name, _method.cls_method_name.pident_name)))
+        in
+        raise (Diagnosis.Error err)
+      );
+
       let type_visibility = annotate_visibility cls_method_visibility in
       Env.with_new_scope env method_scope (fun env ->
         let cls_method_params, method_params, cls_method_params_deps = annotate_function_params env cls_method_params in

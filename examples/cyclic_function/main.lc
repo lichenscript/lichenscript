@@ -1,20 +1,20 @@
 
-function A() {
-    B();
+function a() {
+    b();
 }
 
-function B() {
-    C(false);
+function b() {
+    c(false);
 }
 
-function C(callA: boolean) {
+function c(callA: boolean) {
     if callA {
-        A()
+        a()
     } else {
         print("finished")
     }
 }
 
 function main() {
-    C(true);
+    c(true);
 }

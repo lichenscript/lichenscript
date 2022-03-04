@@ -1,0 +1,8 @@
+
+function Test() {
+	print("Hello world");
+}
+
+function main() {
+	Test();
+}
