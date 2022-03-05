@@ -54,6 +54,7 @@ module%gen rec Expression : sig
 
   and init = {
     init_loc: Loc.t;
+    init_namespace: identifier option;
     init_name: identifier;
     init_elements: init_element list;
   }
