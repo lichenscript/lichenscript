@@ -744,7 +744,11 @@ and annotate_expression_if ~prev_deps env _if =
 and prescan_pattern_for_scope ~kind ~(scope: Scope.scope) env pat =
   let open Ast.Pattern in
   match pat.spec with
-  | Identifier { Identifier. pident_name; pident_loc } -> (
+
+  (*
+   * if a pattern is with namespace, it can not be a identifier pattern
+   *)
+  | Identifier [{ Identifier. pident_name; pident_loc }] -> (
     if String.equal pident_name "_" then ()
     else if is_name_enum_or_class pident_name then ()
     else (
@@ -1412,7 +1416,8 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
   let spec =
     match spec with
     | Literal l -> T.Pattern.Literal l
-    | Identifier ident -> (
+    | Identifier [] -> failwith "unrechable"
+    | Identifier [ident] -> (
       (* It's a enum contructor *)
       if String.equal ident.pident_name "_" then (
         T.Pattern.Underscore
@@ -1435,21 +1440,111 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
       )
     )
 
-    | EnumCtor(id, pat) -> (
-      let ctor_var = scope#find_var_symbol id.pident_name in
-      if Option.is_none ctor_var then (
-        let err = Diagnosis.(make_error (Env.ctx env) loc (CannotFindName id.pident_name)) in
+    | Identifier (namespace::ident::rest) -> (
+      let ns_var = scope#find_var_symbol namespace.pident_name in
+      if Option.is_none ns_var then (
+        let err = Diagnosis.(make_error (Env.ctx env) loc (CannotFindName namespace.pident_name)) in
         raise (Diagnosis.Error err)
       );
-      let ctor_var = Option.value_exn ctor_var in
+      let ns_var = Option.value_exn ns_var in
 
-      let param_pat, param_deps = annotate_pattern env pat in
-      deps := List.concat [ param_deps; !deps; [ctor_var.var_id]];
+      let ns_type = Type_context.deref_node_type (Env.ctx env) ns_var.var_id in
 
-      (T.Pattern.EnumCtor (
-        (id.pident_name, ctor_var.var_id),
-        param_pat
-      ))
+      match ns_type with
+      | TypeExpr.TypeDef { spec = Namespace ns_path; _} -> (
+        let resolver = Env.external_resolver env in
+        let ext_id = resolver ns_path ~name:ident.pident_name in
+        
+        if Option.is_none ext_id then (
+          let err_spec = Type_error.CannotFindNameForImport(namespace.pident_name, ident.pident_name) in
+          let err = Diagnosis.make_error (Env.ctx env) ident.pident_loc err_spec in
+          raise (Diagnosis.Error err)
+        );
+
+        let ext_id = Option.value_exn ext_id in
+
+        if not (List.is_empty rest) then (
+          let first = List.hd_exn rest in
+          let err_spec = Type_error.CannotResolverReference first.pident_name in
+          let err = Diagnosis.make_error (Env.ctx env) first.pident_loc err_spec in
+          raise (Diagnosis.Error err)
+        );
+
+        deps := List.append !deps [ext_id];
+        (T.Pattern.Symbol (ident.pident_name, ext_id))
+      )
+
+      | _ ->
+        let err_spec = Type_error.CannotFindNameForImport(namespace.pident_name, ident.pident_name) in
+        let err = Diagnosis.make_error (Env.ctx env) ident.pident_loc err_spec in
+        raise (Diagnosis.Error err)
+
+    )
+
+    | EnumCtor(ids, pat) -> (
+      match ids with
+      | [] -> failwith "unrechable"
+      | [id] -> (
+        let ctor_var = scope#find_var_symbol id.pident_name in
+        if Option.is_none ctor_var then (
+          let err = Diagnosis.(make_error (Env.ctx env) loc (CannotFindName id.pident_name)) in
+          raise (Diagnosis.Error err)
+        );
+        let ctor_var = Option.value_exn ctor_var in
+
+        let param_pat, param_deps = annotate_pattern env pat in
+        deps := List.concat [ param_deps; !deps; [ctor_var.var_id]];
+
+        (T.Pattern.EnumCtor (
+          (id.pident_name, ctor_var.var_id),
+          param_pat
+        ))
+      )
+      | namespace::id::rest -> (
+        let ns_var = scope#find_var_symbol namespace.pident_name in
+        if Option.is_none ns_var then (
+          let err = Diagnosis.(make_error (Env.ctx env) loc (CannotFindName namespace.pident_name)) in
+          raise (Diagnosis.Error err)
+        );
+        let ns_var = Option.value_exn ns_var in
+
+        let ns_type = Type_context.deref_node_type (Env.ctx env) ns_var.var_id in
+
+        match ns_type with
+        | TypeExpr.TypeDef { spec = Namespace ns_path; _} -> (
+          let resolver = Env.external_resolver env in
+          let ext_id = resolver ns_path ~name:id.pident_name in
+          
+          if Option.is_none ext_id then (
+            let err_spec = Type_error.CannotFindNameForImport(namespace.pident_name, id.pident_name) in
+            let err = Diagnosis.make_error (Env.ctx env) id.pident_loc err_spec in
+            raise (Diagnosis.Error err)
+          );
+
+          let ext_id = Option.value_exn ext_id in
+
+          if not (List.is_empty rest) then (
+            let first = List.hd_exn rest in
+            let err_spec = Type_error.CannotResolverReference first.pident_name in
+            let err = Diagnosis.make_error (Env.ctx env) first.pident_loc err_spec in
+            raise (Diagnosis.Error err)
+          );
+
+          let param_pat, param_deps = annotate_pattern env pat in
+          deps := List.concat [ param_deps; !deps; [ext_id]];
+
+          (T.Pattern.EnumCtor (
+            (id.pident_name, ext_id),
+            param_pat
+          ))
+        )
+
+        | _ ->
+          let err_spec = Type_error.CannotFindNameForImport(namespace.pident_name, id.pident_name) in
+          let err = Diagnosis.make_error (Env.ctx env) id.pident_loc err_spec in
+          raise (Diagnosis.Error err)
+
+      )
     )
 
     | Tuple children -> (
