@@ -1,0 +1,18 @@
+
+function returnF32(): f32 {
+	3.3
+}
+
+function acceptOptionI32(a: Option<i32>) {
+	print("accept")
+}
+
+function main() {
+	const i = returnF32() as i32;
+	print(1);
+	const b = 0.3 + (3 as f32);
+	print(b);
+
+	const a = None as Option<i32>;
+	acceptOptionI32(a);
+}

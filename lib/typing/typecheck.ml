@@ -1042,7 +1042,7 @@ and check_expression env expr =
     
     let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
 
-    if Check_helper.type_castable env.ctx expr_type _type then (
+    if not (Check_helper.type_castable env.ctx expr_type _type) then (
       let err = Diagnosis.(make_error env.ctx expr.loc (CannotCastType (expr_type, _type))) in
       raise (Diagnosis.Error err)
     );

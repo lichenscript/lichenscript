@@ -1507,9 +1507,10 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     | TypeCast(expr, _type) ->(
       if Check_helper.check_castable_primitive env.ctx _type then (
         let expr_result = transform_expression ~is_move:true env expr in
+        let ctor_opt = Check_helper.find_construct_of env.ctx _type in
         let type_name =
-          match _type with
-          | Core_type.TypeExpr.TypeDef type_def -> (
+          match ctor_opt with
+          | Some (type_def, []) -> (
             type_def.name
           )
           | _ -> failwith "unrechable"
