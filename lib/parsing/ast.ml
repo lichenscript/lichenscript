@@ -184,8 +184,8 @@ and Pattern : sig
 
   and spec =
     | Literal of Literal.t
-    | Identifier of Identifier.t
-    | EnumCtor of (Identifier.t * t)
+    | Identifier of Identifier.t list
+    | EnumCtor of (Identifier.t list * t)
     | Tuple of t list
     | Array of array_pat
 
