@@ -1052,7 +1052,7 @@ and parse_expression env : Expression.t =
     let rec try_cast_member_into_id_list acc (expr: Expression.t) =
       match expr.spec with
       | Expression.Identifier id ->
-        Some (List.rev (id::acc))
+        Some (id::acc)
 
       | Expression.Member(expr, name) ->
         let next = name::acc in

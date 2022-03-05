@@ -490,11 +490,58 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     | Init init -> (
       let { init_loc; init_name; init_elements } = init in
       let ctx = Env.ctx env in
-      let init_name = match init_name with
-        | [init_name] -> init_name
-        | _ -> failwith "unimplemented"
+      let scope = Env.peek_scope env in
+      let init_namespace, (init_name, type_int) = match init_name with
+        | [] -> failwith "unrechable"
+        | [init_name] -> (
+          let type_int =(Env.peek_scope env)#find_type_symbol init_name.pident_name in
+          if Option.is_none type_int then (
+            let err = Diagnosis.(make_error ctx init_loc (CannotFindName init_name.pident_name)) in
+            raise (Diagnosis.Error err)
+          );
+          None, (init_name, (Option.value_exn type_int))
+        )
+
+        | namespace::init_name::rest -> (
+          let not_found_error () =
+            let err_spec = Type_error.CannotFindNameForImport(namespace.pident_name, init_name.pident_name) in
+            let err = Diagnosis.make_error (Env.ctx env) init_name.pident_loc err_spec in
+            raise (Diagnosis.Error err)
+          in
+          let variable_opt = scope#find_var_symbol namespace.pident_name in
+          match variable_opt with
+          | Some variable -> (
+            let node_type = Type_context.deref_node_type ctx variable.var_id in
+            match node_type with
+            | TypeDef { Core_type.TypeDef. spec = Namespace ns_path; _ } -> (
+              let resolver = Env.external_resolver env in
+              let result = resolver ns_path ~name:init_name.pident_name in
+              match result with
+              | Some ty_var ->
+
+                if not (List.is_empty rest) then (
+                  let first = List.hd_exn rest in
+                  let err_spec = Type_error.CannotResolverReference first.pident_name in
+                  let err = Diagnosis.make_error (Env.ctx env) first.pident_loc err_spec in
+                  raise (Diagnosis.Error err)
+                );
+
+                (Some (namespace.pident_name, variable.var_id)), (init_name, ty_var)
+
+              | _ -> not_found_error ()
+            )
+
+            | _ -> not_found_error ()
+
+          )
+
+          | None ->
+            let err_spec = Type_error.CannotFindName namespace.pident_name in
+            let err = Diagnosis.make_error (Env.ctx env) namespace.pident_loc err_spec in
+            raise (Diagnosis.Error err)
+
+        )
       in
-      let type_int =(Env.peek_scope env)#find_type_symbol init_name.pident_name in
       let deps = ref [] in
 
       let annotate_element elm =
@@ -543,26 +590,19 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         )
       in
 
-      match type_int with
-      | Some v -> (
-        let node = {
-          value = TypeExpr.Ctor(Ref v, []);
-          loc = init_loc;
-          deps = v::(List.rev !deps);
-          (* TODO: check props and expressions *)
-        } in
-        let node_id = Type_context.new_id ctx node in
-        node_id, T.Expression.Init{
-          init_loc;
-          init_name = (init_name.pident_name, v);
-          init_elements = List.map ~f:annotate_element init_elements;
-        } 
-      )
-      | None -> (
-        let err = Diagnosis.(make_error ctx init_loc (CannotFindName init_name.pident_name)) in
-        raise (Diagnosis.Error err)
-      )
-
+      let node = {
+        value = TypeExpr.Ctor(Ref type_int, []);
+        loc = init_loc;
+        deps = type_int::(List.rev !deps);
+        (* TODO: check props and expressions *)
+      } in
+      let node_id = Type_context.new_id ctx node in
+      node_id, T.Expression.Init {
+        init_loc;
+        init_namespace;
+        init_name = (init_name.pident_name, type_int);
+        init_elements = List.map ~f:annotate_element init_elements;
+      } 
     )
 
     | Match _match -> annotate_expression_match ~prev_deps env _match
