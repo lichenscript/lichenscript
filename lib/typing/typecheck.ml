@@ -602,18 +602,20 @@ and check_expression env expr =
     in
 
     match main_expr with
+
+    (*
+     * Call a static function from another lib
+     *
+     * import lib from "xxx";
+     *
+     * lib.function(...)
+     *
+     *)
     | { T.Expression. spec = Identifier _; ty_var; _ } -> (
       let node_type = Type_context.deref_node_type env.ctx ty_var in
       match node_type with
       | TypeExpr.TypeDef { TypeDef. spec = Namespace _; _ } ->
-        (* let expr_node = Type_context.get_node env.ctx main_expr.ty_var in
-        let member_type_opt =
-          Check_helper.find_member_of_type env.ctx ~scope:env.scope expr_node.value name.pident_name
-        in
-        handle_member_typpe expr_node member_type_opt *)
         ()
-
-        (* failwith "unimplemented" *)
 
       | _ ->
         default_clause ()

@@ -1,5 +1,6 @@
 import lib from "anotherLib";
 
 function main () {
+  lib.MyClass.printHelloWorld();
   const cls = lib.MyClass {};
 }
