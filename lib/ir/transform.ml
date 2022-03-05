@@ -1504,7 +1504,32 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         Ir.Expr.Ident SymThis
     )
 
-    | TypeCast _ -> failwith "unimplemented: type cast"
+    | TypeCast(expr, _type) ->(
+      if Check_helper.check_castable_primitive env.ctx _type then (
+        let expr_result = transform_expression ~is_move:true env expr in
+        let type_name =
+          match _type with
+          | Core_type.TypeExpr.TypeDef type_def -> (
+            type_def.name
+          )
+          | _ -> failwith "unrechable"
+        in
+        let cast_type =
+          match type_name with
+          | "i32" -> Primitives.PrimType.I32
+          | "f32" -> Primitives.PrimType.F32
+          | "char" -> Primitives.PrimType.Char
+          | "boolean" -> Primitives.PrimType.Boolean
+          | _ -> failwith "unrechable"
+        in
+        Ir.Expr.TypeCast(expr_result.expr, cast_type)
+      ) else (
+        let tmp = transform_expression ~is_move ~is_borrow env expr in
+        append_stmts := tmp.append_stmts;
+        prepend_stmts := tmp.prepend_stmts;
+        tmp.expr
+      )
+    )
 
     | Try try_expr -> (
       let expr_result = transform_expression ~is_move:true env try_expr in

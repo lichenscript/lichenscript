@@ -163,6 +163,7 @@ and Expr : sig
   | TupleGetValue of (t * int)
   | ArrayGetValue of (t * t)
   | ArraySetValue of (t * t * t)
+  | TypeCast of t * Primitives.PrimType.t
   | I32Binary of Asttypes.BinaryOp.t * t * t
   | F32Binary of Asttypes.BinaryOp.t * t * t
   | I64Binary of Asttypes.BinaryOp.t * t * t

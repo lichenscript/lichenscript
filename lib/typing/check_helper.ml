@@ -65,6 +65,8 @@ let check_is_primitive_type2 ~group ctx (left: TypeExpr.t) (right: TypeExpr.t) =
     | _ -> false
   )
 
+let check_castable_primitive = check_is_primitive_type ~group:[| "i32"; "f32"; "char"; "boolean" |]
+
 let rec type_assinable_with_maps ctx var_maps left right =
   let open TypeExpr in
   let left = Type_context.deref_type ctx left in
@@ -193,7 +195,6 @@ and type_assinable ctx left right =
  * cast from left to right
  *)
 and type_castable ctx left right =
-  let check_castable_primitive = check_is_primitive_type ~group:[| "i32"; "f32"; "char"; "boolean" |] in
   if type_assinable ctx right left then
     true
   else if (check_castable_primitive ctx left) && (check_castable_primitive ctx right) then
