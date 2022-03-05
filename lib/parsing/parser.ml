@@ -1004,6 +1004,7 @@ and parse_expression env : Expression.t =
   let expr = parse_assignment_expression env in
   let next = Peek.token env in
   if next = Token.T_AS then (
+    Eat.token env;
     let t = parse_type env in
     {
       spec = As (expr, t);
