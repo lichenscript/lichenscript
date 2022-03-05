@@ -1200,45 +1200,62 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     )
 
     | Member(main_expr, id) -> (
-      let expr_result = transform_expression ~is_borrow:true env main_expr in
-      prepend_stmts := List.append !prepend_stmts expr_result.prepend_stmts;
-      append_stmts := List.append expr_result.append_stmts !append_stmts;
-
       let node = Type_context.get_node env.ctx main_expr.ty_var in
-
-      let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) node.value id.pident_name in
-      (* could be a property of a getter *)
       let open Core_type.TypeDef in
-      match member with
-      | Some (Method ({ Core_type.TypeDef. id = def_int; spec = ClassMethod { method_get_set = Some _; _ }; _ }, _params, _rt), _) -> (
-        let ext_sym_opt = Type_context.find_external_symbol env.ctx def_int in
-        let ext_sym = Option.value_exn ext_sym_opt in
-        Ir.Expr.Call(SymLocal ext_sym, Some expr_result.expr, [])
-      )
-
-      | Some (Core_type.TypeExpr.TypeDef { id = method_id; spec = ClassMethod { method_get_set = Some Getter; _ }; _ }, _) -> (
-        let ext_sym_opt = Type_context.find_external_symbol env.ctx method_id in
-        let ext_sym = Option.value_exn ext_sym_opt in
-        Ir.Expr.Call(SymLocal ext_sym, Some expr_result.expr, [])
-      )
-
-      (* it's a property *) 
-      | Some _ -> (
-        let expr_type = Type_context.deref_type env.ctx node.value in
-        let expr_ctor_opt = Check_helper.find_construct_of env.ctx expr_type in
-        match expr_ctor_opt with
-        | Some({ id = expr_id; _ }, _) -> (
-          let cls_meta = Hashtbl.find_exn env.cls_meta_map expr_id in
-          let prop_name = Hashtbl.find_exn cls_meta.cls_fields_map id.pident_name in
-          Ir.Expr.GetField(expr_result.expr, cls_meta.cls_gen_name, prop_name)
-        )
+      match node.value with
+      | Core_type.TypeExpr.TypeDef { spec = Namespace _; _ } -> (
+        let expr_node_type = Type_context.deref_node_type env.ctx expr.ty_var in
+        let open Core_type in
+        match expr_node_type with
+        | TypeExpr.TypeDef { TypeDef. id = ctor_id; spec = EnumCtor _; _ } ->
+          let generate_name = Hashtbl.find_exn env.global_name_map ctor_id in
+          (* let sym = find_variable env name in *)
+          Ir.Expr.Call(generate_name, None, [])
 
         | _ ->
-          Format.eprintf "%s expr_type: %a\n" id.pident_name Core_type.TypeExpr.pp expr_type;
-          failwith "can not find ctor of expr, maybe it's a property"
+          let id_ty = Type_context.print_type_value env.ctx expr_node_type in
+          failwith (Format.sprintf "unknown identifier: %s" id_ty)
+
       )
 
-      | _ -> failwith (Format.sprintf "unexpected: can not find member %s of id %d" id.pident_name expr.ty_var)
+      | _ ->
+        let expr_result = transform_expression ~is_borrow:true env main_expr in
+        prepend_stmts := List.append !prepend_stmts expr_result.prepend_stmts;
+        append_stmts := List.append expr_result.append_stmts !append_stmts;
+
+
+        let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) node.value id.pident_name in
+        (* could be a property of a getter *)
+        match member with
+        | Some (Method ({ Core_type.TypeDef. id = def_int; spec = ClassMethod { method_get_set = Some _; _ }; _ }, _params, _rt), _) -> (
+          let ext_sym_opt = Type_context.find_external_symbol env.ctx def_int in
+          let ext_sym = Option.value_exn ext_sym_opt in
+          Ir.Expr.Call(SymLocal ext_sym, Some expr_result.expr, [])
+        )
+
+        | Some (Core_type.TypeExpr.TypeDef { id = method_id; spec = ClassMethod { method_get_set = Some Getter; _ }; _ }, _) -> (
+          let ext_sym_opt = Type_context.find_external_symbol env.ctx method_id in
+          let ext_sym = Option.value_exn ext_sym_opt in
+          Ir.Expr.Call(SymLocal ext_sym, Some expr_result.expr, [])
+        )
+
+        (* it's a property *) 
+        | Some _ -> (
+          let expr_type = Type_context.deref_type env.ctx node.value in
+          let expr_ctor_opt = Check_helper.find_construct_of env.ctx expr_type in
+          match expr_ctor_opt with
+          | Some({ id = expr_id; _ }, _) -> (
+            let cls_meta = Hashtbl.find_exn env.cls_meta_map expr_id in
+            let prop_name = Hashtbl.find_exn cls_meta.cls_fields_map id.pident_name in
+            Ir.Expr.GetField(expr_result.expr, cls_meta.cls_gen_name, prop_name)
+          )
+
+          | _ ->
+            Format.eprintf "%s expr_type: %a\n" id.pident_name Core_type.TypeExpr.pp expr_type;
+            failwith "can not find ctor of expr, maybe it's a property"
+        )
+
+        | _ -> failwith (Format.sprintf "unexpected: can not find member %s of id %d" id.pident_name expr.ty_var)
     )
 
     | Unary(op, expr) -> (

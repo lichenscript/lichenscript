@@ -1,0 +1,6 @@
+import lib from "anotherLib";
+
+function main () {
+  const num1: lib.Num = lib.One;
+  const num2: lib.Num = lib.Other(2);
+}
