@@ -351,7 +351,16 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         | Some variable -> (
           let node_type = Type_context.deref_node_type (Env.ctx env) variable.var_id in
           match node_type with
-          (* it's a namespace *)
+
+          (*
+           * it's a namespace, return the var of the original symbol
+           * for example:
+           * 
+           * import lib from "xxx";
+           *
+           * lib.bar() -> use the ty_var "bar" in the "xxx" module
+           *
+           *)
           | TypeDef { Core_type.TypeDef. spec = Namespace ns_path; _} -> (
             let resolver = Env.external_resolver env in
             let resolve_result = resolver ns_path ~name:name.pident_name in
@@ -363,17 +372,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
                 ty_var = variable.var_id;
                 loc = id.pident_loc;
               } in
-              if is_name_enum_or_class name.pident_name then (
-                let node = {
-                  value = TypeExpr.Ref variable.var_id;
-                  loc = loc;
-                  deps = [ty_int];
-                } in
-                let ty_id = Type_context.new_id (Env.ctx env) node in
-                ty_id, T.Expression.Member(id_expr, name)
-              ) else (
-                ty_int, T.Expression.Member(id_expr, name)
-              )
+              ty_int, T.Expression.Member(id_expr, name)
 
             | None ->
               let err_spec = Type_error.CannotFindNameForImport(id.pident_name, name.pident_name) in
