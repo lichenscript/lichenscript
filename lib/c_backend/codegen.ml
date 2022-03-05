@@ -577,6 +577,46 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env (Int.to_string id);
     ps env "]"
 
+  | TypeCast(expr, Primitives.PrimType.I32) -> (
+    ps env "MK_I32(";
+
+    ps env "(";
+    codegen_expression env expr;
+    ps env ").int_val";
+
+    ps env ")"
+  )
+
+  | TypeCast(expr, Primitives.PrimType.F32) -> (
+    ps env "MK_F32(";
+
+    ps env "(";
+    codegen_expression env expr;
+    ps env ").float_val";
+
+    ps env ")"
+  )
+
+  | TypeCast(expr, Primitives.PrimType.Boolean) -> (
+    ps env "MK_BOOL(";
+
+    ps env "(";
+    codegen_expression env expr;
+    ps env ").int_val";
+
+    ps env ")"
+  )
+
+  | TypeCast(expr, Primitives.PrimType.Char) -> (
+    ps env "MK_CHAR(";
+
+    ps env "(";
+    codegen_expression env expr;
+    ps env ").int_val";
+
+    ps env ")"
+  )
+
   | I32Binary(op, left, right) -> (
     let name = Primitives.Bin.prim op in
     ps env name;

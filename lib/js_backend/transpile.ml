@@ -495,6 +495,33 @@ and transpile_expression ?(parent_expr=true) env expr =
     ps env "]"
   )
 
+  | TypeCast(expr, Primitives.PrimType.Char)
+  | TypeCast(expr, Primitives.PrimType.I32) -> (
+    ps env "(";
+
+    ps env "(";
+    transpile_expression env expr;
+    ps env ") | 0";
+
+    ps env ")"
+  )
+
+  | TypeCast(expr, Primitives.PrimType.F32) -> (
+    ps env "Math.fround(";
+
+    transpile_expression env expr;
+
+    ps env ")"
+  )
+
+  | TypeCast(expr, Primitives.PrimType.Boolean) -> (
+    ps env "!!(";
+
+    transpile_expression env expr;
+
+    ps env ")"
+  )
+
   | IntValue expr -> transpile_expression env expr
 
   | GetField(expr, _, field_name) -> (

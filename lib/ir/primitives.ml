@@ -1,5 +1,16 @@
 open Lichenscript_parsing
 
+module PrimType = struct
+
+  type t =
+    | I32
+    | F32
+    | Boolean
+    | Char
+  [@@deriving show]
+  
+end
+
 module Value = struct
 
   let mk_i32 = "MK_I32"
