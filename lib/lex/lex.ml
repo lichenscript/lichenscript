@@ -829,6 +829,7 @@ let token (env : Lex_env.t) lexbuf : result =
   | floatnumber ->
     Token (env, T_NUMBER { kind = NORMAL; raw = lexeme lexbuf })
   (* Keywords *)
+  | "as" -> Token (env, T_AS)
   | "async" -> Token (env, T_ASYNC)
   | "await" -> Token (env, T_AWAIT)
   | "break" -> Token (env, T_BREAK)

@@ -32,6 +32,7 @@ type t =
   | T_AT
   | T_POUND
   (* Keywords *)
+  | T_AS
   | T_FUNCTION
   | T_IF
   | T_IN
@@ -182,6 +183,7 @@ let token_to_string = function
   | T_TEMPLATE_PART _ -> "T_TEMPLATE_PART"
   | T_IDENTIFIER _ -> "T_IDENTIFIER"
   | T_REGEXP _ -> "T_REGEXP"
+  | T_AS -> "T_AS"
   | T_FUNCTION -> "T_FUNCTION"
   | T_IF -> "T_IF"
   | T_IN -> "T_IN"
@@ -318,6 +320,7 @@ let value_of_token = function
   | T_ELLIPSIS -> "..."
   | T_AT -> "@"
   | T_POUND -> "#"
+  | T_AS -> "as"
   | T_FUNCTION -> "function"
   | T_IF -> "if"
   | T_IN -> "in"
