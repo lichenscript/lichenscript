@@ -2,8 +2,8 @@ import lib from "anotherLib";
 
 function printNum(num: lib.Num) {
   match num {
-    case One => print("One")
-    case Other(n2) => print(2)
+    case lib.One => print("One")
+    case lib.Other(n2) => print(2)
   }
 }
 
