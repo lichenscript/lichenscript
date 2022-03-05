@@ -1504,6 +1504,8 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         Ir.Expr.Ident SymThis
     )
 
+    | TypeCast _ -> failwith "unimplemented: type cast"
+
     | Try try_expr -> (
       let expr_result = transform_expression ~is_move:true env try_expr in
 

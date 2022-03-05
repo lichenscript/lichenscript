@@ -66,6 +66,11 @@ module PP = struct
     | CannotFindNameForImport(local_name, find_name) ->
       Format.fprintf formatter "Cannot find '%s' for module '%s'." find_name local_name
 
+    | CannotCastType(expr_type, cast_type) ->
+      let expr_type = Type_context.print_type_value ctx expr_type in
+      let cast_type = Type_context.print_type_value ctx cast_type in
+      Format.fprintf formatter "Cannot cast type '%s' to '%s'." expr_type cast_type
+
     | MissingMethodForInterface(intf_name, method_name) ->
       Format.fprintf formatter "Missing method '%s' for interface '%s'." method_name intf_name
 
