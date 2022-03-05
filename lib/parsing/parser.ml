@@ -1614,11 +1614,25 @@ and parse_pattern env : Pattern.t =
 
   in
 
+  let rec parse_id_with_name acc =
+    let next = Peek.token env in
+    match next with
+    | Token.T_PERIOD ->
+      Eat.token env;
+      let ident = parse_identifier env in
+      let next_acc = ident::acc in
+      parse_id_with_name next_acc
+
+    | _ ->
+      List.rev acc
+
+  in
+
   let next = Peek.token env in
   let spec =
     match next with
     | Token.T_IDENTIFIER _ -> (
-      let ident = parse_identifier env in
+      let ident = parse_id_with_name [parse_identifier env] in
       if (Peek.token env) == Token.T_LPAREN then (
         Eat.token env;
         let content = parse_pattern env in

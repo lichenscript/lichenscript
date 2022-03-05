@@ -23,7 +23,7 @@ type file = {
 	ast: Ast.program option;
 	typed_env: Env.t;
   typed_tree: Typedtree.program option;
-	extern_modules: string list;  (* full id *)
+	import_star_external_modules: string list;  (* full id *)
 
   (* relative_map -> absolute map *)
   imports_map: (string, string) Hashtbl.t;

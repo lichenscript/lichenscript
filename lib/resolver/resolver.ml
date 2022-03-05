@@ -199,20 +199,20 @@ module S (FS: FSProvider) = struct
         ast.tree.pprogram_declarations
       in
       let preclude = { Ast.Import.
-        spec = None;
+        spec = Some ImportAll;
         source = "std/preclude";
         source_loc = Loc.none;
       } in
       List.rev (preclude::collected_imports)
     ) in
 
-    let extern_modules = ref [] in
+    let import_star_external_modules = ref [] in
     let imports_map = Hashtbl.create (module String) in
 
     List.iter
       ~f:(fun import ->
         let open Ast.Import in
-        let { source; source_loc; _ } = import in
+        let { source; source_loc; spec; _ } = import in
         let find_paths = env.find_paths in
         let result =
           List.fold
@@ -235,7 +235,10 @@ module S (FS: FSProvider) = struct
         | Some (path, source) -> (
           ignore (parse_module_by_dir ~ctx env ~real_path:path source);
           Hashtbl.set imports_map ~key:source ~data:path;
-          extern_modules := path::!extern_modules;
+          match spec with
+          | Some ImportAll ->
+            import_star_external_modules := path::!import_star_external_modules;
+          | _ -> ()
         )
         | None -> (
           let err = { Resolve_error.
@@ -247,10 +250,10 @@ module S (FS: FSProvider) = struct
       )
       imports;
 
-    let extern_modules = List.rev !extern_modules in
+    let import_star_external_modules = List.rev !import_star_external_modules in
 
     let module_scope = Module.module_scope _mod in
-    let file_scope = new file_scope ~prev:module_scope env extern_modules in
+    let file_scope = new file_scope ~prev:module_scope env import_star_external_modules in
     (* parse and create env, do annotation when all files are parsed
     * because annotation stage needs all exported symbols are resolved
     *)
@@ -269,7 +272,7 @@ module S (FS: FSProvider) = struct
         ast = Some ast.tree;
         typed_env;
         typed_tree = None;
-        extern_modules;
+        import_star_external_modules;
         imports_map;
       }
     in
