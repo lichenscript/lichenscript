@@ -108,6 +108,9 @@ module%gen rec Expression : sig
     | Init of init
     | Match of _match
     | Try of t
+
+    | TypeCast of (t * Core_type.TypeExpr.t)
+
     | This
     | Super
 

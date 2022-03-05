@@ -618,7 +618,19 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       node_id, (T.Expression.Try expr')
     )
 
-    | As _ -> failwith "not implement as"
+    | As(expr, as_type) -> (
+      let expr' = annotate_expression ~prev_deps env expr in
+      let as_type', type_deps = annotate_type env as_type in
+
+      let node = {
+        value = as_type';
+        loc;
+        deps = List.append [expr'.ty_var] type_deps;
+      } in
+
+      let node_id = Type_context.new_id (Env.ctx env) node in
+      node_id, (T.Expression.TypeCast (expr', as_type'))
+    )
 
     | This -> (
       let scope = Env.peek_scope env in

@@ -14,6 +14,7 @@ type t =
   | CannotAccessBeforeInit of string
   | CannotFindNameForImport of string * string  (* local_name, find_name *)
   | CannotResolverReference of string
+  | CannotCastType of TypeExpr.t * TypeExpr.t
   | MissingMethodForInterface of string * string  (* interface_name, method_name *)
   | InvalidAssign
   | OnlyAssignArrayIndexAlpha

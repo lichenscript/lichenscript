@@ -39,6 +39,32 @@ let find_typedef_of ctx type_expr =
   | TypeDef sym -> Some sym
   | _ -> None
 
+let check_is_primitive_type ~group ctx (ty: TypeExpr.t) =
+  let ty = Type_context.deref_type ctx ty in
+  let ty_def_opt = find_construct_of ctx ty in
+  (match ty_def_opt with
+    | Some(ty_def, []) -> (
+      let open TypeDef in
+      ty_def.builtin &&
+      (Array.mem group ~equal:String.equal ty_def.name)
+    )
+    | _ -> false
+  )
+
+let check_is_primitive_type2 ~group ctx (left: TypeExpr.t) (right: TypeExpr.t) =
+  let left = Type_context.deref_type ctx left in
+  let right = Type_context.deref_type ctx right in
+  let left_def_opt = find_construct_of ctx left in
+  let right_def_opt = find_construct_of ctx right in
+  (match (left_def_opt, right_def_opt) with
+    | (Some(left, []), Some(right, [])) -> (
+      let open TypeDef in
+      left.builtin && right.builtin && (String.equal left.name right.name) &&
+      (Array.mem group ~equal:String.equal left.name)
+    )
+    | _ -> false
+  )
+
 let rec type_assinable_with_maps ctx var_maps left right =
   let open TypeExpr in
   let left = Type_context.deref_type ctx left in
@@ -162,6 +188,19 @@ and type_assinable ctx left right =
   let _, result = type_assinable_with_maps ctx TypeVarMap.empty left right in
   result
 
+(*
+ * oppsite to assignable
+ * cast from left to right
+ *)
+and type_castable ctx left right =
+  let check_castable_primitive = check_is_primitive_type ~group:[| "i32"; "f32"; "char"; "boolean" |] in
+  if type_assinable ctx right left then
+    true
+  else if (check_castable_primitive ctx left) && (check_castable_primitive ctx right) then
+    true
+  else
+    false
+
 and type_equal ctx left right =
   let open TypeExpr in
   let left = Type_context.deref_type ctx left in
@@ -207,20 +246,6 @@ and type_equal ctx left right =
       false
   )
 
-let check_is_primitive_type ~group ctx (left: TypeExpr.t) (right: TypeExpr.t) =
-  let left = Type_context.deref_type ctx left in
-  let right = Type_context.deref_type ctx right in
-  let left_def_opt = find_construct_of ctx left in
-  let right_def_opt = find_construct_of ctx right in
-  (match (left_def_opt, right_def_opt) with
-    | (Some(left, []), Some(right, [])) -> (
-      let open TypeDef in
-      left.builtin && right.builtin && (String.equal left.name right.name) &&
-      (Array.mem group ~equal:String.equal left.name)
-    )
-    | _ -> false
-  )
-
 let type_should_not_release ctx expr =
   (* i64/f64 should not release on 64bit platform *)
   let group = [| "i32"; "u32"; "f32"; "char"; "boolean" |] in
@@ -264,13 +289,13 @@ let type_addable ctx left right =
   match (left, right) with
   | TypeExpr.String, TypeExpr.String -> true
   | _ ->
-    check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64" |] ctx left right
+    check_is_primitive_type2 ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64" |] ctx left right
 
 let type_arithmetic =
-  check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; |]
+  check_is_primitive_type2 ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; |]
 
 let type_arithmetic_integer =
-  check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; |]
+  check_is_primitive_type2 ~group:[| "i32"; "u32"; "u64"; "i64"; |]
 
 let type_logic_compareable ctx left right =
   let left = Type_context.deref_type ctx left in
@@ -278,7 +303,7 @@ let type_logic_compareable ctx left right =
   match (left, right) with
   | TypeExpr.String, TypeExpr.String -> true
   | _ ->
-    check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "char" |] ctx left right
+    check_is_primitive_type2 ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "char" |] ctx left right
 
 let try_unwrap_array ctx expr =
   let expr = Type_context.deref_type ctx expr in
