@@ -115,6 +115,7 @@ and Expression : sig
     | Init of init
     | Match of _match
     | Try of t
+    | As of t * Type.t
     | This
     | Super
 
