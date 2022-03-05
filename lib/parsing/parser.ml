@@ -1002,7 +1002,15 @@ and parse_class_body env: Declaration.class_body =
 and parse_expression env : Expression.t =
   let start_loc = Peek.loc env in
   let expr = parse_assignment_expression env in
-  if Parser_env.allow_init env && (Peek.token env) = Token.T_LCURLY then (
+  let next = Peek.token env in
+  if next = Token.T_AS then (
+    let t = parse_type env in
+    {
+      spec = As (expr, t);
+      loc = with_start_loc env start_loc;
+      attributes = [];
+    }
+  ) else if Parser_env.allow_init env && next = Token.T_LCURLY then (
     let parse_init_with_name init_name =
       Eat.token env;
       let init_elements = ref [] in

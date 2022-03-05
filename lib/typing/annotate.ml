@@ -618,6 +618,8 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       node_id, (T.Expression.Try expr')
     )
 
+    | As _ -> failwith "not implement as"
+
     | This -> (
       let scope = Env.peek_scope env in
       let this_expr = scope#this_expr in
@@ -632,7 +634,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       node_id, T.Expression.This
     )
 
-    | Super -> failwith "not implemented this"
+    | Super -> failwith "not implemented super"
 
   in
   { T.Expression.
