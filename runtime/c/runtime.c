@@ -1438,6 +1438,7 @@ static void std_print_string(LCRuntime* rt, LCString* str) {
 
 void std_print_array(LCRuntime* rt, LCValue val);
 void std_print_tuple(LCRuntime* rt, LCValue val);
+void std_print_class_object(LCRuntime* rt, LCValue val);
 
 static void std_print_val(LCRuntime* rt, LCValue val) {
     switch (val.tag)
@@ -1489,6 +1490,10 @@ static void std_print_val(LCRuntime* rt, LCValue val) {
     case LC_TY_MAP:
         printf("Map");
         break;
+
+    case LC_TY_CLASS_OBJECT:
+        std_print_class_object(rt, val);
+        break;
     
     default:
         break;
@@ -1523,6 +1528,12 @@ void std_print_array(LCRuntime* rt, LCValue val) {
     }
 
     printf("]");
+}
+
+void std_print_class_object(LCRuntime* rt, LCValue val) {
+    LCGCObject* gc_obj = (LCGCObject*)val.ptr_val;
+    LCClassMeta* cls_meta = &rt->cls_meta_data[gc_obj->header.class_id];
+    printf("%s {...}", cls_meta->cls_def->name);
 }
 
 LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def) {
