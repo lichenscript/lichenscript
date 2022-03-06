@@ -1,0 +1,9 @@
+
+class MyClass {
+
+}
+
+function main() {
+	const cls = MyClass{};
+	print(cls);
+}
