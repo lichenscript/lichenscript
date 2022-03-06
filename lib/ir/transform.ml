@@ -1506,24 +1506,11 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
     | TypeCast(expr, _type) ->(
       if Check_helper.check_castable_primitive env.ctx _type then (
+        let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
         let expr_result = transform_expression ~is_move:true env expr in
-        let ctor_opt = Check_helper.find_construct_of env.ctx _type in
-        let type_name =
-          match ctor_opt with
-          | Some (type_def, []) -> (
-            type_def.name
-          )
-          | _ -> failwith "unrechable"
-        in
-        let cast_type =
-          match type_name with
-          | "i32" -> Primitives.PrimType.I32
-          | "f32" -> Primitives.PrimType.F32
-          | "char" -> Primitives.PrimType.Char
-          | "boolean" -> Primitives.PrimType.Boolean
-          | _ -> failwith "unrechable"
-        in
-        Ir.Expr.TypeCast(expr_result.expr, cast_type)
+        let expr_type = Primitives.PrimType.from_type ~ctx:env.ctx expr_type in
+        let cast_type = Primitives.PrimType.from_type ~ctx:env.ctx _type in
+        Ir.Expr.TypeCast(expr_result.expr, expr_type, cast_type)
       ) else (
         let tmp = transform_expression ~is_move ~is_borrow env expr in
         append_stmts := tmp.append_stmts;

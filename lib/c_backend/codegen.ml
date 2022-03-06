@@ -577,42 +577,50 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env (Int.to_string id);
     ps env "]"
 
-  | TypeCast(expr, Primitives.PrimType.I32) -> (
+  | TypeCast(expr, expr_type, Primitives.PrimType.I32) -> (
     ps env "MK_I32(";
 
+    let val_str = if Primitives.PrimType.is_f32 expr_type then "float_val" else "int_val" in
+
     ps env "(";
     codegen_expression env expr;
-    ps env ").int_val";
+    ps env (")." ^ val_str);
 
     ps env ")"
   )
 
-  | TypeCast(expr, Primitives.PrimType.F32) -> (
+  | TypeCast(expr, expr_type, Primitives.PrimType.F32) -> (
     ps env "MK_F32(";
 
+    let val_str = if Primitives.PrimType.is_f32 expr_type then "float_val" else "int_val" in
+
     ps env "(";
     codegen_expression env expr;
-    ps env ").float_val";
+    ps env (")." ^ val_str);
 
     ps env ")"
   )
 
-  | TypeCast(expr, Primitives.PrimType.Boolean) -> (
+  | TypeCast(expr, expr_type, Primitives.PrimType.Boolean) -> (
     ps env "MK_BOOL(";
 
+    let val_str = if Primitives.PrimType.is_f32 expr_type then "float_val" else "int_val" in
+
     ps env "(";
     codegen_expression env expr;
-    ps env ").int_val";
+    ps env (")." ^ val_str);
 
     ps env ")"
   )
 
-  | TypeCast(expr, Primitives.PrimType.Char) -> (
+  | TypeCast(expr, expr_type, Primitives.PrimType.Char) -> (
     ps env "MK_CHAR(";
+
+    let val_str = if Primitives.PrimType.is_f32 expr_type then "float_val" else "int_val" in
 
     ps env "(";
     codegen_expression env expr;
-    ps env ").int_val";
+    ps env (")." ^ val_str);
 
     ps env ")"
   )

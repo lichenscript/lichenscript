@@ -495,8 +495,25 @@ and transpile_expression ?(parent_expr=true) env expr =
     ps env "]"
   )
 
-  | TypeCast(expr, Primitives.PrimType.Char)
-  | TypeCast(expr, Primitives.PrimType.I32) -> (
+  | TypeCast(expr, Primitives.PrimType.Char, Primitives.PrimType.Char) -> (
+    transpile_expression env expr;
+  )
+
+  | TypeCast(expr, Primitives.PrimType.Char, I32)
+  | TypeCast(expr, Primitives.PrimType.Char, F32) -> (
+    ps env "(";
+    transpile_expression env expr;
+    ps env ").charCodeAt(0)"
+  )
+
+  | TypeCast(expr, Primitives.PrimType.Char, Boolean) -> (
+    ps env "!!((";
+    transpile_expression env expr;
+    ps env ").charCodeAt(0))"
+  )
+
+  | TypeCast(expr, _, Primitives.PrimType.Char)
+  | TypeCast(expr, _, Primitives.PrimType.I32) -> (
     ps env "(";
 
     ps env "(";
@@ -506,7 +523,7 @@ and transpile_expression ?(parent_expr=true) env expr =
     ps env ")"
   )
 
-  | TypeCast(expr, Primitives.PrimType.F32) -> (
+  | TypeCast(expr, _, Primitives.PrimType.F32) -> (
     ps env "Math.fround(";
 
     transpile_expression env expr;
@@ -514,7 +531,7 @@ and transpile_expression ?(parent_expr=true) env expr =
     ps env ")"
   )
 
-  | TypeCast(expr, Primitives.PrimType.Boolean) -> (
+  | TypeCast(expr, _, Primitives.PrimType.Boolean) -> (
     ps env "!!(";
 
     transpile_expression env expr;

@@ -13,6 +13,12 @@ function main() {
 	const b = 0.3 + (3 as f32);
 	print(b);
 
+	const c = b as i32;
+	print(c);
+
+	const ch = 'a' as i32;
+	print(ch);
+
 	const a = None as Option<i32>;
 	acceptOptionI32(a);
 }

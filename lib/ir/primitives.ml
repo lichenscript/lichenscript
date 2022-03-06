@@ -1,4 +1,5 @@
 open Lichenscript_parsing
+open Lichenscript_typing
 
 module PrimType = struct
 
@@ -8,6 +9,30 @@ module PrimType = struct
     | Boolean
     | Char
   [@@deriving show]
+
+  let from_type ~ctx ty =
+    let ctor_opt = Check_helper.find_construct_of ctx ty in
+    let type_name =
+      match ctor_opt with
+      | Some (type_def, []) -> (
+        type_def.name
+      )
+      | _ -> failwith "unrechable"
+    in
+    match type_name with
+    | "i32" -> I32
+    | "f32" -> F32
+    | "char" -> Char
+    | "boolean" -> Boolean
+    | _ -> failwith "unrechable"
+
+  let is_f32 = function
+    | F32 -> true
+    | _ -> false
+
+  let is_char = function
+    | Char -> true
+    | _ -> false
   
 end
 
