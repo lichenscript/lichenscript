@@ -26,4 +26,4 @@ compiler:
 	dune build
 
 bump:
-	./_build/default/npm_version_bumper/npm_version_bumper.exe ./npm --main lichenscript
+	./_build/default/npm_version_bumper/npm_version_bumper.exe ./npm --main lichenscript --ml ./bin/version.ml

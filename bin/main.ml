@@ -29,6 +29,10 @@ lsc <command> [<args>]
   build
   run
 
+|} ^ TermColor.bold ^ "Options:" ^ TermColor.reset ^ {|
+  -v, --version                    Print the version of the compiler
+  -h, --help                   Show help message
+
 |}
 
 let build_help_message = {|
@@ -46,7 +50,7 @@ lsc build <entry> [<args>]
   --verbose, -V                Print verbose log
   --search-paths               Show the search paths
   --standalone-wasm <executor> Build the standalone wasm, specify the executor
-  -h, --help                   Show help message
+  -h, --help                   Show help message of build command
 
 |} ^ TermColor.bold ^ "Environment:" ^ TermColor.reset ^ {|
 LSC_RUNTIME              The directory of runtime.
@@ -71,6 +75,14 @@ let rec main () =
   match command with
   | "build" -> ignore (build_command args index)
   | "run" -> build_and_run args index
+
+  | "-h" | "--help" ->
+    Format.printf "%s" help_message;
+    ignore (exit 0)
+  | "-v" | "--version" ->
+    Format.printf "%s\n" Version.version;
+    ignore (exit 0)
+
   | _ -> (
     Format.printf "unkown command %s\n" command;
     ignore (exit 2)

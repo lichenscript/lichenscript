@@ -24,6 +24,7 @@ npm_verion_bumper <dir> --main <main_dir>
 
 |} ^ TermColor.bold ^ "Options:" ^ TermColor.reset ^ {|
   --main <dir>  Name of main repo dir
+  --ml   <path> The path of OCaml file
   -h, --help    Show help message
 
 |}
@@ -34,6 +35,7 @@ let rec main () =
   let index = ref 1 in
   let args = Sys.get_argv () in
   let main_repo = ref "" in
+  let ml_file = ref None in
   let dir = ref "" in
   while !index < (Array.length args) do
     let item = Array.get args !index in
@@ -42,6 +44,12 @@ let rec main () =
     | "-h" | "--help" ->
       Format.printf "%s" help_message;
       ignore (exit 0)
+
+    | "--ml" -> (
+      let next_item = Array.get args !index in
+      ml_file := Some next_item;
+      index := !index + 1
+    )
 
     | "--main" -> (
       let next_item = Array.get args !index in
@@ -57,9 +65,9 @@ let rec main () =
   if (String.is_empty !main_repo) || (String.is_empty !dir) then (
     print_endline help_message
   ) else
-    bump_version !dir !main_repo
+    bump_version !dir !main_repo !ml_file
 
-and bump_version dir main_repo_name =
+and bump_version dir main_repo_name ml =
   let main_repo_package_json_path = dir ^ "/" ^ main_repo_name ^ "/package.json" in
   let main_repo_package_json_content = In_channel.read_all main_repo_package_json_path in
   let test_result = Re.exec version_regex main_repo_package_json_content in
@@ -73,7 +81,14 @@ and bump_version dir main_repo_name =
     Out_channel.(flush stdout);
     let new_version = In_channel.(input_line_exn stdin) in
     replace_version_in_file main_repo_package_json_path prev_version new_version;
-    replace_all_dir_in_dir ~except:main_repo_name dir prev_version new_version
+    replace_all_dir_in_dir ~except:main_repo_name dir prev_version new_version;
+    match ml with
+    | Some ml ->
+      Out_channel.write_all
+        ml
+        ~data:(Format.asprintf "\nlet version = \"%s\"\n" new_version);
+
+    | None -> ()
   )
 
 and replace_all_dir_in_dir ~except dir old_version version =
