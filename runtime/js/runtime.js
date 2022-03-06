@@ -2,7 +2,8 @@
 const i32_max = 0x7FFFFFFF;
 const i32_min = 0x7FFFFFFF * -1 + 1;
 
-const tupleSym = Symbol("tuple")
+const tupleSym = Symbol("tuple");
+const clsNameSym = Symbol("clsName");
 
 function i32_add(a, b) {
   a = a|0;  // give hinting to v8
@@ -85,7 +86,9 @@ function lc_std_char_to_string() {
 function lc_std_print(...args) {
   let content = '';
   for (let i = 0; i < args.length; i++) {
-    if (Array.isArray(args[i])) {
+    if (typeof args[i] === "object" && args[i].__proto__[clsNameSym]) {
+      content += args[i].__proto__[clsNameSym] + " {...}";
+    } else if (Array.isArray(args[i])) {
       if (args[i][0] === tupleSym) {
         let tmp = '(';
 
