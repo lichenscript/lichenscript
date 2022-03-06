@@ -145,6 +145,7 @@ and transpile_class env (cls: Ir.Decl._class) =
   in *)
 
   ps env ("const " ^ cls.name ^ " = {\n");
+  ps env (Format.asprintf "  [clsNameSym]: \"%s\",\n" cls.original_name);
 
   List.iter
     ~f:(fun { class_method_name; class_method_gen_name } ->
