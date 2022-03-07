@@ -2,6 +2,7 @@
 const i32_max = 0x7FFFFFFF;
 const i32_min = 0x7FFFFFFF * -1 + 1;
 
+const unionSym = Symbol("union");
 const tupleSym = Symbol("tuple");
 const clsNameSym = Symbol("clsName");
 
@@ -89,7 +90,22 @@ function lc_std_print(...args) {
     if (typeof args[i] === "object" && args[i].__proto__[clsNameSym]) {
       content += args[i].__proto__[clsNameSym] + " {...}";
     } else if (Array.isArray(args[i])) {
-      if (args[i][0] === tupleSym) {
+      if (typeof args[i][0] === 'object' && args[i][0][unionSym]) {
+        content += args[i][0].members[args[i][1]];
+        if (args[i].length > 2) {
+          let tmp = '(';
+
+          for (let j = 2; j < args[i].length; j++) {
+            tmp += args[i][j];
+            if (j < args[i].length - 1) {
+              tmp += ", "
+            }
+          }
+
+          tmp += ')'
+          content += tmp;
+        }
+      } else if (args[i][0] === tupleSym) {
         let tmp = '(';
 
         for (let j = 1; j < args[i].length; j++) {
@@ -120,6 +136,24 @@ function lc_std_print(...args) {
   }
   console.log(content);
 }
+
+const LCC_Option = {
+  [unionSym]: 1,
+  name: "Option",
+  members: [
+    "Some",
+    "None",
+  ]
+};
+
+const LCC_Result = {
+  [unionSym]: 1,
+  name: "Result",
+  members: [
+    "Ok",
+    "Error",
+  ]
+};
 
 function lc_std_exit(code) {
   const process = require('process');
@@ -168,9 +202,9 @@ function lc_std_array_sort(cmp) {
 function lc_std_map_get(key, value) {
   const tmp = Map.prototype.get.call(this, key, value);
   if (tmp) {
-    return [0, tmp];
+    return [LCC_Option, 0, tmp];
   }
-  return [1];
+  return [LCC_Option, 1];
 }
 
 function lc_std_map_set(key, value) {
@@ -180,9 +214,9 @@ function lc_std_map_set(key, value) {
 function lc_std_map_remove(key, value) {
   const tmp = Map.prototype.delete.call(this, key, value);
   if (tmp) {
-    return [0, tmp];
+    return [LCC_Option, 0, tmp];
   }
-  return [1];
+  return [LCC_Option, 1];
 }
 
 function lc_std_map_size() {
