@@ -68,6 +68,7 @@ public class String {
 
 }
 
+@meta_id("LC_STD_CLS_ID_OPTION")
 public enum Option<A> {
     case Some(A)
     case None
@@ -88,6 +89,7 @@ public enum Option<A> {
 
 }
 
+@meta_id("LC_STD_CLS_ID_RESULT")
 public enum Result<A, B> {
     case Ok(A)
     case Error(B)

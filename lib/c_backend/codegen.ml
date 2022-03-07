@@ -324,25 +324,30 @@ and codegen_declaration env decl =
   )
 
   | Enum enum -> (
-    let { enum_name; enum_original_name; _ } = enum in
-    let class_id_var_name = enum_name ^ "_class_id" in
+    let { enum_name; enum_members; _ } = enum in
+    let class_id_var_name = enum_name ^ "_id" in
     ps env (Format.sprintf "static LCClassID %s;\n" class_id_var_name);
 
     let class_def_name = enum_name ^ "_def" in
-    ps env (Format.sprintf "static LCEnumDef %s = {\n" class_def_name);
+    ps env (Format.sprintf "static LCEnumMemberDef %s[] = {\n" class_def_name);
     with_indent env (fun () ->
-      print_indents env;
-      ps env (Format.sprintf "\"%s\",\n" enum_original_name);
+      List.iter
+        ~f:(fun (member_name, member_size) -> 
+          print_indents env;
+          ps env (Format.sprintf "{ \"%s\", %d },\n" member_name member_size);
+        )
+        enum_members;
     );
-    ps env "}\n";
+    ps env "};\n";
   )
 
   | EnumCtor ctor -> (
+    let { enum_ctor_params_size; enum_ctor_meta_id; enum_ctor_tag_id; _ } = ctor in
     ps env (Format.sprintf "LCValue %s(LCRuntime* rt, LCValue this, int argv, LCValue* args) {\n" ctor.enum_ctor_name);
-    if ctor.enum_ctor_params_size = 0 then
-      ps env (Format.sprintf "    return MK_UNION(%d);\n" ctor.enum_ctor_tag_id)
+    if enum_ctor_params_size = 0 then
+      ps env (Format.sprintf "    return MK_UNION(%s, %d);\n" enum_ctor_meta_id enum_ctor_tag_id)
     else (
-      ps env (Format.sprintf "    return LCNewUnionObject(rt, %d, argv, args);\n" ctor.enum_ctor_tag_id)
+      ps env (Format.sprintf "    return LCNewUnionObject(rt, %s, %d, argv, args);\n" enum_ctor_meta_id enum_ctor_tag_id)
     );
     ps env "}\n";
   )
@@ -350,23 +355,27 @@ and codegen_declaration env decl =
   | GlobalClassInit(init_name, init_entries) -> (
     List.iter
       ~f:(fun entry ->
-        let { class_name; class_methods; _} = entry in
-        if not (List.is_empty class_methods) then (
-          ps env (Format.sprintf "static LCClassMethodDef %s_methods[] = {\n" class_name);
-          with_indent env (fun () ->
-            List.iter
-              ~f:(fun m ->
-                print_indents env;
-                ps env "{ \"";
-                ps env m.class_method_name;
-                ps env "\", 0, ";
-                ps env m.class_method_gen_name;
-                ps env " },\n"
-              )
-              class_methods
-          );
-          ps env "};\n"
+        match entry with
+        | Ir.Decl.InitClass cls_entry -> (
+          let { class_name; class_methods; _} = cls_entry in
+          if not (List.is_empty class_methods) then (
+            ps env (Format.sprintf "static LCClassMethodDef %s_methods[] = {\n" class_name);
+            with_indent env (fun () ->
+              List.iter
+                ~f:(fun m ->
+                  print_indents env;
+                  ps env "{ \"";
+                  ps env m.class_method_name;
+                  ps env "\", 0, ";
+                  ps env m.class_method_gen_name;
+                  ps env " },\n"
+                )
+                class_methods
+            );
+            ps env "};\n"
+          )
         )
+        |_ -> ()
       )
       init_entries;
 
@@ -374,10 +383,22 @@ and codegen_declaration env decl =
 
     List.iter
       ~f:(fun entry ->
-        ps env (Format.sprintf "    %s = LCDefineClass(rt, &%s);\n" entry.class_id_name entry.class_def_name);
-        if not (List.is_empty entry.class_methods) then (
-          ps env (Format.sprintf "    LCDefineClassMethod(rt, %s, %s_methods, countof(%s_methods));\n" entry.class_id_name entry.class_name entry.class_name)
+        match entry with
+        | Ir.Decl.InitClass cls_entry -> (
+          let { class_name; class_id_name; class_def_name; class_methods; _ } = cls_entry in
+          ps env (Format.sprintf "    %s = LCDefineClass(rt, &%s);\n" class_id_name class_def_name);
+          if not (List.is_empty class_methods) then (
+            ps env (Format.sprintf "    LCDefineClassMethod(rt, %s, %s_methods, countof(%s_methods));\n" class_id_name class_name class_name)
+          )
         )
+
+        | Ir.Decl.InitEnum enum -> (
+          let { enum_name; _ } = enum in
+          ps env
+            (Format.sprintf "    %s_id = LCDefineEnum(rt, %s_def, countof(%s_def));\n" enum_name enum_name enum_name)
+
+        )
+
       )
       init_entries;
 

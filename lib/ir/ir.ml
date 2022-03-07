@@ -71,12 +71,18 @@ module%gen rec Decl : sig
   type enum = {
     enum_name: string;
     enum_original_name: string;
-    enum_members: (string * int);
+    enum_members: (string * int) list;
   }
+  [@@deriving show]
+
+  type init =
+  | InitEnum of enum
+  | InitClass of class_init
   [@@deriving show]
 
   type enum_ctor = {
     enum_ctor_name: string;
+    enum_ctor_meta_id: string;
     enum_ctor_tag_id: int;
     enum_ctor_params_size: int;
   }
@@ -96,7 +102,7 @@ module%gen rec Decl : sig
   | Class of _class
   | Enum of enum
   | EnumCtor of enum_ctor
-  | GlobalClassInit of string * class_init list
+  | GlobalClassInit of string * init list
   [@@deriving show]
 
   type t = {
