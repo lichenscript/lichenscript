@@ -6,10 +6,10 @@ function anotherFun(callback: () => unit) {
 function main() {
     const a = 3;
     let b = 4;
-    print("before call: ", b)
+    print("before call:", b)
     anotherFun(() => {
-        print("call in lambda: ", a);
+        print("call in lambda:", a);
         b = 5;
     });
-    print("after call: ", b)
+    print("after call:", b)
 }

@@ -10,5 +10,5 @@ function main() {
         nextTerm = t1 + t2;
     }
 
-    print("result: ", nextTerm);
+    print("result:", nextTerm);
 }

@@ -31,7 +31,7 @@ function main() {
     const generateor = generate();
     let index = 0;
     while isSome(generateor()) {
-        const content = "ok ";
+        const content = "ok";
         print(content, index);
 
         if index == 3 {

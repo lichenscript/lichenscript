@@ -26,18 +26,18 @@ function main() {
     print(a.size);
     let test = a.get("name");
     match test {
-        case Some(name) => print("found: ", name)
+        case Some(name) => print("found:", name)
         case None => print("not found")
     }
     test = a.get("name1");
     match test {
-        case Some(name) => print("found: ", name)
+        case Some(name) => print("found:", name)
         case None => print("not found")
     }
     a.delete("name");
     test = a.get("name");
     match test {
-        case Some(name) => print("found: ", name)
+        case Some(name) => print("found:", name)
         case None => print("not found")
     }
 }

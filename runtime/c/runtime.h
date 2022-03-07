@@ -346,6 +346,8 @@ LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_le
 LCValue LCEvalLambda(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 // TODO: dynamic dispatch by ATOM
 
+LCValue LCToString(LCRuntime* rt, LCValue val);
+
 LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);
 void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCGCObject* obj);
 

@@ -35,7 +35,7 @@ class Child extends Base {
     }
 
     override printName() {
-        print("name: ", this.name)
+        print("name:", this.name)
     }
 
 }

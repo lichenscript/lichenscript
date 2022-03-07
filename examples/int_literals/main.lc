@@ -4,8 +4,8 @@ function main() {
   const octal = 0o73;
   const hex = 0xff;
 
-  print("expect 100_000 == 100000: ", decimal == 100000);
-  print("expect 0b10 == 2: ", binary == 2);
-  print("expect 0o73 == 59: ", octal == 59);
-  print("expect 0xff == 255: ", hex == 255);
+  print("expect 100_000 == 100000:", decimal == 100000);
+  print("expect 0b10 == 2:", binary == 2);
+  print("expect 0o73 == 59:", octal == 59);
+  print("expect 0xff == 255:", hex == 255);
 }
