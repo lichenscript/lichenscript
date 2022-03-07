@@ -87,6 +87,12 @@ let rec transpile_declaration env (delcaration: Ir.Decl.t) =
   | Func _fun ->
     transpile_function env _fun
 
+  | Enum enum -> (
+    let { enum_name; _ } = enum in
+    ps env (Format.asprintf "const %s = {\n" enum_name);
+    ps env "};\n";
+  )
+
   | LambdaDef _ -> failwith "unimplement:lambda"
 
   | EnumCtor enum_ctor -> (

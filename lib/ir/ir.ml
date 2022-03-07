@@ -68,6 +68,13 @@ module%gen rec Decl : sig
   }
   [@@deriving show]
 
+  type enum = {
+    enum_name: string;
+    enum_original_name: string;
+    enum_members: (string * int);
+  }
+  [@@deriving show]
+
   type enum_ctor = {
     enum_ctor_name: string;
     enum_ctor_tag_id: int;
@@ -87,6 +94,7 @@ module%gen rec Decl : sig
   | FuncDecl of symbol 
   | LambdaDef of lambda_def
   | Class of _class
+  | Enum of enum
   | EnumCtor of enum_ctor
   | GlobalClassInit of string * class_init list
   [@@deriving show]

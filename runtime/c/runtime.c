@@ -205,14 +205,22 @@ typedef struct LCClassMeta {
     size_t cls_method_size;
 } LCClassMeta;
 
+typedef struct LCObjectMeta {
+    uint8_t is_enum;
+    union {
+        LCClassMeta cls;
+        LCEnumDef* _enum;
+    } v;
+} LCObjectMeta;
+
 typedef struct LCRuntime {
     LCMallocState malloc_state;
     uint32_t seed;
     LCValue* i64_pool;
     LCBox64* i64_pool_space;
-    uint32_t cls_meta_cap;
-    uint32_t cls_meta_size;
-    LCClassMeta* cls_meta_data;
+    uint32_t obj_meta_cap;
+    uint32_t obj_meta_size;
+    LCObjectMeta* obj_meta_data;
     uint8_t      gc_phase;
     GCObjectList gc_objs;
     GCObjectList tmp_objs;
@@ -336,8 +344,13 @@ static inline void LCFreeLambda(LCRuntime* rt, LCLambda* lambda) {
  */
 static void LCFreeClassObject(LCRuntime* rt, LCGCObject* cls_obj) {
     LCClassID cls_id = cls_obj->header.class_id;
-    LCClassMeta* meta = &rt->cls_meta_data[cls_id];
-    LCFinalizer finalizer = meta->cls_def->finalizer;
+    LCObjectMeta* meta = &rt->obj_meta_data[cls_id];
+
+    if (unlikely(meta->is_enum)) {
+        return;
+    }
+
+    LCFinalizer finalizer = meta->v.cls.cls_def->finalizer;
     if (finalizer) {
         finalizer(rt, cls_obj);
     }
@@ -345,6 +358,7 @@ static void LCFreeClassObject(LCRuntime* rt, LCGCObject* cls_obj) {
     if (rt->gc_phase != LC_GC_PHASE_REMOVING_CYCLES) {
         lc_gc_objs_list_remove(&rt->gc_objs, (LCGCObject*)cls_obj);
     }
+
     lc_free(rt, cls_obj);
 }
 
@@ -581,9 +595,9 @@ LCRuntime* LCNewRuntime() {
 
     runtime->i64_pool = init_i64_pool(runtime);
 
-    runtime->cls_meta_cap = LC_INIT_CLASS_META_CAP;
-    runtime->cls_meta_size = 0;
-    runtime->cls_meta_data = lc_malloc(runtime, sizeof(LCClassMeta) * runtime->cls_meta_cap);
+    runtime->obj_meta_cap = LC_INIT_CLASS_META_CAP;
+    runtime->obj_meta_size = 0;
+    runtime->obj_meta_data = lc_malloc(runtime, sizeof(LCObjectMeta) * runtime->obj_meta_cap);
 
     runtime->gc_phase = LC_GC_PHASE_DONE;
 
@@ -602,7 +616,7 @@ void LCFreeRuntime(LCRuntime* rt) {
 
     free_i64_pool(rt);
 
-    lc_free(rt, rt->cls_meta_data);
+    lc_free(rt, rt->obj_meta_data);
 
 #ifdef LSC_DEBUG
     if (rt->malloc_state.malloc_count != 1) {
@@ -684,10 +698,14 @@ static void lc_mark_lambda(LCRuntime* rt, LCLambda* lambda, LCMarkFunc mark_fun)
 
 static void lc_mark_class_object(LCRuntime* rt, LCGCObject* gc_obj, LCMarkFunc mark_func) {
     uint32_t cls_id = gc_obj->header.class_id;
-    LCClassMeta* meta = &rt->cls_meta_data[cls_id];
+    LCObjectMeta* meta = &rt->obj_meta_data[cls_id];
 
-    if (meta->cls_def->gc_mark) {
-        meta->cls_def->gc_mark(rt, MK_CLASS_OBJ(gc_obj), mark_func);
+    if (unlikely(meta->is_enum)) {
+        return;
+    }
+
+    if (meta->v.cls.cls_def->gc_mark) {
+        meta->v.cls.cls_def->gc_mark(rt, MK_CLASS_OBJ(gc_obj), mark_func);
     }
 }
 
@@ -1532,27 +1550,48 @@ void std_print_array(LCRuntime* rt, LCValue val) {
 
 void std_print_class_object(LCRuntime* rt, LCValue val) {
     LCGCObject* gc_obj = (LCGCObject*)val.ptr_val;
-    LCClassMeta* cls_meta = &rt->cls_meta_data[gc_obj->header.class_id];
-    printf("%s {...}", cls_meta->cls_def->name);
+    LCObjectMeta* meta = &rt->obj_meta_data[gc_obj->header.class_id];
+    if (unlikely(meta->is_enum)) {
+        return;
+    }
+    printf("%s {...}", meta->v.cls.cls_def->name);
+}
+
+static void lc_expand_obj_meta(LCRuntime* rt) {
+    if (rt->obj_meta_size >= rt->obj_meta_cap) {
+        rt->obj_meta_cap *= 2;
+        rt->obj_meta_data = lc_realloc(rt, rt->obj_meta_data, sizeof(LCObjectMeta) * rt->obj_meta_cap);
+    }
 }
 
 LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def) {
-    LCClassID id = rt->cls_meta_size++;
+    lc_expand_obj_meta(rt);
 
-    if (rt->cls_meta_size >= rt->cls_meta_cap) {
-        rt->cls_meta_cap *= 2;
-        rt->cls_meta_data = lc_realloc(rt, rt->cls_meta_data, sizeof(LCClassMeta) * rt->cls_meta_cap);
-    }
+    LCClassID id = rt->obj_meta_size++;
 
-    rt->cls_meta_data[id].cls_def = cls_def;
+    LCObjectMeta* meta = &rt->obj_meta_data[id];
+    meta->is_enum = FALSE;
+    meta->v.cls.cls_def = cls_def;
 
     return id;
 }
 
 void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_method, size_t size) {
-    LCClassMeta* meta = rt->cls_meta_data + cls_id;
-    meta->cls_method = cls_method;
-    meta->cls_method_size = size;
+    LCObjectMeta* meta = rt->obj_meta_data + cls_id;
+    meta->v.cls.cls_method = cls_method;
+    meta->v.cls.cls_method_size = size;
+}
+
+LCClassID LCDefineEnum(LCRuntime* rt, LCEnumDef* enum_def) {
+    lc_expand_obj_meta(rt);
+
+    LCClassID id = rt->obj_meta_size++;
+
+    LCObjectMeta* meta = &rt->obj_meta_data[id];
+    meta->is_enum = TRUE;
+    meta->v._enum = enum_def;
+
+    return id;
 }
 
 LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_len, LCValue* args) {
@@ -1563,12 +1602,12 @@ LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_le
 
     LCGCObject* obj = (LCGCObject*)this.ptr_val;
     LCClassID class_id = obj->header.class_id;
-    LCClassMeta* meta = rt->cls_meta_data + class_id;
+    LCObjectMeta* meta = rt->obj_meta_data + class_id;
 
     size_t i;
     LCClassMethodDef* method_def;
-    for (i = 0; i < meta->cls_method_size; i++) {
-        method_def = &meta->cls_method[i];
+    for (i = 0; i < meta->v.cls.cls_method_size; i++) {
+        method_def = &meta->v.cls.cls_method[i];
         if (strcmp(method_def->name, content) == 0) {  // this is it
             return method_def->fun_ptr(rt, this, arg_len, args);
         }
