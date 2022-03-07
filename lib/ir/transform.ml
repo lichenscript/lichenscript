@@ -2473,7 +2473,7 @@ and transform_enum env ~attributes enum loc : Ir.Decl.t list =
 
   env.current_fun_meta <- Some (create_current_fun_meta enum_original_name);
 
-  let meta_id =
+  let meta_id' =
     List.find_map
       ~f:(fun attr ->
         let open Lichenscript_parsing.Ast in
@@ -2490,7 +2490,7 @@ and transform_enum env ~attributes enum loc : Ir.Decl.t list =
   let enum_name = "LCC_" ^ enum_original_name in
 
   let meta_id =
-    match meta_id with
+    match meta_id' with
     | Some v -> v
     | None ->
       enum_name ^ "_id"
@@ -2512,6 +2512,7 @@ and transform_enum env ~attributes enum loc : Ir.Decl.t list =
           let spec = Ir.Decl.EnumCtor {
             enum_ctor_name = new_name;
             enum_ctor_meta_id = meta_id;
+            enum_ctor_meta_name = enum_name;
             enum_ctor_tag_id = index;
             enum_ctor_params_size;
           } in
@@ -2530,6 +2531,7 @@ and transform_enum env ~attributes enum loc : Ir.Decl.t list =
   in
 
   let enum_def = { Ir.Decl.
+    enum_has_meta_id = Option.is_some meta_id';
     enum_name;
     enum_original_name;
     enum_members = List.rev !enum_members;

@@ -88,9 +88,33 @@ let rec transpile_declaration env (delcaration: Ir.Decl.t) =
     transpile_function env _fun
 
   | Enum enum -> (
-    let { enum_name; _ } = enum in
-    ps env (Format.asprintf "const %s = {\n" enum_name);
-    ps env "};\n";
+    let { enum_has_meta_id; enum_name; enum_original_name; enum_members; _ } = enum in
+    if not enum_has_meta_id then (
+      ps env (Format.asprintf "const %s = {\n" enum_name);
+      with_indents env (fun env ->
+        print_indents env;
+        ps env "[unionSym]: 1,\n";
+        print_indents env;
+        ps env "name: \"";
+        ps env enum_original_name;
+        ps env "\",\n";
+        print_indents env;
+        ps env "members: [\n";
+        with_indents env (fun env ->
+          List.iter
+            ~f:(fun (member_name, _) -> 
+              print_indents env;
+              ps env "\"";
+              ps env member_name;
+              ps env "\",\n"
+            )
+            enum_members;
+        );
+        print_indents env;
+        ps env "]\n";
+      );
+      ps env "};\n"
+    )
   )
 
   | LambdaDef _ -> failwith "unimplement:lambda"
@@ -100,6 +124,8 @@ let rec transpile_declaration env (delcaration: Ir.Decl.t) =
     ps env enum_ctor.enum_ctor_name;
     ps env "() {\n";
     ps env "  return [";
+    ps env enum_ctor.enum_ctor_meta_name;
+    ps env ", ";
     ps env (Int.to_string enum_ctor.enum_ctor_tag_id);
     if enum_ctor.enum_ctor_params_size > 0 then (
       ps env ", ";
@@ -484,7 +510,7 @@ and transpile_expression ?(parent_expr=true) env expr =
 
   | TagEqual (expr, tag) -> (
     transpile_expression env expr;
-    ps env "[0]";
+    ps env "[1]";
     ps env " === ";
     ps env (Int.to_string tag)
   )
@@ -492,7 +518,7 @@ and transpile_expression ?(parent_expr=true) env expr =
   | UnionGet (expr, tag) -> (
     transpile_expression env expr;
     ps env "[";
-    ps env (Int.to_string (tag + 1));
+    ps env (Int.to_string (tag + 2));
     ps env "]"
   )
 

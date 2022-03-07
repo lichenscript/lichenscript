@@ -69,6 +69,7 @@ module%gen rec Decl : sig
   [@@deriving show]
 
   type enum = {
+    enum_has_meta_id: bool;
     enum_name: string;
     enum_original_name: string;
     enum_members: (string * int) list;
@@ -83,6 +84,7 @@ module%gen rec Decl : sig
   type enum_ctor = {
     enum_ctor_name: string;
     enum_ctor_meta_id: string;
+    enum_ctor_meta_name: string;
     enum_ctor_tag_id: int;
     enum_ctor_params_size: int;
   }
