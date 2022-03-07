@@ -22,8 +22,10 @@
 
 (rule
  (targets runtime.ml)
+ (deps ../runtime/js/runtime.js)
  (action (run ../file_packer/file_packer.exe ../runtime/ --base .. -o runtime.ml)))
 
 (rule
  (targets preclude.ml)
+ (deps ../std/std/preclude/lib.lc)
  (action (run ../file_packer/file_packer.exe ../std/ --base .. -o preclude.ml)))
