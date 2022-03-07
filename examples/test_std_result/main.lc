@@ -25,12 +25,12 @@ function isFirstCharA(str: string): Result<unit, SomeError> {
 function main() {
     let test = isFirstCharA("A");
     match test {
-        case Error(err) => print("error: ", err.msg)
+        case Error(err) => print("error:", err.msg)
         case _ => print("ok")
     }
     test = isFirstCharA("B");
     match test {
-        case Error(err) => print("error: ", err.msg)
+        case Error(err) => print("error:", err.msg)
         case _ => print("ok")
     }
 }

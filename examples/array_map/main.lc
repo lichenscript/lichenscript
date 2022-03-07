@@ -12,7 +12,7 @@ function main() {
     while index < tuples.length {
         const item = tuples[index];
         match item {
-            case (name, index) => print("name: ", name, " index: ", index)
+            case (name, index) => print("name:", name, "index:", index)
         }
         index += 1;
     }

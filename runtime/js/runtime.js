@@ -84,55 +84,66 @@ function lc_std_char_to_string() {
   return this[0];
 }
 
-function lc_std_print(...args) {
+function lc_to_string(v) {
   let content = '';
-  for (let i = 0; i < args.length; i++) {
-    if (typeof args[i] === "object" && args[i].__proto__[clsNameSym]) {
-      content += args[i].__proto__[clsNameSym] + " {...}";
-    } else if (Array.isArray(args[i])) {
-      if (typeof args[i][0] === 'object' && args[i][0][unionSym]) {
-        content += args[i][0].members[args[i][1]];
-        if (args[i].length > 2) {
-          let tmp = '(';
 
-          for (let j = 2; j < args[i].length; j++) {
-            tmp += args[i][j];
-            if (j < args[i].length - 1) {
-              tmp += ", "
-            }
-          }
-
-          tmp += ')'
-          content += tmp;
-        }
-      } else if (args[i][0] === tupleSym) {
+  if (typeof v === "object" && v.__proto__[clsNameSym]) {
+    content += v.__proto__[clsNameSym] + " {...}";
+  } else if (Array.isArray(v)) {
+    if (typeof v[0] === 'object' && v[0][unionSym]) {
+      content += v[0].members[v[1]];
+      if (v.length > 2) {
         let tmp = '(';
 
-        for (let j = 1; j < args[i].length; j++) {
-          tmp += args[i][j];
-          if (j < args[i].length - 1) {
+        for (let j = 2; j < v.length; j++) {
+          tmp += v[j];
+          if (j < v.length - 1) {
             tmp += ", "
           }
         }
 
         tmp += ')'
         content += tmp;
-      } else {
-        let tmp = '[';
-
-        for (let j = 0; j < args[i].length; j++) {
-          tmp += args[i][j];
-          if (j < args[i].length - 1) {
-            tmp += ", "
-          }
-        }
-
-        tmp += ']'
-        content += tmp;
       }
+    } else if (v[0] === tupleSym) {
+      let tmp = '(';
+
+      for (let j = 1; j < v.length; j++) {
+        tmp += v[j];
+        if (j < v.length - 1) {
+          tmp += ", "
+        }
+      }
+
+      tmp += ')'
+      content += tmp;
     } else {
-      content += args[i];
+      let tmp = '[';
+
+      for (let j = 0; j < v.length; j++) {
+        tmp += v[j];
+        if (j < v.length - 1) {
+          tmp += ", "
+        }
+      }
+
+      tmp += ']'
+      content += tmp;
     }
+  } else {
+    content += v;
+  }
+
+  return content;
+}
+
+function lc_std_print(...args) {
+  let content = '';
+  for (let i = 0; i < args.length; i++) {
+    if (i != 0) {
+      content += ' ';
+    }
+    content += lc_to_string(args[i]);
   }
   console.log(content);
 }

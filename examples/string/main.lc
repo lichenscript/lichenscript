@@ -6,10 +6,10 @@ function main() {
     print("Hello " + name);
     print(name == "LichenScript");
     print(name == "LichenScript2");
-    print("lt: ", name < "LichenScript2");
-    print("gt: ", name > "LichenScript2");
-    print("lt2: ", "你好" > "nh");
-    print("gt2: ", "你好" < "nh");
+    print("lt:", name < "LichenScript2");
+    print("gt:", name > "LichenScript2");
+    print("lt2:", "你好" > "nh");
+    print("gt2:", "你好" < "nh");
     print(name.slice(2, 6));
     const url1 = "https://www." + "lichenscript.com";
     const url2 = "https://www.lichenscript.com";

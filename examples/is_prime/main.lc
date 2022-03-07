@@ -14,11 +14,11 @@ function isPrime(num: i32): boolean {
 }
 
 function main () {
-    print("1: ", isPrime(1));
-    print("2: ", isPrime(2));
-    print("3: ", isPrime(3));
-    print("4: ", isPrime(4));
-    print("5: ", isPrime(5));
-    print("100: ", isPrime(100));
-    print("101: ", isPrime(101));
+    print("1:", isPrime(1));
+    print("2:", isPrime(2));
+    print("3:", isPrime(3));
+    print("4:", isPrime(4));
+    print("5:", isPrime(5));
+    print("100:", isPrime(100));
+    print("101:", isPrime(101));
 }

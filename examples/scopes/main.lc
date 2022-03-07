@@ -8,5 +8,5 @@ function main() {
         i
     };
 
-    print(i, " ", j);
+    print(i, j);
 }

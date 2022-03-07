@@ -1013,8 +1013,7 @@ static no_inline int string_buffer_putc_slow(StringBuffer *s, uint32_t c)
 }
 
 /* 0 <= c <= 0xff */
-static int string_buffer_putc8(StringBuffer *s, uint32_t c)
-{
+static int string_buffer_putc8(StringBuffer *s, uint32_t c) {
     if (unlikely(s->len >= s->size)) {
         if (string_buffer_realloc(s, s->len + 1, c))
             return -1;
@@ -1028,8 +1027,7 @@ static int string_buffer_putc8(StringBuffer *s, uint32_t c)
 }
 
 /* 0 <= c <= 0xffff */
-static int string_buffer_putc16(StringBuffer *s, uint32_t c)
-{
+static int string_buffer_putc16(StringBuffer *s, uint32_t c) {
     if (likely(s->len < s->size)) {
         if (s->is_wide_char) {
             s->str->u.str16[s->len++] = c;
@@ -1089,6 +1087,49 @@ static int string_buffer_write8(StringBuffer *s, const uint8_t *p, int len)
         s->len += len;
     }
     return 0;
+}
+
+static int string_buffer_puts8(StringBuffer *s, const char *str) {
+    return string_buffer_write8(s, (const uint8_t *)str, strlen(str));
+}
+
+static int string_buffer_write16(StringBuffer *s, const uint16_t *p, int len)
+{
+    int c = 0, i;
+
+    for (i = 0; i < len; i++) {
+        c |= p[i];
+    }
+    if (s->len + len > s->size) {
+        if (string_buffer_realloc(s, s->len + len, c))
+            return -1;
+    } else if (!s->is_wide_char && c >= 0x100) {
+        if (string_buffer_widen(s, s->size))
+            return -1;
+    }
+    if (s->is_wide_char) {
+        memcpy(&s->str->u.str16[s->len], p, len << 1);
+        s->len += len;
+    } else {
+        for (i = 0; i < len; i++) {
+            s->str->u.str8[s->len + i] = p[i];
+        }
+        s->len += len;
+    }
+    return 0;
+}
+
+static int string_buffer_concat(StringBuffer *s, const LCString *p,
+                                uint32_t from, uint32_t to)
+{
+    if (to <= from) {
+        return 0;
+    }
+    if (p->is_wide_char) {
+        return string_buffer_write16(s, p->u.str16 + from, to - from);
+    } else {
+        return string_buffer_write8(s, p->u.str8 + from, to - from);
+    }
 }
 
 static LCValue string_buffer_end(StringBuffer *s) {
@@ -1475,145 +1516,6 @@ static void std_print_string(LCRuntime* rt, LCString* str) {
     lc_free(rt, space);
 }
 
-void std_print_array(LCRuntime* rt, LCValue val);
-void std_print_tuple(LCRuntime* rt, LCValue val);
-void std_print_union(LCRuntime* rt, LCValue val);
-void std_print_union_obj(LCRuntime* rt, LCValue val);
-void std_print_class_object(LCRuntime* rt, LCValue val);
-
-static void std_print_val(LCRuntime* rt, LCValue val) {
-    switch (val.tag)
-    {
-    case LC_TY_BOOL:
-        if (val.int_val) {
-            printf("true");
-        } else {
-            printf("false");
-        }
-        break;
-
-    case LC_TY_F32:
-        printf("%f", val.float_val);
-        break;
-
-    case LC_TY_I32:
-        printf("%d", val.int_val);
-        break;
-
-    case LC_TY_NULL:
-        printf("unit");
-        break;
-
-    case LC_TY_CHAR:
-        printf("%c", val.int_val);
-        break;
-
-    case LC_TY_STRING:
-        std_print_string(rt, (LCString*)val.ptr_val);
-        break;
-
-    case LC_TY_BOXED_I64:
-        printf("%" PRId64, ((LCBox64*)val.ptr_val)->u.i64);
-        break;
-
-    case LC_TY_BOXED_F64:
-        printf("%lf", ((LCBox64*)val.ptr_val)->u.f64);
-        break;
-
-    case LC_TY_TUPLE:
-        std_print_tuple(rt, val);
-        break;
-
-    case LC_TY_ARRAY:
-        std_print_array(rt, val);
-        break;
-
-    case LC_TY_MAP:
-        printf("Map");
-        break;
-
-    case LC_TY_CLASS_OBJECT:
-        std_print_class_object(rt, val);
-        break;
-
-    case LC_TY_UNION:
-        std_print_union(rt, val);
-        break;
-
-    case LC_TY_UNION_OBJECT:
-        std_print_union_obj(rt, val);
-        break;
-    
-    default:
-        break;
-    }
-
-}
-
-void std_print_tuple(LCRuntime* rt, LCValue val) {
-    size_t i;
-    LCTuple* tuple = (LCTuple*)val.ptr_val;
-    printf("(");
-    for (i = 0; i < tuple->len; i++) {
-        std_print_val(rt, tuple->data[i]);
-        if (i < tuple->len - 1) {
-            printf (", ");
-        }
-    }
-    printf(")");
-}
-
-void std_print_array(LCRuntime* rt, LCValue val) {
-    LCArray* arr = (LCArray*)val.ptr_val;
-
-    printf("[");
-    for (uint32_t i = 0; i < arr->len; i++) {
-        std_print_val(rt, arr->data[i]);
-        if (i < arr->len - 1) {
-            printf(", ");
-        }
-    }
-    printf("]");
-}
-
-void std_print_class_object(LCRuntime* rt, LCValue val) {
-    LCGCObject* gc_obj = (LCGCObject*)val.ptr_val;
-    LCObjectMeta* meta = &rt->obj_meta_data[gc_obj->header.class_id];
-    if (unlikely(meta->is_enum)) {
-        return;
-    }
-    printf("%s {...}", meta->v.cls.cls_def->name);
-}
-
-void std_print_union(LCRuntime* rt, LCValue val) {
-    uint16_t cls_id = (val.int_val >> 16) & 0xFFFF;
-    uint16_t tag = val.int_val & 0xFFFF;
-    LCObjectMeta* meta = &rt->obj_meta_data[cls_id];
-    if (unlikely(!meta->is_enum)) {
-        return;
-    }
-    printf("%s", meta->v._enum.members[tag].name);
-}
-
-void std_print_union_obj(LCRuntime* rt, LCValue val) {
-    LCUnionObject* obj = (LCUnionObject*)val.ptr_val;
-    LCObjectMeta* meta = &rt->obj_meta_data[obj->cls_id];
-    if (unlikely(!meta->is_enum)) {
-        return;
-    }
-    LCEnumMemberDef* member_def = &meta->v._enum.members[obj->tag];
-    printf("%s(", member_def->name);
-
-    for (size_t i = 0; i < member_def->size; i++) {
-        std_print_val(rt, obj->value[i]);
-        if (i < member_def->size - 1) {
-            printf(", ");
-        }
-    }
-
-    printf(")");
-}
-
 static void lc_expand_obj_meta(LCRuntime* rt) {
     if (rt->obj_meta_size >= rt->obj_meta_cap) {
         rt->obj_meta_cap *= 2;
@@ -1681,11 +1583,185 @@ LCValue LCEvalLambda(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     return lambda->c_fun(rt, this, argc, args);
 }
 
-LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
-    for (int i = 0; i < arg_len; i++) {
-        std_print_val(rt, args[i]);
+LCValue LCTupleToString(LCRuntime* rt, LCValue val) {
+    StringBuffer s;
+    LCValue item;
+    LCString* item_str;
+
+    string_buffer_init(rt, &s, 32);
+    size_t i;
+    LCTuple* tuple = (LCTuple*)val.ptr_val;
+    string_buffer_putc8(&s, '(');
+    for (i = 0; i < tuple->len; i++) {
+        if (i != 0) {
+            string_buffer_puts8(&s, ", ");
+        }
+        item = LCToString(rt, tuple->data[i]);
+        item_str = (LCString*)item.ptr_val;
+        string_buffer_concat(&s, item_str, 0, item_str->length);
+        LCRelease(rt, item);
     }
-    printf("\n");
+    string_buffer_putc8(&s, ')');
+
+    return string_buffer_end(&s);
+}
+
+LCValue LCArrayToString(LCRuntime* rt, LCValue val) {
+    StringBuffer s;
+    LCValue item;
+    LCString* item_str;
+    LCArray* arr = (LCArray*)val.ptr_val;
+
+    string_buffer_init(rt, &s, 32);
+    string_buffer_putc8(&s, '[');
+    for (uint32_t i = 0; i < arr->len; i++) {
+        if (i != 0) {
+            string_buffer_puts8(&s, ", ");
+        }
+        item = LCToString(rt, arr->data[i]);
+        item_str = (LCString*)item.ptr_val;
+        string_buffer_concat(&s, item_str, 0, item_str->length);
+        LCRelease(rt, item);
+    }
+    string_buffer_putc8(&s, ']');
+    return string_buffer_end(&s);
+}
+
+LCValue LCClassObjectToString(LCRuntime* rt, LCValue val) {
+    StringBuffer s;
+    string_buffer_init(rt, &s, 32);
+    LCGCObject* gc_obj = (LCGCObject*)val.ptr_val;
+    LCObjectMeta* meta = &rt->obj_meta_data[gc_obj->header.class_id];
+    string_buffer_puts8(&s, meta->v.cls.cls_def->name);
+    string_buffer_puts8(&s, " {...}");
+    return string_buffer_end(&s);
+}
+
+LCValue LCUnionToString(LCRuntime* rt, LCValue val) {
+    StringBuffer s;
+    string_buffer_init(rt, &s, 16);
+    uint16_t cls_id = (val.int_val >> 16) & 0xFFFF;
+    uint16_t tag = val.int_val & 0xFFFF;
+    LCObjectMeta* meta = &rt->obj_meta_data[cls_id];
+    string_buffer_puts8(&s, meta->v._enum.members[tag].name);
+    return string_buffer_end(&s);
+}
+
+LCValue LCUnionObjectToString(LCRuntime* rt, LCValue val) {
+    StringBuffer s;
+    LCValue item;
+    LCString* item_str;
+
+    string_buffer_init(rt, &s, 32);
+
+    LCUnionObject* obj = (LCUnionObject*)val.ptr_val;
+    LCObjectMeta* meta = &rt->obj_meta_data[obj->cls_id];
+    LCEnumMemberDef* member_def = &meta->v._enum.members[obj->tag];
+    string_buffer_puts8(&s, member_def->name);
+    string_buffer_putc8(&s, '(');
+
+    for (size_t i = 0; i < member_def->size; i++) {
+        if (i != 0) {
+            string_buffer_puts8(&s, ", ");
+        }
+        item = LCToString(rt, obj->value[i]);
+        item_str = (LCString*)item.ptr_val;
+
+        string_buffer_concat(&s, item_str, 0, item_str->length);
+
+        LCRelease(rt, item);
+    }
+
+    string_buffer_putc8(&s, ')');
+    return string_buffer_end(&s);
+}
+
+LCValue LCToString(LCRuntime* rt, LCValue val) {
+    const char *str;
+    char buf[32];
+
+    switch (val.tag) {
+    case LC_TY_BOOL:
+        if (val.int_val) {
+            str = "true";
+        } else {
+            str = "false";
+        }
+        break;
+
+    case LC_TY_F32:
+        snprintf(buf, sizeof(buf), "%f", val.float_val);
+        str = buf;
+        break;
+
+    case LC_TY_I32:
+        snprintf(buf, sizeof(buf), "%d", val.int_val);
+        str = buf;
+        break;
+
+    case LC_TY_NULL:
+        str = "unit";
+        break;
+
+    case LC_TY_CHAR:
+        snprintf(buf, sizeof(buf), "%c", val.int_val);
+        str = buf;
+        break;
+
+    case LC_TY_STRING:
+        LCRetain(val);
+        return val;
+
+    case LC_TY_BOXED_I64:
+        snprintf(buf, sizeof(buf), "%" PRId64, ((LCBox64*)val.ptr_val)->u.i64);
+        str = buf;
+        break;
+
+    case LC_TY_BOXED_F64:
+        snprintf(buf, sizeof(buf), "%lf", ((LCBox64*)val.ptr_val)->u.f64);
+        str = buf;
+        break;
+
+    case LC_TY_TUPLE:
+        return LCTupleToString(rt, val);
+
+    case LC_TY_ARRAY:
+        return LCArrayToString(rt, val);
+
+    case LC_TY_MAP:
+        str = "#{...}";
+        break;
+
+    case LC_TY_CLASS_OBJECT:
+        return LCClassObjectToString(rt, val);
+
+    case LC_TY_UNION:
+        return LCUnionToString(rt, val);
+
+    case LC_TY_UNION_OBJECT:
+        return LCUnionObjectToString(rt, val);
+    
+    default:
+        break;
+    }
+
+    return LCNewStringFromCString(rt, (const unsigned char*)str);
+}
+
+LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
+    LCValue val;
+    for (int i = 0; i < arg_len; i++) {
+        if (i != 0) {
+            putchar(' ');
+        }
+
+        val = LCToString(rt, args[i]);
+
+        std_print_string(rt, (LCString*)val.ptr_val);
+
+        LCRelease(rt, val);
+    }
+    putchar('\n');
     return MK_NULL();
 }
 

@@ -8,6 +8,6 @@ function main() {
     print(tuple);
 
     match tuple {
-        case (a, b) => print("a: ", a, " b: ", b)
+        case (a, b) => print("a:", a, "b:", b)
     }
 }
