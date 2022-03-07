@@ -1,6 +1,8 @@
 
 function main() {
     let a = Some(1);
+    print(a);
+    print(None);
     match a {
         case Some(i) => {
             print("Some")

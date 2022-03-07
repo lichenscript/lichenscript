@@ -30,7 +30,7 @@
 #endif
 
 #define LC_INIT_SYMBOL_BUCKET_SIZE 128
-#define LC_INIT_CLASS_META_CAP 8
+#define LC_INIT_CLASS_META_CAP 16
 #define LC_SMALL_MAP_THRESHOLD 8
 #define I64_POOL_SIZE 1024
 
@@ -205,11 +205,16 @@ typedef struct LCClassMeta {
     size_t cls_method_size;
 } LCClassMeta;
 
+typedef struct LCEnumMeta {
+    LCEnumMemberDef* members;
+    size_t member_size;
+} LCEnumMeta;
+
 typedef struct LCObjectMeta {
     uint8_t is_enum;
     union {
         LCClassMeta cls;
-        LCEnumDef* _enum;
+        LCEnumMeta _enum;
     } v;
 } LCObjectMeta;
 
@@ -401,8 +406,10 @@ static inline void LCFreeRefCell(LCRuntime* rt, LCRefCell* cell) {
 }
 
 static inline void LCFreeUnionObject(LCRuntime* rt, LCUnionObject* union_obj) {
-    int i;
-    for (i = 0; i < union_obj->size; i++) {
+    LCObjectMeta* meta = &rt->obj_meta_data[union_obj->cls_id];
+    size_t union_size = meta->v._enum.members[union_obj->tag].size;
+
+    for (int i = 0; i < union_size; i++) {
         LCRelease(rt, union_obj->value[i]);
     }
 
@@ -586,6 +593,16 @@ static LCClassMethodDef Object_method_def[] = {
     { "toString", 0, LC_Object_toString }
 };
 
+static LCEnumMemberDef Option_members[] = {
+    { "Some", 1 },
+    { "None", 0 },
+};
+
+static LCEnumMemberDef Result_members[] = {
+    { "Ok", 1 },
+    { "Error", 1 },
+};
+
 LCRuntime* LCNewRuntime() {
     LCRuntime* runtime = (LCRuntime*)lc_raw_malloc(sizeof(LCRuntime));
     memset(runtime, 0, sizeof(LCRuntime));
@@ -607,6 +624,9 @@ LCRuntime* LCNewRuntime() {
     // the ancester of all classes
     LCClassID object_cls_id = LCDefineClass(runtime, &Object_def);
     LCDefineClassMethod(runtime, object_cls_id, Object_method_def, countof(Object_method_def));
+
+    LCDefineEnum(runtime, Option_members, countof(Option_members));
+    LCDefineEnum(runtime, Result_members, countof(Result_members));
 
     return runtime;
 }
@@ -681,9 +701,10 @@ static void lc_mark_val(LCRuntime *rt, LCValue val, LCMarkFunc mark_fun) {
 }
 
 static void lc_mark_union_object(LCRuntime* rt, LCUnionObject* union_obj, LCMarkFunc mark_fun) {
-    size_t i;
+    LCObjectMeta* meta = &rt->obj_meta_data[union_obj->cls_id];
+    size_t union_size = meta->v._enum.members[union_obj->tag].size;
 
-    for (i = 0; i < union_obj->size; i++) {
+    for (size_t i = 0; i < union_size; i++) {
         lc_mark_val(rt, union_obj->value[i], mark_fun);
     }
 }
@@ -1176,14 +1197,14 @@ LCValue LCRefCellGetValue(LCValue cell) {
     return ref->value;
 }
 
-LCValue LCNewUnionObject(LCRuntime* rt, int tag, int size, LCValue* args) {
+LCValue LCNewUnionObject(LCRuntime* rt, LCClassID cls_id, int tag, int size, LCValue* args) {
     size_t malloc_size = sizeof(LCUnionObject) + size * sizeof(LCValue);
     LCUnionObject* union_obj = (LCUnionObject*)lc_mallocz(rt, malloc_size);
 
     init_gc_object(rt, (LCGCObject*)union_obj, LC_GC_UNION_OBJECT);
 
+    union_obj->cls_id = cls_id;
     union_obj->tag = tag;
-    union_obj->size = size;
 
     int i;
     for (i = 0; i < size; i++) {
@@ -1203,7 +1224,7 @@ LCValue LCUnionObjectGet(LCRuntime* rt, LCValue this, int index) {
 
 int LCUnionGetType(LCValue val) {
     if (val.tag == LC_TY_UNION) {
-        return val.int_val;
+        return val.int_val & 0xFFFF;
     }
 
     LCUnionObject* union_obj = (LCUnionObject*)val.ptr_val;
@@ -1456,6 +1477,8 @@ static void std_print_string(LCRuntime* rt, LCString* str) {
 
 void std_print_array(LCRuntime* rt, LCValue val);
 void std_print_tuple(LCRuntime* rt, LCValue val);
+void std_print_union(LCRuntime* rt, LCValue val);
+void std_print_union_obj(LCRuntime* rt, LCValue val);
 void std_print_class_object(LCRuntime* rt, LCValue val);
 
 static void std_print_val(LCRuntime* rt, LCValue val) {
@@ -1512,6 +1535,14 @@ static void std_print_val(LCRuntime* rt, LCValue val) {
     case LC_TY_CLASS_OBJECT:
         std_print_class_object(rt, val);
         break;
+
+    case LC_TY_UNION:
+        std_print_union(rt, val);
+        break;
+
+    case LC_TY_UNION_OBJECT:
+        std_print_union_obj(rt, val);
+        break;
     
     default:
         break;
@@ -1534,17 +1565,14 @@ void std_print_tuple(LCRuntime* rt, LCValue val) {
 
 void std_print_array(LCRuntime* rt, LCValue val) {
     LCArray* arr = (LCArray*)val.ptr_val;
-    uint32_t i;
 
     printf("[");
-
-    for (i = 0; i < arr->len; i++) {
+    for (uint32_t i = 0; i < arr->len; i++) {
         std_print_val(rt, arr->data[i]);
         if (i < arr->len - 1) {
             printf(", ");
         }
     }
-
     printf("]");
 }
 
@@ -1555,6 +1583,35 @@ void std_print_class_object(LCRuntime* rt, LCValue val) {
         return;
     }
     printf("%s {...}", meta->v.cls.cls_def->name);
+}
+
+void std_print_union(LCRuntime* rt, LCValue val) {
+    uint16_t cls_id = (val.int_val >> 16) & 0xFFFF;
+    uint16_t tag = val.int_val & 0xFFFF;
+    LCObjectMeta* meta = &rt->obj_meta_data[cls_id];
+    if (unlikely(!meta->is_enum)) {
+        return;
+    }
+    printf("%s", meta->v._enum.members[tag].name);
+}
+
+void std_print_union_obj(LCRuntime* rt, LCValue val) {
+    LCUnionObject* obj = (LCUnionObject*)val.ptr_val;
+    LCObjectMeta* meta = &rt->obj_meta_data[obj->cls_id];
+    if (unlikely(!meta->is_enum)) {
+        return;
+    }
+    LCEnumMemberDef* member_def = &meta->v._enum.members[obj->tag];
+    printf("%s(", member_def->name);
+
+    for (size_t i = 0; i < member_def->size; i++) {
+        std_print_val(rt, obj->value[i]);
+        if (i < member_def->size - 1) {
+            printf(", ");
+        }
+    }
+
+    printf(")");
 }
 
 static void lc_expand_obj_meta(LCRuntime* rt) {
@@ -1582,14 +1639,15 @@ void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_
     meta->v.cls.cls_method_size = size;
 }
 
-LCClassID LCDefineEnum(LCRuntime* rt, LCEnumDef* enum_def) {
+LCClassID LCDefineEnum(LCRuntime* rt, LCEnumMemberDef* members, size_t size) {
     lc_expand_obj_meta(rt);
 
     LCClassID id = rt->obj_meta_size++;
 
     LCObjectMeta* meta = &rt->obj_meta_data[id];
     meta->is_enum = TRUE;
-    meta->v._enum = enum_def;
+    meta->v._enum.members = members;
+    meta->v._enum.member_size = size;
 
     return id;
 }
@@ -2608,10 +2666,10 @@ LCValue lc_std_map_get(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
 
     t = lc_std_map_find_tuple(rt, map, args[0]);
     if (t == NULL) {
-        return /* None */MK_UNION(1);
+        return /* None */MK_UNION(LC_STD_CLS_ID_OPTION, 1);
     }
 
-    return /* Some(result) */LCNewUnionObject(rt, 0, 1, (LCValue[]) { t->value });
+    return /* Some(result) */LCNewUnionObject(rt, LC_STD_CLS_ID_OPTION, 0, 1, (LCValue[]) { t->value });
 }
 
 static void lc_std_map_become_small(LCRuntime* rt, LCMap* map) {
@@ -2649,7 +2707,7 @@ static inline LCValue lc_std_map_remove_complex(LCRuntime* rt, LCMap* map, LCVal
 
         if ((*bucket_ref)->hash == hash && LCMapKeyEq(rt, (*bucket_ref)->data->key, key)) {
             t = (*bucket_ref)->data;
-            result = LCNewUnionObject(rt, 0, 1, (LCValue[]){ t->value });
+            result = LCNewUnionObject(rt, LC_STD_CLS_ID_OPTION, 0, 1, (LCValue[]){ t->value });
 
             if (t->prev) {
                 t->prev->next = t->next;
@@ -2679,7 +2737,7 @@ static inline LCValue lc_std_map_remove_complex(LCRuntime* rt, LCMap* map, LCVal
         bucket_ref = &((*bucket_ref)->next);
     }
 
-    return  /* None */MK_UNION(1);
+    return  MK_UNION(LC_STD_CLS_ID_OPTION, 1);
 }
 
 LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
@@ -2694,7 +2752,7 @@ LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args) 
             tmp = t->next;
 
             if (LCMapKeyEq(rt, t->key, args[0])) {
-                result = LCNewUnionObject(rt, 0, 1, (LCValue[]){ t->value });
+                result = LCNewUnionObject(rt, LC_STD_CLS_ID_OPTION, 0, 1, (LCValue[]){ t->value });
 
                 if (t->prev) {
                     t->prev->next = t->next;
@@ -2717,7 +2775,7 @@ LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args) 
             t = tmp;
         }
 
-        return  /* None */MK_UNION(1);
+        return  MK_UNION(LC_STD_CLS_ID_OPTION, 1);
     }
 
     return lc_std_map_remove_complex(rt, map, args[0]);

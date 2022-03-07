@@ -197,7 +197,7 @@ type t = {
   mutable scope: TScope.t;
   mutable tmp_vars_count: int;
   mutable main_function_name: string option;
-  mutable class_inits: Ir.Decl.class_init list;
+  mutable class_inits: Ir.Decl.init list;
 
   mutable prepends_decls: Ir.Decl.t list;
 
@@ -296,7 +296,7 @@ let rec transform_declaration env decl =
     List.append lambdas bodys
   )
 
-  | Enum enum -> transform_enum env enum loc
+  | Enum enum -> transform_enum env ~attributes enum loc
 
   | Interface _ -> []
 
@@ -2386,7 +2386,7 @@ and transform_class env cls loc: Ir.Decl.t list =
     class_methods = List.rev !class_methods;
   } in
 
-  env.class_inits <- class_init::env.class_inits;
+  env.class_inits <- (Ir.Decl.InitClass class_init)::env.class_inits;
 
   let _, cls_id' = cls_id in
   let cls_type = Type_context.deref_node_type env.ctx cls_id' in
@@ -2467,11 +2467,36 @@ and generate_gc_marker env name (type_def: Core_type.TypeDef.t) : Ir.Decl.gc_mar
       gc_marker_field_names = fields;
     }
 
-and transform_enum env enum loc : Ir.Decl.t list =
+and transform_enum env ~attributes enum loc : Ir.Decl.t list =
   let open Enum in
   let { elements; name = (enum_original_name, _); _ } = enum in
 
   env.current_fun_meta <- Some (create_current_fun_meta enum_original_name);
+
+  let meta_id =
+    List.find_map
+      ~f:(fun attr ->
+        let open Lichenscript_parsing.Ast in
+        if String.equal attr.attr_name.txt "meta_id" then (
+          match attr.attr_payload with
+          | name::_ -> Some name
+          | _ -> None
+        ) else
+          None
+      )
+      attributes
+  in
+
+  let enum_name = "LCC_" ^ enum_original_name in
+
+  let meta_id =
+    match meta_id with
+    | Some v -> v
+    | None ->
+      enum_name ^ "_id"
+  in
+
+  let enum_members = ref [] in
 
   let result =
     elements
@@ -2482,11 +2507,17 @@ and transform_enum env enum loc : Ir.Decl.t list =
           let case_name, case_name_id = case.case_name in
           let new_name = distribute_name env case_name in
           Hashtbl.set env.global_name_map ~key:case_name_id ~data:(SymLocal new_name);
+
+          let enum_ctor_params_size = List.length case.case_fields in
           let spec = Ir.Decl.EnumCtor {
             enum_ctor_name = new_name;
+            enum_ctor_meta_id = meta_id;
             enum_ctor_tag_id = index;
-            enum_ctor_params_size = List.length case.case_fields;
+            enum_ctor_params_size;
           } in
+
+          enum_members := (case_name, enum_ctor_params_size)::(!enum_members);
+
           [{ Ir.Decl. spec; loc }]
         )
         | Typedtree.Enum.Method _method ->
@@ -2498,9 +2529,16 @@ and transform_enum env enum loc : Ir.Decl.t list =
     |> List.concat
   in
 
+  let enum_def = { Ir.Decl.
+    enum_name;
+    enum_original_name;
+    enum_members = List.rev !enum_members;
+  } in
+
+  env.class_inits <- (Ir.Decl.InitEnum enum_def)::env.class_inits;
   env.current_fun_meta <- None;
 
-  result
+  List.append [{ Ir.Decl. spec = Enum enum_def; loc = Loc.none; }] result
 
 and transform_lambda env ~lambda_name content _ty_var =
   let prev_fun_meta = env.current_fun_meta in

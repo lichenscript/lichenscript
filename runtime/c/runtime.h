@@ -13,6 +13,9 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
+#ifndef LICHENSCRIPT_RUNTIME
+#define LICHENSCRIPT_RUNTIME
+
 #include <stdint.h>
 #include <stdlib.h>
 
@@ -158,7 +161,7 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 #define MK_BOOL(v) ((LCValue) { { .int_val = (v) }, LC_TY_BOOL })
 #define MK_VARIANT_CLOSED(v) ((LCValue) { { .int_val = v }, (LC_TY_MAX + (v << 6)) })
 #define MK_CLASS_OBJ(obj) ((LCValue){ { .ptr_val = (LCObject*)obj }, LC_TY_CLASS_OBJECT })
-#define MK_UNION(v) ((LCValue) { { .int_val = v }, LC_TY_UNION })
+#define MK_UNION(cls_id, v) ((LCValue) { { .int_val = (cls_id << 16) | v }, LC_TY_UNION })
 #define LC_NOT(v) MK_BOOL(!((v).int_val))
 #define LC_I32_EQ(l, r) MK_BOOL((l).int_val == (r).int_val)
 #define LC_I32_NOT_EQ(l, r) MK_BOOL((l).int_val != (r).int_val)
@@ -222,7 +225,6 @@ typedef struct LCUnionObject {
     LCGCObjectHeader header;
     LCClassID cls_id;
     int tag;
-    size_t size;
     LCValue value[];
 } LCUnionObject;
 
@@ -300,7 +302,7 @@ LCValue LCNewRefCell(LCRuntime* rt, LCValue value);
 void LCRefCellSetValue(LCRuntime* rt, LCValue cell, LCValue value);
 LCValue LCRefCellGetValue(LCValue cell);
 
-LCValue LCNewUnionObject(LCRuntime* rt, int tag, int size, LCValue* args);
+LCValue LCNewUnionObject(LCRuntime* rt, LCClassID cls_id, int tag, int size, LCValue* args);
 LCValue LCUnionObjectGet(LCRuntime* rt, LCValue this, int index);
 int LCUnionGetType(LCValue);
 
@@ -334,15 +336,10 @@ typedef struct LCEnumMemberDef {
     size_t size;
 } LCEnumMemberDef;
 
-typedef struct LCEnumDef {
-    const char* name;
-    LCEnumMemberDef members[];
-} LCEnumDef;
-
 LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def);
 void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_method, size_t size);
 
-LCClassID LCDefineEnum(LCRuntime* rt, LCEnumDef* enum_def);
+LCClassID LCDefineEnum(LCRuntime* rt, LCEnumMemberDef* members, size_t size);
 
 // dynamic dispatch by str
 LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_len, LCValue* args);
@@ -392,3 +389,8 @@ LCValue lc_std_map_size(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
 LCValue lc_std_exit(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 LCValue lc_std_panic(LCRuntime* rt, LCValue this, int argc, LCValue* args);
+
+#define LC_STD_CLS_ID_OPTION 1
+#define LC_STD_CLS_ID_RESULT 2
+
+#endif
