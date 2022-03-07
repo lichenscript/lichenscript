@@ -323,6 +323,20 @@ and codegen_declaration env decl =
     ps env "}\n";
   )
 
+  | Enum enum -> (
+    let { enum_name; enum_original_name; _ } = enum in
+    let class_id_var_name = enum_name ^ "_class_id" in
+    ps env (Format.sprintf "static LCClassID %s;\n" class_id_var_name);
+
+    let class_def_name = enum_name ^ "_def" in
+    ps env (Format.sprintf "static LCEnumDef %s = {\n" class_def_name);
+    with_indent env (fun () ->
+      print_indents env;
+      ps env (Format.sprintf "\"%s\",\n" enum_original_name);
+    );
+    ps env "}\n";
+  )
+
   | EnumCtor ctor -> (
     ps env (Format.sprintf "LCValue %s(LCRuntime* rt, LCValue this, int argv, LCValue* args) {\n" ctor.enum_ctor_name);
     if ctor.enum_ctor_params_size = 0 then

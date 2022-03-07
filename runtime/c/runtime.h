@@ -194,6 +194,8 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 
 #endif
 
+typedef uint32_t LCClassID;
+
 typedef struct LCString {
     LCRefCountHeader header;
     uint32_t length: 31;
@@ -218,6 +220,7 @@ typedef struct LCRefCell {
 
 typedef struct LCUnionObject {
     LCGCObjectHeader header;
+    LCClassID cls_id;
     int tag;
     size_t size;
     LCValue value[];
@@ -326,10 +329,20 @@ typedef struct LCClassDef {
     LCClassGCMark gc_mark;
 } LCClassDef;
 
-typedef uint32_t LCClassID;
+typedef struct LCEnumMemberDef {
+    const char* name;
+    size_t size;
+} LCEnumMemberDef;
+
+typedef struct LCEnumDef {
+    const char* name;
+    LCEnumMemberDef members[];
+} LCEnumDef;
 
 LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def);
 void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_method, size_t size);
+
+LCClassID LCDefineEnum(LCRuntime* rt, LCEnumDef* enum_def);
 
 // dynamic dispatch by str
 LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_len, LCValue* args);
