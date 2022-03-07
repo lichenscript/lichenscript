@@ -1627,7 +1627,7 @@ LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def) {
     LCClassID id = rt->obj_meta_size++;
 
     LCObjectMeta* meta = &rt->obj_meta_data[id];
-    meta->is_enum = FALSE;
+    meta->is_enum = 0;
     meta->v.cls.cls_def = cls_def;
 
     return id;
@@ -1645,7 +1645,7 @@ LCClassID LCDefineEnum(LCRuntime* rt, LCEnumMemberDef* members, size_t size) {
     LCClassID id = rt->obj_meta_size++;
 
     LCObjectMeta* meta = &rt->obj_meta_data[id];
-    meta->is_enum = TRUE;
+    meta->is_enum = 1;
     meta->v._enum.members = members;
     meta->v._enum.member_size = size;
 
