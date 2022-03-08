@@ -247,6 +247,50 @@ and type_equal ctx left right =
       false
   )
 
+let method_sig_type_equal ctx left right =
+  let open TypeExpr in
+  match (left, right) with
+  | (Method(_, left_params, left_rt) , Method(_, right_params, right_rt)) -> (
+    if not (type_equal ctx left_rt right_rt) then
+      false
+    else (
+      let result =
+        List.fold2
+          ~init:true
+          ~f:(fun acc (_, left) (_, right) ->
+            if not acc then
+              acc
+            else (
+              type_equal ctx left right
+            )
+          )
+          left_params.params_content
+          right_params.params_content
+      in
+
+      let params_content_eq =
+        match result with
+        | List.Or_unequal_lengths.Ok v -> v
+        | List.Or_unequal_lengths.Unequal_lengths -> false
+      in
+
+      let rest_eq =
+        match (left_params.params_rest, right_params.params_rest) with
+        | (None, None) -> true
+        | (Some (_, left_rest), Some (_, right_rest)) ->
+          type_equal ctx left_rest right_rest
+
+        | _, _ -> false
+
+      in
+
+      params_content_eq && rest_eq
+    )
+
+  )
+
+  | _ -> failwith "unrechable"
+
 let type_should_not_release ctx expr =
   (* i64/f64 should not release on 64bit platform *)
   let group = [| "i32"; "u32"; "f32"; "char"; "boolean" |] in
@@ -618,16 +662,15 @@ and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) op
         ~f:(fun (method_name, _) -> String.equal method_name member_name)
       in
       let open Option in
-      find_method >>= (fun (_, intf_elm) ->
-        match intf_elm with
-        | Cls_elm_method (_, ({ TypeDef. id = member_id; spec = ClassMethod { method_params; method_return; _ }; _ } as def)) -> (
-          (* let params = replace_params_with_type ctx types_map method_params in
-          let rt = replace_type_vars_with_maps ctx types_map method_return in *)
-          let expr = TypeExpr.Method(def, method_params, method_return) in
-          Some (expr, member_id)
-        )
-        | _ -> None
+      find_method >>= fun (_, intf_elm) ->
+      match intf_elm with
+      | Cls_elm_method (_, ({ TypeDef. id = member_id; spec = ClassMethod { method_params; method_return; _ }; _ } as def)) -> (
+        (* let params = replace_params_with_type ctx types_map method_params in
+        let rt = replace_type_vars_with_maps ctx types_map method_return in *)
+        let expr = TypeExpr.Method(def, method_params, method_return) in
+        Some (expr, member_id)
       )
+      | _ -> None
     )
 
     | _ -> (
