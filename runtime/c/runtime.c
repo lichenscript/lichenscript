@@ -200,14 +200,15 @@ static void lc_gc_objs_list_remove(GCObjectList* list, LCGCObject* obj) {
 }
 
 typedef struct LCClassMeta {
-    LCClassDef* cls_def;
+    LCClassID         ancester_id;
+    LCClassDef*       cls_def;
     LCClassMethodDef* cls_method;
-    size_t cls_method_size;
+    size_t            cls_method_size;
 } LCClassMeta;
 
 typedef struct LCEnumMeta {
     LCEnumMemberDef* members;
-    size_t member_size;
+    size_t           member_size;
 } LCEnumMeta;
 
 typedef struct LCObjectMeta {
@@ -622,7 +623,7 @@ LCRuntime* LCNewRuntime() {
     lc_gc_objs_list_init(&runtime->tmp_objs);
 
     // the ancester of all classes
-    LCClassID object_cls_id = LCDefineClass(runtime, &Object_def);
+    LCClassID object_cls_id = LCDefineClass(runtime, -1, &Object_def);
     LCDefineClassMethod(runtime, object_cls_id, Object_method_def, countof(Object_method_def));
 
     LCDefineEnum(runtime, Option_members, countof(Option_members));
@@ -1523,13 +1524,14 @@ static void lc_expand_obj_meta(LCRuntime* rt) {
     }
 }
 
-LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def) {
+LCClassID LCDefineClass(LCRuntime* rt, LCClassID ancester_id, LCClassDef* cls_def) {
     lc_expand_obj_meta(rt);
 
     LCClassID id = rt->obj_meta_size++;
 
     LCObjectMeta* meta = &rt->obj_meta_data[id];
     meta->is_enum = 0;
+    meta->v.cls.ancester_id = ancester_id;
     meta->v.cls.cls_def = cls_def;
 
     return id;
@@ -1554,15 +1556,8 @@ LCClassID LCDefineEnum(LCRuntime* rt, LCEnumMemberDef* members, size_t size) {
     return id;
 }
 
-LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_len, LCValue* args) {
-    if (this.tag <= 0) {
-        fprintf(stderr, "[LichenScript] try to invoke on primitive type\n");
-        lc_panic_internal();
-    }
-
-    LCGCObject* obj = (LCGCObject*)this.ptr_val;
-    LCClassID class_id = obj->header.class_id;
-    LCObjectMeta* meta = rt->obj_meta_data + class_id;
+static LCValue LCInvokeStrInternal(LCRuntime* rt, LCValue this, const char* content, LCClassID class_id, int arg_len, LCValue* args) {
+    LCObjectMeta* meta = &rt->obj_meta_data[class_id];
 
     size_t i;
     LCClassMethodDef* method_def;
@@ -1573,9 +1568,26 @@ LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_le
         }
     }
 
+    if (likely(meta->v.cls.ancester_id >= 0)) {
+        class_id = meta->v.cls.ancester_id;
+        return LCInvokeStrInternal(rt, this, content, class_id, arg_len, args);
+    }
+
     fprintf(stderr, "[LichenScript] Can not find method \"%s\" of class, id: %u\n", content, class_id);
     lc_panic_internal();
     return MK_NULL();
+}
+
+LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_len, LCValue* args) {
+    if (unlikely(this.tag <= 0)) {
+        fprintf(stderr, "[LichenScript] try to invoke on primitive type\n");
+        lc_panic_internal();
+    }
+
+    LCGCObject* obj = (LCGCObject*)this.ptr_val;
+    LCClassID class_id = obj->header.class_id;
+
+    return LCInvokeStrInternal(rt, this, content, class_id, arg_len, args);
 }
 
 LCValue LCEvalLambda(LCRuntime* rt, LCValue this, int argc, LCValue* args) {

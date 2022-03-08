@@ -1,0 +1,17 @@
+
+class Base {
+
+  virtual f() {
+    print("base");
+  }
+
+}
+
+class Child extends Base {
+
+}
+
+function main() {
+  const child = Child{};
+  child.f();
+}

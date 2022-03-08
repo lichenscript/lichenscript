@@ -385,8 +385,13 @@ and codegen_declaration env decl =
       ~f:(fun entry ->
         match entry with
         | Ir.Decl.InitClass cls_entry -> (
-          let { class_name; class_id_name; class_def_name; class_methods; _ } = cls_entry in
-          ps env (Format.sprintf "    %s = LCDefineClass(rt, &%s);\n" class_id_name class_def_name);
+          let { class_ancester; class_name; class_id_name; class_def_name; class_methods; _ } = cls_entry in
+          let ancester_id =
+            match class_ancester with
+            | Some (SymLocal name) -> name ^ "_class_id"
+            | _ -> "0"
+          in
+          ps env (Format.sprintf "    %s = LCDefineClass(rt, %s, &%s);\n" class_id_name ancester_id class_def_name);
           if not (List.is_empty class_methods) then (
             ps env (Format.sprintf "    LCDefineClassMethod(rt, %s, %s_methods, countof(%s_methods));\n" class_id_name class_name class_name)
           )

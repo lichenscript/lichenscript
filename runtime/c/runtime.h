@@ -197,7 +197,7 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 
 #endif
 
-typedef uint32_t LCClassID;
+typedef int32_t LCClassID;
 
 typedef struct LCString {
     LCRefCountHeader header;
@@ -326,8 +326,8 @@ typedef struct LCClassMethodDef {
 } LCClassMethodDef;
 
 typedef struct LCClassDef {
-    const char* name;  // class name
-    LCFinalizer finalizer;
+    const char*   name;  // class name
+    LCFinalizer   finalizer;
     LCClassGCMark gc_mark;
 } LCClassDef;
 
@@ -336,7 +336,7 @@ typedef struct LCEnumMemberDef {
     size_t size;
 } LCEnumMemberDef;
 
-LCClassID LCDefineClass(LCRuntime* rt, LCClassDef* cls_def);
+LCClassID LCDefineClass(LCRuntime* rt, LCClassID ancester_id, LCClassDef* cls_def);
 void LCDefineClassMethod(LCRuntime* rt, LCClassID cls_id, LCClassMethodDef* cls_method, size_t size);
 
 LCClassID LCDefineEnum(LCRuntime* rt, LCEnumMemberDef* members, size_t size);
