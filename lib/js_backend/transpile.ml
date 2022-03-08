@@ -144,13 +144,13 @@ let rec transpile_declaration env (delcaration: Ir.Decl.t) =
   | FuncDecl _ -> ()
 
 and transpile_class env (cls: Ir.Decl._class) =
-  let ancester =
-    match cls.init.class_ancester with
-    | Some (Ir.SymLocal v) -> v
-    | _ -> "null"
-  in
   ps env ("const " ^ cls.name ^ " = {\n");
-  ps env (Format.asprintf "  __proto__: %s,\n" ancester);
+
+  (match cls.init.class_ancester with
+  | Some (Ir.SymLocal v) -> 
+    ps env (Format.asprintf "  __proto__: %s,\n" v);
+  | _ -> ());
+
   ps env (Format.asprintf "  [clsNameSym]: \"%s\",\n" cls.original_name);
 
   List.iter
