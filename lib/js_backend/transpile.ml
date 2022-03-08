@@ -324,6 +324,7 @@ and transpile_expression ?(parent_expr=true) env expr =
     ps env ")"
 
   | NewString content ->
+    let content = Ir.Utils.escape_string content in
     ps env "\"";
     ps env content;
     ps env "\"";

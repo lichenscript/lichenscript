@@ -456,6 +456,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
 
   | NewString value -> (
     let len = String.length value in
+    let value = Ir.Utils.escape_string value in
     let value = Format.sprintf "%s(rt, (const unsigned char*)\"%s\", %d)" Primitives.Value.new_string_len value len in
     ps env value
   )
