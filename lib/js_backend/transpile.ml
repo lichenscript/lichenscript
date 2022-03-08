@@ -144,39 +144,13 @@ let rec transpile_declaration env (delcaration: Ir.Decl.t) =
   | FuncDecl _ -> ()
 
 and transpile_class env (cls: Ir.Decl._class) =
-  (* let transpile_class_method ~given_name _method =
-    let { Typedtree.Declaration. cls_method_body; cls_method_params; cls_method_scope; _ } = _method in
-    with_scope env (Option.value_exn cls_method_scope) (fun env ->
-      ps env "function ";
-      ps env given_name;
-      ps env "(";
-      tranpile_function_params env cls_method_params;
-      ps env ") {\n";
-      transpile_function_body env cls_method_body;
-      ps env "}\n"
-    )
+  let ancester =
+    match cls.init.class_ancester with
+    | Some (Ir.SymLocal v) -> v
+    | _ -> "null"
   in
-
-  let names = 
-    List.filter_map
-      ~f:(fun elm ->
-        match elm with
-        | Cls_method _method -> (
-          let { Typedtree.Declaration. cls_method_name = method_name', method_id; _ } = _method in
-          let method_name = "LCC_" ^ original_name ^ "_" ^ method_name' in
-          Hashtbl.set env.global_name_map ~key:method_id ~data:method_name;
-
-          transpile_class_method ~given_name:method_name _method;
-
-          Some (method_name', method_name)
-        )
-
-        | _ -> None
-      )
-      cls.cls_body.cls_body_elements
-  in *)
-
   ps env ("const " ^ cls.name ^ " = {\n");
+  ps env (Format.asprintf "  __proto__: %s,\n" ancester);
   ps env (Format.asprintf "  [clsNameSym]: \"%s\",\n" cls.original_name);
 
   List.iter

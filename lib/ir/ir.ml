@@ -51,6 +51,7 @@ module%gen rec Decl : sig
   [@@deriving show]
 
   type class_init = {
+    class_ancester: symbol option;
     class_name: string;
     class_id_name: string;
     class_def_name: string;

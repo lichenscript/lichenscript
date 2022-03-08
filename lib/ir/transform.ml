@@ -2379,7 +2379,28 @@ and transform_class env cls loc: Ir.Decl.t list =
       cls_body.cls_body_elements;
   in
 
+  let _, cls_id' = cls_id in
+  let cls_type = Type_context.deref_node_type env.ctx cls_id' in
+  let cls_typedef = Check_helper.find_typedef_of env.ctx cls_type in
+
+  let unwrap_class =
+    match cls_typedef with
+    | Some { Core_type.TypeDef. spec = Class cls; _ } -> cls
+    | _ -> failwith "unrechable"
+  in
+
+  let class_ancester =
+    Option.map
+      ~f:(fun ancester ->
+        let typedef, _ = Option.value_exn (Check_helper.find_construct_of env.ctx ancester) in
+        let ancester_id = typedef.id in
+        Hashtbl.find_exn env.global_name_map ancester_id
+      )
+      unwrap_class.tcls_extends
+  in
+
   let class_init = { Ir.Decl.
+    class_ancester;
     class_name = fun_name;
     class_id_name = fun_name ^ "_class_id";
     class_def_name = fun_name ^ "_def";
@@ -2388,9 +2409,6 @@ and transform_class env cls loc: Ir.Decl.t list =
 
   env.class_inits <- (Ir.Decl.InitClass class_init)::env.class_inits;
 
-  let _, cls_id' = cls_id in
-  let cls_type = Type_context.deref_node_type env.ctx cls_id' in
-  let cls_typedef = Check_helper.find_typedef_of env.ctx cls_type in
   let finalizer = generate_finalizer env finalizer_name (Option.value_exn cls_typedef) in
   let gc_marker = generate_gc_marker env gc_marker_name (Option.value_exn cls_typedef) in
 
