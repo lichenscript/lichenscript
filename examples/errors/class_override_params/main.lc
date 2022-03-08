@@ -1,0 +1,21 @@
+
+class Base {
+
+  virtual f(name: string) {
+    print("base:", name);
+  }
+
+}
+
+class Child {
+
+  override f(name: i32) {
+    print("base:", name);
+  }
+
+}
+
+function main() {
+  const child = Child{};
+  child.f(1);
+}

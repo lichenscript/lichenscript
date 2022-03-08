@@ -118,7 +118,7 @@ and check_enum env enum =
   List.iter
     ~f:(fun elm ->
       match elm with
-      | Method _method -> check_class_method env _method
+      | Method _method -> check_method_content env _method
       | _ -> ()
     )
     elements
@@ -1366,13 +1366,78 @@ and check_class env cls =
   List.iter
     ~f:(fun elm ->
       match elm with
-      | Cls_method _method -> check_class_method env _method
+      | Cls_method _method -> (
+        check_method_for_class env unwrap_class _method;
+        check_method_content env _method
+      )
+
       | Cls_property _
       | Cls_declare _ -> ()
     )
     cls_body_elements
 
-and check_class_method env _method =
+(*
+ * 1. if a method is virtual, check if it's parent has a virtual method with the same name, add a warning to make it override
+ *    check the params and return type, if they are different, throw an error
+ * 2. if a method is override, check if it's parent has a virtual/override method with the same name,
+ *    throw an error if there are not.
+ *    check the params and return type, if they are different, throw an error
+ * 3. if a method is neither virtual nor override. check if it's parent has a virtual/override method with the same name,
+ *    add a warning
+ *)
+and check_method_for_class env cls_type _method =
+  let open T.Declaration in
+  let { cls_method_name = method_name, _; cls_method_modifier; cls_method_visibility; cls_method_loc; _ } = _method in
+  let is_private =
+    match cls_method_visibility with
+    | Some Asttypes.Pvisibility_private -> true
+    | _ -> false
+  in
+  let is_virtual =
+    match cls_method_modifier with
+    | Some Cls_modifier_virtual -> true
+    | _ -> false
+  in
+  let is_override =
+    match cls_method_modifier with
+    | Some Cls_modifier_override -> true
+    | _ -> false
+  in
+
+  let check_private_virtual () =
+    if is_private then (
+      let open Diagnosis in
+      let spec = Type_error.PrivateVirtualMethod method_name in
+      let err = make_error env.ctx cls_method_loc spec in
+      raise (Error err)
+    );
+  in
+
+  let scope = env.scope in
+
+  if is_virtual then (
+    check_private_virtual ();
+    match cls_type.tcls_extends with
+    | Some parent_type -> (
+      let _method_opt = Check_helper.find_member_of_type env.ctx ~scope parent_type method_name in
+      ()
+    )
+    | None -> ()
+  ) else if is_override then (
+    check_private_virtual ();
+    match cls_type.tcls_extends with
+    | Some parent_type -> (
+      let _method_opt = Check_helper.find_member_of_type env.ctx ~scope parent_type method_name in
+      printf "found\n";
+      ()
+    )
+    | None -> (
+      printf "not found: %s\n" method_name;
+    )
+  ) else
+    ()
+
+and check_method_content env _method =
   let open T.Declaration in
   let { cls_method_name = _, name_id; cls_method_scope; cls_method_body; cls_method_modifier; _ } = _method in
   with_scope env (Option.value_exn cls_method_scope) (fun env ->

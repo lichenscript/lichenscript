@@ -1,0 +1,13 @@
+
+class Base {
+
+  private virtual f() {
+    print("base");
+  }
+
+}
+
+function main() {
+  const child = Base{};
+  child.f();
+}

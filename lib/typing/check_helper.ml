@@ -473,6 +473,10 @@ let get_visibility_of_class_elm class_elm =
   | Cls_elm_method(v, _) -> v
   | Cls_elm_get_set(v, _, _) -> v
 
+(*
+ * params type_vars:
+ *   For a class instance a: A<T1, T2>, the type_vars is [T1, T2]
+ *)
 let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
   let type_expr = Type_context.deref_type ctx type_expr in
   let open TypeDef in
