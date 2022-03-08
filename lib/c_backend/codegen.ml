@@ -87,6 +87,10 @@ let rec codegen_statement (env: t) stmt =
   let open Stmt in
   let { spec; _ } = stmt in
   match spec with
+  (* elimiate unused code *)
+  | Expr (Ir.Expr.Temp _) 
+  | Expr (Ir.Expr.Ident _) -> ()
+
   | Expr expr ->
     codegen_expression env expr;
     ps env ";"

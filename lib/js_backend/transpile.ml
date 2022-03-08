@@ -202,6 +202,10 @@ and transpile_if env if_spec =
 and transpile_statement env decl =
   let open Ir.Stmt in
   match decl.spec with
+  (* elimiate unused code *)
+  | Expr (Ir.Expr.Temp _) 
+  | Expr (Ir.Expr.Ident _) -> ()
+
   | Expr expr ->
     transpile_expression ~parent_expr:false env expr;
     ps env ";\n"

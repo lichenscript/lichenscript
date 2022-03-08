@@ -1,0 +1,14 @@
+
+function test(): Result<unit, i32> {
+  Ok(())
+}
+
+function test2(): Result<unit, i32> {
+  test()?;
+  Ok(())
+}
+
+function main() {
+  test2();
+  print("done");
+}
