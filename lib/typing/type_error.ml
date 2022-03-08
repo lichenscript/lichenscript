@@ -48,3 +48,4 @@ type t =
   | WhileTestShouldBeBoolean of TypeExpr.t
   | IfTestShouldBeBoolean of TypeExpr.t
   | CannotUsedForTryExpression of TypeExpr.t
+  | NoMethodToBeOverride of (string * string)  (* method_name, class_name *)
