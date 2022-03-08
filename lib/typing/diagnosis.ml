@@ -196,6 +196,10 @@ module PP = struct
     | NoMethodToBeOverride(method_name, class_name) ->
       Format.fprintf formatter "There are not method name '%s' in the ancester of '%s' to be overrided." method_name class_name
 
+    | OverrideFunctionNotMatch(parent_method, this_method) ->
+      (* Hot to express in English ?*)
+      Format.fprintf formatter "The overrided function's signature mismatched: '%s', '%s'" (pp_ty parent_method) (pp_ty this_method)
+
   let error ~ctx formatter diagnosis =
     let { spec; loc; _ } = diagnosis in
     match spec with

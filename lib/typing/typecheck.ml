@@ -1367,7 +1367,14 @@ and check_class env cls =
     ~f:(fun elm ->
       match elm with
       | Cls_method _method -> (
-        check_method_for_class env unwrap_class _method;
+        let is_static =
+          match _method.cls_method_modifier with
+          | (Some Cls_modifier_static) -> true
+          | _ -> false
+        in
+        if not is_static then (
+          check_method_for_class env unwrap_class _method
+        );
         check_method_content env _method
       )
 
@@ -1387,7 +1394,10 @@ and check_class env cls =
  *)
 and check_method_for_class env cls_type _method =
   let open T.Declaration in
-  let { cls_method_name = method_name, _; cls_method_modifier; cls_method_visibility; cls_method_loc; _ } = _method in
+  let { cls_method_name = method_name, method_id;
+    cls_method_modifier; cls_method_visibility;
+    cls_method_loc; _
+  } = _method in
   let is_private =
     match cls_method_visibility with
     | Some Asttypes.Pvisibility_private -> true
@@ -1422,6 +1432,28 @@ and check_method_for_class env cls_type _method =
 
   let scope = env.scope in
 
+  let method_node = Type_context.get_node env.ctx method_id in
+  let method_def, unwrap_method =
+    match method_node.value with
+    | TypeExpr.TypeDef ({ Core_type.TypeDef. spec = ClassMethod method_type; _ } as def) ->
+      (def, method_type)
+    | _ -> failwith ("unrechable: " ^ method_name)
+  in
+
+  let find_member_in_ancester method_name =
+    let open Option in
+    cls_type.tcls_extends >>= fun parent_type ->
+    Check_helper.find_member_of_type env.ctx ~scope parent_type method_name
+  in
+
+  let find_member_in_interface method_name =
+    List.find_map
+      ~f:(fun (intf_type_expr, _) ->
+        Check_helper.find_member_of_type env.ctx ~scope intf_type_expr method_name
+      )
+      cls_type.tcls_implements
+  in
+
   if is_virtual then (
     check_private_virtual ();
     match cls_type.tcls_extends with
@@ -1432,18 +1464,23 @@ and check_method_for_class env cls_type _method =
     | None -> ()
   ) else if is_override then (
     check_private_virtual ();
-    match cls_type.tcls_extends with
-    | Some parent_type -> (
-      let method_opt = Check_helper.find_member_of_type env.ctx ~scope parent_type method_name in
-      match method_opt with
-      | Some (_type_expr, _) -> (
-        printf "found!";
-        (* print_endline (Format.asprintf "%a\n" TypeExpr.pp type_expr); *)
+    let method_opt = find_member_in_ancester method_name in
+    let method_opt =
+      if Option.is_none method_opt then
+        find_member_in_interface method_name
+      else
+        method_opt
+    in
+    match method_opt with
+    | Some (found_type_expr, _) -> (
+      let this_type_expr = TypeExpr.Method(method_def, unwrap_method.method_params, unwrap_method.method_return) in
+      if not (Check_helper.method_sig_type_equal env.ctx this_type_expr found_type_expr) then (
+        let open Diagnosis in
+        let spec = Type_error.OverrideFunctionNotMatch(found_type_expr, this_type_expr)in
+        let err = make_error env.ctx cls_method_loc spec in
+        raise (Error err)
       )
-      | None -> raise_no_method_to_be_overrided ()
-
     )
-
     | None -> raise_no_method_to_be_overrided ()
 
   ) else
