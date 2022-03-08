@@ -1528,16 +1528,20 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       env.tmp_vars_count <- env.tmp_vars_count + 1;
       let tmp_var = "t[" ^ (Int.to_string tmp_id) ^ "]" in
 
+      let cleanup = generate_finalize_stmts_function env.scope in
+
       let stmt = { Ir.Stmt.
         spec = If {
           if_test = Ir.Expr.TagEqual (expr', 1);  (* 1 represent error *)
           if_consequent =
-            List.append
-            expr_result.append_stmts
-            [{ Ir.Stmt.
-                spec = Return (Some expr');
-                loc = Loc.none;
-            }];
+            List.concat [
+              expr_result.append_stmts;
+              cleanup;
+              [{ Ir.Stmt.
+                  spec = Return (Some expr');
+                  loc = Loc.none;
+              }]
+            ];
           if_alternate = None;
         };
         loc = expr.loc;

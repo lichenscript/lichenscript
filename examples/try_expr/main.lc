@@ -16,10 +16,11 @@ function test2(content: string): Result<i32, MyError> {
   }
 }
 
-function test1(content: string): Result<unit, MyError> {
+function test1(content: string): Result<string, MyError> {
+  const str = "finished";
   const num = test2(content)?;
   print(num);
-  Ok(())
+  Ok(str)
 }
 
 function main() {

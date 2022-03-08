@@ -1,4 +1,5 @@
 
 function main() {
 	print("\"Hello\"\n\tWorld");
+	print ("\\");
 }

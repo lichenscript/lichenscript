@@ -5,7 +5,9 @@ let escape_string content =
   String.iter
     ~f:(fun ch ->
       let open Char in
-      if ch = '"' then
+      if ch = '\\' then
+        Buffer.add_string buffer "\\\\"
+      else if ch = '"' then
         Buffer.add_string buffer "\\\""
       else if ch = '\n' then
         Buffer.add_string buffer "\\n"
