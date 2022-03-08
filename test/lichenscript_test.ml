@@ -17,20 +17,20 @@ open Core
 open Lichenscript_common.Cli_utils
 
 type test_suite = {
-  mutable stdout:        Core.Unix.File_descr.t option;
-  pid:           Pid.t;
-  test_file:     string;
-  stdout_buffer: Buffer.t;
+  mutable stdout: Core.Unix.File_descr.t option;
+  pid:            Pid.t;
+  test_file:      string;
+  stdout_buffer:  Buffer.t;
 }
 
 type t = {
-  mutable totoal_files: int;
+  mutable totoal_files:   int;
   mutable finished_files: int;
-  mutable error_files: int;
-  rest_args: string array;
-  compiler_path: string;
+  mutable error_files:    int;
+  rest_args:              string array;
+  compiler_path:          string;
   (* fd -> suites *)
-  suites: (int, test_suite) Hashtbl.t;
+  suites:                 (int, test_suite) Hashtbl.t;
 }
 
 let create ~rest_args ~compiler_path () = {
@@ -99,7 +99,7 @@ let rec main () =
   done;
   let env = create  ~compiler_path:!compiler_path ~rest_args:!rest_args () in
   let full_path = Filename.realpath test_dir in
-  run_test_in_dir env ?name:!suite_name full_path;
+  run_test_in_dir env ?name:!suite_name full_path full_path;
   receive_all_messages env
 
 and remove_suite_by_fd env fd =
@@ -244,36 +244,34 @@ and diff_stdout env suite =
 (*
  * Traverse the test_dir, findout all the .lc files
  *)
-and run_test_in_dir env ?name test_dir =
+and run_test_in_dir env ?name root_dir test_dir =
   let filenames = Sys.ls_dir test_dir in
   List.iter
     ~f:(fun filename ->
       let child_path = Filename.concat test_dir filename in
-      if Sys.is_directory_exn child_path then
-        run_test_in_dir ?name env child_path
-      else if (String.equal filename "main.lc") then (
+      if Sys.is_directory_exn child_path then (
+        run_test_in_dir ?name env root_dir child_path
+      ) else if (String.equal filename "main.lc") then (
         let child_path_parts = Filename.parts test_dir in
         let last_slice = List.last_exn child_path_parts in
+        let relative_path = String.slice test_dir (String.length root_dir) (String.length test_dir) in
         match name with
         | Some name ->
-          if String.equal last_slice name then
-            run_test_for_file env child_path
-          else ()
+          if String.equal last_slice name then (
+            run_test_for_file env relative_path child_path
+          )
 
         | _ ->
-          run_test_for_file env child_path
+          run_test_for_file env relative_path child_path
 
-      ) else ()
+      )
     )
     filenames
 
-and run_test_for_file env test_file =
+and run_test_for_file env relative_path test_file =
   env.totoal_files <- env.totoal_files + 1;
 
-  let dirname = Filename.dirname test_file in
-  let dirname_slices = Filename.parts dirname in
-  let dirname = List.last_exn dirname_slices in
-  let test_dir = Filename.concat "_test" dirname in
+  let test_dir = Filename.concat "_test" relative_path in
   Unix.mkdir_p test_dir;
 
   let args = List.concat [
