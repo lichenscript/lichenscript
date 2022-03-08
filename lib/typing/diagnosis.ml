@@ -193,6 +193,9 @@ module PP = struct
     | CannotUsedForTryExpression ty ->
       Format.fprintf formatter "The type '%s' can not be used in a try expression." (pp_ty ty)
 
+    | NoMethodToBeOverride(method_name, class_name) ->
+      Format.fprintf formatter "There are not method name '%s' in the ancester of '%s' to be overrided." method_name class_name
+
   let error ~ctx formatter diagnosis =
     let { spec; loc; _ } = diagnosis in
     match spec with

@@ -1413,6 +1413,13 @@ and check_method_for_class env cls_type _method =
     );
   in
 
+  let raise_no_method_to_be_overrided () =
+    let open Diagnosis in
+    let spec = Type_error.NoMethodToBeOverride(method_name, cls_type.tcls_name)in
+    let err = make_error env.ctx cls_method_loc spec in
+    raise (Error err)
+  in
+
   let scope = env.scope in
 
   if is_virtual then (
@@ -1427,14 +1434,20 @@ and check_method_for_class env cls_type _method =
     check_private_virtual ();
     match cls_type.tcls_extends with
     | Some parent_type -> (
-      let _method_opt = Check_helper.find_member_of_type env.ctx ~scope parent_type method_name in
-      printf "found\n";
-      ()
+      let method_opt = Check_helper.find_member_of_type env.ctx ~scope parent_type method_name in
+      match method_opt with
+      | Some (_type_expr, _) -> (
+        printf "found!";
+        (* print_endline (Format.asprintf "%a\n" TypeExpr.pp type_expr); *)
+      )
+      | None -> raise_no_method_to_be_overrided ()
+
     )
-    | None -> (
-      printf "not found: %s\n" method_name;
-    )
+
+    | None -> raise_no_method_to_be_overrided ()
+
   ) else
+    (* TODO: add warning *)
     ()
 
 and check_method_content env _method =
