@@ -1,0 +1,26 @@
+
+class Base {
+
+  private index: i32
+
+  static new(): Base {
+    Base { index: 0 }
+  }
+
+  plus(num: i32) {
+    if num > 0 {
+      this.index += num;
+    }
+  }
+
+  print() {
+    print(this.index);
+  }
+
+}
+
+function main() {
+  const base = Base.new();
+  base.plus(10);
+  base.print();
+}

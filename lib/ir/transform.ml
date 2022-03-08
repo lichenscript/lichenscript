@@ -112,14 +112,14 @@ module TScope = struct
     )
     | None -> false
 
-  let is_in_lambda scope =
+  let rec is_in_lambda scope =
     match scope.raw with
     | Some raw -> (
       if raw#test_lambda_scope then
         true
       else (
         match scope.prev with
-        | Some prev -> is_in_class prev
+        | Some prev -> is_in_lambda prev
         | None -> false
       )
     )
