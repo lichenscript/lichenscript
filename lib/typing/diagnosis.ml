@@ -77,6 +77,9 @@ module PP = struct
     | CannotContructParamOfType(name, ty) ->
       Format.fprintf formatter "Can not construct param %s type '%s'" name (pp_ty ty)
 
+    | PrivateVirtualMethod method_name ->
+      Format.fprintf formatter "The method '%s' is private, it can't be 'virtual' or 'override'." method_name
+
     | InvalidAssign ->
       Format.fprintf formatter "The left-hand side of an assignment expression must be a variable or a property access."
 
