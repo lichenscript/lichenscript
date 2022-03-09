@@ -5,7 +5,7 @@ open Scope
 type external_resolver = string -> name:string -> int option
 
 type t = {
-  ctx: Type_context.t;
+  prog: Program.t;
   file_scope: scope;
   external_resolver: external_resolver;
   mutable current_scope: scope;
@@ -14,9 +14,9 @@ type t = {
   mutable in_lambda: bool;
 }
 
-let create ~external_resolver ~file_scope ctx =
+let create ~external_resolver ~file_scope prog =
   {
-    ctx;
+    prog;
     external_resolver;
     file_scope;
     current_scope = file_scope;
@@ -25,7 +25,7 @@ let create ~external_resolver ~file_scope ctx =
     in_lambda = false;
   }
 
-let ctx env = env.ctx
+let prog env = env.prog
 
 let in_lambda env = env.in_lambda
 
@@ -59,7 +59,7 @@ let with_new_scope env scope callback =
 let external_resolver env = env.external_resolver
 
 let get_global_type_val env =
-  let root_scope = Type_context.root_scope env.ctx in
+  let root_scope = Program.root_scope env.prog in
   root_scope#find_type_symbol
 
 let unwrap_global_type name env =

@@ -56,8 +56,8 @@ module S (FS: FSProvider) = struct
     profile_exe_path: string;
   }
 
-  let create ~find_paths ~ctx () =
-    let linker = Linker.create ~ctx () in
+  let create ~find_paths ~prog () =
+    let linker = Linker.create ~prog () in
     {
       linker;
       find_paths;
@@ -176,7 +176,7 @@ module S (FS: FSProvider) = struct
       failwith (Format.sprintf "unexpected: can not find mod %s" mod_path)
     )
 
-  let rec compile_file_to_path ~ctx ~mod_path env _mod path =
+  let rec compile_file_to_path ~prog ~mod_path env _mod path =
     let file_content = FS.read_file_content path in
     let file_key = File_key.LibFile path in
     let ast =
@@ -233,7 +233,7 @@ module S (FS: FSProvider) = struct
             find_paths in
         match result with
         | Some (path, source) -> (
-          ignore (parse_module_by_dir ~ctx env ~real_path:path source);
+          ignore (parse_module_by_dir ~prog env ~real_path:path source);
           Hashtbl.set imports_map ~key:source ~data:path;
           match spec with
           | Some ImportAll ->
@@ -260,7 +260,7 @@ module S (FS: FSProvider) = struct
     let typed_env = Lichenscript_typing.Env.create
       ~file_scope
       ~external_resolver:(external_resolver env imports_map)
-      ctx
+      prog
     in
 
     (* add all top level symbols to typed_env *)
@@ -279,13 +279,13 @@ module S (FS: FSProvider) = struct
     insert_moudule_file env ~mod_path file
 
   (*
-  * recursive all files in the path
-  *
-  * @param real_path must be an absolute path
-  *)
-  and parse_module_by_dir ~ctx env ~real_path:dir_path _source : string option =
+   * recursive all files in the path
+   *
+   * @param real_path must be an absolute path
+   *)
+  and parse_module_by_dir ~prog env ~real_path:dir_path _source : string option =
     let iterate_parse_file mod_path =
-      let module_scope = new module_scope ~prev:(Type_context.root_scope ctx) () in
+      let module_scope = new module_scope ~prev:(Program.root_scope prog) () in
       let _mod = Module.create ~full_path:mod_path ~module_scope () in
       Linker.set_module env.linker mod_path _mod;
       let children = FS.ls_dir mod_path in
@@ -297,7 +297,7 @@ module S (FS: FSProvider) = struct
             try[@alert "-deprecated"]  (* disable the deprecated alert *)
               let test_result = Re.exec allow_suffix child_path |> Re.Group.all in
               if Array.length test_result > 1 then ((* is a .lc file *)
-                compile_file_to_path ~ctx ~mod_path env _mod child_path
+                compile_file_to_path ~prog ~mod_path env _mod child_path
               )
             with
             | Not_found -> ()
@@ -375,7 +375,7 @@ module S (FS: FSProvider) = struct
       )
     | _ -> ()
 
-  let typecheck_all_modules ~ctx ~verbose env =
+  let typecheck_all_modules ~prog ~verbose env =
     annotate_all_modules env;
     Linker.iter_modules
       ~f:(fun m ->
@@ -385,7 +385,7 @@ module S (FS: FSProvider) = struct
           let open Module in
           let tree = Option.value_exn file.typed_tree in
           Typecheck.typecheck_module
-            ~verbose ctx
+            ~verbose prog
             ~import_checker:(import_checker env m file)
             tree
         )
@@ -416,14 +416,14 @@ module S (FS: FSProvider) = struct
     let { find_paths; build_dir; runtime_dir; platform; verbose; wasm_standalone } = config in
     try
       (* ctx is a typing context for all modules *)
-      let ctx = Lichenscript_typing.Type_context.create () in
-      let env = create ~find_paths ~ctx () in
+      let prog = Lichenscript_typing.Program.create () in
+      let env = create ~find_paths ~prog () in
 
       (* parse the entry dir *)
       let dir_of_entry = Filename.dirname entry_file_path in
-      let entry_full_path = parse_module_by_dir ~ctx env ~real_path:(FS.get_realpath dir_of_entry) dir_of_entry  in
+      let entry_full_path = parse_module_by_dir ~prog env ~real_path:(FS.get_realpath dir_of_entry) dir_of_entry  in
 
-      typecheck_all_modules ~ctx ~verbose env;
+      typecheck_all_modules ~prog ~verbose env;
 
       let main_mod = Option.value_exn (Linker.get_module env.linker (Option.value_exn entry_full_path)) in
       if List.is_empty (Module.files main_mod) then (
@@ -458,7 +458,7 @@ module S (FS: FSProvider) = struct
       match platform with
       | "native"
       | "wasm32" -> (
-        let output = Lichenscript_c.codegen ~ctx declarations in
+        let output = Lichenscript_c.codegen ~prog declarations in
         let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
         let build_dir = get_build_dir () in
         let output_path = write_to_file build_dir mod_name ~ext:".c" output in
@@ -470,7 +470,7 @@ module S (FS: FSProvider) = struct
       | "js" -> (
         let js_runtime_preclude_file = Filename.(concat (concat runtime_dir "js") "runtime.js") in
         let preclude = FS.read_file_content js_runtime_preclude_file in
-        let output = Lichenscript_js.codegen ~ctx ~preclude declarations in
+        let output = Lichenscript_js.codegen ~prog ~preclude declarations in
         let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
         let build_dir = get_build_dir () in
         let output_path = write_to_file build_dir mod_name ~ext:".js" output in

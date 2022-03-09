@@ -62,7 +62,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
         deps = List.append prev_deps [ty_var];
       } in
 
-      let id = Type_context.new_id (Env.ctx env) node in
+      let id = Program.new_id (Env.prog env) node in
       [id], (T.Statement.Semi expr)
     )
 
@@ -95,9 +95,9 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       )
 
       | Symbol (_, sym_id) -> (
-        let ctx = Env.ctx env in
-        let node = Type_context.get_node ctx sym_id in
-        Type_context.update_node ctx sym_id {
+        let ctx = Env.prog env in
+        let node = Program.get_node ctx sym_id in
+        Program.update_node ctx sym_id {
           node with
           deps = List.concat [node.deps; [binding_init.ty_var]; prev_deps ];
         };
@@ -116,7 +116,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       | Array _
       | EnumCtor _ -> (
         let open Type_error in
-        let err = Diagnosis.(make_error (Env.ctx env) binding_loc (CannotBindingOfPattern "enum")) in
+        let err = Diagnosis.(make_error (Env.prog env) binding_loc (CannotBindingOfPattern "enum")) in
         raise (Diagnosis.Error err)
       )
     )
@@ -149,7 +149,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
 and annotate_expression ~prev_deps env expr : T.Expression.t =
   let open Ast.Expression in
   let { spec; loc; attributes; } = expr in
-  let root_scope = Type_context.root_scope (Env.ctx env) in
+  let root_scope = Program.root_scope (Env.prog env) in
   let ty_var, spec = 
     match spec with
     | Constant cnst -> (
@@ -187,7 +187,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         deps;
       } in
 
-      let node_id = Type_context.new_id (Env.ctx env) node in
+      let node_id = Program.new_id (Env.prog env) node in
 
       node_id, (T.Expression.Constant cnst)
     )
@@ -197,7 +197,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       match ty_var_opt with
       | Some variable -> (
         if not !(variable.var_init) then (
-          let err = Diagnosis.(make_error (Env.ctx env) expr.loc (CannotAccessBeforeInit id.pident_name)) in
+          let err = Diagnosis.(make_error (Env.prog env) expr.loc (CannotAccessBeforeInit id.pident_name)) in
           raise (Diagnosis.Error err)
         );
         (*
@@ -210,7 +210,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
             loc = loc;
             deps = [variable.var_id];
           } in
-          let ty_id = Type_context.new_id (Env.ctx env) node in
+          let ty_id = Program.new_id (Env.prog env) node in
           ty_id, (T.Expression.Identifier (id.pident_name, ty_id))
         ) else (
           Env.capture_variable env ~name:id.pident_name;
@@ -220,7 +220,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
       | _ ->
         let err_spec = Type_error.CannotFindName id.pident_name in
-        let err = Diagnosis.make_error (Env.ctx env) id.pident_loc err_spec in
+        let err = Diagnosis.make_error (Env.prog env) id.pident_loc err_spec in
         raise (Diagnosis.Error err)
     )
 
@@ -251,7 +251,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           deps = [lambda_body.ty_var];
         } in
 
-        let node_id = Type_context.new_id (Env.ctx env) node in
+        let node_id = Program.new_id (Env.prog env) node in
 
         Env.set_in_lambda env prev_in_lambda;
 
@@ -273,7 +273,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       let a_list = List.map ~f:(annotate_expression ~prev_deps env) arr_list in
       let deps = List.map ~f:(fun expr -> expr.ty_var) a_list in
 
-      let ty_var = Type_context.new_id (Env.ctx env) {
+      let ty_var = Program.new_id (Env.prog env) {
         value = TypeExpr.Unknown;
         loc;
         deps;
@@ -297,7 +297,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         |> List.unzip
       in
 
-      let ty_var = Type_context.new_id (Env.ctx env) {
+      let ty_var = Program.new_id (Env.prog env) {
         value = TypeExpr.Unknown;
         loc;
         deps;
@@ -326,20 +326,20 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         loc;
         deps = List.append prev_deps deps;
       } in
-      let id = Type_context.new_id (Env.ctx env) node in
+      let id = Program.new_id (Env.prog env) node in
       id, T.Expression.Tuple expressions
     )
 
     | Member (expr, name) -> (
       let default_clause () =
         let expr = annotate_expression ~prev_deps env expr in
-        let ctx = Env.ctx env in
+        let ctx = Env.prog env in
         let node = {
           value = TypeExpr.Unknown;
           loc;
           deps = List.append prev_deps [expr.ty_var];
         } in
-        let id = Type_context.new_id ctx node in
+        let id = Program.new_id ctx node in
         id, T.Expression.Member(expr, name)
       in
 
@@ -349,7 +349,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         let variable_opt = scope#find_var_symbol id.pident_name in
         match variable_opt with
         | Some variable -> (
-          let node_type = Type_context.deref_node_type (Env.ctx env) variable.var_id in
+          let node_type = Program.deref_node_type (Env.prog env) variable.var_id in
           match node_type with
 
           (*
@@ -376,7 +376,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
             | None ->
               let err_spec = Type_error.CannotFindNameForImport(id.pident_name, name.pident_name) in
-              let err = Diagnosis.make_error (Env.ctx env) expr.loc err_spec in
+              let err = Diagnosis.make_error (Env.prog env) expr.loc err_spec in
               raise (Diagnosis.Error err)
 
           )
@@ -403,7 +403,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         loc;
       } in
 
-      let id = Type_context.new_id (Env.ctx env) node in
+      let id = Program.new_id (Env.prog env) node in
 
       id, (T.Expression.Index(expr, index_expr))
     )
@@ -415,7 +415,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         deps = [child_expr.ty_var];
         loc;
       } in
-      let id = Type_context.new_id (Env.ctx env) node in
+      let id = Program.new_id (Env.prog env) node in
       id, T.Expression.Unary(op, child_expr)
     )
 
@@ -428,7 +428,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         deps = [left.ty_var; right.ty_var];
         loc;
       } in
-      let id = Type_context.new_id (Env.ctx env) node in
+      let id = Program.new_id (Env.prog env) node in
 
       id, (T.Expression.Binary(op, left, right))
     )
@@ -443,7 +443,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
     | Assign (op, left, expr) -> (
       let expr = annotate_expression ~prev_deps env expr in
       let scope = Env.peek_scope env in
-      let ctx = Env.ctx env in
+      let ctx = Env.prog env in
       let left' =
         match left with
         | { spec = Identifier id; _; } -> (
@@ -473,7 +473,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         )
       in
       let value = TypeExpr.Unit in
-      let next_id = Type_context.new_id ctx {
+      let next_id = Program.new_id ctx {
         value;
         deps = [ expr.ty_var; left'.ty_var ];
         loc;
@@ -488,7 +488,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
     | Init init -> (
       let { init_loc; init_name; init_elements } = init in
-      let ctx = Env.ctx env in
+      let ctx = Env.prog env in
       let scope = Env.peek_scope env in
       let init_namespace, (init_name, type_int) = match init_name with
         | [] -> failwith "unrechable"
@@ -504,13 +504,13 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         | namespace::init_name::rest -> (
           let not_found_error () =
             let err_spec = Type_error.CannotFindNameForImport(namespace.pident_name, init_name.pident_name) in
-            let err = Diagnosis.make_error (Env.ctx env) init_name.pident_loc err_spec in
+            let err = Diagnosis.make_error (Env.prog env) init_name.pident_loc err_spec in
             raise (Diagnosis.Error err)
           in
           let variable_opt = scope#find_var_symbol namespace.pident_name in
           match variable_opt with
           | Some variable -> (
-            let node_type = Type_context.deref_node_type ctx variable.var_id in
+            let node_type = Program.deref_node_type ctx variable.var_id in
             match node_type with
             | TypeDef { Core_type.TypeDef. spec = Namespace ns_path; _ } -> (
               let resolver = Env.external_resolver env in
@@ -521,7 +521,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
                 if not (List.is_empty rest) then (
                   let first = List.hd_exn rest in
                   let err_spec = Type_error.CannotResolverReference first.pident_name in
-                  let err = Diagnosis.make_error (Env.ctx env) first.pident_loc err_spec in
+                  let err = Diagnosis.make_error (Env.prog env) first.pident_loc err_spec in
                   raise (Diagnosis.Error err)
                 );
 
@@ -536,7 +536,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
           | None ->
             let err_spec = Type_error.CannotFindName namespace.pident_name in
-            let err = Diagnosis.make_error (Env.ctx env) namespace.pident_loc err_spec in
+            let err = Diagnosis.make_error (Env.prog env) namespace.pident_loc err_spec in
             raise (Diagnosis.Error err)
 
         )
@@ -576,7 +576,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
 
               | _ ->
                 let err_spec = Type_error.CannotFindName key_name in
-                let err = Diagnosis.make_error (Env.ctx env) init_entry_key.pident_loc err_spec in
+                let err = Diagnosis.make_error (Env.prog env) init_entry_key.pident_loc err_spec in
                 raise (Diagnosis.Error err)
 
             )
@@ -595,7 +595,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         deps = type_int::(List.rev !deps);
         (* TODO: check props and expressions *)
       } in
-      let node_id = Type_context.new_id ctx node in
+      let node_id = Program.new_id ctx node in
       node_id, T.Expression.Init {
         init_loc;
         init_namespace;
@@ -614,7 +614,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         deps = [expr'.ty_var];
       } in
 
-      let node_id = Type_context.new_id (Env.ctx env) node in
+      let node_id = Program.new_id (Env.prog env) node in
       node_id, (T.Expression.Try expr')
     )
 
@@ -628,7 +628,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         deps = List.append [expr'.ty_var] type_deps;
       } in
 
-      let node_id = Type_context.new_id (Env.ctx env) node in
+      let node_id = Program.new_id (Env.prog env) node in
       node_id, (T.Expression.TypeCast (expr', as_type'))
     )
 
@@ -642,7 +642,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         deps = [];
       } in
 
-      let node_id = Type_context.new_id (Env.ctx env) node in
+      let node_id = Program.new_id (Env.prog env) node in
       node_id, T.Expression.This
     )
 
@@ -690,7 +690,7 @@ and annotate_expression_match ~prev_deps env _match =
     loc = match_loc;
   } in
 
-  let id = Type_context.new_id (Env.ctx env) node in
+  let id = Program.new_id (Env.prog env) node in
 
   id, (T.Expression.Match { T.Expression.
     match_expr;
@@ -707,7 +707,7 @@ and annotate_expression_call ~prev_deps env loc call =
 
   let params_deps = List.map ~f:(fun expr -> expr.ty_var) call_params in
 
-  let ty_var = Type_context.new_id (Env.ctx env) {
+  let ty_var = Program.new_id (Env.prog env) {
     value = TypeExpr.Unknown;
     loc;
     deps = List.append [ T.Expression.(callee.ty_var) ] params_deps;
@@ -746,7 +746,7 @@ and annotate_expression_if ~prev_deps env _if =
     deps = List.append [if_consequent.return_ty] !alt_deps;
   } in
 
-  let node_id = Type_context.new_id (Env.ctx env) node in
+  let node_id = Program.new_id (Env.prog env) node in
   node_id, { T.Expression.
     if_test;
     if_consequent;
@@ -772,10 +772,10 @@ and prescan_pattern_for_scope ~kind ~(scope: Scope.scope) env pat =
         value = TypeExpr.Unknown;
         deps = [];
       } in
-      let id = Type_context.new_id (Env.ctx env) node in
+      let id = Program.new_id (Env.prog env) node in
       (match scope#new_var_symbol pident_name ~id ~kind ~loc:pident_loc with
       | `Duplicate -> (
-        let err = Diagnosis.(make_error (Env.ctx env) pident_loc (Redefinition pident_name)) in
+        let err = Diagnosis.(make_error (Env.prog env) pident_loc (Redefinition pident_name)) in
         raise Diagnosis.(Error err)
       )
       | _ -> ());
@@ -826,7 +826,7 @@ and annotate_block_impl ~prev_deps env block : T.Block.t =
     deps = body_dep;
     loc;
   } in
-  let return_ty = Type_context.new_id (Env.ctx env) node in
+  let return_ty = Program.new_id (Env.prog env) node in
   { T.Block.
     body = body_stmts;
     loc;
@@ -915,7 +915,7 @@ and annotate_declaration env decl : T.Declaration.t =
             }
           } in
 
-          Type_context.update_node (Env.ctx env) ty_id {
+          Program.update_node (Env.prog env) ty_id {
             value = TypeExpr.TypeDef ty_def;
             deps = List.append params_deps fun_return_deps;
             loc = decl_loc;
@@ -923,11 +923,11 @@ and annotate_declaration env decl : T.Declaration.t =
 
           (match List.last attributes with
           | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; _ } ->
-            Type_context.set_external_symbol (Env.ctx env) ty_id ext_name
+            Program.set_external_symbol (Env.prog env) ty_id ext_name
 
           | _ ->
             let open Diagnosis in
-            let err = make_error (Env.ctx env) loc DeclareFunctionShouldSpecificExternal in
+            let err = make_error (Env.prog env) loc DeclareFunctionShouldSpecificExternal in
             raise (Error err)
           );
 
@@ -963,8 +963,8 @@ and annotate_declaration env decl : T.Declaration.t =
 
   (* record the declaration for linking stage *)
   if ty_var >= 0 then (
-    let open Type_context in
-    let ctx = Env.ctx env in
+    let open Program in
+    let ctx = Env.prog env in
     Hashtbl.set ctx.declarations ~key:ty_var ~data:result
   );
 
@@ -1004,7 +1004,7 @@ and annotate_class env cls =
   let props_deps = ref [] in
   let method_deps = ref [] in
 
-  let ctx = Env.ctx env in
+  let ctx = Env.prog env in
 
   let base_deps = ref None in
 
@@ -1040,7 +1040,7 @@ and annotate_class env cls =
         |> Option.is_some
     in
     if exist then (
-      let err = Diagnosis.(make_error (Env.ctx env) loc (ClassPropRedefinition(cls.cls_id.pident_name, name))) in
+      let err = Diagnosis.(make_error (Env.prog env) loc (ClassPropRedefinition(cls.cls_id.pident_name, name))) in
       raise (Diagnosis.Error err)
     );
     tcls_elements := elm::(!tcls_elements)
@@ -1054,7 +1054,7 @@ and annotate_class env cls =
       |> Option.is_some
     in
     if exist then (
-      let err = Diagnosis.(make_error (Env.ctx env) loc (ClassPropRedefinition(cls.cls_id.pident_name, name))) in
+      let err = Diagnosis.(make_error (Env.prog env) loc (ClassPropRedefinition(cls.cls_id.pident_name, name))) in
       raise (Diagnosis.Error err)
     );
     tcls_static_elements := elm::(!tcls_static_elements)
@@ -1092,7 +1092,7 @@ and annotate_class env cls =
           let first_char = String.get cls_method_name.pident_name 0 in
           if Char.is_uppercase first_char then (
             let err = Diagnosis.(make_error
-              (Env.ctx env) cls_method_name.pident_loc
+              (Env.prog env) cls_method_name.pident_loc
               (LowercaseTheMethod ("class", cls.cls_id.pident_name, _method.cls_method_name.pident_name)))
             in
             raise (Diagnosis.Error err)
@@ -1126,7 +1126,7 @@ and annotate_class env cls =
 
             in
 
-            let method_id = Type_context.size (Env.ctx env) in
+            let method_id = Program.size (Env.prog env) in
             let new_type =
               match _method.cls_method_modifier with
               | Some Cls_modifier_static -> { TypeDef.
@@ -1159,7 +1159,7 @@ and annotate_class env cls =
             this_deps := List.append !this_deps return_ty_deps;
 
             let typedef = TypeExpr.TypeDef new_type in
-            ignore (Type_context.new_id ctx
+            ignore (Program.new_id ctx
               { Core_type.
                 deps = List.concat [ List.rev !this_deps; cls_method_params_deps ]
                 |> List.filter
@@ -1203,7 +1203,7 @@ and annotate_class env cls =
             deps;
             loc = cls_property_loc;
           } in
-          let node_id = Type_context.new_id ctx node in
+          let node_id = Program.new_id ctx node in
           let ty_elm = Core_type.TypeDef.Cls_elm_prop (type_visibility, node_id, property_ty) in
           add_tcls_element (cls_property_name.pident_name, ty_elm) cls_property_loc;
 
@@ -1232,15 +1232,15 @@ and annotate_class env cls =
           let { cls_decl_method_attributes; cls_decl_method_name; cls_decl_method_type_vars; cls_decl_method_params; cls_decl_method_loc; cls_decl_method_return_ty; cls_decl_method_get_set; _ } = declare in
           let type_visibility = Visibility.Public in
 
-          let declare_id = Type_context.size ctx in
+          let declare_id = Program.size ctx in
 
           (match List.last cls_decl_method_attributes with
           | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; _ } ->
-            Type_context.set_external_symbol (Env.ctx env) declare_id ext_name
+            Program.set_external_symbol (Env.prog env) declare_id ext_name
 
           | _ ->
             let open Diagnosis in
-            let err = make_error (Env.ctx env) cls_decl_method_loc DeclareFunctionShouldSpecificExternal in
+            let err = make_error (Env.prog env) cls_decl_method_loc DeclareFunctionShouldSpecificExternal in
             raise (Error err)
           );
 
@@ -1300,7 +1300,7 @@ and annotate_class env cls =
 
             add_tcls_element (cls_decl_method_name.pident_name, cls_elm) cls_decl_method_loc;
 
-            ignore (Type_context.new_id ctx
+            ignore (Program.new_id ctx
               { Core_type.
                 deps = (List.append cls_method_params_deps return_ty_deps)
                 |> List.filter
@@ -1360,7 +1360,7 @@ and annotate_class env cls =
     let cls_body = annotate_class_body cls_body in
 
     (* reduced all method and elements here *)
-    Type_context.map_node ctx 
+    Program.map_node ctx 
       ~f:(fun _ -> {
         value = TypeExpr.TypeDef { TypeDef.
           id = cls_var.var_id;
@@ -1407,11 +1407,11 @@ and annotate_function_param env ident =
     value = TypeExpr.Unknown;
     deps = [];
   } in
-  let id = Type_context.new_id (Env.ctx env) node in
+  let id = Program.new_id (Env.prog env) node in
   let scope = Env.peek_scope env in
   (match scope#new_var_symbol ~id ~kind:Pvar_const ~loc:pident_loc pident_name  with
   | `Duplicate -> (
-    let err = Diagnosis.(make_error (Env.ctx env) pident_loc (Redefinition pident_name)) in
+    let err = Diagnosis.(make_error (Env.prog env) pident_loc (Redefinition pident_name)) in
     raise Diagnosis.(Error err)
   )
   | _ -> ());
@@ -1440,7 +1440,7 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
 
         let ctor_var = scope#find_var_symbol ident.pident_name in
         if Option.is_none ctor_var then (
-          let err = Diagnosis.(make_error (Env.ctx env) ident.pident_loc (NotAEnumConstructor ident.pident_name)) in
+          let err = Diagnosis.(make_error (Env.prog env) ident.pident_loc (NotAEnumConstructor ident.pident_name)) in
           raise (Diagnosis.Error err)
         );
         let ctor = Option.value_exn ctor_var in
@@ -1457,12 +1457,12 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
     | Identifier (namespace::ident::rest) -> (
       let ns_var = scope#find_var_symbol namespace.pident_name in
       if Option.is_none ns_var then (
-        let err = Diagnosis.(make_error (Env.ctx env) loc (CannotFindName namespace.pident_name)) in
+        let err = Diagnosis.(make_error (Env.prog env) loc (CannotFindName namespace.pident_name)) in
         raise (Diagnosis.Error err)
       );
       let ns_var = Option.value_exn ns_var in
 
-      let ns_type = Type_context.deref_node_type (Env.ctx env) ns_var.var_id in
+      let ns_type = Program.deref_node_type (Env.prog env) ns_var.var_id in
 
       match ns_type with
       | TypeExpr.TypeDef { spec = Namespace ns_path; _} -> (
@@ -1471,7 +1471,7 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
         
         if Option.is_none ext_id then (
           let err_spec = Type_error.CannotFindNameForImport(namespace.pident_name, ident.pident_name) in
-          let err = Diagnosis.make_error (Env.ctx env) ident.pident_loc err_spec in
+          let err = Diagnosis.make_error (Env.prog env) ident.pident_loc err_spec in
           raise (Diagnosis.Error err)
         );
 
@@ -1480,7 +1480,7 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
         if not (List.is_empty rest) then (
           let first = List.hd_exn rest in
           let err_spec = Type_error.CannotResolverReference first.pident_name in
-          let err = Diagnosis.make_error (Env.ctx env) first.pident_loc err_spec in
+          let err = Diagnosis.make_error (Env.prog env) first.pident_loc err_spec in
           raise (Diagnosis.Error err)
         );
 
@@ -1490,7 +1490,7 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
 
       | _ ->
         let err_spec = Type_error.CannotFindNameForImport(namespace.pident_name, ident.pident_name) in
-        let err = Diagnosis.make_error (Env.ctx env) ident.pident_loc err_spec in
+        let err = Diagnosis.make_error (Env.prog env) ident.pident_loc err_spec in
         raise (Diagnosis.Error err)
 
     )
@@ -1501,7 +1501,7 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
       | [id] -> (
         let ctor_var = scope#find_var_symbol id.pident_name in
         if Option.is_none ctor_var then (
-          let err = Diagnosis.(make_error (Env.ctx env) loc (CannotFindName id.pident_name)) in
+          let err = Diagnosis.(make_error (Env.prog env) loc (CannotFindName id.pident_name)) in
           raise (Diagnosis.Error err)
         );
         let ctor_var = Option.value_exn ctor_var in
@@ -1517,12 +1517,12 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
       | namespace::id::rest -> (
         let ns_var = scope#find_var_symbol namespace.pident_name in
         if Option.is_none ns_var then (
-          let err = Diagnosis.(make_error (Env.ctx env) loc (CannotFindName namespace.pident_name)) in
+          let err = Diagnosis.(make_error (Env.prog env) loc (CannotFindName namespace.pident_name)) in
           raise (Diagnosis.Error err)
         );
         let ns_var = Option.value_exn ns_var in
 
-        let ns_type = Type_context.deref_node_type (Env.ctx env) ns_var.var_id in
+        let ns_type = Program.deref_node_type (Env.prog env) ns_var.var_id in
 
         match ns_type with
         | TypeExpr.TypeDef { spec = Namespace ns_path; _} -> (
@@ -1531,7 +1531,7 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
           
           if Option.is_none ext_id then (
             let err_spec = Type_error.CannotFindNameForImport(namespace.pident_name, id.pident_name) in
-            let err = Diagnosis.make_error (Env.ctx env) id.pident_loc err_spec in
+            let err = Diagnosis.make_error (Env.prog env) id.pident_loc err_spec in
             raise (Diagnosis.Error err)
           );
 
@@ -1540,7 +1540,7 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
           if not (List.is_empty rest) then (
             let first = List.hd_exn rest in
             let err_spec = Type_error.CannotResolverReference first.pident_name in
-            let err = Diagnosis.make_error (Env.ctx env) first.pident_loc err_spec in
+            let err = Diagnosis.make_error (Env.prog env) first.pident_loc err_spec in
             raise (Diagnosis.Error err)
           );
 
@@ -1555,7 +1555,7 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
 
         | _ ->
           let err_spec = Type_error.CannotFindNameForImport(namespace.pident_name, id.pident_name) in
-          let err = Diagnosis.make_error (Env.ctx env) id.pident_loc err_spec in
+          let err = Diagnosis.make_error (Env.prog env) id.pident_loc err_spec in
           raise (Diagnosis.Error err)
 
       )
@@ -1611,7 +1611,7 @@ and annotate_type env ty : (TypeExpr.t * int list) =
   | Ty_ctor([{ pident_name = "unit"; _ }], []) -> TypeExpr.Unit, []
   | Ty_ctor([{ pident_name = "any"; _ }], []) -> TypeExpr.Any, []
   | Ty_ctor(ids, params) -> (
-    let ctx = Env.ctx env in
+    let ctx = Env.prog env in
     match ids with
     | [] -> failwith "unrechable"
 
@@ -1623,7 +1623,7 @@ and annotate_type env ty : (TypeExpr.t * int list) =
 
       if scope#is_generic_type_symbol pident_name then (
         if not (List.is_empty params) then (
-          let err = Diagnosis.(make_error (Env.ctx env) loc (IsNotGeneric pident_name)) in
+          let err = Diagnosis.(make_error (Env.prog env) loc (IsNotGeneric pident_name)) in
           raise (Diagnosis.Error err)
         );
         TypeExpr.TypeSymbol pident_name, !deps
@@ -1647,12 +1647,12 @@ and annotate_type env ty : (TypeExpr.t * int list) =
       let variable_opt = scope#find_var_symbol namespace.pident_name in
       let not_found_error () =
         let err_spec = Type_error.CannotFindNameForImport(namespace.pident_name, cls_name.pident_name) in
-        let err = Diagnosis.make_error (Env.ctx env) cls_name.pident_loc err_spec in
+        let err = Diagnosis.make_error (Env.prog env) cls_name.pident_loc err_spec in
         raise (Diagnosis.Error err)
       in
       match variable_opt with
       | Some variable -> (
-        let node_type = Type_context.deref_node_type ctx variable.var_id in
+        let node_type = Program.deref_node_type ctx variable.var_id in
         match node_type with
         | TypeDef { Core_type.TypeDef. spec = Namespace ns_path; _ } -> (
           let resolver = Env.external_resolver env in
@@ -1665,7 +1665,7 @@ and annotate_type env ty : (TypeExpr.t * int list) =
             if not (List.is_empty rest) then (
               let first = List.hd_exn rest in
               let err_spec = Type_error.CannotResolverReference first.pident_name in
-              let err = Diagnosis.make_error (Env.ctx env) first.pident_loc err_spec in
+              let err = Diagnosis.make_error (Env.prog env) first.pident_loc err_spec in
               raise (Diagnosis.Error err)
             );
 
@@ -1731,7 +1731,7 @@ and annotate_function_params env params : T.Function.params * TypeExpr.params * 
       value = !value;
       deps = !deps;
     } in
-    Type_context.update_node (Env.ctx env) param_id node;
+    Program.update_node (Env.prog env) param_id node;
     let param_name', _ = param_name in
     { T.Function.
       param_name;
@@ -1749,7 +1749,7 @@ and annotate_function_params env params : T.Function.params * TypeExpr.params * 
     params_content
     |> List.mapi ~f:(fun index param ->
       if param.param_rest && (index <> params_len - 1) then (
-        let err = Diagnosis.(make_error (Env.ctx env) param.param_loc RestParamsMustAtLast) in
+        let err = Diagnosis.(make_error (Env.prog env) param.param_loc RestParamsMustAtLast) in
         raise Diagnosis.(Error err)
       );
 
@@ -1782,7 +1782,7 @@ and annotate_function env fun_ =
     let first_char = String.get header.id.pident_name 0 in
     if Char.is_uppercase first_char then (
       let err = Diagnosis.(make_error
-        (Env.ctx env) header.id.pident_loc
+        (Env.prog env) header.id.pident_loc
         (LowercaseTheFunctionName header.id.pident_name))
       in
       raise (Diagnosis.Error err)
@@ -1793,14 +1793,14 @@ and annotate_function env fun_ =
       failwith (Format.sprintf "unexpected: function id %s is not added in parsing stage" header.id.pident_name)
     );
     let fun_id = (Option.value_exn fun_id_opt).var_id in
-    let name_node = Type_context.get_node (Env.ctx env) fun_id in
+    let name_node = Program.get_node (Env.prog env) fun_id in
     let fun_deps = ref [] in
 
     let name_node = {
       name_node with
       loc;
     } in
-    Type_context.update_node (Env.ctx env) fun_id name_node;
+    Program.update_node (Env.prog env) fun_id name_node;
 
     (*
      * differnt from TypeScript
@@ -1834,7 +1834,7 @@ and annotate_function env fun_ =
         fun_return = return_ty;
       };
     } in
-    Type_context.update_node (Env.ctx env) fun_id {
+    Program.update_node (Env.prog env) fun_id {
       name_node with
       value = TypeExpr.TypeDef type_def;
       (* deps = return_id::params_types; *)
@@ -1856,7 +1856,7 @@ and annotate_function env fun_ =
 and annotate_enum env enum =
   let open Ast.Enum in
   let { visibility; name; loc; elements; type_vars } = enum in
-  let ctx = Env.ctx env in
+  let ctx = Env.prog env in
   let scope = Env.peek_scope env in
   let variable = Option.value_exn (scope#find_var_symbol name.pident_name) in
 
@@ -1904,7 +1904,7 @@ and annotate_enum env enum =
 
       enum_members := (case_name.pident_name, ty_def)::(!enum_members);
 
-      Type_context.map_node
+      Program.map_node
         ctx
         ~f:(fun _ -> {
           deps = List.concat ([variable.var_id]::deps);
@@ -1944,7 +1944,7 @@ and annotate_enum env enum =
       let first_char = String.get cls_method_name.pident_name 0 in
       if Char.is_uppercase first_char then (
         let err = Diagnosis.(make_error
-          (Env.ctx env) cls_method_name.pident_loc
+          (Env.prog env) cls_method_name.pident_loc
           (LowercaseTheMethod ("enum", name.pident_name, _method.cls_method_name.pident_name)))
         in
         raise (Diagnosis.Error err)
@@ -1967,7 +1967,7 @@ and annotate_enum env enum =
 
         in
 
-        let method_id = Type_context.size (Env.ctx env) in
+        let method_id = Program.size (Env.prog env) in
 
         let new_type = { TypeDef.
           id = method_id;
@@ -1985,7 +1985,7 @@ and annotate_enum env enum =
         enum_methods := (cls_method_name.pident_name, type_visibility, new_type)::(!enum_methods);
 
         let typedef = TypeExpr.TypeDef new_type in
-        ignore (Type_context.new_id ctx
+        ignore (Program.new_id ctx
           { Core_type.
             deps =
               [ List.rev !this_deps; cls_method_params_deps; return_ty_deps ]
@@ -2038,7 +2038,7 @@ and annotate_enum env enum =
       enum_methods = List.rev !enum_methods;
     } in
 
-    Type_context.map_node
+    Program.map_node
       ctx
       ~f:(fun _ ->
         {
@@ -2089,7 +2089,7 @@ and annotate_interface env intf: T.Declaration.intf =
 
     in
 
-    let node_id = Type_context.size (Env.ctx env) in
+    let node_id = Program.size (Env.prog env) in
 
     let cls_method = { Core_type.TypeDef.
       method_cls_id = intf_id;
@@ -2115,7 +2115,7 @@ and annotate_interface env intf: T.Declaration.intf =
       deps = List.append params_deps  ret_deps;
     } in
 
-    let node_id = Type_context.new_id (Env.ctx env) node in
+    let node_id = Program.new_id (Env.prog env) node in
     deps := node_id::!deps;
 
     { T.Declaration.
@@ -2136,8 +2136,8 @@ and annotate_interface env intf: T.Declaration.intf =
     };
   } in
 
-  Type_context.map_node
-    (Env.ctx env)
+  Program.map_node
+    (Env.prog env)
     ~f:(fun _ -> {
       deps = List.rev !deps;
       loc = intf_name.pident_loc;
@@ -2157,12 +2157,12 @@ and annotate_import env import =
   let { spec; source; _ } = import in
   match spec with
   | Some (ImportNamespace local_name) -> (
-    let id = Type_context.size (Env.ctx env) in
+    let id = Program.size (Env.prog env) in
 
     let first_char = String.get local_name.pident_name 0 in
     if Char.is_uppercase first_char then (
       let err = Diagnosis.(make_error
-        (Env.ctx env)
+        (Env.prog env)
         local_name.pident_loc
         (LowercaseTheImportName local_name.pident_name)
       ) in
@@ -2176,7 +2176,7 @@ and annotate_import env import =
       spec = Namespace source;
     } in
 
-    ignore (Type_context.new_id (Env.ctx env) { Core_type.
+    ignore (Program.new_id (Env.prog env) { Core_type.
       loc = local_name.pident_loc;
       value = TypeExpr.TypeDef type_def;
       deps = [];
@@ -2192,7 +2192,7 @@ and annotate_import env import =
     match result with
     | `Duplicate -> 
       let err = Diagnosis.(make_error
-        (Env.ctx env)
+        (Env.prog env)
         local_name.pident_loc
         (Redefinition local_name.pident_name)
       ) in
@@ -2257,7 +2257,7 @@ let annotate_program env (program: Ast.program) =
       deps;
     }
   in
-  let ty_var = Type_context.new_id (Env.ctx env) val_ in
+  let ty_var = Program.new_id (Env.prog env) val_ in
   let tree = { T.
     tprogram_declarations;
     tprogram_scope = Env.file_scope env;

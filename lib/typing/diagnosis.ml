@@ -22,7 +22,7 @@ type spec =
 type t = {
   loc: Loc.t;
   spec: spec;
-  ctx: Type_context.t;
+  ctx: Program.t;
 }
 
 let make_error ctx loc err_spec =
@@ -34,7 +34,7 @@ module PP = struct
 
   let error_spec formatter ~ctx spec =
     let open Type_error in
-    let pp_ty = Type_context.print_type_value ctx in
+    let pp_ty = Program.print_type_value ctx in
     match spec with
     | NotAssignable (be_assigned, assign) ->
       Format.fprintf formatter "Type '%s' is not assignable to type '%s'" (pp_ty assign) (pp_ty be_assigned)
@@ -49,15 +49,15 @@ module PP = struct
       Format.fprintf formatter "Can not find name '%s'" name
 
     | CannotGetIndex ty ->
-      let left_type = Type_context.print_type_value ctx ty in
+      let left_type = Program.print_type_value ctx ty in
       Format.fprintf formatter "Can not get index of type '%s'" left_type
 
     | CannotImplement ty ->
-      let left_type = Type_context.print_type_value ctx ty in
+      let left_type = Program.print_type_value ctx ty in
       Format.fprintf formatter "'%s' is not an interface, can not implement" left_type
 
     | CannotUsedAsKeyOfMap ty ->
-      let left_type = Type_context.print_type_value ctx ty in
+      let left_type = Program.print_type_value ctx ty in
       Format.fprintf formatter "Type '%s' can not be used ad key of Map." left_type
 
     | CannotAccessBeforeInit var_name ->
@@ -67,8 +67,8 @@ module PP = struct
       Format.fprintf formatter "Cannot find '%s' for module '%s'." find_name local_name
 
     | CannotCastType(expr_type, cast_type) ->
-      let expr_type = Type_context.print_type_value ctx expr_type in
-      let cast_type = Type_context.print_type_value ctx cast_type in
+      let expr_type = Program.print_type_value ctx expr_type in
+      let cast_type = Program.print_type_value ctx cast_type in
       Format.fprintf formatter "Cannot cast type '%s' to '%s'." expr_type cast_type
 
     | MissingMethodForInterface(intf_name, method_name) ->
@@ -110,8 +110,8 @@ module PP = struct
         name (pp_ty ty)
 
     | CannotApplyBinary (op, left ,right) ->
-      let left_type = Type_context.print_type_value ctx left in
-      let right_type = Type_context.print_type_value ctx right in
+      let left_type = Program.print_type_value ctx left in
+      let right_type = Program.print_type_value ctx right in
       Format.fprintf formatter "Can not apply '%s' to type '%s' and '%s'"
         (BinaryOp.to_string op) left_type right_type
 
