@@ -183,18 +183,23 @@ and parse_attributes env : attributes =
   List.rev !result
 
 and parse_string source content = 
-  let env = Parser_env.init_env source content in
-  let program = parse_program env in
-  let errs = errors env in
-  if List.length errs > 0 then
-    Result.Error errs
-  else  (
-    let include_module_ids = Parser_env.include_module_ids env in
-    Result.Ok {
-      tree = program;
-      include_module_ids;
-    }
-  )
+  try
+    let env = Parser_env.init_env source content in
+    let program = parse_program env in
+    let errs = errors env in
+    if List.length errs > 0 then
+      Result.Error errs
+    else  (
+      let include_module_ids = Parser_env.include_module_ids env in
+      Result.Ok {
+        tree = program;
+        include_module_ids;
+      }
+    )
+
+  with
+  | Parse_error.Error errors ->
+    Result.Error errors
 
 and parse_program env : program =
   let decls = ref [] in

@@ -182,8 +182,8 @@ module S (FS: FSProvider) = struct
     let ast =
       match Parser.parse_string (Some file_key) file_content with
       | Result.Ok ast -> ast
-      | Result.Error err ->
-        raise (ParseError err)
+      | Result.Error errors ->
+        raise (ParseError errors)
     in
 
     let imports = Ast.(
@@ -486,9 +486,6 @@ module S (FS: FSProvider) = struct
     with
       | Diagnosis.Error e ->
         raise (TypeCheckError [e])
-
-      | Parse_error.Error errors ->
-        raise (ParseError errors)
 
   and write_to_file build_dir mod_name ~ext content: string =
     if (not (FS.file_exists build_dir)) then (
