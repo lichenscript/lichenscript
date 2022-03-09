@@ -1,0 +1,1 @@
+2:22 Type 'any' is only allowed in declare statement.

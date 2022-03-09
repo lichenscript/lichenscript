@@ -12,6 +12,7 @@ type t = {
   mutable errors: Type_error.t list;
   mutable scope_counter: int;
   mutable in_lambda: bool;
+  mutable in_declare: bool;
 }
 
 let create ~external_resolver ~file_scope prog =
@@ -23,14 +24,18 @@ let create ~external_resolver ~file_scope prog =
     errors = [];
     scope_counter = 1;
     in_lambda = false;
+    in_declare = false;
   }
 
 let prog env = env.prog
 
 let in_lambda env = env.in_lambda
 
-let set_in_lambda env v =
-  env.in_lambda <- v
+let set_in_lambda env v = env.in_lambda <- v
+
+let in_declare env = env.in_declare
+
+let set_in_declare env v = env.in_declare <- v
 
 let capture_variable env ~name =
   if env.in_lambda then 

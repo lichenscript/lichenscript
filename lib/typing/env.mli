@@ -12,6 +12,10 @@ val in_lambda: t -> bool
 
 val set_in_lambda: t -> bool -> unit
 
+val in_declare: t -> bool
+
+val set_in_declare: t -> bool -> unit
+
 val capture_variable: t -> name:string -> unit
 
 val set_current_scope: t -> scope -> unit

@@ -1,0 +1,8 @@
+
+function returnAny(): any {
+  "hello"
+}
+
+function main() {
+  returnAny();
+}

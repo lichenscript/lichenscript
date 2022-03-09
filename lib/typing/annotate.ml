@@ -892,6 +892,8 @@ and annotate_declaration env decl : T.Declaration.t =
           type_vars;
 
         Env.with_new_scope env scope (fun env ->
+          Env.set_in_declare env true;
+
           let params, params_type, params_deps = annotate_function_params env params in
           let fun_return, fun_return_deps =
             match return_ty with
@@ -930,6 +932,8 @@ and annotate_declaration env decl : T.Declaration.t =
             let err = make_error (Env.prog env) loc DeclareFunctionShouldSpecificExternal in
             raise (Error err)
           );
+
+          Env.set_in_declare env false;
 
           let header = {
             T.Function.
@@ -1606,10 +1610,17 @@ and annotate_type env ty : (TypeExpr.t * int list) =
   let deps = ref [] in
   let scope = Env.peek_scope env in
   match spec with
-  | Ty_any -> TypeExpr.Any, []
+  | Ty_any
+  | Ty_ctor([{ pident_name = "any"; _ }], []) ->
+    if not (Env.in_declare env) then (
+      let err = Diagnosis.(make_error (Env.prog env) loc AnyTypeIsOnlyAllowedInDeclare) in
+      raise (Diagnosis.Error err)
+    );
+    TypeExpr.Any, []
+
   | Ty_ctor([{ pident_name = "string"; _ }], []) -> TypeExpr.String, []
   | Ty_ctor([{ pident_name = "unit"; _ }], []) -> TypeExpr.Unit, []
-  | Ty_ctor([{ pident_name = "any"; _ }], []) -> TypeExpr.Any, []
+
   | Ty_ctor(ids, params) -> (
     let ctx = Env.prog env in
     match ids with

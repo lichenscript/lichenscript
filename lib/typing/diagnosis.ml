@@ -200,6 +200,9 @@ module PP = struct
       (* Hot to express in English ?*)
       Format.fprintf formatter "The overrided function's signature mismatched: '%s', '%s'" (pp_ty parent_method) (pp_ty this_method)
 
+    | AnyTypeIsOnlyAllowedInDeclare ->
+      Format.fprintf formatter "Type 'any' is only allowed in declare statement."
+
   let error ~ctx formatter diagnosis =
     let { spec; loc; _ } = diagnosis in
     match spec with
