@@ -85,9 +85,11 @@ function lc_std_char_to_string() {
 }
 
 function lc_to_string(v) {
-  let content = '';
+  let content = "";
 
-  if (typeof v === "object" && v.__proto__[clsNameSym]) {
+  if (typeof v === "undefined") {
+    return "()";
+  } else if (typeof v === "object" && v.__proto__[clsNameSym]) {
     content += v.__proto__[clsNameSym] + " {...}";
   } else if (Array.isArray(v)) {
     if (typeof v[0] === 'object' && v[0][unionSym]) {
@@ -96,7 +98,7 @@ function lc_to_string(v) {
         let tmp = '(';
 
         for (let j = 2; j < v.length; j++) {
-          tmp += v[j];
+          tmp += lc_to_string(v[j]);
           if (j < v.length - 1) {
             tmp += ", "
           }
@@ -109,7 +111,7 @@ function lc_to_string(v) {
       let tmp = '(';
 
       for (let j = 1; j < v.length; j++) {
-        tmp += v[j];
+        tmp += lc_to_string(v[j]);
         if (j < v.length - 1) {
           tmp += ", "
         }
@@ -121,7 +123,7 @@ function lc_to_string(v) {
       let tmp = '[';
 
       for (let j = 0; j < v.length; j++) {
-        tmp += v[j];
+        tmp += lc_to_string(v[j]);
         if (j < v.length - 1) {
           tmp += ", "
         }

@@ -4,6 +4,7 @@ class MyClass {
 }
 
 function main() {
-	const cls = MyClass{};
-	print(cls);
+  const cls = MyClass{};
+  print(cls);
+  print(Ok(()));
 }

@@ -1712,7 +1712,7 @@ LCValue LCToString(LCRuntime* rt, LCValue val) {
         break;
 
     case LC_TY_NULL:
-        str = "unit";
+        str = "()";
         break;
 
     case LC_TY_CHAR:
