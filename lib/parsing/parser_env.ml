@@ -191,7 +191,7 @@ let in_function env = env.in_function
 
 let source env = env.source
 
-let errors env = !(env.errors)
+let errors env = List.rev !(env.errors)
 
 module Peek = struct
   open Lichenscript_lex
