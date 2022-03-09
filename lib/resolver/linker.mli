@@ -2,7 +2,7 @@ open Lichenscript_typing
 
 type t
 
-val create: ctx:Type_context.t -> unit -> t
+val create: prog:Program.t -> unit -> t
 
 val link_from_entry: t -> verbose:bool -> int -> Typedtree.Declaration.t list
 

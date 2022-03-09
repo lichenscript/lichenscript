@@ -21,10 +21,10 @@ module TypeVarMap = Map.Make(String)
 (* recursive find type *)
 let find_construct_of ctx type_expr: (TypeDef.t * TypeExpr.t list) option =
   let open TypeExpr in
-  let type_expr = Type_context.deref_type ctx type_expr in
+  let type_expr = Program.deref_type ctx type_expr in
   match type_expr with
   | Ctor (c, args) -> (
-    let value = Type_context.deref_type ctx c in
+    let value = Program.deref_type ctx c in
     match value with
     | TypeDef sym -> Some (sym, args)
     | _ -> None
@@ -34,13 +34,13 @@ let find_construct_of ctx type_expr: (TypeDef.t * TypeExpr.t list) option =
 
 let find_typedef_of ctx type_expr = 
   let open TypeExpr in
-  let type_expr = Type_context.deref_type ctx type_expr in
+  let type_expr = Program.deref_type ctx type_expr in
   match type_expr with
   | TypeDef sym -> Some sym
   | _ -> None
 
 let check_is_primitive_type ~group ctx (ty: TypeExpr.t) =
-  let ty = Type_context.deref_type ctx ty in
+  let ty = Program.deref_type ctx ty in
   let ty_def_opt = find_construct_of ctx ty in
   (match ty_def_opt with
     | Some(ty_def, []) -> (
@@ -52,8 +52,8 @@ let check_is_primitive_type ~group ctx (ty: TypeExpr.t) =
   )
 
 let check_is_primitive_type2 ~group ctx (left: TypeExpr.t) (right: TypeExpr.t) =
-  let left = Type_context.deref_type ctx left in
-  let right = Type_context.deref_type ctx right in
+  let left = Program.deref_type ctx left in
+  let right = Program.deref_type ctx right in
   let left_def_opt = find_construct_of ctx left in
   let right_def_opt = find_construct_of ctx right in
   (match (left_def_opt, right_def_opt) with
@@ -69,8 +69,8 @@ let check_castable_primitive = check_is_primitive_type ~group:[| "i32"; "f32"; "
 
 let rec type_assinable_with_maps ctx var_maps left right =
   let open TypeExpr in
-  let left = Type_context.deref_type ctx left in
-  let right = Type_context.deref_type ctx right in
+  let left = Program.deref_type ctx left in
+  let right = Program.deref_type ctx right in
   match (left, right) with
   | (Any, _) -> var_maps, true
   | (_, Any) -> var_maps, false
@@ -204,8 +204,8 @@ and type_castable ctx left right =
 
 and type_equal ctx left right =
   let open TypeExpr in
-  let left = Type_context.deref_type ctx left in
-  let right = Type_context.deref_type ctx right in
+  let left = Program.deref_type ctx left in
+  let right = Program.deref_type ctx right in
   match (left, right) with
   | (Any, Any)
   | (Unit, Unit)
@@ -294,7 +294,7 @@ let method_sig_type_equal ctx left right =
 let type_should_not_release ctx expr =
   (* i64/f64 should not release on 64bit platform *)
   let group = [| "i32"; "u32"; "f32"; "char"; "boolean" |] in
-  let expr = Type_context.deref_type ctx expr in
+  let expr = Program.deref_type ctx expr in
   match expr with
   | Unit -> true
   | _ -> (
@@ -316,7 +316,7 @@ let type_is_not_gc ctx expr =
   | _ ->
     begin
       let group = [| "i32"; "u32"; "f32"; "char"; "boolean"; "i64"; "f64" |] in
-      let expr = Type_context.deref_type ctx expr in
+      let expr = Program.deref_type ctx expr in
       let expr_def_opt = find_construct_of ctx expr in
       (match expr_def_opt with
         | Some(def, []) -> (
@@ -329,8 +329,8 @@ let type_is_not_gc ctx expr =
     end
 
 let type_addable ctx left right =
-  let left = Type_context.deref_type ctx left in
-  let right = Type_context.deref_type ctx right in
+  let left = Program.deref_type ctx left in
+  let right = Program.deref_type ctx right in
   match (left, right) with
   | TypeExpr.String, TypeExpr.String -> true
   | _ ->
@@ -343,15 +343,15 @@ let type_arithmetic_integer =
   check_is_primitive_type2 ~group:[| "i32"; "u32"; "u64"; "i64"; |]
 
 let type_logic_compareable ctx left right =
-  let left = Type_context.deref_type ctx left in
-  let right = Type_context.deref_type ctx right in
+  let left = Program.deref_type ctx left in
+  let right = Program.deref_type ctx right in
   match (left, right) with
   | TypeExpr.String, TypeExpr.String -> true
   | _ ->
     check_is_primitive_type2 ~group:[| "i32"; "u32"; "u64"; "i64"; "f32"; "f64"; "char" |] ctx left right
 
 let try_unwrap_array ctx expr =
-  let expr = Type_context.deref_type ctx expr in
+  let expr = Program.deref_type ctx expr in
   let open TypeExpr in
   match expr with
   | Array t -> Some t
@@ -360,7 +360,7 @@ let try_unwrap_array ctx expr =
 let contruct_enum_case ctx enum_ctor _param_types =
   let open Core_type.TypeDef in
   let super_id = enum_ctor.enum_ctor_super_id in
-  let _super_node = Type_context.get_node ctx super_id in
+  let _super_node = Program.get_node ctx super_id in
   failwith "not implemented"
   (* match super_node.value with
   | TypeDef { spec = Enum enum; _ } -> (
@@ -378,7 +378,7 @@ let contruct_enum_case ctx enum_ctor _param_types =
             Error err
           ) else (
             let provided = Array.get provided_types index in
-            let node = Type_context.get_node ctx provided in
+            let node = Program.get_node ctx provided in
             Ok (node.value::acc)
           )
         )
@@ -390,10 +390,10 @@ let contruct_enum_case ctx enum_ctor _param_types =
   | _ -> failwith "super of enum case is not a enum" *)
 
 let find_classname_of_type ctx type_expr =
-  let type_expr = Type_context.deref_type ctx type_expr in
+  let type_expr = Program.deref_type ctx type_expr in
   match type_expr with
   | Ctor(type_expr, _) -> (
-    let type_expr = Type_context.deref_type ctx type_expr in
+    let type_expr = Program.deref_type ctx type_expr in
     let open TypeDef in
     match type_expr with
     | TypeDef { spec = Class cls; _ } -> (
@@ -405,13 +405,13 @@ let find_classname_of_type ctx type_expr =
   | _ -> None
 
 let is_array ctx type_expr =
-  let type_expr = Type_context.deref_type ctx type_expr in
+  let type_expr = Program.deref_type ctx type_expr in
   match type_expr with
   | Array _ -> true
   | _ -> false
 
 let is_primitive_with_name ctx ~name:expect_name type_expr =
-  let type_expr = Type_context.deref_type ctx type_expr in
+  let type_expr = Program.deref_type ctx type_expr in
   (match type_expr with
     | String -> String.equal expect_name "string"
     | _ ->
@@ -463,7 +463,7 @@ let rec replace_type_vars_with_maps ctx type_map type_expr =
   )
 
   | Ref ref_id -> (
-    let node = Type_context.get_node ctx ref_id in
+    let node = Program.get_node ctx ref_id in
     replace_type_vars_with_maps ctx type_map node.value
   )
 
@@ -522,7 +522,7 @@ let get_visibility_of_class_elm class_elm =
  *   For a class instance a: A<T1, T2>, the type_vars is [T1, T2]
  *)
 let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
-  let type_expr = Type_context.deref_type ctx type_expr in
+  let type_expr = Program.deref_type ctx type_expr in
   let open TypeDef in
   match type_expr with
   | TypeDef { id = enum_id; spec = Enum enum; _ } -> (
@@ -646,10 +646,10 @@ let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
   *
   *)
 and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) option =
-  let type_expr' = Type_context.deref_type ctx type_expr in
+  let type_expr' = Program.deref_type ctx type_expr in
   match type_expr' with
   | Ctor(type_expr, type_vars) -> (
-    let type_expr = Type_context.deref_type ctx type_expr in
+    let type_expr = Program.deref_type ctx type_expr in
     let open TypeDef in
     match type_expr with
     | TypeDef { spec = Enum _; _ }
@@ -678,7 +678,7 @@ and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) op
         let ty_int_opt = scope#find_type_symbol "Char" in
         match ty_int_opt with
         | Some ty_int -> (
-          let array_node = Type_context.get_node ctx ty_int in
+          let array_node = Program.get_node ctx ty_int in
           (* building type Array<T> *)
           let ctor_type = TypeExpr.Ctor(array_node.value, []) in
           find_member_of_type ctx ~scope ctor_type member_name
@@ -700,7 +700,7 @@ and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) op
     match result with
     | Some (_, Cls_elm_method(_, _method)) ->
       let member_id = _method.id in
-      let node = Type_context.get_node ctx member_id in
+      let node = Program.get_node ctx member_id in
       Some (node.value, member_id)
 
     | Some (_, Cls_elm_prop(_, id, prop)) ->
@@ -713,7 +713,7 @@ and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) op
     let ty_int_opt = scope#find_type_symbol "Array" in
     match ty_int_opt with
     | Some ty_int -> (
-      let array_node = Type_context.get_node ctx ty_int in
+      let array_node = Program.get_node ctx ty_int in
       (* building type Array<T> *)
       let ctor_type = TypeExpr.Ctor(array_node.value, [t]) in
       find_member_of_type ctx ~scope ctor_type member_name
@@ -725,7 +725,7 @@ and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) op
     let ty_int_opt = scope#find_type_symbol "String" in
     match ty_int_opt with
     | Some ty_int -> (
-      let array_node = Type_context.get_node ctx ty_int in
+      let array_node = Program.get_node ctx ty_int in
       (* building type Array<T> *)
       let ctor_type = TypeExpr.Ctor(array_node.value, []) in
       find_member_of_type ctx ~scope ctor_type member_name

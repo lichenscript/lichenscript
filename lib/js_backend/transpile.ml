@@ -20,7 +20,7 @@ open Core_kernel
 open Sourcemap
 
 type t = {
-  ctx: Type_context.t;
+  prog: Program.t;
   buffer: Buffer.t;
   sourcemap: sourcemap_generator;
 
@@ -45,11 +45,11 @@ let ps env str =
     )
     lines
 
-let create ~ctx () =
+let create ~prog () =
   let sourcemap = new sourcemap_generator in
   let buffer = Buffer.create 1024 in
   {
-    ctx;
+    prog;
     buffer;
     sourcemap;
     scope = None;
@@ -769,15 +769,15 @@ and transpile_id env (name, loc) =
   env.sourcemap#add_location env.col 0 loc.start.line loc.start.column;
   ps env name
 
-let transpile_program ~ctx ~preclude declarations =
-  let env = create ~ctx () in
+let transpile_program ~prog ~preclude declarations =
+  let env = create ~prog () in
   ps env preclude;
 
   let transform_config = { Transform.
     arc = false;
     prepend_lambda = false;
   } in
-  let ir_tree = Transform.transform_declarations ~config:transform_config ctx declarations in
+  let ir_tree = Transform.transform_declarations ~config:transform_config prog declarations in
 
   List.iter ~f:(transpile_declaration env) ir_tree.declarations;
 

@@ -28,17 +28,17 @@ module ModuleMap = Hashtbl.Make(String)
 module VisitPathSet = Set.Make(Int)
 
 type t = {
-  ctx: Type_context.t;
+  prog: Program.t;
   module_map: Module.t ModuleMap.t;
   mutable modules_in_order: Module.t list;
   top_level_deps: (int list) Array.t;
 }
 
-let create ~ctx () =
-  let open Type_context in
-  let top_level_deps = Array.create ~len:(ResizableArray.size ctx.ty_map) [] in
+let create ~prog () =
+  let open Program in
+  let top_level_deps = Array.create ~len:(ResizableArray.size prog.ty_map) [] in
   {
-    ctx;
+    prog;
     module_map = ModuleMap.create ();
     modules_in_order = [];
     top_level_deps;
@@ -101,7 +101,7 @@ let rec link_from_entry env ~verbose entry : Typedtree.Declaration.t list =
   link_from_entry_internal env ~verbose entry
 
 and link_from_entry_internal env ~verbose entry : Typedtree.Declaration.t list =
-  let needs_decl = Array.create ~len:(ResizableArray.size env.ctx.ty_map) false in
+  let needs_decl = Array.create ~len:(ResizableArray.size env.prog.ty_map) false in
 
   (* remove duplicate nodes *)
   let normalize_deps deps =
@@ -124,9 +124,9 @@ and link_from_entry_internal env ~verbose entry : Typedtree.Declaration.t list =
       Array.set needs_decl id true;
       []
     ) else (
-      let open Type_context in
+      let open Program in
 
-      let node = ResizableArray.get env.ctx.ty_map id in
+      let node = ResizableArray.get env.prog.ty_map id in
       let next_path = VisitPathSet.add path id in
 
       let children_orders =
@@ -187,8 +187,8 @@ and link_from_entry_internal env ~verbose entry : Typedtree.Declaration.t list =
       ~init:[]
       ~f:(fun acc id->
         if id >= 0 then (
-          let open Type_context in
-          match Hashtbl.find env.ctx.declarations id with
+          let open Program in
+          match Hashtbl.find env.prog.declarations id with
           | None -> acc
           | Some decl ->
             if is_builtin decl then
@@ -197,8 +197,8 @@ and link_from_entry_internal env ~verbose entry : Typedtree.Declaration.t list =
               decl::acc
         ) else (
           let positive = id * (-1) in
-          let open Type_context in
-          match Hashtbl.find env.ctx.declarations positive with
+          let open Program in
+          match Hashtbl.find env.prog.declarations positive with
           | None -> acc
           | Some decl -> (
             if is_builtin decl then

@@ -192,7 +192,7 @@ type config = {
 }
 
 type t = {
-  ctx: Type_context.t;
+  ctx: Program.t;
   config: config;
   mutable scope: TScope.t;
   mutable tmp_vars_count: int;
@@ -342,7 +342,7 @@ and transform_function env _fun =
 
   env.current_fun_meta <- Some (create_current_fun_meta original_name);
 
-  let node = Type_context.get_node env.ctx original_name_id in
+  let node = Program.get_node env.ctx original_name_id in
 
   let fun_name = 
     match find_or_distribute_name env original_name_id original_name with
@@ -577,7 +577,7 @@ and transform_statement ?ret env stmt =
     let name = TScope.find_variable scope original_name in
     let init_expr = transform_expression ~is_move:true env binding.binding_init in
 
-    let node_type = Type_context.deref_node_type env.ctx name_id in
+    let node_type = Program.deref_node_type env.ctx name_id in
     let need_release =
       env.config.arc &&
       not (Check_helper.type_should_not_release env.ctx node_type)
@@ -665,7 +665,7 @@ and gen_release_temp id =
   }
 
 and auto_release_expr env ?(is_move=false) ~append_stmts ty_var expr =
-  let node_type = Type_context.deref_node_type env.ctx ty_var in
+  let node_type = Program.deref_node_type env.ctx ty_var in
   if (not env.config.arc) || is_move || Check_helper.type_should_not_release env.ctx node_type then (
     expr
   ) else (
@@ -836,7 +836,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     | Identifier (name, name_id) -> (
       let first_char = String.get name 0 in
       if Char.is_uppercase first_char then (
-        let node_type = Type_context.deref_node_type env.ctx name_id in
+        let node_type = Program.deref_node_type env.ctx name_id in
         let ctor = Check_helper.find_construct_of env.ctx node_type in
         let open Core_type in
         match ctor with
@@ -846,7 +846,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           Ir.Expr.Call(generate_name, None, [])
 
         | _ ->
-          let id_ty = Type_context.print_type_value env.ctx node_type in
+          let id_ty = Program.print_type_value env.ctx node_type in
           failwith (Format.sprintf "unknown identifier: %s" id_ty)
       ) else (
         let variable_opt = (Option.value_exn env.scope.raw)#find_var_symbol name in
@@ -859,7 +859,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
             Ir.Expr.Ident sym
         in
 
-        let node_type = Type_context.deref_node_type env.ctx variable.var_id in
+        let node_type = Program.deref_node_type env.ctx variable.var_id in
         let need_release =
           env.config.arc &&
           not (Check_helper.type_should_not_release env.ctx node_type)
@@ -923,7 +923,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       env.tmp_vars_count <- env.tmp_vars_count + 1;
       let tmp_var = Ir.SymTemp tmp_id in
 
-      if Check_helper.is_unit (Type_context.deref_node_type env.ctx ty_var) then (
+      if Check_helper.is_unit (Program.deref_node_type env.ctx ty_var) then (
         let init_stmt = { Ir.Stmt.
           spec = Expr(Ir.Expr.Assign(Ident tmp_var, Null));
           loc = Loc.none;
@@ -1087,7 +1087,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       let test_namespace expr =
         match expr with
         | { spec = Identifier (_, id); _ } -> (
-          let expr_type = Type_context.deref_node_type env.ctx id in
+          let expr_type = Program.deref_node_type env.ctx id in
           match expr_type with
           | TypeDef { Core_type.TypeDef. spec = Namespace _; _ } -> true
 
@@ -1100,7 +1100,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       let call_expr =
         match callee with
         | { spec = Identifier (_, id); _ } -> (
-          match Type_context.find_external_symbol env.ctx id with
+          match Program.find_external_symbol env.ctx id with
 
           | Some ext_name -> (
 
@@ -1110,7 +1110,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
           (* it's a local function *)
           | None -> (
-            let deref_type = Type_context.deref_node_type env.ctx callee.ty_var in
+            let deref_type = Program.deref_node_type env.ctx callee.ty_var in
             match deref_type with
             | Core_type.TypeExpr.Lambda _ -> (
               let transformed_callee = transform_expression ~is_borrow:true env callee in
@@ -1121,7 +1121,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
             (* it's a contructor *)
             | _ ->
-              let node = Type_context.get_node env.ctx id in
+              let node = Program.get_node env.ctx id in
               let ctor_opt = Check_helper.find_typedef_of env.ctx node.value in
               let ctor_name = Option.value_exn ctor_opt in
               let name = find_variable env ctor_name.name in
@@ -1133,14 +1133,14 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         | { spec = Member(expr, id); _ } ->
           begin
             if test_namespace expr then (
-              (* let callee_node = Type_context.get_node env.ctx ty_var in
+              (* let callee_node = Program.get_node env.ctx ty_var in
               let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
               let ctor = Option.value_exn ctor_opt in
               let ctor_ty_id = ctor.id in *)
               let global_name = Hashtbl.find_exn env.global_name_map callee.ty_var in
               Ir.Expr.Call(global_name, None, params)
             ) else (
-              let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
+              let expr_type = Program.deref_node_type env.ctx expr.ty_var in
               let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) expr_type id.pident_name in
               match member with
               | Some ((Method ({ spec = ClassMethod { method_is_virtual = true; _ }; _ }, _, _)), _) -> (
@@ -1158,13 +1158,13 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
                 prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
                 append_stmts := List.append !append_stmts this_expr.append_stmts;
 
-                match Type_context.find_external_symbol env.ctx method_id with
+                match Program.find_external_symbol env.ctx method_id with
                 | Some ext_name -> (
                   (* external method *)
                   Ir.Expr.Call((Ir.SymLocal ext_name), Some this_expr.expr, params)
                 )
                 | _ ->
-                  let callee_node = Type_context.get_node env.ctx method_id in
+                  let callee_node = Program.get_node env.ctx method_id in
                   let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
                   let ctor = Option.value_exn ~message:"Cannot find typedef of class" ctor_opt in
                   let ctor_ty_id = ctor.id in
@@ -1174,7 +1174,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
               (* it's a static function *)
               | Some (TypeDef { id = fun_id; spec = Function _; _ }, _) -> (
-                let callee_node = Type_context.get_node env.ctx fun_id in
+                let callee_node = Program.get_node env.ctx fun_id in
                 let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
                 let ctor = Option.value_exn ctor_opt in
                 let ctor_ty_id = ctor.id in
@@ -1188,7 +1188,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           end
 
         | _ -> (
-          let callee_node = Type_context.get_node env.ctx callee.ty_var in
+          let callee_node = Program.get_node env.ctx callee.ty_var in
           let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
           let ctor = Option.value_exn ctor_opt in
           let ctor_ty_id = ctor.id in
@@ -1200,11 +1200,11 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     )
 
     | Member(main_expr, id) -> (
-      let node = Type_context.get_node env.ctx main_expr.ty_var in
+      let node = Program.get_node env.ctx main_expr.ty_var in
       let open Core_type.TypeDef in
       match node.value with
       | Core_type.TypeExpr.TypeDef { spec = Namespace _; _ } -> (
-        let expr_node_type = Type_context.deref_node_type env.ctx expr.ty_var in
+        let expr_node_type = Program.deref_node_type env.ctx expr.ty_var in
         let open Core_type in
         match expr_node_type with
         | TypeExpr.TypeDef { TypeDef. id = ctor_id; spec = EnumCtor _; _ } ->
@@ -1213,7 +1213,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           Ir.Expr.Call(generate_name, None, [])
 
         | _ ->
-          let id_ty = Type_context.print_type_value env.ctx expr_node_type in
+          let id_ty = Program.print_type_value env.ctx expr_node_type in
           failwith (Format.sprintf "unknown identifier: %s" id_ty)
 
       )
@@ -1228,20 +1228,20 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         (* could be a property of a getter *)
         match member with
         | Some (Method ({ Core_type.TypeDef. id = def_int; spec = ClassMethod { method_get_set = Some _; _ }; _ }, _params, _rt), _) -> (
-          let ext_sym_opt = Type_context.find_external_symbol env.ctx def_int in
+          let ext_sym_opt = Program.find_external_symbol env.ctx def_int in
           let ext_sym = Option.value_exn ext_sym_opt in
           Ir.Expr.Call(SymLocal ext_sym, Some expr_result.expr, [])
         )
 
         | Some (Core_type.TypeExpr.TypeDef { id = method_id; spec = ClassMethod { method_get_set = Some Getter; _ }; _ }, _) -> (
-          let ext_sym_opt = Type_context.find_external_symbol env.ctx method_id in
+          let ext_sym_opt = Program.find_external_symbol env.ctx method_id in
           let ext_sym = Option.value_exn ext_sym_opt in
           Ir.Expr.Call(SymLocal ext_sym, Some expr_result.expr, [])
         )
 
         (* it's a property *) 
         | Some _ -> (
-          let expr_type = Type_context.deref_type env.ctx node.value in
+          let expr_type = Program.deref_type env.ctx node.value in
           let expr_ctor_opt = Check_helper.find_construct_of env.ctx expr_type in
           match expr_ctor_opt with
           | Some({ id = expr_id; _ }, _) -> (
@@ -1295,7 +1295,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
      *)
     | Assign (op_opt, left_expr, right_expr) -> (
       let assign_or_update main_expr ty_id =
-        let node_type = Type_context.deref_node_type env.ctx ty_id in
+        let node_type = Program.deref_node_type env.ctx ty_id in
         let need_release =
           env.config.arc &&
           not (Check_helper.type_should_not_release env.ctx node_type)
@@ -1352,7 +1352,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
         (* let boxed_main_expr = prepend_expr ~is_borrow env ~prepend_stmts ~append_stmts transform_main_expr.expr in *)
 
-        let main_expr_ty = Type_context.deref_node_type env.ctx main_expr.ty_var in
+        let main_expr_ty = Program.deref_node_type env.ctx main_expr.ty_var in
         let classname_opt = Check_helper.find_classname_of_type env.ctx main_expr_ty in
         let classname = Option.value_exn ~message:"can not find member of class" classname_opt in
         let gen_classname = find_variable env classname in
@@ -1506,7 +1506,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
     | TypeCast(expr, _type) ->(
       if Check_helper.check_castable_primitive env.ctx _type then (
-        let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
+        let expr_type = Program.deref_node_type env.ctx expr.ty_var in
         let expr_result = transform_expression ~is_move:true env expr in
         let expr_type = Primitives.PrimType.from_type ~ctx:env.ctx expr_type in
         let cast_type = Primitives.PrimType.from_type ~ctx:env.ctx _type in
@@ -1564,7 +1564,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
     | Index(expr, index) -> (
       let expr' = transform_expression ~is_borrow:true env expr in
-      let node_type = Type_context.deref_node_type env.ctx expr.ty_var in
+      let node_type = Program.deref_node_type env.ctx expr.ty_var in
 
       let index = transform_expression env index in
 
@@ -1706,7 +1706,7 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
     | Symbol (name, name_id) -> (
       let first_char = String.get name 0 in
       if Char.is_uppercase first_char then (
-        let name_node = Type_context.get_node env.ctx name_id in
+        let name_node = Program.get_node env.ctx name_id in
         let ctor_opt = Check_helper.find_typedef_of env.ctx name_node.value in
         let ctor = Option.value_exn ~message:(Format.sprintf "find enum ctor failed: %s %d" name name_id) ctor_opt in
         let enum_ctor = Core_type.TypeDef.(
@@ -1739,7 +1739,7 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
       )
     )
     | EnumCtor ((_name, name_id), child) -> (
-      let name_node = Type_context.get_node env.ctx name_id in
+      let name_node = Program.get_node env.ctx name_id in
       let ctor_opt = Check_helper.find_typedef_of env.ctx name_node.value in
       let ctor = Option.value_exn ctor_opt in
       let enum_ctor = Core_type.TypeDef.(
@@ -2004,7 +2004,7 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
   Ir.Expr.Temp result_tmp
 
 and transform_spreading_init env tmp_id spread_ty_var spread_expr =
-  let expr_node_type = Type_context.deref_node_type env.ctx spread_ty_var in
+  let expr_node_type = Program.deref_node_type env.ctx spread_ty_var in
 
   let ctor_opt = Check_helper.find_construct_of env.ctx expr_node_type in
   let ctor, _ = Option.value_exn
@@ -2052,7 +2052,7 @@ and transform_binary_expr env ~is_move ~append_stmts ~prepend_stmts expr op left
     prepend_stmts := List.concat [!prepend_stmts; left'.prepend_stmts; right'.prepend_stmts];
     append_stmts := List.concat [!append_stmts; left'.append_stmts; right'.append_stmts];
 
-    let left_type = Type_context.deref_node_type env.ctx left.ty_var in
+    let left_type = Program.deref_node_type env.ctx left.ty_var in
 
     let open Core_type in
     match (left_type, op) with
@@ -2073,7 +2073,7 @@ and transform_binary_expr env ~is_move ~append_stmts ~prepend_stmts expr op left
       spec
 
     | _ -> (
-      (* let node_type = Type_context.deref_node_type env.ctx ty_var in *)
+      (* let node_type = Program.deref_node_type env.ctx ty_var in *)
       if Check_helper.is_i64 env.ctx left_type then
         Ir.Expr.I64Binary(op, left'.expr, right'.expr)
       else if Check_helper.is_f64 env.ctx left_type then
@@ -2220,7 +2220,7 @@ and generate_finalize_stmts_while scope =
     )
 
 and generate_cls_meta env cls_id gen_name =
-  let node = Type_context.get_node env.ctx cls_id in
+  let node = Program.get_node env.ctx cls_id in
   let ctor_opt = Check_helper.find_typedef_of env.ctx node.value in
   let ctor = Option.value_exn ctor_opt in
 
@@ -2277,8 +2277,8 @@ and transform_class_method env _method : (Ir.Decl.t list * Ir.Decl.class_method_
   in
 
   let open Core_type in
-  let node = Type_context.get_node env.ctx method_id in
-  let node_type = Type_context.deref_type env.ctx node.value in
+  let node = Program.get_node env.ctx method_id in
+  let node_type = Program.deref_type env.ctx node.value in
   let is_virtual =
     match node_type with
     | TypeExpr.TypeDef { spec = TypeDef.ClassMethod { method_is_virtual = true; _ }; _ } ->
@@ -2384,7 +2384,7 @@ and transform_class env cls loc: Ir.Decl.t list =
   in
 
   let _, cls_id' = cls_id in
-  let cls_type = Type_context.deref_node_type env.ctx cls_id' in
+  let cls_type = Program.deref_node_type env.ctx cls_id' in
   let cls_typedef = Check_helper.find_typedef_of env.ctx cls_type in
 
   let unwrap_class =
@@ -2440,7 +2440,7 @@ and generate_finalizer env name (type_def: Core_type.TypeDef.t) : Ir.Decl.class_
     let cls_meta = Hashtbl.find_exn env.cls_meta_map type_def.id in
     List.filter_map
       ~f:(fun (field_name, ty_var) ->
-        let field_type = Type_context.deref_node_type env.ctx ty_var in
+        let field_type = Program.deref_node_type env.ctx ty_var in
         if Check_helper.type_should_not_release env.ctx field_type then
           None
         else
@@ -2469,7 +2469,7 @@ and generate_gc_marker env name (type_def: Core_type.TypeDef.t) : Ir.Decl.gc_mar
     let cls_meta = Hashtbl.find_exn env.cls_meta_map type_def.id in
     List.filter_map
       ~f:(fun (field_name, ty_var) ->
-        let field_type = Type_context.deref_node_type env.ctx ty_var in
+        let field_type = Program.deref_node_type env.ctx ty_var in
         if Check_helper.type_is_not_gc env.ctx field_type then
           None
         else

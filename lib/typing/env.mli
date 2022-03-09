@@ -4,9 +4,9 @@ type t
 
 type external_resolver = string -> name:string -> int option
 
-val create: external_resolver:external_resolver -> file_scope:scope -> Type_context.t -> t
+val create: external_resolver:external_resolver -> file_scope:scope -> Program.t -> t
 
-val ctx : t -> Type_context.t
+val prog: t -> Program.t
 
 val in_lambda: t -> bool
 

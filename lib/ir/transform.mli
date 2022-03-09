@@ -12,4 +12,4 @@ type config = {
   prepend_lambda: bool;
 }
 
-val transform_declarations: config:config -> Type_context.t -> Typedtree.Declaration.t list -> result
+val transform_declarations: config:config -> Program.t -> Typedtree.Declaration.t list -> result

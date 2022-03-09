@@ -27,7 +27,7 @@ type import_checker = Ast.Import.t -> unit
  * Type check deeply, check every expressions
  **)
 type env = {
-  ctx: Type_context.t;
+  ctx: Program.t;
   mutable scope: Scope.scope;
 
   (*
@@ -54,7 +54,7 @@ let take_return_type env =
   types
 
 let get_global_type_val env =
-  let root_scope = Type_context.root_scope env.ctx in
+  let root_scope = Program.root_scope env.ctx in
   root_scope#find_type_symbol
 
 let unwrap_global_type name env =
@@ -93,11 +93,11 @@ let rec typecheck_module ctx ~import_checker ~verbose (typedtree: T.program) =
     } in
     List.iter ~f:(check_declaration env) tprogram_declarations;
     if verbose then (
-      Type_context.print ctx
+      Program.print ctx
     );
   with e ->
     if verbose then (
-      Type_context.print ctx
+      Program.print ctx
     );
     raise e
 
@@ -138,7 +138,7 @@ and check_function env _fun =
   with_scope env scope (fun env ->
     check_block env body;
 
-    let type_node = Type_context.get_node env.ctx name_id in
+    let type_node = Program.get_node env.ctx name_id in
     let typedef = Option.value_exn (Check_helper.find_typedef_of env.ctx type_node.value) in
     let unwrap_function =
       match typedef with
@@ -150,7 +150,7 @@ and check_function env _fun =
   )
 
 and check_function_return_type env fun_return_ty (block: T.Block.t) =
-  let block_return_type = Type_context.deref_node_type env.ctx block.return_ty in
+  let block_return_type = Program.deref_node_type env.ctx block.return_ty in
 
   let is_last_stmt_return (block: T.Block.t) =
     let last_stmt = List.last block.body in
@@ -191,11 +191,11 @@ and check_block env blk =
     match last_opt with
     | Some { Typedtree.Statement. spec = Expr expr ; _ } -> (
       let ty_var = Typedtree.Expression.(expr.ty_var) in
-      Type_context.update_node_type env.ctx return_ty (TypeExpr.Ref ty_var)
+      Program.update_node_type env.ctx return_ty (TypeExpr.Ref ty_var)
     )
 
     | _ -> (
-      Type_context.update_node_type env.ctx return_ty (TypeExpr.Unit)
+      Program.update_node_type env.ctx return_ty (TypeExpr.Unit)
     )
   )
 
@@ -209,7 +209,7 @@ and check_statement env stmt =
 
   | While { while_test; while_block; _ } -> (
     check_expression env while_test;
-    let test_type = Type_context.deref_node_type env.ctx while_test.ty_var in
+    let test_type = Program.deref_node_type env.ctx while_test.ty_var in
     if not (Check_helper.is_boolean env.ctx test_type) then (
       let open Diagnosis in
       let spec = Type_error.WhileTestShouldBeBoolean test_type in
@@ -225,8 +225,8 @@ and check_statement env stmt =
     match binding_pat.spec with
     | T.Pattern.Underscore -> ()
     | T.Pattern.Symbol(_, ty_var) -> (
-      let expr_node = Type_context.get_node env.ctx binding_init.ty_var in
-      Type_context.update_node_type env.ctx ty_var expr_node.value
+      let expr_node = Program.get_node env.ctx binding_init.ty_var in
+      Program.update_node_type env.ctx ty_var expr_node.value
     )
     | _ -> failwith "unreachable"
   )
@@ -243,7 +243,7 @@ and check_statement env stmt =
 
   | Return (Some expr) -> (
     check_expression env expr;
-    let node_type = Type_context.deref_node_type env.ctx expr.ty_var in
+    let node_type = Program.deref_node_type env.ctx expr.ty_var in
     add_return_type env (node_type, expr.loc)
   )
 
@@ -254,7 +254,7 @@ and check_expression_if env if_spec =
   let { if_test; if_consequent; if_alternative; if_ty_var; if_loc; _ } = if_spec in
   check_expression env if_test;
 
-  let test_type = Type_context.deref_node_type env.ctx if_test.ty_var in
+  let test_type = Program.deref_node_type env.ctx if_test.ty_var in
   if not (Check_helper.is_boolean env.ctx test_type) then (
     let open Diagnosis in
     let spec = Type_error.IfTestShouldBeBoolean test_type in
@@ -264,14 +264,14 @@ and check_expression_if env if_spec =
 
   check_block env if_consequent;
 
-  let node = Type_context.get_node env.ctx if_consequent.return_ty in
+  let node = Program.get_node env.ctx if_consequent.return_ty in
 
   let if_ty =
     match if_alternative with
     | Some (If_alt_block blk) -> (
       check_block env blk;
 
-      let blk_ty = Type_context.deref_node_type env.ctx blk.return_ty in
+      let blk_ty = Program.deref_node_type env.ctx blk.return_ty in
       if Check_helper.type_assinable env.ctx node.value blk_ty then
         node.value
       else if Check_helper.type_assinable env.ctx node.value blk_ty then
@@ -284,7 +284,7 @@ and check_expression_if env if_spec =
     | Some (If_alt_if desc) -> (
       check_expression_if env desc;
 
-      let alt_ty = Type_context.deref_node_type env.ctx desc.if_ty_var in
+      let alt_ty = Program.deref_node_type env.ctx desc.if_ty_var in
       if Check_helper.type_assinable env.ctx node.value alt_ty then
         node.value
       else if Check_helper.type_assinable env.ctx node.value alt_ty then
@@ -308,7 +308,7 @@ and check_expression_if env if_spec =
     )
   in
 
-  Type_context.update_node_type env.ctx if_ty_var if_ty
+  Program.update_node_type env.ctx if_ty_var if_ty
 
 and check_expression env expr =
   let open T.Expression in
@@ -320,13 +320,13 @@ and check_expression env expr =
    * if it's a enum constructor, auto construct it
    *)
   | Identifier (_, name_id) -> (
-    let node = Type_context.get_node env.ctx name_id in
+    let node = Program.get_node env.ctx name_id in
     let test_typedef = Check_helper.find_typedef_of env.ctx node.value in
     Option.iter
       ~f:(fun typedef ->
         match typedef with
         | { id; spec = EnumCtor { enum_ctor_params = []; _ }; _ } -> (
-          Type_context.update_node_type env.ctx name_id (TypeExpr.Ctor(Ref id, []))
+          Program.update_node_type env.ctx name_id (TypeExpr.Ctor(Ref id, []))
         )
         | _ -> ()
       )
@@ -344,7 +344,7 @@ and check_expression env expr =
         ~init:init_sym
         ~f:(fun acc expr ->
           check_expression env expr;
-          let item_type = Type_context.deref_node_type env.ctx expr.ty_var in
+          let item_type = Program.deref_node_type env.ctx expr.ty_var in
           match acc with
           | TypeExpr.TypeSymbol _ -> item_type
           | _ -> (
@@ -360,25 +360,25 @@ and check_expression env expr =
         )
         arr_list
     in
-    Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Array arr_type)
+    Program.update_node_type env.ctx expr.ty_var TypeExpr.(Array arr_type)
   )
 
   | Tuple children -> (
     let children_types = List.map
       ~f:(fun child ->
         check_expression env child;
-        Type_context.deref_node_type env.ctx child.ty_var
+        Program.deref_node_type env.ctx child.ty_var
       )
       children
     in
-    Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Tuple children_types)
+    Program.update_node_type env.ctx expr.ty_var TypeExpr.(Tuple children_types)
   )
 
   | Map map_entries -> (
     let map_opt = env.scope#find_type_symbol "Map" in
     let map_ty = Option.value_exn ~message:"Cannot found Map in the current scope" map_opt in
     if List.is_empty map_entries then (
-      Type_context.update_node_type
+      Program.update_node_type
         env.ctx
         expr.ty_var
         TypeExpr.(Ctor (Ref map_ty, [(TypeSymbol "K"); (TypeSymbol "V")]))
@@ -407,7 +407,7 @@ and check_expression env expr =
               let err = Diagnosis.(make_error env.ctx entry.map_entry_loc (CannotUsedAsKeyOfMap ty)) in
               raise (Diagnosis.Error err)
           in
-          let node_type = Type_context.deref_node_type env.ctx entry.map_entry_value.ty_var in
+          let node_type = Program.deref_node_type env.ctx entry.map_entry_value.ty_var in
           let value_ty =
             match (acc_value, node_type) with
             | (TypeExpr.TypeSymbol "V", _) -> node_type
@@ -425,7 +425,7 @@ and check_expression env expr =
         )
         map_entries
       in
-      Type_context.update_node_type env.ctx expr.ty_var TypeExpr.(Ctor (Ref map_ty, [key_ty; value_ty]))
+      Program.update_node_type env.ctx expr.ty_var TypeExpr.(Ctor (Ref map_ty, [key_ty; value_ty]))
     )
   )
 
@@ -434,7 +434,7 @@ and check_expression env expr =
     List.iter ~f:(check_expression env) call_params;
     let ctx = env.ctx in
     let ty_int = callee.ty_var in
-    let deref_type_expr = Type_context.deref_node_type ctx ty_int  in
+    let deref_type_expr = Program.deref_node_type ctx ty_int  in
 
     let check_params symbol_map (expected_params: TypeExpr.params) =
       let { TypeExpr. params_content; params_rest } = expected_params in
@@ -448,7 +448,7 @@ and check_expression env expr =
           raise (Diagnosis.Error err)
         );
         let pass_param = Array.get pass_params i in
-        let pass_param_type = Type_context.deref_node_type env.ctx pass_param.ty_var in
+        let pass_param_type = Program.deref_node_type env.ctx pass_param.ty_var in
         let test_map, test_result = Check_helper.type_assinable_with_maps env.ctx !symbol_map expect_param pass_param_type in
         symbol_map := test_map;
         if not test_result then (
@@ -469,7 +469,7 @@ and check_expression env expr =
           let pass_rest = Array.slice pass_params (Array.length expected_params) (Array.length pass_params) in
           Array.iter
             ~f:(fun param ->
-              let pass_param_type = Type_context.deref_node_type env.ctx param.ty_var in
+              let pass_param_type = Program.deref_node_type env.ctx param.ty_var in
               if not (Check_helper.type_assinable env.ctx array_content pass_param_type) then (
                 let err = Diagnosis.(make_error env.ctx expr_loc (CannotPassParam(rest_name, array_content, pass_param_type))) in
                 raise (Diagnosis.Error err)
@@ -496,7 +496,7 @@ and check_expression env expr =
       for i = 0 to ((Array.length expected_params) - 1) do
         let expect_param = Array.get expected_params i in
         let pass_param = Array.get pass_params i in
-        let pass_param_type = Type_context.deref_node_type env.ctx pass_param.ty_var in
+        let pass_param_type = Program.deref_node_type env.ctx pass_param.ty_var in
         match expect_param with
         | TypeExpr.TypeSymbol sym_name ->
           symbol_map := Check_helper.TypeVarMap.set !symbol_map ~key:sym_name ~data:pass_param_type
@@ -507,7 +507,7 @@ and check_expression env expr =
             let err = Diagnosis.(make_error env.ctx expr_loc (ParamDoesNotProvided expect_param_name)) in
             raise (Diagnosis.Error err)
           );
-          let pass_param_type = Type_context.deref_node_type env.ctx pass_param.ty_var in
+          let pass_param_type = Program.deref_node_type env.ctx pass_param.ty_var in
           if not (Check_helper.type_assinable env.ctx expect_param pass_param_type) then (
             let err = Diagnosis.(make_error env.ctx expr_loc (CannotPassParam(expect_param_name, expect_param, pass_param_type))) in
             raise (Diagnosis.Error err)
@@ -520,12 +520,12 @@ and check_expression env expr =
     match deref_type_expr with
     | TypeExpr.Lambda(params, ret) -> (
       ignore (check_params Check_helper.TypeVarMap.empty params);
-      Type_context.update_node_type ctx expr.ty_var ret
+      Program.update_node_type ctx expr.ty_var ret
     )
 
     | TypeExpr.Method(_, params, ret) -> (
       let symbol_map = check_params Check_helper.TypeVarMap.empty params in
-      Type_context.update_node_type ctx expr.ty_var (Check_helper.replace_type_vars_with_maps env.ctx symbol_map ret)
+      Program.update_node_type ctx expr.ty_var (Check_helper.replace_type_vars_with_maps env.ctx symbol_map ret)
     )
 
     | _ ->
@@ -534,14 +534,14 @@ and check_expression env expr =
         match deref_type_expr with
         | TypeExpr.TypeDef { TypeDef. spec = Function _fun; _ } ->
           let symbol_map = check_params Check_helper.TypeVarMap.empty _fun.fun_params in
-          Type_context.update_node_type ctx expr.ty_var (Check_helper.replace_type_vars_with_maps env.ctx symbol_map _fun.fun_return)
+          Program.update_node_type ctx expr.ty_var (Check_helper.replace_type_vars_with_maps env.ctx symbol_map _fun.fun_return)
 
         | TypeExpr.TypeDef { TypeDef. spec = EnumCtor enum_ctor; _} -> (
           let super_id = enum_ctor.enum_ctor_super_id in
 
           let symbol_map = check_enum_ctor_params Check_helper.TypeVarMap.empty enum_ctor.enum_ctor_params in
 
-          let enum_base_node = Type_context.deref_node_type env.ctx super_id in
+          let enum_base_node = Program.deref_node_type env.ctx super_id in
           let unwrap_enum_base =
             match enum_base_node with
             | TypeExpr.TypeDef { TypeDef. spec = Enum enum; _ } -> enum
@@ -558,7 +558,7 @@ and check_expression env expr =
               unwrap_enum_base.enum_params
           in
 
-          Type_context.update_node_type ctx expr.ty_var (TypeExpr.Ctor (Ref super_id, params_types))
+          Program.update_node_type ctx expr.ty_var (TypeExpr.Ctor (Ref super_id, params_types))
         )
 
         | _ -> (
@@ -574,17 +574,17 @@ and check_expression env expr =
       let open Core_type.TypeExpr in
       match member_type_opt with
       | Some (Method({ TypeDef. spec = ClassMethod { method_get_set = Some _; method_return; _ }; _ }, _params, _rt), _) -> (
-        Type_context.update_node_type env.ctx expr.ty_var method_return
+        Program.update_node_type env.ctx expr.ty_var method_return
       )
 
       | Some (Method({ TypeDef. spec = ClassMethod { method_get_set = None; _ }; _ }, _params, _rt), _) -> (
         let ty, _ = Option.value_exn member_type_opt in
-        Type_context.update_node_type env.ctx expr.ty_var ty
+        Program.update_node_type env.ctx expr.ty_var ty
       )
 
       (* it's a property *) 
       | Some (ty_expr, _) ->
-        Type_context.update_node_type env.ctx expr.ty_var ty_expr
+        Program.update_node_type env.ctx expr.ty_var ty_expr
 
       | None ->
         let err = Diagnosis.(make_error env.ctx expr_loc (CannotReadMember(name.pident_name, expr_node.value))) in
@@ -594,7 +594,7 @@ and check_expression env expr =
 
     let default_clause () =
       check_expression env main_expr;
-      let expr_node = Type_context.get_node env.ctx main_expr.ty_var in
+      let expr_node = Program.get_node env.ctx main_expr.ty_var in
       let member_type_opt =
         Check_helper.find_member_of_type env.ctx ~scope:env.scope expr_node.value name.pident_name
       in
@@ -612,7 +612,7 @@ and check_expression env expr =
      *
      *)
     | { T.Expression. spec = Identifier _; ty_var; _ } -> (
-      let node_type = Type_context.deref_node_type env.ctx ty_var in
+      let node_type = Program.deref_node_type env.ctx ty_var in
       match node_type with
       | TypeExpr.TypeDef { TypeDef. spec = Namespace _; _ } ->
         ()
@@ -631,19 +631,19 @@ and check_expression env expr =
     check_expression env index_expr;
     check_expression env main_expr;
 
-    let node_type = Type_context.deref_node_type env.ctx main_expr.ty_var in
+    let node_type = Program.deref_node_type env.ctx main_expr.ty_var in
     match node_type with
     | String -> (
       let ty_char = ty_char env in
       let t = TypeExpr.Ctor(Ref ty_char, []) in
-      Type_context.update_node_type env.ctx expr.ty_var t
+      Program.update_node_type env.ctx expr.ty_var t
     )
 
     | _ ->
       begin
         match (Check_helper.try_unwrap_array env.ctx node_type) with
         | Some t ->
-          Type_context.update_node_type env.ctx expr.ty_var t
+          Program.update_node_type env.ctx expr.ty_var t
 
         | None -> (
           let err = Diagnosis.(make_error env.ctx expr_loc (CannotGetIndex node_type)) in
@@ -654,7 +654,7 @@ and check_expression env expr =
 
   | Unary(op, child) -> (
     check_expression env child;
-    let node_type = Type_context.deref_node_type env.ctx child.ty_var in
+    let node_type = Program.deref_node_type env.ctx child.ty_var in
     let raise_err () =
       let err = Diagnosis.(make_error env.ctx expr_loc (CannotApplyUnary(op, node_type))) in
       raise (Diagnosis.Error err)
@@ -664,7 +664,7 @@ and check_expression env expr =
       let ctor = Check_helper.find_construct_of env.ctx node_type in
       match ctor with
       | Some({ TypeDef. builtin = true; name = "boolean"; _ }, []) -> (
-        Type_context.update_node_type env.ctx expr.ty_var node_type
+        Program.update_node_type env.ctx expr.ty_var node_type
       )
       | _ -> raise_err()
     )
@@ -673,7 +673,7 @@ and check_expression env expr =
       if not (Check_helper.is_i32 env.ctx node_type) && not (Check_helper.is_f32 env.ctx node_type) then (
         raise_err ()
       );
-      Type_context.update_node_type env.ctx expr.ty_var node_type
+      Program.update_node_type env.ctx expr.ty_var node_type
     | Asttypes.UnaryOp.Plus -> (
       if
         not (Check_helper.is_i32 env.ctx node_type) &&
@@ -682,7 +682,7 @@ and check_expression env expr =
       then (
         raise_err ()
       );
-      Type_context.update_node_type env.ctx expr.ty_var node_type
+      Program.update_node_type env.ctx expr.ty_var node_type
     )
 
     (* TODO: check other operations *)
@@ -713,7 +713,7 @@ and check_expression env expr =
     )
 
     | { spec = Member(main_expr, name) ; _ } -> (
-      let main_expr_type = Type_context.deref_node_type ctx main_expr.ty_var in
+      let main_expr_type = Program.deref_node_type ctx main_expr.ty_var in
       let member_opt = Check_helper.find_member_of_type ctx ~scope:env.scope main_expr_type name.pident_name in
       match member_opt with
       | Some _ -> ()
@@ -724,8 +724,8 @@ and check_expression env expr =
     )
 
     | { spec = Index(main_expr, value_expr) ; _ } -> (
-      let main_expr_type = Type_context.deref_node_type ctx main_expr.ty_var in
-      let value_type = Type_context.deref_node_type ctx value_expr.ty_var in
+      let main_expr_type = Program.deref_node_type ctx main_expr.ty_var in
+      let value_type = Program.deref_node_type ctx value_expr.ty_var in
       if not (Check_helper.is_array ctx main_expr_type) then (
         let err = Diagnosis.(make_error ctx main_expr.loc OnlyAssignArrayIndexAlpha) in
         raise (Diagnosis.Error err)
@@ -741,8 +741,8 @@ and check_expression env expr =
 
     match op with
     | None -> (
-      let sym_node = Type_context.get_node ctx left.ty_var in
-      let expr_node = Type_context.get_node ctx right.ty_var in
+      let sym_node = Program.get_node ctx left.ty_var in
+      let expr_node = Program.get_node ctx right.ty_var in
       if not (Check_helper.type_assinable ctx sym_node.value expr_node.value) then (
         let err = Diagnosis.(make_error ctx expr_loc (NotAssignable(sym_node.value, expr_node.value))) in
         raise (Diagnosis.Error err)
@@ -756,7 +756,7 @@ and check_expression env expr =
   | Block blk -> check_block env blk
 
   | Init { init_name = cls_name, name_id;  init_elements; _ } -> (
-    let node = Type_context.deref_node_type env.ctx name_id in
+    let node = Program.deref_node_type env.ctx name_id in
     let def = Option.value_exn (Check_helper.find_typedef_of env.ctx node) in
     let unwrap_class =
       match def.spec with
@@ -786,7 +786,7 @@ and check_expression env expr =
         | InitEntry { init_entry_key; init_entry_value; _ } -> (
           check_expression env init_entry_value;
           let expected_type = PropMap.find_exn type_map init_entry_key.pident_name in
-          let actual_type = Type_context.deref_node_type env.ctx init_entry_value.ty_var in
+          let actual_type = Program.deref_node_type env.ctx init_entry_value.ty_var in
           if not (Check_helper.type_assinable env.ctx expected_type actual_type) then (
             let err = Diagnosis.(make_error env.ctx expr_loc (ClassInitNotAssignable(cls_name, init_entry_key.pident_name, expected_type, actual_type))) in
             raise Diagnosis.(Error err)
@@ -817,7 +817,7 @@ and check_expression env expr =
       | Underscore -> ()
       | Symbol (name, name_id) -> (
         if not (Annotate.is_name_enum_or_class name) then (
-          Type_context.update_node_type env.ctx name_id expr_type
+          Program.update_node_type env.ctx name_id expr_type
         );
       )
 
@@ -865,7 +865,7 @@ and check_expression env expr =
           raise (Diagnosis.Error err)
         in
         let enum_ctor_typedef =
-          match Type_context.deref_node_type env.ctx ctor_id with
+          match Program.deref_node_type env.ctx ctor_id with
           | TypeDef { TypeDef. spec = EnumCtor enum_ctor ; _ } -> enum_ctor
           | _ -> failwith "unrechable"
         in
@@ -889,7 +889,7 @@ and check_expression env expr =
             raise_err ()
           );
           let enum_ctor_typedef =
-            match Type_context.deref_node_type env.ctx ctor_id with
+            match Program.deref_node_type env.ctx ctor_id with
             | TypeDef { TypeDef. spec = EnumCtor c; _ } -> c
             | _ -> failwith "unrechable"
           in
@@ -951,7 +951,7 @@ and check_expression env expr =
     let { match_expr; match_clauses; match_loc } = _match in
 
     check_expression env match_expr;
-    let match_expr_type = Type_context.deref_node_type env.ctx match_expr.ty_var in
+    let match_expr_type = Program.deref_node_type env.ctx match_expr.ty_var in
 
     let ty =
       if List.is_empty match_clauses then (
@@ -964,14 +964,14 @@ and check_expression env expr =
             check_clause_pattern match_expr_type clause.clause_pat;
             let consequent = clause.clause_consequent in
             check_expression env consequent;
-            let node_expr = Type_context.deref_node_type env.ctx consequent.ty_var in
+            let node_expr = Program.deref_node_type env.ctx consequent.ty_var in
             match (acc, node_expr) with
             | TypeExpr.Unknown, _ ->
               node_expr
 
             | (TypeExpr.Ctor(c1, [])), (TypeExpr.Ctor (c2, [])) ->  (
-              let c1_def = Type_context.deref_type env.ctx c1 in
-              let c2_def = Type_context.deref_type env.ctx c2 in
+              let c1_def = Program.deref_type env.ctx c1 in
+              let c2_def = Program.deref_type env.ctx c2 in
               (match (c1_def, c2_def) with
               | (TypeExpr.TypeDef left_sym, TypeExpr.TypeDef right_sym) -> (
                 if TypeDef.(left_sym == right_sym) then ()
@@ -997,12 +997,12 @@ and check_expression env expr =
 
     check_match_exhausted env _match;
 
-    Type_context.update_node_type env.ctx expr.ty_var ty
+    Program.update_node_type env.ctx expr.ty_var ty
   )
 
   | Try try_expr -> (
     check_expression env try_expr;
-    let try_expr_type = Type_context.deref_node_type env.ctx try_expr.ty_var in
+    let try_expr_type = Program.deref_node_type env.ctx try_expr.ty_var in
     let ctor_opt = Check_helper.find_construct_of env.ctx try_expr_type in
     let raise_err () =
       let err = Diagnosis.(make_error env.ctx expr_loc (CannotUsedForTryExpression try_expr_type)) in
@@ -1024,7 +1024,7 @@ and check_expression env expr =
         | List.Or_unequal_lengths.Unequal_lengths -> raise_err ()
       in
       let ok_type = Check_helper.TypeVarMap.find_exn type_maps "A" in
-      Type_context.update_node_type env.ctx expr.ty_var ok_type;
+      Program.update_node_type env.ctx expr.ty_var ok_type;
 
       let error_type = Check_helper.TypeVarMap.find_exn type_maps "B" in
 
@@ -1040,7 +1040,7 @@ and check_expression env expr =
   | TypeCast(expr, _type) -> (
     check_expression env expr;
     
-    let expr_type = Type_context.deref_node_type env.ctx expr.ty_var in
+    let expr_type = Program.deref_node_type env.ctx expr.ty_var in
 
     if not (Check_helper.type_castable env.ctx expr_type _type) then (
       let err = Diagnosis.(make_error env.ctx expr.loc (CannotCastType (expr_type, _type))) in
@@ -1054,8 +1054,8 @@ and check_expression env expr =
   | Super -> ()
 
 and check_binary_op env op expr left right =
-  let left_node = Type_context.get_node env.ctx left.ty_var in
-  let right_node = Type_context.get_node env.ctx right.ty_var in
+  let left_node = Program.get_node env.ctx left.ty_var in
+  let right_node = Program.get_node env.ctx right.ty_var in
   let ctx = env.ctx in
   let loc = expr.loc in
   let id = expr.ty_var in
@@ -1066,7 +1066,7 @@ and check_binary_op env op expr left right =
       let err = Diagnosis.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
       raise (Diagnosis.Error err)
     );
-    Type_context.update_node_type ctx id left_node.value;
+    Program.update_node_type ctx id left_node.value;
   )
 
   | BinaryOp.Minus
@@ -1077,7 +1077,7 @@ and check_binary_op env op expr left right =
       let err = Diagnosis.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
       raise (Diagnosis.Error err)
     );
-    Type_context.update_node_type ctx id left_node.value;
+    Program.update_node_type ctx id left_node.value;
   )
 
   | BinaryOp.Mod
@@ -1089,7 +1089,7 @@ and check_binary_op env op expr left right =
       let err = Diagnosis.(make_error ctx loc (CannotApplyBinary (op, left_node.value, right_node.value))) in
       raise (Diagnosis.Error err)
     );
-    Type_context.update_node_type ctx id left_node.value;
+    Program.update_node_type ctx id left_node.value;
   )
 
   | BinaryOp.Equal
@@ -1104,7 +1104,7 @@ and check_binary_op env op expr left right =
         raise (Diagnosis.Error err)
       );
       let bool_ty = ty_boolean env in
-      Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
+      Program.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
     )
 
   | BinaryOp.And
@@ -1115,7 +1115,7 @@ and check_binary_op env op expr left right =
         raise (Diagnosis.Error err)
       );
       let bool_ty = ty_boolean env in
-      Type_context.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
+      Program.update_node_type ctx id (TypeExpr.Ctor (Ref bool_ty, []));
     )
 
   | _ -> (
@@ -1225,7 +1225,7 @@ and check_match_exhausted env _match =
 
       let (_ctor_name, ctor_id), _ = List.hd_exn items in
 
-      let def = Type_context.deref_node_type env.ctx ctor_id in
+      let def = Program.deref_node_type env.ctx ctor_id in
       let first_enum_ctor =
         match def with
         | TypeExpr.TypeDef { Core_type.TypeDef. spec = EnumCtor ctor;_ } -> ctor
@@ -1233,7 +1233,7 @@ and check_match_exhausted env _match =
       in
 
       let enum_super_id = first_enum_ctor.enum_ctor_super_id in
-      let super_def = Type_context.deref_node_type env.ctx enum_super_id in
+      let super_def = Program.deref_node_type env.ctx enum_super_id in
       let unwrap_super_def =
         match super_def with
         | TypeExpr.TypeDef { Core_type.TypeDef. spec = Enum enum;_ } -> enum
@@ -1291,7 +1291,7 @@ and check_lambda env lambda =
   check_expression env lambda_body;
   let lambda_return_types = take_return_type env in
 
-  let expr_type = Type_context.deref_node_type env.ctx lambda_body.ty_var in
+  let expr_type = Program.deref_node_type env.ctx lambda_body.ty_var in
 
   if not (Check_helper.type_assinable env.ctx lambda_return_ty expr_type) then (
     let open Diagnosis in
@@ -1319,7 +1319,7 @@ and check_class env cls =
   let { cls_id = _, cls_id; cls_body; _ } = cls in
   let { cls_body_elements; _ } = cls_body in
 
-  let node = Type_context.get_node env.ctx cls_id in
+  let node = Program.get_node env.ctx cls_id in
   let cls_node = Check_helper.find_typedef_of env.ctx node.value in
   let unwrap_class =
     match cls_node with
@@ -1432,7 +1432,7 @@ and check_method_for_class env cls_type _method =
 
   let scope = env.scope in
 
-  let method_node = Type_context.get_node env.ctx method_id in
+  let method_node = Program.get_node env.ctx method_id in
   let method_def, unwrap_method =
     match method_node.value with
     | TypeExpr.TypeDef ({ Core_type.TypeDef. spec = ClassMethod method_type; _ } as def) ->
@@ -1500,7 +1500,7 @@ and check_method_content env _method =
     in
 
     if is_static then (
-      let type_node = Type_context.get_node env.ctx name_id in
+      let type_node = Program.get_node env.ctx name_id in
       let typedef = Option.value_exn (Check_helper.find_typedef_of env.ctx type_node.value) in
       let unwrap_function =
         match typedef with
@@ -1510,7 +1510,7 @@ and check_method_content env _method =
 
       check_function_return_type env unwrap_function.fun_return cls_method_body
     ) else (
-      let type_node = Type_context.get_node env.ctx name_id in
+      let type_node = Program.get_node env.ctx name_id in
       let typedef = Option.value_exn (Check_helper.find_typedef_of env.ctx type_node.value) in
       let unwrap_method =
         match typedef with
