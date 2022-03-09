@@ -1,7 +1,7 @@
 {
   "name": "lichenscript",
   "description": "The compiler of LichenScript",
-  "version": "0.2.12",
+  "version": "0.2.13",
   "homepage": "https://lichenscript.com/",
   "license": "Apache-2.0",
   "author": {
@@ -16,8 +16,8 @@
     "lsc": "bin/lsc"
   },
   "optionalDependencies": {
-    "lichenscript-darwin-x64": "0.2.12",
-    "lichenscript-linux-x64": "0.2.12",
-    "lichenscript-darwin-arm64": "0.2.12"
+    "lichenscript-darwin-x64": "0.2.13",
+    "lichenscript-linux-x64": "0.2.13",
+    "lichenscript-darwin-arm64": "0.2.13"
   }
 }
