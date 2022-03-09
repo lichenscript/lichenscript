@@ -1,7 +1,7 @@
 
 export interface IntellisenseInstantce {
-	parseAndCacheWillThrow(path: string, content: string);
-	deleteFile(path: string);
+	parseAndCacheWillThrow(path: string, content: string): void;
+	deleteFile(path: string): void;
 }
 
 export function compile(content: string): string;
