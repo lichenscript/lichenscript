@@ -65,26 +65,29 @@ let create () =
       let path = Js.to_string path in
       let file_content = Js.to_string content in
       let file_key = File_key.LibFile path in
-      try
-        let ast_result = Parser.parse_string (Some file_key) file_content in
-        match ast_result with
-        | Result.Ok ast -> (
-          AstMap.set ast_map ~key:path ~data:ast
-        )
+      let ast_result =
+        try
+          Parser.parse_string (Some file_key) file_content
+        with
+          | Parse_error.Error raw_errors -> (
+            let err = parse_errors_to_js_error raw_errors in
+            Js_error.raise_ err
+          )
+          | e ->
+            let msg = (Exn.to_string e) |> Js.string in
+            let js_err = new%js Js.error_constr msg in
+            Js_error.raise_ (Js_error.of_error js_err)
 
-        | Result.Error raw_errors -> (
-          let err = parse_errors_to_js_error raw_errors in
-          Js_error.raise_ err
-        )
-      with
-        | Parse_error.Error raw_errors -> (
-          let err = parse_errors_to_js_error raw_errors in
-          Js_error.raise_ err
-        )
-        | e ->
-          let msg = (Exn.to_string e) |> Js.string in
-          let js_err = new%js Js.error_constr msg in
-          Js_error.raise_ (Js_error.of_error js_err)
+      in
+      match ast_result with
+      | Result.Ok ast -> (
+        AstMap.set ast_map ~key:path ~data:ast
+      )
+
+      | Result.Error raw_errors -> (
+        let err = parse_errors_to_js_error raw_errors in
+        Js_error.raise_ err
+      )
 
     method deleteFile path =
       AstMap.remove ast_map path
