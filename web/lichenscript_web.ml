@@ -82,6 +82,8 @@ let _ =
   Js.export_all
     (object%js
 
+    method createIntellisenseInstance = Intellisense.create()
+
     method compile str =
       let module R = Resolver.S (JsFS) in
       try
@@ -168,30 +170,8 @@ let _ =
       )
 
       | ParseError raw_errors -> (
-        let error_list = Js.array [||] in
-
-        List.iteri
-          ~f:(fun index err ->
-            let err_content = Format.asprintf "%a" Lichenscript_parsing.Parse_error.PP.error err in
-            let err_obj = object%js
-              val line = err.perr_loc.start.line
-              val column = err.perr_loc.start.column
-              val source =
-                match err.perr_loc.source with
-                | Some source ->
-                  let source_str = Format.asprintf "%a" Lichenscript_lex.File_key.pp source in
-                  Js.string source_str
-                | None -> Js.string ""
-              val content = Js.string err_content
-
-            end in
-            Js.array_set error_list index err_obj
-          )
-          raw_errors;
-
-        let js_err = new%js Js.error_constr (Js.string "ParseError") in
-        Js.Unsafe.set js_err (Js.string "errors") error_list;
-        Js_error.raise_ (Js_error.of_error js_err)
+        let err = Intellisense.parse_errors_to_js_error raw_errors in
+        Js_error.raise_ err
       )
 
       | e ->
