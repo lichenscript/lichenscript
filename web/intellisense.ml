@@ -26,7 +26,18 @@ let parse_errors_to_js_error raw_errors =
   List.iteri
     ~f:(fun index err ->
       let err_content = Format.asprintf "%a" Lichenscript_parsing.Parse_error.PP.error err in
+
+      let start = Js.array [||] in
+      Js.array_set start 0 err.perr_loc.start.line;
+      Js.array_set start 1 err.perr_loc.start.column;
+
+      let _end = Js.array [||] in
+      Js.array_set _end 0 err.perr_loc._end.line;
+      Js.array_set _end 1 err.perr_loc._end.column;
+
       let err_obj = object%js
+        val start = start
+        val _end = _end
         val line = err.perr_loc.start.line
         val column = err.perr_loc.start.column
         val source =
