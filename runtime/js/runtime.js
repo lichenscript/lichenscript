@@ -259,7 +259,7 @@ function lc_std_string_concat(a, b) {
 
 function lc_std_panic(message) {
   console.log("panic");
-  throw new Error("panic: " + message);
+  throw new Error("panic: " + lc_to_string(message));
 }
 
 function lc_std_get_args() {
