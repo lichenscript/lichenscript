@@ -498,13 +498,19 @@ module S (FS: FSProvider) = struct
       match platform with
       | "native"
       | "wasm32" -> (
-        let includes =
-          List.filter
+        let include_dir_names = Hash_set.create (module String) in
+
+        let includes: string list =
+          List.filter_map
             ~f:(fun path ->
               let _, ext_opt = Filename.split_extension path in
               match ext_opt with
-              | Some "h" -> true
-              | _ -> false
+              | Some "h" -> (
+                let dirname, filename = Filename.split path in
+                Hash_set.add include_dir_names dirname;
+                Some filename
+              )
+              | _ -> None
             )
             external_resources
         in
@@ -514,8 +520,17 @@ module S (FS: FSProvider) = struct
         let build_dir = get_build_dir () in
         let output_path = write_to_file build_dir mod_name ~ext:".c" output in
         let bin_name = entry_file_path |> last_piece_of_path |> (Filename.chop_extension) in
+
+        let ext_includes = Hash_set.to_list include_dir_names in
+
         write_makefiles
-          ~bin_name ~runtime_dir ~platform ~wasm_standalone build_dir [ (mod_name, output_path) ]
+          ~bin_name
+          ~runtime_dir
+          ~platform
+          ~wasm_standalone
+          ~ext_includes
+          build_dir
+          [ (mod_name, output_path) ]
       )
 
       | "js" -> (
@@ -564,7 +579,7 @@ module S (FS: FSProvider) = struct
     FS.write_file_content output_file_path ~data:content;
     output_file_path
 
-  and write_makefiles ~bin_name ~runtime_dir ~platform ~wasm_standalone build_dir mods: profile list =
+  and write_makefiles ~bin_name ~runtime_dir ~platform ~wasm_standalone ~ext_includes build_dir mods: profile list =
     let debug_dir =
       match platform with
       | "native" -> Filename.concat build_dir "debug"
@@ -586,8 +601,8 @@ module S (FS: FSProvider) = struct
     in
     FS.mkdir_p debug_dir;
     FS.mkdir_p release_dir;
-    write_makefiles_with_mode ~bin_name ~runtime_dir ~mode:"debug" ~platform debug_dir mods;
-    write_makefiles_with_mode ~bin_name ~runtime_dir ~mode:"release" ~platform release_dir mods;
+    write_makefiles_with_mode ~bin_name ~runtime_dir ~mode:"debug" ~platform ~ext_includes debug_dir mods;
+    write_makefiles_with_mode ~bin_name ~runtime_dir ~mode:"release" ~platform ~ext_includes release_dir mods;
     [
       {
         profile_name = "debug";
@@ -601,11 +616,21 @@ module S (FS: FSProvider) = struct
       }
     ]
 
-  and write_makefiles_with_mode ~bin_name ~runtime_dir ~mode ~platform build_dir mods =
+  and write_makefiles_with_mode ~bin_name ~runtime_dir ~mode ~platform ~ext_includes build_dir mods =
     let output_path = Filename.concat build_dir "Makefile" in
     let open Makefile in
     let runtime_dir = Filename.concat runtime_dir "c" in
     let c_srcs = List.fold ~init:"runtime.o" ~f:(fun acc (m, _) -> (acc ^ " " ^ m ^ ".o")) mods in
+
+    let ext_flags =
+      List.fold
+        ~init:""
+        ~f:(fun acc ic ->
+          acc ^ " -I" ^ ic
+        )
+        ext_includes
+    in
+    
     let entries = List.concat [
       [
         {
@@ -636,7 +661,7 @@ module S (FS: FSProvider) = struct
             entry_name = m;
             deps = [output_full_path];
             content = [
-              Format.sprintf "$(CC) $(FLAGS) -I%s -c %s" (FS.get_realpath runtime_dir) output_full_path
+              Format.sprintf "$(CC) $(FLAGS) -I%s%s -c %s" (FS.get_realpath runtime_dir) ext_flags output_full_path
             ];
           }
         )
@@ -648,6 +673,7 @@ module S (FS: FSProvider) = struct
       else
         "FLAGS=-O3 -g0\n"
     in
+
     let cc =
       match platform with
       | "native" -> "cc"
