@@ -90,12 +90,27 @@ public enum Option<A> {
         }
     }
 
+    public unwrap(): A {
+        match this {
+            case Some(v) => v
+            case None => panic("None")
+        }
+    }
+
 }
 
 @meta_id("LC_STD_CLS_ID_RESULT")
 public enum Result<A, B> {
     case Ok(A)
     case Error(B)
+
+    public unwrap(): A {
+        match this {
+            case Ok(v) => v
+            case Error(err) => panic(err)
+        }
+    }
+
 }
 
 @builtin()
