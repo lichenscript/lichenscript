@@ -226,12 +226,8 @@ module S (FS: FSProvider) = struct
         let { source; source_loc; spec; _ } = import in
         let find_paths = env.find_paths in
         let result =
-          List.fold
-            ~init:None
-            ~f:(fun acc path ->
-              match acc with
-              | Some _ -> acc
-              | None ->
+          List.find_map
+            ~f:(fun path ->
                 if Filename.is_absolute source then
                   Some (source, source)
                 else (
@@ -241,7 +237,8 @@ module S (FS: FSProvider) = struct
                   ) else None
                 )
             )
-            find_paths in
+            find_paths
+        in
         match result with
         | Some (path, source) -> (
           ignore (parse_module_by_dir ~prog env ~real_path:path source);
