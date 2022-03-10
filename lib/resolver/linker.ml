@@ -32,6 +32,7 @@ type t = {
   module_map: Module.t ModuleMap.t;
   mutable modules_in_order: Module.t list;
   top_level_deps: (int list) Array.t;
+  mutable external_resources: string list;
 }
 
 let create ~prog () =
@@ -42,6 +43,7 @@ let create ~prog () =
     module_map = ModuleMap.create ();
     modules_in_order = [];
     top_level_deps;
+    external_resources = [];
   }
 
 let make_declare_of_decl id (decl: Typedtree.Declaration.t) =
@@ -228,3 +230,8 @@ let has_module env key =
 let iter_modules env ~f =
   env.modules_in_order
   |> List.iter ~f
+
+let add_external_resource env res =
+  env.external_resources <- res::(env.external_resources)
+
+let external_resources env = List.rev env.external_resources

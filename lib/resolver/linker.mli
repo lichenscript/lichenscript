@@ -13,3 +13,7 @@ val get_module: t -> string -> Module.t option
 val has_module: t -> string -> bool
 
 val iter_modules: t -> f:(Module.t -> unit) -> unit
+
+val add_external_resource: t -> string -> unit
+
+val external_resources: t -> string list
