@@ -261,3 +261,10 @@ function lc_std_panic(message) {
   console.log("panic");
   throw new Error("panic: " + message);
 }
+
+function lc_std_get_args() {
+  if (typeof process === 'undefined') {
+    return [];
+  }
+  return [...process.argv];
+}

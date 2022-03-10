@@ -9,7 +9,10 @@ public declare function print(...content: any[]);
 public declare function exit(exitCode: i32);
 
 @external("lc_std_panic")
-public declare function panic(...content: any[]);
+public declare function panic(...content: any[]): any;
+
+@external("lc_std_get_args")
+public declare function getArgs(): string[];
 
 @builtin()
 public class Object {

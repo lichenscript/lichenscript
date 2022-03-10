@@ -272,7 +272,7 @@ LCValue LCNewF64(LCRuntime* rt, double val);
 
 LCValue LCF64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue right);
 
-LCValue LCRunMain(LCProgram* program);
+LCValue LCRunMain(LCProgram* program, int argc, char** argv);
 
 LCRuntime* LCNewRuntime();
 void LCFreeRuntime(LCRuntime* rt);
@@ -392,6 +392,8 @@ LCValue lc_std_map_size(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
 LCValue lc_std_exit(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 LCValue lc_std_panic(LCRuntime* rt, LCValue this, int argc, LCValue* args);
+
+LCValue lc_std_get_args(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
 #define LC_STD_CLS_ID_OPTION 1
 #define LC_STD_CLS_ID_RESULT 2

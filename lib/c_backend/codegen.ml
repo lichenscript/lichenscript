@@ -19,13 +19,13 @@ open Lichenscript_ir
 open Core_kernel
 
 let main_snippet ?init_name main_name = {|
-int main() {
+int main(int argc, char** argv) {
   int ec = 0;
   LCValue ev;
   LCRuntime*rt = LCNewRuntime();
   |} ^ Option.value ~default:"" (Option.map ~f:(Format.sprintf "%s(rt);") init_name) ^ {|
   LCProgram program = { rt, |} ^ main_name ^ {| };
-  ev = LCRunMain(&program);
+  ev = LCRunMain(&program, argc, argv);
   ec = ev.int_val;
   LCFreeRuntime(rt);
   

@@ -230,6 +230,8 @@ typedef struct LCRuntime {
     uint8_t      gc_phase;
     GCObjectList gc_objs;
     GCObjectList tmp_objs;
+    int    argc;
+    char** argv;
 } LCRuntime;
 
 typedef struct LCArray {
@@ -621,6 +623,9 @@ LCRuntime* LCNewRuntime() {
 
     lc_gc_objs_list_init(&runtime->gc_objs);
     lc_gc_objs_list_init(&runtime->tmp_objs);
+
+    runtime->argc = 0;
+    runtime->argv = NULL;
 
     // the ancester of all classes
     LCClassID object_cls_id = LCDefineClass(runtime, -1, &Object_def);
@@ -1499,10 +1504,12 @@ LCValue LCF64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue ri
     return LCNewF64(rt, result);
 }
 
-LCValue LCRunMain(LCProgram* program) {
+LCValue LCRunMain(LCProgram* program, int argc, char** argv) {
     if (program->main_fun == NULL) {
         return MK_NULL();
     }
+    program->runtime->argc = argc;
+    program->runtime->argv = argv;
     return program->main_fun(program->runtime, MK_NULL(), 0, NULL);
 }
 
@@ -2887,3 +2894,17 @@ LCValue lc_std_panic(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     lc_panic_internal();
 }
 #pragma GCC diagnostic pop
+
+LCValue lc_std_get_args(LCRuntime* rt, LCValue this, int fun_argc, LCValue* args) {
+    int argc = rt->argc;
+    LCValue result = LCNewArrayLen(rt, argc);
+    LCValue item;
+
+    for (int i = 0; i < argc; i++) {
+        item = LCNewStringFromCString(rt, (unsigned char *)rt->argv[i]);
+        LCArraySetValue(rt, result, 2, (LCValue[]) { MK_I32(i), item });
+        LCRelease(rt, item);
+    }
+
+    return result;
+}
