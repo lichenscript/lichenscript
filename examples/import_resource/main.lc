@@ -1,0 +1,13 @@
+
+@platform("js")
+import "./foo.js";
+
+@platform("native", "wasm32")
+import "./foo.h";
+
+@external("ext_foo")
+public declare function foo();
+
+function main() {
+	foo();
+}

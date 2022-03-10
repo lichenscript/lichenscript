@@ -493,10 +493,23 @@ module S (FS: FSProvider) = struct
         )
       in
 
+      let external_resources = Linker.external_resources env.linker in
+
       match platform with
       | "native"
       | "wasm32" -> (
-        let output = Lichenscript_c.codegen ~prog declarations in
+        let includes =
+          List.filter
+            ~f:(fun path ->
+              let _, ext_opt = Filename.split_extension path in
+              match ext_opt with
+              | Some "h" -> true
+              | _ -> false
+            )
+            external_resources
+        in
+
+        let output = Lichenscript_c.codegen ~prog ~includes declarations in
         let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
         let build_dir = get_build_dir () in
         let output_path = write_to_file build_dir mod_name ~ext:".c" output in
@@ -506,8 +519,26 @@ module S (FS: FSProvider) = struct
       )
 
       | "js" -> (
+
+        let preclude_ext =
+          List.fold
+            ~init:""
+            ~f:(fun acc path ->
+              let _, ext_opt = Filename.split_extension path in
+              match ext_opt with
+              | Some "js" -> (
+                let file_content = FS.read_file_content path in
+                acc ^ "\n" ^ file_content
+              )
+
+              | _ -> acc
+            )
+            external_resources
+        in
+
         let js_runtime_preclude_file = Filename.(concat (concat runtime_dir "js") "runtime.js") in
-        let preclude = FS.read_file_content js_runtime_preclude_file in
+        let preclude_runtime = FS.read_file_content js_runtime_preclude_file in
+        let preclude = preclude_runtime ^ "\n" ^ preclude_ext in
         let output = Lichenscript_js.codegen ~prog ~preclude declarations in
         let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
         let build_dir = get_build_dir () in

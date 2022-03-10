@@ -265,6 +265,9 @@ and parse_import env : Import.t =
     import_tail_with_spec (Some (ImportNamespace id))
   )
 
+  | Token.T_STRING _ ->
+    import_tail_with_spec None
+
   | _ ->
     let perr_spec = Parser_env.get_unexpected_error next in
     let perr_loc = Peek.loc env in
