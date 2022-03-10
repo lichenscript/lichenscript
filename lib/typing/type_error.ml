@@ -51,3 +51,4 @@ type t =
   | NoMethodToBeOverride of (string * string)  (* method_name, class_name *)
   | OverrideFunctionNotMatch of (TypeExpr.t * TypeExpr.t)  (* parent method, this method *)
   | AnyTypeIsOnlyAllowedInDeclare
+  | InvalidMainFunctionDefinition

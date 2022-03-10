@@ -131,10 +131,26 @@ and check_interface _env _intf =
   (* failwith "intf" *)
   ()
 
+and check_main_function (env: env) loc _fun =
+  let open Core_type.TypeDef in
+  if (not (List.is_empty _fun.fun_params.params_content)) || (Option.is_some _fun.fun_params.params_rest) then (
+    let open Diagnosis in
+    let spec = Type_error.InvalidMainFunctionDefinition in
+    let err = make_error env.ctx loc spec in
+    raise (Error err)
+  ) else ();
+  if not (Check_helper.is_unit _fun.fun_return) then (
+    let open Diagnosis in
+    let spec = Type_error.InvalidMainFunctionDefinition in
+    let err = make_error env.ctx loc spec in
+    raise (Error err)
+  ) else ()
+
 and check_function env _fun =
   let open T.Function in
   let { header; scope; body; _ } = _fun in
-  let _, name_id = header.name in
+  let name_str, name_id = header.name in
+  let node = Program.get_node env.ctx name_id in
   with_scope env scope (fun env ->
     check_block env body;
 
@@ -146,7 +162,10 @@ and check_function env _fun =
       | _ -> failwith "unwrap function failed"
     in
 
-    check_function_return_type env unwrap_function.fun_return body
+    check_function_return_type env unwrap_function.fun_return body;
+    if String.equal name_str "main" then (
+      check_main_function env node.loc  unwrap_function
+    );
   )
 
 and check_function_return_type env fun_return_ty (block: T.Block.t) =

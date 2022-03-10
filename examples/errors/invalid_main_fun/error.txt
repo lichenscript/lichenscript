@@ -1,0 +1,1 @@
+2:0 Invalid main function definition

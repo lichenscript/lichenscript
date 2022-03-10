@@ -203,6 +203,9 @@ module PP = struct
     | AnyTypeIsOnlyAllowedInDeclare ->
       Format.fprintf formatter "Type 'any' is only allowed in declare statement."
 
+    | InvalidMainFunctionDefinition ->
+      Format.fprintf formatter "Invalid main function definition"
+
   let error ~ctx formatter diagnosis =
     let { spec; loc; _ } = diagnosis in
     match spec with
