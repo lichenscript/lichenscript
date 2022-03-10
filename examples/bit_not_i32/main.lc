@@ -1,0 +1,6 @@
+
+function main() {
+	const a = 0;
+	print(~a);
+	print(~(-1));
+}

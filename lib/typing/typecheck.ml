@@ -674,6 +674,7 @@ and check_expression env expr =
         raise_err ()
       );
       Program.update_node_type env.ctx expr.ty_var node_type
+
     | Asttypes.UnaryOp.Plus -> (
       if
         not (Check_helper.is_i32 env.ctx node_type) &&
@@ -685,8 +686,12 @@ and check_expression env expr =
       Program.update_node_type env.ctx expr.ty_var node_type
     )
 
-    (* TODO: check other operations *)
-    | _ -> raise_err ()
+    | Asttypes.UnaryOp.BitNot -> (
+      if not (Check_helper.is_arithmetic_integer env.ctx node_type) then (
+        raise_err ()
+      );
+      Program.update_node_type env.ctx expr.ty_var node_type
+    )
   )
 
   | Binary (op, left, right) -> (

@@ -710,6 +710,12 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ")"
   )
 
+  | I32BitNot expr -> (
+    ps env "LC_I32_BITNOT(";
+    codegen_expression env expr;
+    ps env ")"
+  )
+
   | Assign(Expr.Ident name, right) -> (
     (* TODO: release the left, retain the right *)
     (match name with

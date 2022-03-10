@@ -342,6 +342,9 @@ let type_arithmetic =
 let type_arithmetic_integer =
   check_is_primitive_type2 ~group:[| "i32"; "u32"; "u64"; "i64"; |]
 
+let is_arithmetic_integer =
+  check_is_primitive_type ~group:[| "i32"; "u32"; "u64"; "i64"; |]
+
 let type_logic_compareable ctx left right =
   let left = Program.deref_type ctx left in
   let right = Program.deref_type ctx right in

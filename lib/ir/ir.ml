@@ -185,6 +185,7 @@ and Expr : sig
   | F32Binary of Asttypes.BinaryOp.t * t * t
   | I64Binary of Asttypes.BinaryOp.t * t * t
   | F64Binary of Asttypes.BinaryOp.t * t * t
+  | I32BitNot of t
   | CallLambda of t * t list
   | Invoke of t * string * t list
   | Assign of t * t

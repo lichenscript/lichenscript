@@ -1274,7 +1274,9 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       | UnaryOp.Minus ->
         Ir.Expr.I32Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewInt "-1")
 
-      | _ -> failwith "not implement"
+      | UnaryOp.BitNot ->
+        Ir.Expr.I32BitNot expr'.expr
+
     )
 
     | Binary (op, left, right) ->

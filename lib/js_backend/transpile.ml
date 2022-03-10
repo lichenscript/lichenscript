@@ -408,6 +408,11 @@ and transpile_expression ?(parent_expr=true) env expr =
   | I32Binary(op, left, right) ->
     transpile_i32_binary env op left right
 
+  | I32BitNot expr ->
+    ps env "i32_bit_not(";
+    transpile_expression env expr;
+    ps env ")"
+
   | F32Binary(op, left, right) ->
     transpile_f32_binary env op left right
 

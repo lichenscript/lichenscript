@@ -163,6 +163,7 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 #define MK_CLASS_OBJ(obj) ((LCValue){ { .ptr_val = (LCObject*)obj }, LC_TY_CLASS_OBJECT })
 #define MK_UNION(cls_id, v) ((LCValue) { { .int_val = (cls_id << 16) | v }, LC_TY_UNION })
 #define LC_NOT(v) MK_BOOL(!((v).int_val))
+#define LC_I32_BITNOT(v) MK_I32(~((v).int_val))
 #define LC_I32_EQ(l, r) MK_BOOL((l).int_val == (r).int_val)
 #define LC_I32_NOT_EQ(l, r) MK_BOOL((l).int_val != (r).int_val)
 #define LC_I32_LT(l, r) MK_BOOL((l).int_val < (r).int_val)

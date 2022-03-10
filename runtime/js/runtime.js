@@ -60,6 +60,11 @@ function i32_mod(a, b) {
   return (a % b)|0;
 }
 
+function i32_bit_not(e) {
+  e = ~e;
+  return e|0;
+}
+
 function f32_add(a, b) {
   return Math.fround(a + b);
 }
