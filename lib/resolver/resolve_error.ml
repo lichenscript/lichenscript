@@ -3,6 +3,7 @@ open Lichenscript_lex
 type spec =
   | Redeclared of string
   | CannotResolve of string
+  | CannotfindExtOfUnivertialImport of string
 
 type t = {
   spec: spec;
@@ -15,3 +16,6 @@ let pp_spec formatter = function
 
   | CannotResolve name ->
     Format.fprintf formatter "Can not resolve symbol '%s'" name
+
+  | CannotfindExtOfUnivertialImport path ->
+    Format.fprintf formatter "Can get the extension of a universal import: '%s'" path

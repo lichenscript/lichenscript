@@ -220,41 +220,80 @@ module S (FS: FSProvider) = struct
     let import_star_external_modules = ref [] in
     let imports_map = Hashtbl.create (module String) in
 
+    let handle_import_lc_module import spec =
+      let open Ast.Import in
+      let { source; source_loc; _ } = import in
+      let find_paths = env.find_paths in
+      let result =
+        List.find_map
+          ~f:(fun path ->
+              if Filename.is_absolute source then
+                Some (source, source)
+              else (
+                let path = Filename.concat path source in
+                if FS.is_directory path then (
+                  Some (FS.get_realpath path, source)
+                ) else None
+              )
+          )
+          find_paths
+      in
+      match result with
+      | Some (path, source) -> (
+        ignore (parse_module_by_dir ~prog env ~real_path:path source);
+        Hashtbl.set imports_map ~key:source ~data:path;
+        match spec with
+        | ImportAll ->
+          import_star_external_modules := path::!import_star_external_modules;
+        | _ -> ()
+      )
+      | None -> (
+        let err = { Resolve_error.
+          spec = CannotResolve source;
+          loc = source_loc
+        } in
+        raise (ResolveError err)
+      )
+    in
+
+    let handle_import_resource source source_loc =
+      let _, ext_opt = Filename.split_extension source in
+      match ext_opt with
+      | Some "js"
+      | Some "h"
+      | Some "c" -> (
+        let normalized_path =
+          if Char.((String.get source 0) = '/') then
+            source
+          else
+            Filename.concat mod_path source
+        in
+        Linker.add_external_resource env.linker normalized_path
+      )
+
+      | Some _ -> (
+        let err = { Resolve_error.
+          spec = CannotResolve source;
+          loc = source_loc
+        } in
+        raise (ResolveError err)
+      )
+      | None -> (
+        let err = { Resolve_error.
+          spec = CannotfindExtOfUnivertialImport source;
+          loc = source_loc
+        } in
+        raise (ResolveError err)
+      )
+    in
+
     List.iter
       ~f:(fun import ->
         let open Ast.Import in
         let { source; source_loc; spec; _ } = import in
-        let find_paths = env.find_paths in
-        let result =
-          List.find_map
-            ~f:(fun path ->
-                if Filename.is_absolute source then
-                  Some (source, source)
-                else (
-                  let path = Filename.concat path source in
-                  if FS.is_directory path then (
-                    Some (FS.get_realpath path, source)
-                  ) else None
-                )
-            )
-            find_paths
-        in
-        match result with
-        | Some (path, source) -> (
-          ignore (parse_module_by_dir ~prog env ~real_path:path source);
-          Hashtbl.set imports_map ~key:source ~data:path;
-          match spec with
-          | Some ImportAll ->
-            import_star_external_modules := path::!import_star_external_modules;
-          | _ -> ()
-        )
-        | None -> (
-          let err = { Resolve_error.
-            spec = CannotResolve source;
-            loc = source_loc
-          } in
-          raise (ResolveError err)
-        )
+        match spec with
+        | Some spec -> handle_import_lc_module import spec
+        | None -> handle_import_resource source source_loc
       )
       imports;
 
