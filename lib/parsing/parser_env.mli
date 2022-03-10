@@ -2,7 +2,7 @@ open Lichenscript_lex
 
 type env
 
-val init_env: Lichenscript_lex.File_key.t option -> string -> env
+val init_env: Lichenscript_lex.File_key.t option -> ?filter_platform:string -> string -> env
 
 val add_top_level: env -> name:string -> loc:Loc.t -> visibility:Asttypes.visibility option -> unit
 
@@ -37,6 +37,10 @@ val get_unexpected_error : ?expected:string -> Lichenscript_lex.Token.t -> Parse
 val error_unexpected : ?expected:string -> env -> unit
 
 val last_loc : env -> Lichenscript_lex.Loc.t option
+
+val has_platform_filter: env -> bool
+
+val filter_declaration: env -> Ast.Declaration.t -> bool
 
 module Peek : sig
 

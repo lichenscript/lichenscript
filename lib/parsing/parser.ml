@@ -182,9 +182,9 @@ and parse_attributes env : attributes =
   done;
   List.rev !result
 
-and parse_string source content = 
+and parse_string source ?filter_platform content = 
   try
-    let env = Parser_env.init_env source content in
+    let env = Parser_env.init_env source ?filter_platform content in
     let program = parse_program env in
     let errs = errors env in
     if List.length errs > 0 then
@@ -210,9 +210,18 @@ and parse_program env : program =
     decls := decl::(!decls)
   done;
 
+  let pprogram_declarations = List.rev !decls in
+
+  let pprogram_declarations =
+    if has_platform_filter env then
+      List.filter (filter_declaration env) pprogram_declarations
+    else
+      pprogram_declarations
+  in
+
   {
     pprogram_top_level = Parser_env.get_top_level env;
-    pprogram_declarations = List.rev !decls;
+    pprogram_declarations;
     pprogram_comments = [];
     pprogram_loc = with_start_loc env start_loc;
   }

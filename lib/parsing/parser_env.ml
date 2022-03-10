@@ -113,6 +113,7 @@ type env = {
   mutable allow_arrow: bool;
   mutable include_module_ids: string list;
   mutable scope: Parse_scope.t;
+  filter_platform: string option;
 }
 
 let add_top_level env ~name ~loc ~visibility =
@@ -129,7 +130,7 @@ let lookahead ~i env =
   assert (i < maximum_lookahead);
   Lookahead.peek !(env.lookahead) i
 
-let init_env source content =
+let init_env source ?filter_platform content =
   let (lb, errors) =
   try (Sedlexing.Utf8.from_string content, [])
     with Sedlexing.MalFormed ->
@@ -153,6 +154,7 @@ let init_env source content =
     top_level = Top_level.create ();
     allow_init = true;
     allow_arrow = true;
+    filter_platform;
   }
 
 let include_module_ids env = List.rev env.include_module_ids
@@ -192,6 +194,39 @@ let in_function env = env.in_function
 let source env = env.source
 
 let errors env = List.rev !(env.errors)
+
+let has_platform_filter env = Option.is_some env.filter_platform
+
+let filter_declaration env decl =
+  match env.filter_platform with
+  | Some filter_str -> (
+    let open Ast in
+    let open Ast.Declaration in
+    let attributes = decl.attributes in
+    let platform_opt =
+      List.find_map
+        (fun attr ->
+          if String.equal attr.attr_name.txt "platform" then (
+            Some attr.attr_payload
+          ) else
+            None
+        )
+        attributes
+    in
+    match platform_opt with
+    | Some platforms -> (
+      let match_platform =
+        List.find_opt
+          (fun plat -> String.equal plat filter_str)
+          platforms
+      in
+      Option.is_some match_platform
+    )
+
+    | None -> true  (* no platform specific *)
+  )
+
+  | None -> true
 
 module Peek = struct
   open Lichenscript_lex

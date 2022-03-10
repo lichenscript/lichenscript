@@ -44,10 +44,20 @@ end
 
 module S (FS: FSProvider) = struct
 
+  type config = {
+    find_paths: string list;
+    build_dir: string option;
+    runtime_dir: string;
+    platform: string;
+    verbose: bool;
+    wasm_standalone: bool;
+  }
+
   type t = {
     (* absolute path => module *)
     linker: Linker.t;
     find_paths: string list;
+    config: config;
   }
 
   type profile = {
@@ -56,11 +66,12 @@ module S (FS: FSProvider) = struct
     profile_exe_path: string;
   }
 
-  let create ~find_paths ~prog () =
+  let create ~find_paths ~prog ~config () =
     let linker = Linker.create ~prog () in
     {
       linker;
       find_paths;
+      config;
     }
 
   class module_scope ~prev () = object
@@ -180,7 +191,7 @@ module S (FS: FSProvider) = struct
     let file_content = FS.read_file_content path in
     let file_key = File_key.LibFile path in
     let ast =
-      match Parser.parse_string (Some file_key) file_content with
+      match Parser.parse_string (Some file_key) ~filter_platform:env.config.platform file_content with
       | Result.Ok ast -> ast
       | Result.Error errors ->
         raise (ParseError errors)
@@ -394,15 +405,6 @@ module S (FS: FSProvider) = struct
       )
       env.linker
 
-  type config = {
-    find_paths: string list;
-    build_dir: string option;
-    runtime_dir: string;
-    platform: string;
-    verbose: bool;
-    wasm_standalone: bool;
-  }
-
   (*
   * 1. parse all in the entry dir
   * 2. annotate all files
@@ -417,7 +419,7 @@ module S (FS: FSProvider) = struct
     try
       (* ctx is a typing context for all modules *)
       let prog = Lichenscript_typing.Program.create () in
-      let env = create ~find_paths ~prog () in
+      let env = create ~find_paths ~prog ~config () in
 
       (* parse the entry dir *)
       let dir_of_entry = Filename.dirname entry_file_path in
