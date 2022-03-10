@@ -555,41 +555,15 @@ static LCValue LC_Object_toString(LCRuntime* rt, LCValue this, int argc, LCValue
     return LCNewStringFromCString(rt, (const unsigned char*)"Object");;
 }
 
-static char* LCStringToUTF8(LCRuntime* rt, LCString* str) {
-    char* space = lc_malloc(rt, str->length * 2 + 1);
-    int idx = 0;
-    int len;
-    uint8_t* buf = (uint8_t*)space;
-
-    while (idx < str->length) {
-        len = unicode_to_utf8(buf, str->u.str16[idx]);
-        buf += len;
-        idx++;
-    }
-
-    *buf = 0;
-
-    return space;
-}
-
 int LCStringEqUtf8(LCRuntime* rt, LCValue this, const char* cmp_str, size_t len) {
     int result;
-    LCString* str = (LCString*)this.ptr_val;
 
-    if (!str->is_wide_char) {
-        if (str->length != len) {
-            return 0;
-        }
-
-        return memcmp(str->u.str8, cmp_str, len) == 0;
-    }
-
-    char* utf8_str = LCStringToUTF8(rt, str);
+    const char* utf8_str = LCToUTF8(rt, this);
 
     result = strcmp(utf8_str, cmp_str);
 
-    lc_free(rt, utf8_str);
-    return result;
+    LCFreeUTF8(rt, utf8_str);
+    return result == 0;
 }
 
 static LCClassMethodDef Object_method_def[] = {
@@ -1513,17 +1487,6 @@ LCValue LCRunMain(LCProgram* program, int argc, char** argv) {
     return program->main_fun(program->runtime, MK_NULL(), 0, NULL);
 }
 
-static void std_print_string(LCRuntime* rt, LCString* str) {
-    if (!str->is_wide_char) {
-        printf("%s", str->u.str8);
-        return;
-    }
-
-    char* space = LCStringToUTF8(rt, str);
-    printf("%s", space);
-    lc_free(rt, space);
-}
-
 static void lc_expand_obj_meta(LCRuntime* rt) {
     if (rt->obj_meta_size >= rt->obj_meta_cap) {
         rt->obj_meta_cap *= 2;
@@ -1767,6 +1730,73 @@ LCValue LCToString(LCRuntime* rt, LCValue val) {
     return LCNewStringFromCString(rt, (const unsigned char*)str);
 }
 
+const char* LCToUTF8(LCRuntime* rt, LCValue val) {
+    LCValue str_val;
+    LCString *str, *str_new;
+
+    if (val.tag != LC_TY_STRING) {
+        str_val = LCToString(rt, val);
+    } else {
+        LCRetain(val);
+        str_val = val;
+    }
+
+    str = (LCString*)str_val.ptr_val;
+
+    if (!str->is_wide_char) {
+        return (const char*)str->u.str8;
+    }
+
+    const uint16_t *src = str->u.str16;
+    int len = str->length;
+    str_new = lc_alloc_string_rt(rt, len * 3, 0);
+
+    uint8_t *q = str_new->u.str8;
+    int pos = 0;
+    int c, c1;
+    while (pos < len) {
+        c = src[pos++];
+        if (c < 0x80) {
+            *q++ = c;
+        } else {
+            if (c >= 0xd800 && c < 0xdc00) {
+                if (pos < len) {
+                    c1 = src[pos];
+                    if (c1 >= 0xdc00 && c1 < 0xe000) {
+                        pos++;
+                        /* surrogate pair */
+                        c = (((c & 0x3ff) << 10) | (c1 & 0x3ff)) + 0x10000;
+                    } else {
+                        /* Keep unmatched surrogate code points */
+                        /* c = 0xfffd; */ /* error */
+                    }
+                } else {
+                    /* Keep unmatched surrogate code points */
+                    /* c = 0xfffd; */ /* error */
+                }
+            }
+            q += unicode_to_utf8(q, c);
+        }
+    }
+
+    *q = '\0';
+    str_new->length = q - str_new->u.str8;
+
+    LCRelease(rt, val);
+
+    return (const char*)str_new->u.str8;
+}
+
+void LCFreeUTF8(LCRuntime* rt, const char* str) {
+    if (!str) {
+        return;
+    }
+
+    LCString *s = (LCString*)(void*)(str - offsetof(LCString, u));
+    LCValue val = MK_STRING(s);
+    LCRelease(rt, val);
+}
+
 LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
     LCValue val;
     for (int i = 0; i < arg_len; i++) {
@@ -1774,11 +1804,11 @@ LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
             putchar(' ');
         }
 
-        val = LCToString(rt, args[i]);
+        const char* str = LCToUTF8(rt, args[i]);
 
-        std_print_string(rt, (LCString*)val.ptr_val);
+        printf("%s", str);
 
-        LCRelease(rt, val);
+        LCFreeUTF8(rt, str);
     }
     putchar('\n');
     return MK_NULL();

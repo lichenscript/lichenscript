@@ -6,8 +6,8 @@ import "./foo.js";
 import "./foo.h";
 
 @external("ext_foo")
-public declare function foo();
+public declare function foo(content: string);
 
 function main() {
-	foo();
+	foo("江");
 }
