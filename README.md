@@ -7,6 +7,12 @@
 A quick and small language compiled to JavaScript/C.
 Easy to integrate with the Web ecosystem.
 
+# The origin of the name
+
+> A lichen is a composite organism that arises from algae or cyanobacteria living among filaments of multiple fungi species in a mutualistic relationship.
+
+LichenScript is a thin layer of the existing ecosystem.
+
 # Features
 
 - Modern syntaxes, close to TypeScript/JavaScript
@@ -33,11 +39,8 @@ Easy to integrate with the Web ecosystem.
 - [Introduction](https://docs.lichenscript.com/)
 - [Get Started](https://docs.lichenscript.com/get-started)
 - [Installation](https://docs.lichenscript.com/get-started#install)
+- [VSCode Extension](https://docs.lichenscript.com/advanced/syntax-highlighting)
 
 # Syntaxes
 
 Check [Examples](./examples/).
-
-# VSCode Extension
-
-Install [lichenscript-vscode](https://github.com/vincentdchan/lichenscript-vscode) from the extension store.
