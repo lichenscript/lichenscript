@@ -1,0 +1,6 @@
+
+function main() {
+	const a = Some("Hello world");
+	const hello = a.unwrap();
+	print(hello);
+}

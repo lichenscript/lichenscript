@@ -220,6 +220,12 @@ let[@warning "-unused-value-declaration"] is_identifier expr =
   | Typedtree.Expression.Identifier _ -> true
   | _ -> false
 
+let[@warning "-unused-value-declaration"] is_this expr =
+  let open Typedtree.Expression in
+  match expr.spec with
+  | Typedtree.Expression.This -> true
+  | _ -> false
+
 let push_scope env (scope: TScope.t) =
   let scope = {
     scope with
@@ -1522,10 +1528,18 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       transform_pattern_matching env ~prepend_stmts ~append_stmts ~loc ~ty_var _match
 
     | This -> (
-      if TScope.is_in_lambda env.scope then
-        Ir.Expr.Ident SymLambdaThis
+      let this_symbol =
+        if TScope.is_in_lambda env.scope then
+          Ir.Expr.Ident SymLambdaThis
+        else
+          Ir.Expr.Ident SymThis
+      in
+      if is_move then
+        Ir.Expr.Retaining this_symbol
+      else if (not is_borrow) && (not is_move) then
+        Ir.Expr.Retaining this_symbol
       else
-        Ir.Expr.Ident SymThis
+        this_symbol
     )
 
     | TypeCast(expr, _type) ->(
@@ -1618,7 +1632,7 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
   let { match_expr; match_clauses; _ } = _match in
   let transformed_expr = transform_expression ~is_borrow:true env match_expr in
   let match_expr =
-    if is_identifier match_expr then
+    if (is_identifier match_expr) || (is_this match_expr) then
       transformed_expr.expr
     else
       prepend_expr env
