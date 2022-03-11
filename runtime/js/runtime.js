@@ -155,6 +155,15 @@ function lc_std_print(...args) {
   console.log(content);
 }
 
+function LCC_Object_toString() {
+  return "Object";
+}
+
+const LCC_Object = {
+  [clsNameSym]: "Object",
+  toString: LCC_Object_toString,
+}
+
 const LCC_Option = {
   [unionSym]: 1,
   name: "Option",

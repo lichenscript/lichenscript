@@ -897,6 +897,25 @@ and parse_class_body env: Declaration.class_body =
 
     if (Peek.token env) = Token.T_DECLARE then (
       Eat.token env;
+
+      let cls_decl_method_modifier =
+        match Peek.token env with
+        (* | Token.T_STATIC ->
+          Eat.token env;
+          Some Ast.Declaration.Cls_modifier_static *)
+
+        | Token.T_VIRTUAL ->
+          Eat.token env;
+          Some Ast.Declaration.Cls_modifier_virtual
+
+        | Token.T_OVERRIDE ->
+          Eat.token env;
+          Some Ast.Declaration.Cls_modifier_override
+
+        | _ -> None
+
+      in
+
       let first_id = parse_identifier env in
       let cls_decl_method_get_set =
         match first_id.pident_name with
@@ -933,6 +952,7 @@ and parse_class_body env: Declaration.class_body =
       Cls_declare {
         cls_decl_method_attributes = attributes;
         cls_decl_method_get_set;
+        cls_decl_method_modifier;
         cls_decl_method_name;
         cls_decl_method_type_vars = type_vars;
         cls_decl_method_params = params;

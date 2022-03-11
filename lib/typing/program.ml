@@ -4,12 +4,18 @@ open Scope
  * record the dependency of types
  **)
 
+type root_class = {
+  root_class_id: int;
+  root_class_attributes: string list;
+}
+
 (* num -> [] *)
 type t = {
   ty_map: ResizableArray.t;
   external_symbol: (int, string) Hashtbl.t;
   root_scope: scope;
   declarations: (int, Typedtree.Declaration.t) Hashtbl.t;
+  mutable root_class: root_class option;
 }
 
 let size ctx = ResizableArray.size ctx.ty_map
@@ -56,6 +62,7 @@ let create () =
     external_symbol = Hashtbl.create (module Int);
     root_scope;
     declarations = Hashtbl.create (module Int);
+    root_class = None;
   } in
   make_default_type_sym ctx root_scope;
   ctx

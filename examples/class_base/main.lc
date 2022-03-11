@@ -1,0 +1,7 @@
+
+class MyClass {}
+
+function main() {
+  const cls = MyClass {};
+  print("toString:", cls.toString());
+}

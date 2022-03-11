@@ -335,6 +335,7 @@ and Declaration : sig
   and class_declare_method = {
     cls_decl_method_attributes: attributes;
     cls_decl_method_get_set: class_get_set option;
+    cls_decl_method_modifier: class_modifier option;
     cls_decl_method_name: Identifier.t;
     cls_decl_method_type_vars: Identifier.t list;
     cls_decl_method_params: Function.params;

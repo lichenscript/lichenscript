@@ -149,7 +149,9 @@ and transpile_class env (cls: Ir.Decl._class) =
   (match cls.init.class_ancester with
   | Some (Ir.SymLocal v) -> 
     ps env (Format.asprintf "  __proto__: %s,\n" v);
-  | _ -> ());
+  | _ -> 
+    ps env (Format.asprintf "  __proto__: LCC_Object,\n");
+  );
 
   ps env (Format.asprintf "  [clsNameSym]: \"%s\",\n" cls.original_name);
 
