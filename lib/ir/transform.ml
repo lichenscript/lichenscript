@@ -301,7 +301,30 @@ let rec transform_declaration env decl =
   | Interface _ -> []
 
   | Declare declare -> (
-    if List.is_empty attributes then (
+    let external_attribute =
+      List.find_map
+      ~f:(fun attr ->
+        if String.equal attr.attr_name.txt "external" then
+          Some attr.attr_payload
+        else
+          None
+      )
+      attributes
+    in
+    match external_attribute with
+    | Some (external_name::_) -> (
+      match declare.decl_spec with
+      | DeclFunction fun_header -> (
+        let _, declare_id = fun_header.name in
+        Hashtbl.set
+          env.global_name_map
+          ~key:declare_id
+          ~data:(Ir.SymLocal external_name);
+        []
+      )
+    )
+
+    | _ -> (
       match declare.decl_spec with
       | DeclFunction fun_header -> (
         let phys_name, _ = fun_header.name in
@@ -312,8 +335,7 @@ let rec transform_declaration env decl =
         } in
         [decl]
       )
-    ) else
-      []
+    )
   )
 
   | Import _ -> []

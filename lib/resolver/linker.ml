@@ -164,7 +164,7 @@ and link_from_entry_internal env ~verbose entry : Typedtree.Declaration.t list =
     Format.eprintf "- entry %d\n" entry;
     Array.iteri
       ~f:(fun index id ->
-        Format.printf "- %d: %d\n" index id
+        Format.eprintf "- %d: %d\n" index id
       )
       orders
   );
@@ -228,7 +228,14 @@ let has_module env key =
   ModuleMap.mem env.module_map key
 
 let iter_modules env ~f =
+  let std =
+    List.find_exn
+    ~f:Module.is_std
+    env.modules_in_order
+  in
+  f std;
   env.modules_in_order
+  |> List.filter ~f:(fun m -> not (Module.is_std m))
   |> List.iter ~f
 
 let add_external_resource env res =

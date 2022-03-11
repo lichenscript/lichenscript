@@ -1106,7 +1106,7 @@ and annotate_class env cls attributes =
       | Some _ -> None
       | None -> (
         let prog = Env.prog env in
-        let root_class = Option.value_exn prog.root_class in
+        let root_class = Option.value_exn ~message:"should annotate root_class" prog.root_class in
         let { Program. root_class_id; _ } = root_class in
         base_deps := Some [root_class_id];
         let expr = TypeExpr.Ctor(Ref root_class_id, []) in

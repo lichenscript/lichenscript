@@ -25,7 +25,11 @@ exception ReexportSymbol of (Loc.t * export * export)
 
 type t
 
-val create: full_path:string -> module_scope:Scope.scope -> unit -> t
+val create: full_path:string -> is_std:bool -> module_scope:Scope.scope -> unit -> t
+
+val path: t-> string
+
+val is_std: t -> bool
 
 val module_scope: t -> Scope.scope
 

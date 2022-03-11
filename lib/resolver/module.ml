@@ -42,15 +42,21 @@ type t = {
   mutable files: file list;
   exports: (string, export) Hashtbl.t;
   module_scope: Scope.scope;
+  is_std: bool;
 }
 
-let create ~full_path ~module_scope () =
+let create ~full_path ~is_std ~module_scope () =
   {
     mod_full_path = full_path;
     files = [];
     exports = Hashtbl.create (module String);
     module_scope;
+    is_std;
   }
+
+let path env = env.mod_full_path
+
+let is_std env = env.is_std
 
 let module_scope env = env.module_scope
 

@@ -330,10 +330,11 @@ module S (FS: FSProvider) = struct
    *
    * @param real_path must be an absolute path
    *)
-  and parse_module_by_dir ~prog env ~real_path:dir_path _source : string option =
+  and parse_module_by_dir ~prog env ~real_path:dir_path first_source : string option =
     let iterate_parse_file mod_path =
       let module_scope = new module_scope ~prev:(Program.root_scope prog) () in
-      let _mod = Module.create ~full_path:mod_path ~module_scope () in
+      let is_std = String.equal first_source "std/preclude" in
+      let _mod = Module.create ~full_path:mod_path ~is_std ~module_scope () in
       Linker.set_module env.linker mod_path _mod;
       let children = FS.ls_dir mod_path in
       (* only compile files in this level *)
