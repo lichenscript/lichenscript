@@ -854,7 +854,7 @@ and annotate_declaration env decl : T.Declaration.t =
     match spec with
     | Class _class -> (
       let open Typedtree.Declaration in
-      let _class = annotate_class env _class in
+      let _class = annotate_class env _class attributes in
       let _, ty_int = _class.cls_id in
       ty_int, T.Declaration.Class _class
     )
@@ -987,10 +987,36 @@ and annotate_declaration env decl : T.Declaration.t =
  * - Everything in the method body
  *
  *)
-and annotate_class env cls =
+and annotate_class env cls attributes =
   let open Ast.Declaration in
 
   let cls_var = Option.value_exn ((Env.peek_scope env)#find_var_symbol cls.cls_id.pident_name) in
+
+  (*
+   * implement @root_class()
+   *)
+  let test_root_class =
+    List.find_map
+      ~f:(fun attr ->
+        let open Ast in
+        if String.equal attr.attr_name.txt "root_class" then
+          Some attr.attr_payload
+        else
+          None
+      )
+      attributes
+  in
+
+  Option.iter
+    ~f:(fun payload ->
+      let program = Env.prog env in
+      let root_class = { Program.
+        root_class_id = cls_var.var_id;
+        root_class_attributes = payload;
+      } in
+      program.root_class <- Some root_class;
+    )
+    test_root_class;
 
   let prev_scope = Env.peek_scope env in
 
@@ -1066,13 +1092,28 @@ and annotate_class env cls =
 
   (* depend on the base class *)
   let tcls_extends =
-    Option.map
-    ~f:(fun extend ->
-      let ext_type, deps = annotate_type env extend in
-      base_deps := Some deps;
-      ext_type
+    match cls.cls_extends with
+    | Some extend -> (
+        let ext_type, deps = annotate_type env extend in
+        base_deps := Some deps;
+        Some ext_type
+      )
+
+    (* no explicit extends *)
+    | None -> (
+      match test_root_class with
+      (* has root_class attribute, so this class doesn't has ancester *)
+      | Some _ -> None
+      | None -> (
+        let prog = Env.prog env in
+        let root_class = Option.value_exn prog.root_class in
+        let { Program. root_class_id; _ } = root_class in
+        base_deps := Some [root_class_id];
+        let expr = TypeExpr.Ctor(Ref root_class_id, []) in
+        Some expr
+      )
+
     )
-    cls.cls_extends;
   in
 
   let tcls_implements =
@@ -1233,19 +1274,28 @@ and annotate_class env cls =
         )
 
         | Cls_declare declare -> (
-          let { cls_decl_method_attributes; cls_decl_method_name; cls_decl_method_type_vars; cls_decl_method_params; cls_decl_method_loc; cls_decl_method_return_ty; cls_decl_method_get_set; _ } = declare in
+          let { cls_decl_method_attributes; cls_decl_method_modifier; cls_decl_method_name; cls_decl_method_type_vars; cls_decl_method_params; cls_decl_method_loc; cls_decl_method_return_ty; cls_decl_method_get_set; _ } = declare in
           let type_visibility = Visibility.Public in
 
           let declare_id = Program.size ctx in
 
-          (match List.last cls_decl_method_attributes with
-          | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; _ } ->
-            Program.set_external_symbol (Env.prog env) declare_id ext_name
+          let method_is_virtual =
+            match cls_decl_method_modifier with
+            | Some Ast.Declaration.Cls_modifier_virtual
+            | Some Ast.Declaration.Cls_modifier_override -> true
+            | _ -> false
+          in
 
-          | _ ->
-            let open Diagnosis in
-            let err = make_error (Env.prog env) cls_decl_method_loc DeclareFunctionShouldSpecificExternal in
-            raise (Error err)
+          if not method_is_virtual then (
+            (match List.last cls_decl_method_attributes with
+            | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; _ } ->
+              Program.set_external_symbol (Env.prog env) declare_id ext_name
+
+            | _ ->
+              let open Diagnosis in
+              let err = make_error (Env.prog env) cls_decl_method_loc DeclareFunctionShouldSpecificExternal in
+              raise (Error err)
+            )
           );
 
           let parent_scope = Env.peek_scope env in
@@ -1282,7 +1332,7 @@ and annotate_class env cls =
                 spec = ClassMethod {
                   method_cls_id = cls_var.var_id;
                   method_get_set;
-                  method_is_virtual = false;
+                  method_is_virtual;
                   method_params = method_params;
                   method_return;
                 };

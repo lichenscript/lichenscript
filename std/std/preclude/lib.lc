@@ -14,12 +14,11 @@ public declare function panic(...content: any[]): any;
 @external("lc_std_get_args")
 public declare function getArgs(): string[];
 
+@root_class()
 @builtin()
 public class Object {
 
-    virtual toString(): string {
-        return "Object";
-    }
+    declare virtual toString(): string;
 
 }
 

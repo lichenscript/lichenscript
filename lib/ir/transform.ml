@@ -2396,13 +2396,30 @@ and transform_class env cls loc: Ir.Decl.t list =
   in
 
   let class_ancester =
-    Option.map
-      ~f:(fun ancester ->
-        let typedef, _ = Option.value_exn (Check_helper.find_construct_of env.ctx ancester) in
-        let ancester_id = typedef.id in
-        Hashtbl.find_exn env.global_name_map ancester_id
-      )
+    Option.(
       unwrap_class.tcls_extends
+      >>= fun ancester ->
+      let typedef, _ = Option.value_exn (Check_helper.find_construct_of env.ctx ancester) in
+      let ancester_id = typedef.id in
+
+      let prog = env.ctx in
+      let open Program in
+      match prog.root_class with
+      | Some root_class' -> (
+        (* the ancester is Object *)
+        if root_class'.root_class_id = ancester_id then
+          None
+        else (
+          let name = Hashtbl.find_exn env.global_name_map ancester_id in
+          Some name
+        )
+      )
+
+      | None -> (
+        let name = Hashtbl.find_exn env.global_name_map ancester_id in
+        Some name
+      )
+    )
   in
 
   let class_init = { Ir.Decl.
