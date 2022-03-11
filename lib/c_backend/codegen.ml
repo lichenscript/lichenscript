@@ -328,9 +328,12 @@ and codegen_declaration env decl =
   )
 
   | Enum enum -> (
-    let { enum_name; enum_members; _ } = enum in
+    let { enum_name; enum_members; enum_has_meta_id; _ } = enum in
     let class_id_var_name = enum_name ^ "_id" in
-    ps env (Format.sprintf "static LCClassID %s;\n" class_id_var_name);
+
+    if not enum_has_meta_id then (
+      ps env (Format.sprintf "static LCClassID %s;\n" class_id_var_name)
+    );
 
     let class_def_name = enum_name ^ "_def" in
     ps env (Format.sprintf "static LCEnumMemberDef %s[] = {\n" class_def_name);

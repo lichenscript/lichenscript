@@ -393,7 +393,6 @@ and transform_function env _fun =
 
   [ result ]
 
-
 and distribute_name_to_scope scope fun_meta local_vars : unit =
   let local_names =
     local_vars
@@ -2614,7 +2613,9 @@ and transform_enum env ~attributes enum loc : Ir.Decl.t list =
     enum_members = List.rev !enum_members;
   } in
 
-  env.class_inits <- (Ir.Decl.InitEnum enum_def)::env.class_inits;
+  if Option.is_none meta_id' then (
+    env.class_inits <- (Ir.Decl.InitEnum enum_def)::env.class_inits
+  );
   env.current_fun_meta <- None;
 
   List.append [{ Ir.Decl. spec = Enum enum_def; loc = Loc.none; }] result
