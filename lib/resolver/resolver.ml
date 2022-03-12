@@ -220,24 +220,26 @@ module S (FS: FSProvider) = struct
     let import_star_external_modules = ref [] in
     let imports_map = Hashtbl.create (module String) in
 
+    let find_path source =
+      let find_paths = mod_path::(env.find_paths) in
+      List.find_map
+        ~f:(fun path ->
+            if Filename.is_absolute source then
+              Some (source, source)
+            else (
+              let path = Filename.concat path source in
+              if FS.is_directory path then (
+                Some (FS.get_realpath path, source)
+              ) else None
+            )
+        )
+        find_paths
+    in
+
     let handle_import_lc_module import spec =
       let open Ast.Import in
       let { source; source_loc; _ } = import in
-      let find_paths = env.find_paths in
-      let result =
-        List.find_map
-          ~f:(fun path ->
-              if Filename.is_absolute source then
-                Some (source, source)
-              else (
-                let path = Filename.concat path source in
-                if FS.is_directory path then (
-                  Some (FS.get_realpath path, source)
-                ) else None
-              )
-          )
-          find_paths
-      in
+      let result = find_path source in
       match result with
       | Some (path, source) -> (
         ignore (parse_module_by_dir ~prog env ~real_path:path source);
