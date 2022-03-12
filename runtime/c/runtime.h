@@ -348,7 +348,10 @@ LCValue LCEvalLambda(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 // TODO: dynamic dispatch by ATOM
 
 LCValue LCToString(LCRuntime* rt, LCValue val);
-const char* LCToUTF8(LCRuntime* rt, LCValue val);
+const char* LCToUTF8Len(LCRuntime* rt, size_t* plen, LCValue val);
+static inline const char *LCToUTF8(LCRuntime* rt, LCValue val) {
+    return LCToUTF8Len(rt, NULL, val);
+}
 void LCFreeUTF8(LCRuntime* rt, const char* str);
 
 LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args);

@@ -1730,7 +1730,7 @@ LCValue LCToString(LCRuntime* rt, LCValue val) {
     return LCNewStringFromCString(rt, (const unsigned char*)str);
 }
 
-const char* LCToUTF8(LCRuntime* rt, LCValue val) {
+const char* LCToUTF8Len(LCRuntime* rt, size_t* plen, LCValue val) {
     LCValue str_val;
     LCString *str, *str_new;
 
@@ -1744,6 +1744,9 @@ const char* LCToUTF8(LCRuntime* rt, LCValue val) {
     str = (LCString*)str_val.ptr_val;
 
     if (!str->is_wide_char) {
+        if (plen) {
+            *plen = str->length;
+        }
         return (const char*)str->u.str8;
     }
 
@@ -1783,6 +1786,10 @@ const char* LCToUTF8(LCRuntime* rt, LCValue val) {
     str_new->length = q - str_new->u.str8;
 
     LCRelease(rt, val);
+
+    if (plen) {
+        *plen = str_new->length;
+    }
 
     return (const char*)str_new->u.str8;
 }
