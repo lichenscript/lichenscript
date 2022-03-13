@@ -58,6 +58,7 @@ module S (FS: FSProvider) = struct
     linker: Linker.t;
     find_paths: string list;
     config: config;
+    mutable before_eval_fun_call: string list;
   }
 
   type profile = {
@@ -72,6 +73,7 @@ module S (FS: FSProvider) = struct
       linker;
       find_paths;
       config;
+      before_eval_fun_call = [];
     }
 
   class module_scope ~prev () = object
@@ -385,6 +387,9 @@ module S (FS: FSProvider) = struct
                 typed_env
                 (Option.value_exn ast)
               in
+
+              env.before_eval_fun_call <- List.append env.before_eval_fun_call typed_tree.tprogram_before_eval_fun_call;
+
               { file with
                 (* clear the ast to released memory,
                 * but don't know if there are other references
@@ -523,7 +528,7 @@ module S (FS: FSProvider) = struct
             external_resources
         in
 
-        let output = Lichenscript_c.codegen ~prog ~includes declarations in
+        let output = Lichenscript_c.codegen ~prog ~includes ~init_calls:env.before_eval_fun_call declarations in
         let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
         let build_dir = get_build_dir () in
         let output_path = write_to_file build_dir mod_name ~ext:".c" output in

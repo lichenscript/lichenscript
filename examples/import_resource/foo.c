@@ -8,3 +8,7 @@ LCValue ext_foo(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
   LCFreeUTF8(rt, str);
   return LC_NULL;
 }
+
+void ext_init(LCRuntime* rt) {
+	printf("ext init\n");
+}

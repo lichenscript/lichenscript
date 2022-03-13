@@ -7,4 +7,6 @@
 
 LCValue ext_foo(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
+void ext_init(LCRuntime* rt);
+
 #endif

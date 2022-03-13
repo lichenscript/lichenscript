@@ -32,6 +32,10 @@ val with_new_scope: t -> scope -> (t -> 'a) -> 'a
 
 val external_resolver: t -> external_resolver
 
+val add_before_eval_fun_call: t -> string list -> unit
+
+val before_eval_fun_call: t -> string list
+
 val ty_u32: t -> int
 
 val ty_i32: t -> int

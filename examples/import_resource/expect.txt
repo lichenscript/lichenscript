@@ -1,1 +1,2 @@
+ext init
 name: 江
