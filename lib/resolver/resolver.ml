@@ -578,7 +578,7 @@ module S (FS: FSProvider) = struct
         let js_runtime_preclude_file = Filename.(concat (concat runtime_dir "js") "runtime.js") in
         let preclude_runtime = FS.read_file_content js_runtime_preclude_file in
         let preclude = preclude_runtime ^ "\n" ^ preclude_ext in
-        let output = Lichenscript_js.codegen ~prog ~preclude declarations in
+        let output = Lichenscript_js.codegen ~prog ~preclude ~init_calls:env.before_eval_fun_call declarations in
         let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
         let build_dir = get_build_dir () in
         let output_path = write_to_file build_dir mod_name ~ext:".js" output in
@@ -602,6 +602,8 @@ module S (FS: FSProvider) = struct
     let output_file_path = Filename.concat build_dir (mod_name ^ ext) in
     if String.equal ext ".c" then (
       write_file_content_if_changed output_file_path ~data:content
+    ) else (
+      FS.write_file_content output_file_path ~data:content
     );
     output_file_path
 

@@ -1,5 +1,6 @@
 
 @platform("js")
+@init("ext_init")
 import "./foo.js";
 
 @platform("native", "wasm32")

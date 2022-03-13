@@ -776,7 +776,7 @@ and transpile_id env (name, loc) =
   env.sourcemap#add_location env.col 0 loc.start.line loc.start.column;
   ps env name
 
-let transpile_program ~prog ~preclude declarations =
+let transpile_program ~prog ~preclude ~init_calls declarations =
   let env = create ~prog () in
   ps env preclude;
 
@@ -787,6 +787,13 @@ let transpile_program ~prog ~preclude declarations =
   let ir_tree = Transform.transform_declarations ~config:transform_config prog declarations in
 
   List.iter ~f:(transpile_declaration env) ir_tree.declarations;
+
+  List.iter
+  ~f:(fun fun_name ->
+    ps env fun_name;
+    ps env "();\n";
+  )
+  init_calls;
 
   ps env "LCC_main();\n";
   env
