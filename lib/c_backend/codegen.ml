@@ -226,7 +226,7 @@ and codegen_declaration env decl =
 
   | LambdaDef lambda_def -> (
     ps env (Format.sprintf "LCValue %s(LCRuntime* rt, LCValue this, int argc, LCValue* args) {\n" lambda_def.lambda_gen_name);
-    ps env "    return MK_NULL();\n";
+    ps env "    return LC_NULL;\n";
     ps env "}\n";
   )
 
@@ -446,7 +446,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
   let open Expr in
   match expr with
   | Null ->
-    ps env "MK_NULL()"
+    ps env "LC_NULL"
 
   | NewInt value -> (
     ps env Primitives.Value.mk_i32;
@@ -523,7 +523,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ")"
 
   | NewTuple exprs -> (
-    ps env "LCNewTuple(rt, MK_NULL(), ";
+    ps env "LCNewTuple(rt, LC_NULL, ";
     let exprs_len = List.length exprs in
     ps env (Int.to_string exprs_len);
     ps env ", (LCValue[]) {";
@@ -585,7 +585,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
     (match ths with
     | Some e -> codegen_expression env e
     | None ->
-      ps env "MK_NULL()"
+      ps env "LC_NULL"
     );
     ps env ", ";
     if List.is_empty params then (
