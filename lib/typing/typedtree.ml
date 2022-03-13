@@ -328,6 +328,7 @@ end
 type program = {
   tprogram_declarations: Declaration.t list;
   tprogram_scope: scope;
+  tprogram_before_eval_fun_call: string list;
   ty_var: int;
 }
 [@@deriving show]

@@ -13,6 +13,7 @@ type t = {
   mutable scope_counter: int;
   mutable in_lambda: bool;
   mutable in_declare: bool;
+  mutable before_eval_fun_call: string list;
 }
 
 let create ~external_resolver ~file_scope prog =
@@ -25,6 +26,7 @@ let create ~external_resolver ~file_scope prog =
     scope_counter = 1;
     in_lambda = false;
     in_declare = false;
+    before_eval_fun_call = [];
   }
 
 let prog env = env.prog
@@ -62,6 +64,11 @@ let with_new_scope env scope callback =
   result
 
 let external_resolver env = env.external_resolver
+
+let add_before_eval_fun_call env calls =
+  env.before_eval_fun_call <- List.append env.before_eval_fun_call calls
+
+let before_eval_fun_call env = env.before_eval_fun_call
 
 let get_global_type_val env =
   let root_scope = Program.root_scope env.prog in

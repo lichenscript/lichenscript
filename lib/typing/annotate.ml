@@ -959,7 +959,7 @@ and annotate_declaration env decl : T.Declaration.t =
       ty_var, T.Declaration.Enum enum
 
     | Import import ->
-      annotate_import env import;
+      annotate_import env ~attributes import;
       -1, T.Declaration.Import import
 
   in
@@ -2213,7 +2213,7 @@ and annotate_interface env intf: T.Declaration.intf =
     intf_methods;
   }
 
-and annotate_import env import =
+and annotate_import env ~attributes import =
   let open Ast.Import in
   let { spec; source; _ } = import in
   match spec with
@@ -2264,7 +2264,24 @@ and annotate_import env import =
 
   )
 
-  | _ -> ()
+  | Some ImportAll -> ()
+
+  | None -> (
+    let open Ast in
+    let inits =
+      List.filter_map
+        ~f:(fun attr ->
+          if String.equal attr.attr_name.txt "init" then (
+            match attr.attr_payload with
+            | init_name::_ -> Some init_name
+            | _ -> None
+          ) else
+            None
+        )
+        attributes
+    in
+    Env.add_before_eval_fun_call env inits
+  )
 
 let annotate_program env (program: Ast.program) =
   let { Ast. pprogram_declarations; pprogram_top_level = _; pprogram_loc; _; } = program in
@@ -2319,9 +2336,13 @@ let annotate_program env (program: Ast.program) =
     }
   in
   let ty_var = Program.new_id (Env.prog env) val_ in
+
+  let tprogram_before_eval_fun_call = Env.before_eval_fun_call env in
+
   let tree = { T.
     tprogram_declarations;
     tprogram_scope = Env.file_scope env;
-    ty_var
+    tprogram_before_eval_fun_call;
+    ty_var;
   } in
   tree

@@ -3,6 +3,7 @@
 import "./foo.js";
 
 @platform("native", "wasm32")
+@init("ext_init")
 import "./foo.h";
 
 @platform("native", "wasm32")
