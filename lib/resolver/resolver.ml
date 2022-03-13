@@ -600,7 +600,9 @@ module S (FS: FSProvider) = struct
       FS.mkdir_p build_dir
     );
     let output_file_path = Filename.concat build_dir (mod_name ^ ext) in
-    FS.write_file_content output_file_path ~data:content;
+    if String.equal ext ".c" then (
+      write_file_content_if_changed output_file_path ~data:content
+    );
     output_file_path
 
   and write_makefiles ~bin_name ~runtime_dir ~platform ~wasm_standalone ~ext_includes build_dir mods: profile list =
@@ -708,6 +710,24 @@ module S (FS: FSProvider) = struct
       "CC=" ^ cc ^ "\n" ^
       flags ^
       to_string entries in
-    FS.write_file_content output_path ~data
+    write_file_content_if_changed output_path ~data
+
+  and write_file_content_if_changed output_path ~data =
+    let digest = Md5.digest_string data in
+    let digest_str = Md5.to_hex digest in
+    let hash_path = output_path ^ ".md5" in
+
+    let default() =
+      FS.write_file_content output_path ~data;
+      FS.write_file_content hash_path ~data:digest_str
+    in
+
+    if FS.is_file hash_path then (
+      let hash_content = FS.read_file_content hash_path in
+      if not (String.equal digest_str hash_content) then (
+        default()
+      )
+    ) else
+      default()
   
 end
