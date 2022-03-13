@@ -502,6 +502,7 @@ module S (FS: FSProvider) = struct
       | "native"
       | "wasm32" -> (
         let include_dir_names = Hash_set.create (module String) in
+        let c_assets = ref [] in
 
         let includes: string list =
           List.filter_map
@@ -512,6 +513,10 @@ module S (FS: FSProvider) = struct
                 let dirname, filename = Filename.split path in
                 Hash_set.add include_dir_names dirname;
                 Some filename
+              )
+              | Some "c" -> (
+                c_assets := (path::(!c_assets));
+                None
               )
               | _ -> None
             )
@@ -526,6 +531,17 @@ module S (FS: FSProvider) = struct
 
         let ext_includes = Hash_set.to_list include_dir_names in
 
+        let c_assets =
+          !c_assets
+          |> List.rev
+          |> List.map
+            ~f:(fun asset ->
+              let filename = Filename.basename asset in
+              let prefix, _ = Filename.split_extension filename in
+              ("ext_" ^ prefix), prefix, asset
+            )
+        in
+
         write_makefiles
           ~bin_name
           ~runtime_dir
@@ -533,7 +549,7 @@ module S (FS: FSProvider) = struct
           ~wasm_standalone
           ~ext_includes
           build_dir
-          [ (mod_name, output_path) ]
+          ((mod_name, mod_name, output_path)::c_assets)
       )
 
       | "js" -> (
@@ -623,7 +639,7 @@ module S (FS: FSProvider) = struct
     let output_path = Filename.concat build_dir "Makefile" in
     let open Makefile in
     let runtime_dir = Filename.concat runtime_dir "c" in
-    let c_srcs = List.fold ~init:"runtime.o" ~f:(fun acc (m, _) -> (acc ^ " " ^ m ^ ".o")) mods in
+    let c_srcs = List.fold ~init:"runtime.o" ~f:(fun acc (_, m, _) -> (acc ^ " " ^ m ^ ".o")) mods in
 
     let ext_flags =
       List.fold
@@ -638,7 +654,7 @@ module S (FS: FSProvider) = struct
       [
         {
           entry_name = "all";
-          deps = List.concat [ ["runtime"]; (List.map ~f:(fun (m, _) -> m) mods)];
+          deps = List.concat [ ["runtime"]; (List.map ~f:(fun (m, _, _) -> m) mods)];
           content = [
             Format.sprintf "$(CC) $(FLAGS) %s -o %s" c_srcs bin_name
           ];
@@ -658,7 +674,7 @@ module S (FS: FSProvider) = struct
         }
       ];
       List.map
-        ~f:(fun (m, output) ->
+        ~f:(fun (m, _, output) ->
           let output_full_path = FS.get_realpath output in
           {
             entry_name = m;
