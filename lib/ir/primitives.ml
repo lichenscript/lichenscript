@@ -54,9 +54,9 @@ end
 
 module Constant = struct
 
-  let _true = "LCTrue"
+  let _true = "LC_TRUE"
 
-  let _false = "LCFalse"
+  let _false = "LC_FALSE"
   
 end
 

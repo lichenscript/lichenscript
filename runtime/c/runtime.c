@@ -1480,11 +1480,11 @@ LCValue LCF64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue ri
 
 LCValue LCRunMain(LCProgram* program, int argc, char** argv) {
     if (program->main_fun == NULL) {
-        return MK_NULL();
+        return LC_NULL;
     }
     program->runtime->argc = argc;
     program->runtime->argv = argv;
-    return program->main_fun(program->runtime, MK_NULL(), 0, NULL);
+    return program->main_fun(program->runtime, LC_NULL, 0, NULL);
 }
 
 static void lc_expand_obj_meta(LCRuntime* rt) {
@@ -1545,7 +1545,7 @@ static LCValue LCInvokeStrInternal(LCRuntime* rt, LCValue this, const char* cont
 
     fprintf(stderr, "[LichenScript] Can not find method \"%s\" of class, id: %u\n", content, class_id);
     lc_panic_internal();
-    return MK_NULL();
+    return LC_NULL;
 }
 
 LCValue LCInvokeStr(LCRuntime* rt, LCValue this, const char* content, int arg_len, LCValue* args) {
@@ -1818,7 +1818,7 @@ LCValue lc_std_print(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
         LCFreeUTF8(rt, str);
     }
     putchar('\n');
-    return MK_NULL();
+    return LC_NULL;
 }
 
 LCValue lc_std_array_get_length(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
@@ -1833,13 +1833,13 @@ LCValue lc_std_array_resize(LCRuntime* rt, LCValue this, int arg_len, LCValue* a
     size_t new_cap;
 
     if (new_len == arr->len) {
-        return MK_NULL();
+        return LC_NULL;
     }
 
     if (new_len == 0) {
         for (i = 0; i < arr->len; i++) {
             LCRelease(rt, arr->data[i]);
-            arr->data[i] = MK_NULL();
+            arr->data[i] = LC_NULL;
         }
         arr->len = 0;
 
@@ -1847,16 +1847,16 @@ LCValue lc_std_array_resize(LCRuntime* rt, LCValue this, int arg_len, LCValue* a
         arr->data = lc_realloc(rt, arr->data, sizeof(LCValue) * new_cap);
         arr->capacity = new_cap;
 
-        return MK_NULL();
+        return LC_NULL;
     }
 
     if (new_len < arr->len) {
         for (i = new_len; i < arr->len; i++) {
             LCRelease(rt, arr->data[i]);
-            arr->data[i] = MK_NULL();
+            arr->data[i] = LC_NULL;
         }
         arr->len = new_len;
-        return MK_NULL();
+        return LC_NULL;
     }
 
     // assert(new_len > arr->len)
@@ -1876,7 +1876,7 @@ LCValue lc_std_array_resize(LCRuntime* rt, LCValue this, int arg_len, LCValue* a
     }
 
     arr->len = new_len;
-    return MK_NULL();
+    return LC_NULL;
 }
 
 typedef struct lc_sort_ctx {
@@ -2200,7 +2200,7 @@ LCValue lc_std_array_sort(LCRuntime* rt, LCValue this, int arg_len, LCValue* arg
 
     rqsort(arr->data, arr->len, sizeof(LCValue), lc_cmp_generic, &ctx);
 
-    return MK_NULL();
+    return LC_NULL;
 }
 
 LCValue lc_std_array_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
@@ -2274,7 +2274,7 @@ LCValue lc_std_array_push(LCRuntime* rt, LCValue this, int arg_len, LCValue* arg
     LCRetain(args[0]);
     arr->data[arr->len++] = args[0];
 
-    return MK_NULL();
+    return LC_NULL;
 }
 
 LCValue lc_std_char_code(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
@@ -2722,7 +2722,7 @@ LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
                 lc_std_map_construct_hashtable(rt, map);
             }
 
-            return MK_NULL();
+            return LC_NULL;
         } else {
             hash = LCValueHash(rt, args[0]);
             index = hash % map->bucket_size;
@@ -2734,13 +2734,13 @@ LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
 
             map->buckets[index] = bucket;
 
-            return MK_NULL();
+            return LC_NULL;
         }
     } else {  // found in hashmap, replace exist value
         LCRelease(rt, tuple->value);
         LCRetain(args[1]);
         tuple->value = args[1];
-        return MK_NULL();
+        return LC_NULL;
     }
 }
 
