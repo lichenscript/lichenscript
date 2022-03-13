@@ -130,7 +130,7 @@ and Stmt : sig
     | If_alt_block of Stmt.t list
   [@@deriving show]
 
-  type spec =
+  type t =
   | If of if_spec
   | While of Expr.t * Block.t
   | Expr of Expr.t
@@ -142,12 +142,6 @@ and Stmt : sig
   | WithLabel of string * t list
   | Goto of string
   | Return of Expr.t option
-  [@@deriving show]
-
-  and t = {
-    spec: spec;
-    loc: Loc.t;
-  }
   [@@deriving show]
 
 end

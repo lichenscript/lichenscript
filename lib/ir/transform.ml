@@ -467,10 +467,8 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
 
   let generate_name_def () =
     let names = fun_meta.def_local_names in
-    [{ Ir.Stmt.
-      spec = VarDecl names;
-      loc = Loc.none;
-    }]
+    let open Ir.Stmt in
+    [ VarDecl names; ]
   in
 
   let ending_parts =
@@ -479,19 +477,14 @@ and transform_function_impl env ~name ~params ~body ~scope ~comments =
     | Some { Typedtree.Statement. spec = Expr _; _ } ->
       let cleanup = generate_finalize_stmts fun_scope in
 
-      let return_stmt = { Ir.Stmt.
-        spec = Return (Some (Ir.Expr.Ident (Ir.SymLocal "ret")));
-        loc = Loc.none;
-      } in
+      let return_stmt = 
+        Ir.Stmt.Return (Some (Ir.Expr.Ident (Ir.SymLocal "ret")))
+      in
       List.append cleanup [return_stmt]
 
     | _ -> (
       let cleanup = generate_finalize_stmts fun_scope in
-
-      let return_stmt = { Ir.Stmt.
-        spec = Return (Some Ir.Expr.Null);
-        loc = Loc.none;
-      } in
+      let return_stmt = Ir.Stmt.Return (Some Ir.Expr.Null) in
       List.append cleanup [return_stmt]
     )
   in
@@ -533,7 +526,7 @@ and create_scope_and_distribute_vars env raw_scope =
 
 and transform_statement ?ret env stmt =
   let open Statement in
-  let { spec; loc; _ } = stmt in
+  let { spec; _ } = stmt in
   let transform_return_expr ?ret expr =
     let tmp = transform_expression ~is_move:true env expr in
     let ret = Option.value ~default:(Ir.SymRet) ret in
@@ -544,11 +537,7 @@ and transform_statement ?ret env stmt =
      *
      * But it should retain if it's a normal block.
      *)
-    let expr = {
-      Ir.Stmt.
-      spec = Expr assign;
-      loc;
-    } in
+    let expr = Ir.Stmt.Expr assign in
     List.concat [ tmp.prepend_stmts; [ expr ]; tmp.append_stmts ]
   in
   match spec with
@@ -556,15 +545,11 @@ and transform_statement ?ret env stmt =
 
   | Semi expr -> (
     let tmp = transform_expression env expr in
-    let expr = {
-      Ir.Stmt.
-      spec = Expr tmp.expr;
-      loc;
-    } in
+    let expr = Ir.Stmt.Expr tmp.expr in
     List.concat [ tmp.prepend_stmts; [ expr ]; tmp.append_stmts ]
   )
 
-  | While { while_test; while_block; while_loc } -> (
+  | While { while_test; while_block; _ } -> (
     let while_test' = transform_expression env while_test in
 
     let bodys = transform_block ?ret env while_block in
@@ -572,16 +557,13 @@ and transform_statement ?ret env stmt =
       Ir.Block.
       body =
         List.append while_test'.append_stmts bodys;
-      loc = while_block.loc;
+        loc = while_block.loc;
     } in
 
     List.concat [
       while_test'.prepend_stmts;
       [
-        { Ir.Stmt.
-          spec = While(while_test'.expr, body);
-          loc = while_loc;
-        }
+        Ir.Stmt.While(while_test'.expr, body);
       ];
       while_test'.append_stmts;
     ]
@@ -628,10 +610,7 @@ and transform_statement ?ret env stmt =
     List.concat [
       init_expr.prepend_stmts;
       [
-        { Ir.Stmt.
-          spec = Expr assign_expr;
-          loc = binding.binding_loc;
-        }
+        Ir.Stmt.Expr assign_expr;
       ];
       init_expr.append_stmts;
     ]
@@ -639,25 +618,11 @@ and transform_statement ?ret env stmt =
 
   | Break _ ->
     let stmts = generate_finalize_stmts_while env.scope in
-    List.append
-      stmts
-      [
-        { Ir.Stmt.
-          spec = Break;
-          loc;
-        }
-      ]
+    List.append stmts [ Ir.Stmt.Break ]
 
   | Continue _ ->
     let stmts = generate_finalize_stmts_while env.scope in
-    List.append
-      stmts
-      [
-        { Ir.Stmt.
-          spec = Continue;
-          loc;
-        }
-      ]
+    List.append stmts [ Ir.Stmt.Continue ]
 
   | Debugger -> []
 
@@ -666,30 +631,20 @@ and transform_statement ?ret env stmt =
     match ret_opt with
     | Some ret ->
       let ret = transform_return_expr ~ret:(Ir.SymRet) ret in
-      let ret_stmt = { Ir.Stmt.
-        spec = Return (Some (Ir.Expr.Ident Ir.SymRet));
-        loc;
-      } in
+      let ret_stmt = Ir.Stmt.Return (Some (Ir.Expr.Ident Ir.SymRet)) in
       List.concat [
         ret;
         cleanup;
         [ret_stmt];
       ]
     | None ->
-      let ret_stmt = { Ir.Stmt.
-        spec = Return (Some Ir.Expr.Null);
-        loc;
-      } in
+      let ret_stmt = Ir.Stmt.Return (Some Ir.Expr.Null) in
       List.append cleanup [ret_stmt]
   )
 
   | Empty -> []
 
-and gen_release_temp id =
-  { Ir.Stmt.
-    spec = Release (Ir.Expr.Temp id);
-    loc = Loc.none;
-  }
+and gen_release_temp id = Ir.Stmt.Release (Ir.Expr.Temp id)
 
 and auto_release_expr env ?(is_move=false) ~append_stmts ty_var expr =
   let node_type = Program.deref_node_type env.ctx ty_var in
@@ -717,11 +672,7 @@ and prepend_expr env ~prepend_stmts ~append_stmts (expr: expr_result) =
     expr.expr
   ) in
 
-  let prepend_stmt = {
-    Ir.Stmt.
-    spec = Expr assign_expr;
-    loc = Loc.none;
-  } in
+  let prepend_stmt = Ir.Stmt.Expr assign_expr in
 
   prepend_stmts := List.append !prepend_stmts [prepend_stmt];
 
@@ -951,19 +902,13 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       let tmp_var = Ir.SymTemp tmp_id in
 
       if Check_helper.is_unit (Program.deref_node_type env.ctx ty_var) then (
-        let init_stmt = { Ir.Stmt.
-          spec = Expr(Ir.Expr.Assign(Ident tmp_var, Null));
-          loc = Loc.none;
-        } in
+        let init_stmt = Ir.Stmt.Expr(Ir.Expr.Assign(Ident tmp_var, Null)) in
 
         prepend_stmts := List.append !prepend_stmts [init_stmt];
       );
 
       let spec = transform_expression_if env ~ret:tmp_var ~prepend_stmts ~append_stmts loc if_desc in
-      let tmp_stmt = { Ir.Stmt.
-        spec = If spec;
-        loc;
-      } in
+      let tmp_stmt = Ir.Stmt.If spec in
 
       prepend_stmts := List.append !prepend_stmts [tmp_stmt];
 
@@ -991,16 +936,14 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       let tmp_sym = Ir.SymTemp tmp_id in
 
-      let init_stmt = {
-        Ir.Stmt.
-        spec = Expr (
+      let init_stmt =
+        Ir.Stmt.Expr (
           Ir.Expr.Assign(
             (Ident tmp_sym),
             (Ir.Expr.NewArray arr_len)
           )
-        );
-        loc = Loc.none;
-      } in
+        )
+      in
 
       let inits_exprs = List.map ~f:(transform_expression env) arr_list in
 
@@ -1010,16 +953,14 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       let init_stmts =
         List.mapi
         ~f:(fun index expr ->
-          { Ir.Stmt.
-            spec = Expr (
-              Ir.Expr.ArraySetValue(
-                (Ident tmp_sym),
-                (NewInt (Int.to_string index)),
-                expr.expr
-              );
-            );
-            loc = Loc.none;
-          }
+          let open Ir in
+          Stmt.Expr (
+            Expr.ArraySetValue(
+              (Ident tmp_sym),
+              (NewInt (Int.to_string index)),
+              expr.expr
+            )
+          )
         )
         inits_exprs
       in
@@ -1046,10 +987,14 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       let init_size = List.length entries in
 
-      let init_stmt = { Ir.Stmt.
-        spec = Expr (Ir.Expr.Assign(Ir.Expr.Temp tmp_id, Ir.Expr.NewMap init_size));
-        loc = expr.loc;
-      } in
+      let init_stmt = Ir.(
+        Stmt.Expr(
+          Expr.Assign(
+            Expr.Temp tmp_id,
+            Expr.NewMap init_size)
+          )
+        )
+      in
 
       let pre, set_stmts, app =
         entries
@@ -1075,12 +1020,11 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
               [key_expr; expr.expr]
               )
             in
-            expr.prepend_stmts,
-            { Ir.Stmt.
-              spec = Expr set_expr;
-              loc = entry.map_entry_loc;
-            },
-            expr.append_stmts
+            (
+              expr.prepend_stmts,
+              Ir.Stmt.Expr set_expr,
+              expr.append_stmts
+            )
           )
         |> List.unzip3
       in
@@ -1333,15 +1277,19 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           let tmp_id = env.tmp_vars_count in
           env.tmp_vars_count <- tmp_id + 1;
 
-          let assign_stmt = { Ir.Stmt.
-            spec = Expr (Ir.Expr.Assign (Ir.Expr.Ident (SymTemp tmp_id), main_expr));
-            loc = Loc.none;
-          } in
+          let open Ir in
+          let assign_stmt = Stmt.Expr (
+            Expr.Assign(
+              Expr.Ident (SymTemp tmp_id),
+              main_expr
+            )
+          ) in
 
-          let release_stmt = { Ir.Stmt.
-            spec = Release (Ir.Expr.Ident (Ir.SymTemp tmp_id));
-            loc = Loc.none;
-          } in
+          let release_stmt = Stmt.Release(
+            Expr.Ident(
+              SymTemp tmp_id
+            )
+          ) in
 
           prepend_stmts := List.append !prepend_stmts [assign_stmt];
           append_stmts := List.append [release_stmt] !append_stmts
@@ -1435,22 +1383,21 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       let fun_name = find_variable env init_name in
       let init_call_name = Ir.map_symbol ~f:(fun fun_name -> fun_name ^ "_init") fun_name in
       let init_call = Ir.Expr.InitCall(init_call_name, fun_name) in
-      let init_cls_stmt = { Ir.Stmt.
-        spec = Expr (
-          Ir.Expr.Assign(
+      let init_cls_stmt = Ir.(
+        Stmt.Expr (
+          Expr.Assign(
             (Temp tmp_id),
             init_call
           )
-        );
-        loc = Loc.none;
-      } in
+        )
+      ) in
 
       let init_stmts =
         init_elements
         |> List.map
           ~f:(fun elm ->
             match elm with
-            | InitEntry { init_entry_key; init_entry_value; init_entry_loc; _ } ->
+            | InitEntry { init_entry_key; init_entry_value; _ } ->
               let actual_name = Hashtbl.find_exn cls_meta.cls_fields_map init_entry_key.pident_name in
               let transformed_value = transform_expression ~is_move:true env init_entry_value in
               let unwrap_name =
@@ -1465,15 +1412,12 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
                   actual_name
                 )
               ) in
-              [{ Ir.Stmt.
-                spec = Expr (
-                  Assign(
-                    left_value,
-                    transformed_value.expr
-                  )
-                );
-                loc = init_entry_loc;
-              }]
+              [Ir.Stmt.Expr(
+                Assign(
+                  left_value,
+                  transformed_value.expr
+                )
+              )]
             | InitSpread spread_expr -> (
               let transformed_spread = transform_expression ~is_move:true env spread_expr in
               let spread_expr' =
@@ -1492,10 +1436,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       prepend_stmts := List.append !prepend_stmts (init_cls_stmt::init_stmts);
 
       if not is_move then (
-        let release_stmt = { Ir.Stmt.
-          spec = Release(Ir.Expr.Temp tmp_id);
-          loc = Loc.none;
-        } in
+        let release_stmt = Ir.Stmt.Release(Ir.Expr.Temp tmp_id) in
         append_stmts := List.append !append_stmts [release_stmt];
       );
 
@@ -1507,15 +1448,14 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       env.tmp_vars_count <- env.tmp_vars_count + 1;
       let tmp_var = Ir.SymTemp tmp_id in
 
-      let init = { Ir.Stmt.
-        spec = Expr (
-          Ir.Expr.Assign (
+      let init = Ir.(
+        Stmt.Expr (
+          Expr.Assign (
             (Ident tmp_var),
             Null
           )
-        );
-        loc = Loc.none;
-      } in
+        )
+      ) in
 
       let stmts = transform_block ~ret:tmp_var env block in
 
@@ -1567,29 +1507,26 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       let cleanup = generate_finalize_stmts_function env.scope in
 
-      let stmt = { Ir.Stmt.
-        spec = If {
-          if_test = Ir.Expr.TagEqual (expr', 1);  (* 1 represent error *)
-          if_consequent =
-            List.concat [
-              expr_result.append_stmts;
-              cleanup;
-              [{ Ir.Stmt.
-                  spec = Return (Some expr');
-                  loc = Loc.none;
-              }]
-            ];
-          if_alternate = None;
-        };
-        loc = expr.loc;
+      let open Ir in
+      let stmt = Stmt.If {
+        if_test = Expr.TagEqual (expr', 1);  (* 1 represent error *)
+        if_consequent =
+          List.concat [
+            expr_result.append_stmts;
+            cleanup;
+            [ Stmt.Return (Some expr') ]
+          ];
+        if_alternate = None;
       } in
 
-      let union_get_expr = Ir.Expr.UnionGet(expr', 0) in
+      let union_get_expr = Expr.UnionGet(expr', 0) in
 
-      let assign_stmt = { Ir.Stmt.
-        spec = Expr (Ir.Expr.(Assign (Ident (Ir.SymLocal tmp_var), union_get_expr)));
-        loc = expr.loc;
-      } in
+      let assign_stmt = Stmt.Expr(
+        Expr.Assign(
+          Expr.Ident (SymLocal tmp_var),
+          union_get_expr
+        )
+      ) in
 
       prepend_stmts := List.concat [ !prepend_stmts; expr_result.prepend_stmts; [stmt; assign_stmt] ];
       append_stmts := List.append expr_result.append_stmts !append_stmts;
@@ -1626,7 +1563,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     append_stmts = !append_stmts;
   }
 
-and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmts:out_append_stmts ~loc ~ty_var _match =
+and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmts:out_append_stmts ~loc:_ ~ty_var _match =
   let open Typedtree.Expression in
   let { match_expr; match_clauses; _ } = _match in
   let transformed_expr = transform_expression ~is_borrow:true env match_expr in
@@ -1643,16 +1580,12 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
   env.tmp_vars_count <- env.tmp_vars_count + 1;
 
   out_prepend_stmts := List.append !out_prepend_stmts
-    [{
-      Ir.Stmt.
-      spec = Expr (
-        Ir.Expr.Assign (
-          (Ident (Ir.SymTemp result_tmp)),
-          Null
-        );
+    [Ir.Stmt.Expr (
+      Ir.Expr.Assign (
+        (Ident (Ir.SymTemp result_tmp)),
+        Null
       );
-      loc = Loc.none;
-    }];
+    )];
 
   let tmp_counter = ref [] in
   let label_name = "done_" ^ (Int.to_string ty_var) in
@@ -1661,7 +1594,7 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
   let is_last_goto stmts =
     let last_opt = List.last stmts in
     match last_opt with
-    | Some { Ir.Stmt. spec = Goto _; _ } -> true
+    | Some (Ir.Stmt.Goto _) -> true
     | _ -> false
   in
 
@@ -1676,13 +1609,10 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
       let i_str = Int32.to_string i in
       let if_test = Ir.Expr.IntValue(I32Binary(BinaryOp.Equal, match_expr, NewInt i_str)) in
       (fun genereator ->
-        let if_stmt = { Ir.Stmt.
-          spec = If {
-            if_test;
-            if_consequent= genereator ~finalizers:[] ();
-            if_alternate = None;
-          };
-          loc = Loc.none;
+        let if_stmt = Ir.Stmt.If {
+          if_test;
+          if_consequent= genereator ~finalizers:[] ();
+          if_alternate = None;
         } in
         [if_stmt]
       )
@@ -1691,13 +1621,10 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
     | Literal (Literal.String(str, _, _)) -> (
       let if_test = Ir.Expr.StringEqUtf8(match_expr, str) in
       (fun genereator ->
-        let if_stmt = { Ir.Stmt.
-          spec = If {
-            if_test;
-            if_consequent= genereator ~finalizers:[] ();
-            if_alternate = None;
-          };
-          loc = Loc.none;
+        let if_stmt = Ir.Stmt.If {
+          if_test;
+          if_consequent= genereator ~finalizers:[] ();
+          if_alternate = None;
         } in
         [if_stmt]
       )
@@ -1711,13 +1638,10 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
           Ir.Expr.IntValue(Not match_expr)
       in
       (fun genereator ->
-        let if_stmt = { Ir.Stmt.
-          spec = If {
-            if_test;
-            if_consequent= genereator ~finalizers:[] ();
-            if_alternate = None;
-          };
-          loc = Loc.none;
+        let if_stmt = Ir.Stmt.If {
+          if_test;
+          if_consequent= genereator ~finalizers:[] ();
+          if_alternate = None;
         } in
         [if_stmt]
       )
@@ -1726,13 +1650,10 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
     | Literal (Literal.Char ch) -> (
       let if_test = Ir.Expr.IntValue(I32Binary(BinaryOp.Equal, match_expr, Ir.Expr.NewChar ch)) in
       (fun genereator ->
-        let if_stmt = { Ir.Stmt.
-          spec = If {
-            if_test;
-            if_consequent= genereator ~finalizers:[] ();
-            if_alternate = None;
-          };
-          loc = Loc.none;
+        let if_stmt = Ir.Stmt.If {
+          if_test;
+          if_consequent= genereator ~finalizers:[] ();
+          if_alternate = None;
         } in
         [if_stmt]
       )
@@ -1753,22 +1674,21 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
         ) in
         let if_test = Ir.Expr.TagEqual(match_expr, enum_ctor.enum_ctor_tag_id) in
         (fun genereator ->
-          let if_stmt = { Ir.Stmt.
-            spec = If {
-              if_test;
-              if_consequent= genereator ~finalizers:[] ();
-              if_alternate = None;
-            };
-            loc = Loc.none;
+          let if_stmt = Ir.Stmt.If {
+            if_test;
+            if_consequent= genereator ~finalizers:[] ();
+            if_alternate = None;
           } in
           [if_stmt]
         )
       ) else ( (* binding local var *)
         let sym = find_variable env name in
-        let assign_stmt = { Ir.Stmt.
-          spec = Expr(Assign(Ident sym, match_expr));
-          loc = Loc.none;
-        } in
+        let assign_stmt = Ir.Stmt.Expr(
+          Assign(
+            Ident sym,
+            match_expr
+          )
+        ) in
         (fun genereator ->
           let acc = genereator ~finalizers:[] () in
           assign_stmt::acc
@@ -1789,17 +1709,16 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
       let match_tmp = env.tmp_vars_count in
       env.tmp_vars_count <- env.tmp_vars_count + 1;
 
-      let open Ir.Expr in
+      let open Ir in
 
-      let assign_stmt = { Ir.Stmt.
-        spec = Expr(Assign(Temp match_tmp, UnionGet(match_expr, 0)));
-        loc = Loc.none;
-      } in
+      let assign_stmt = Stmt.Expr(
+        Expr.Assign(
+          Expr.Temp match_tmp,
+          Expr.UnionGet(match_expr, 0)
+        )
+      ) in
 
-      let release_stmt = { Ir.Stmt.
-        spec = Release(Ir.Expr.Temp match_tmp);
-        loc = Loc.none;
-      } in
+      let release_stmt = Stmt.Release(Ir.Expr.Temp match_tmp) in
       
       let open PMMeta in
       let this_pm: t = fun generator ->
@@ -1817,13 +1736,10 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
               [release_stmt];
             ]
         in
-        let if_stmt = { Ir.Stmt.
-          spec = If {
-            if_test;
-            if_consequent;
-            if_alternate = None;
-          };
-          loc = Loc.none;
+        let if_stmt = Ir.Stmt.If {
+          if_test;
+          if_consequent;
+          if_alternate = None;
         } in
         [if_stmt]
       in
@@ -1839,15 +1755,14 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
           ~f:(fun index elm ->
             let match_tmp = env.tmp_vars_count in
             env.tmp_vars_count <- env.tmp_vars_count + 1;
-            let assign_stmt = { Ir.Stmt.
-              spec = Expr(Assign(Temp match_tmp, TupleGetValue(match_expr, index)));
-              loc = Loc.none;
-            } in
+            let assign_stmt = Stmt.Expr(
+              Assign(
+                Temp match_tmp,
+                TupleGetValue(match_expr, index)
+              )
+            ) in
 
-            let release_stmt = { Ir.Stmt.
-              spec = Release(Expr.Temp match_tmp);
-              loc = Loc.none;
-            } in
+            let release_stmt = Stmt.Release(Expr.Temp match_tmp) in
 
             let child_pm = transform_pattern_to_test (Temp match_tmp) elm in
 
@@ -1903,15 +1818,14 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
           ~f:(fun index elm ->
             let match_tmp = env.tmp_vars_count in
             env.tmp_vars_count <- env.tmp_vars_count + 1;
-            let assign_stmt = { Ir.Stmt.
-              spec = Expr(Assign(Temp match_tmp, ArrayGetValue(match_expr, Expr.IntValue(Expr.NewInt (Int.to_string index)))));
-              loc = Loc.none;
-            } in
+            let assign_stmt = Ir.Stmt.Expr(
+              Assign(
+                Temp match_tmp,
+                ArrayGetValue(match_expr, Expr.IntValue(Expr.NewInt (Int.to_string index)))
+              )
+            ) in
 
-            let release_stmt = { Ir.Stmt.
-              spec = Release(Expr.Temp match_tmp);
-              loc = Loc.none;
-            } in
+            let release_stmt = Ir.Stmt.Release(Expr.Temp match_tmp) in
 
             let child_pm = transform_pattern_to_test (Temp match_tmp) elm in
 
@@ -1927,20 +1841,21 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
           let match_tmp = env.tmp_vars_count in
           env.tmp_vars_count <- env.tmp_vars_count + 1;
 
-          let assign_stmt = { Ir.Stmt.
-            spec = Expr(Assign(
+          let assign_stmt = Ir.Stmt.Expr(
+            Assign(
               Temp match_tmp,
               Call(
                 SymLocal "lc_std_array_slice",
                 Some match_expr,
-                [Expr.NewInt (Int.to_string elm_len); Expr.Call(SymLocal "lc_std_array_get_length", Some match_expr, [])])));
-            loc = Loc.none;
-          } in
+                [
+                  Expr.NewInt (Int.to_string elm_len);
+                  Expr.Call(SymLocal "lc_std_array_get_length", Some match_expr, [])
+                ]
+              )
+            )
+          ) in
 
-          let release_stmt = { Ir.Stmt.
-            spec = Release(Expr.Temp match_tmp);
-            loc = Loc.none;
-          } in
+          let release_stmt = Ir.Stmt.Release(Expr.Temp match_tmp) in
 
           let rest_pm = transform_pattern_to_test (Temp match_tmp) rest_pat in
 
@@ -1971,13 +1886,10 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
               release_stmts;
             ]
         in
-        let if_stmt = { Ir.Stmt.
-          spec = If {
-            if_test = need_test;
-            if_consequent;
-            if_alternate = None;
-          };
-          loc = Loc.none;
+        let if_stmt = Ir.Stmt.If {
+          if_test = need_test;
+          if_consequent;
+          if_alternate = None;
         } in
         [if_stmt]
       in
@@ -1995,22 +1907,16 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
       let saved_tmp_count = env.tmp_vars_count in
       let body = transform_expression ~is_move:true env clause.clause_consequent in
 
-      let done_stmt = { Ir.Stmt.
-        spec = Goto label_name;
-        loc = clause.clause_loc;
-      } in
+      let done_stmt = Ir.Stmt.Goto label_name in
 
       let consequent ~finalizers () : Ir.Stmt.t list = List.concat [
         body.prepend_stmts;
-        [{ Ir.Stmt.
-          spec = Expr (
-            Assign(
-              (Ident (Ir.SymTemp result_tmp)),
-              body.expr
-            )
-          );
-          loc = Loc.none;
-        }];
+        [Ir.Stmt.Expr (
+          Assign(
+            (Ident (Ir.SymTemp result_tmp)),
+            body.expr
+          )
+        )];
         body.append_stmts;
         finalizers;
         [done_stmt];
@@ -2029,10 +1935,7 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
 
   List.iter ~f:transform_clause match_clauses;
 
-  let end_label = { Ir.Stmt.
-    spec = WithLabel(label_name, !prepend_stmts);
-    loc;
-  } in
+  let end_label = Ir.Stmt.WithLabel(label_name, !prepend_stmts) in
   out_prepend_stmts := List.append !out_prepend_stmts [end_label];
 
   (* use the max tmp vars *)
@@ -2055,27 +1958,24 @@ and transform_spreading_init env tmp_id spread_ty_var spread_expr =
   cls_meta.cls_fields
   |> List.map
     ~f:(fun (field_name, _) ->
+    let open Ir in
     let left_value = (
-      Ir.Expr.GetField(
+      Expr.GetField(
         (Temp tmp_id),
         cls_meta.cls_gen_name,
         field_name
       )
     ) in
-    let get_field = Ir.Expr.GetField(spread_expr, cls_meta.cls_gen_name, field_name) in
-    [{ Ir.Stmt.
-      spec = Retain get_field;
-      loc = Loc.none;
-    };
-    { Ir.Stmt.
-      spec = Expr (
+    let get_field = Expr.GetField(spread_expr, cls_meta.cls_gen_name, field_name) in
+    [
+      Stmt.Retain get_field;
+      Stmt.Expr(
         Assign(
           left_value,
           get_field
         )
       );
-      loc = Loc.none;
-    }]
+    ]
   )
   |> List.concat
 
@@ -2224,10 +2124,7 @@ and generate_finalize_stmts scope =
   |> List.rev
   |> List.filter_map
     ~f:(fun sym ->
-      Some { Ir.Stmt.
-        spec = Release (Ident sym);
-        loc = Loc.none;
-      }
+      Some (Ir.Stmt.Release(Ident sym))
     )
 
 (*
@@ -2239,10 +2136,7 @@ and generate_finalize_stmts_function scope =
   |> List.rev
   |> List.filter_map
     ~f:(fun sym ->
-      Some { Ir.Stmt.
-        spec = Release (Ident sym);
-        loc = Loc.none;
-      }
+      Some (Ir.Stmt.Release (Ident sym))
     )
 
 and generate_finalize_stmts_while scope =
@@ -2250,10 +2144,7 @@ and generate_finalize_stmts_while scope =
   |> List.rev
   |> List.filter_map
     ~f:(fun sym ->
-      Some { Ir.Stmt.
-        spec = Release (Ident sym);
-        loc = Loc.none;
-      }
+      Some (Ir.Stmt.Release (Ident sym))
     )
 
 and generate_cls_meta env cls_id gen_name =
@@ -2491,6 +2382,7 @@ and transform_class env cls loc: Ir.Decl.t list =
 and generate_finalizer env name (type_def: Core_type.TypeDef.t) : Ir.Decl.class_finalizer option =
   let generate_release_statements_by_cls_meta type_def =
     let open Core_type.TypeDef in
+    let open Ir in
     let cls_meta = Hashtbl.find_exn env.cls_meta_map type_def.id in
     List.filter_map
       ~f:(fun (field_name, ty_var) ->
@@ -2498,11 +2390,9 @@ and generate_finalizer env name (type_def: Core_type.TypeDef.t) : Ir.Decl.class_
         if Check_helper.type_should_not_release env.ctx field_type then
           None
         else
-          Some {
-            Ir.Stmt.
-            spec = Release (Ir.Expr.RawGetField("ptr", field_name));
-            loc = Loc.none;
-          }
+          Some (
+            Stmt.Release (Expr.RawGetField("ptr", field_name))
+          )
       )
       cls_meta.cls_fields
   in
