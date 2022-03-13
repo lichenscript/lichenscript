@@ -2435,17 +2435,17 @@ LCValue lc_std_string_cmp(LCRuntime* rt, LCCmpType cmp_type, LCValue left, LCVal
     // quick check
     if (cmp_type == LC_CMP_EQ) {
         if (s1->length != s2->length) {
-            return LCFalse;
+            return LC_FALSE;
         }
 
         if (s1->is_wide_char != s2->is_wide_char) {
-            return LCFalse;
+            return LC_FALSE;
         }
         hash1 = s1->hash;
         hash2 = s2->hash;
 
         if (hash1 != 0 && hash2 != 0 && hash1 != hash2) {
-            return LCFalse;
+            return LC_FALSE;
         }
     }
 
@@ -2464,25 +2464,25 @@ LCValue lc_std_string_cmp(LCRuntime* rt, LCCmpType cmp_type, LCValue left, LCVal
 cmp:
     switch (cmp_type) {
     case LC_CMP_EQ:
-        return cmp_result == 0 ? LCTrue : LCFalse;
+        return cmp_result == 0 ? LC_TRUE : LC_FALSE;
 
     case LC_CMP_NEQ:
-        return cmp_result != 0 ? LCTrue : LCFalse;
+        return cmp_result != 0 ? LC_TRUE : LC_FALSE;
 
     case LC_CMP_LT:
-        return cmp_result < 0 ? LCTrue : LCFalse;
+        return cmp_result < 0 ? LC_TRUE : LC_FALSE;
 
     case LC_CMP_LTEQ:
-        return cmp_result <= 0 ? LCTrue : LCFalse;
+        return cmp_result <= 0 ? LC_TRUE : LC_FALSE;
 
     case LC_CMP_GT:
-        return cmp_result > 0 ? LCTrue : LCFalse;
+        return cmp_result > 0 ? LC_TRUE : LC_FALSE;
 
     case LC_CMP_GTEQ:
-        return cmp_result >= 0 ? LCTrue : LCFalse;
+        return cmp_result >= 0 ? LC_TRUE : LC_FALSE;
 
     }
-    return LCFalse;
+    return LC_FALSE;
 }
 
 LCValue lc_std_string_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {

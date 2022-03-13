@@ -151,9 +151,6 @@ struct LCValue {
     int64_t tag;
 };
 
-static LCValue LCTrue = { { .int_val = 1 }, LC_TY_BOOL };
-static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
-
 #define MK_NULL() ((LCValue) { { .int_val = 0 }, LC_TY_NULL })
 #define MK_I32(v) ((LCValue) { { .int_val = v }, LC_TY_I32 })
 #define MK_CHAR(v) ((LCValue) { { .int_val = v }, LC_TY_CHAR })
@@ -162,6 +159,8 @@ static LCValue LCFalse = { { .int_val = 0 }, LC_TY_BOOL };
 #define MK_VARIANT_CLOSED(v) ((LCValue) { { .int_val = v }, (LC_TY_MAX + (v << 6)) })
 #define MK_CLASS_OBJ(obj) ((LCValue){ { .ptr_val = (LCObject*)obj }, LC_TY_CLASS_OBJECT })
 #define MK_UNION(cls_id, v) ((LCValue) { { .int_val = (cls_id << 16) | v }, LC_TY_UNION })
+#define LC_TRUE ((LCValue) { { .int_val = 1 }, LC_TY_BOOL })
+#define LC_FALSE ((LCValue) { { .int_val = 1 }, LC_TY_BOOL })
 #define LC_NOT(v) MK_BOOL(!((v).int_val))
 #define LC_I32_BITNOT(v) MK_I32(~((v).int_val))
 #define LC_I32_EQ(l, r) MK_BOOL((l).int_val == (r).int_val)
