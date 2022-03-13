@@ -203,7 +203,7 @@ and transpile_if env if_spec =
 
 and transpile_statement env decl =
   let open Ir.Stmt in
-  match decl.spec with
+  match decl with
   (* elimiate unused code *)
   | Expr (Ir.Expr.Temp _) 
   | Expr (Ir.Expr.Ident _) -> ()
@@ -752,7 +752,7 @@ and transpile_function_body env (body: Ir.Block.t) =
       ~f:(fun index stmt ->
         let is_last = index = (body_len - 1) in
         if is_last then (
-          match stmt.spec with
+          match stmt with
           | Expr expr -> (
             print_indents env;
             ps env "return ";
