@@ -17,47 +17,63 @@ open Js_of_ocaml
 open Core_kernel
 open Lichenscript_lex
 open Lichenscript_parsing
+open Lichenscript_resolver
 
 module AstMap = Hashtbl.Make(String)
 
-let parse_errors_to_js_error raw_errors =
-  let error_list = Js.array [||] in
+let create dummy_fs =
+  let module R = Resolver.S(
+    struct
 
-  List.iteri
-    ~f:(fun index err ->
-      let err_content = Format.asprintf "%a" Lichenscript_parsing.Parse_error.PP.error err in
+      let is_directory path =
+        let _fun = (Js.Unsafe.coerce dummy_fs)##isDirectory in
+        let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+        Js.to_bool (Js.Unsafe.coerce ret)
 
-      let start = Js.array [||] in
-      Js.array_set start 0 err.perr_loc.start.line;
-      Js.array_set start 1 err.perr_loc.start.column;
+      let is_file path =
+        let _fun = (Js.Unsafe.coerce dummy_fs)##isFile in
+        let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+        Js.to_bool (Js.Unsafe.coerce ret)
 
-      let _end = Js.array [||] in
-      Js.array_set _end 0 err.perr_loc._end.line;
-      Js.array_set _end 1 err.perr_loc._end.column;
+      let get_realpath path =
+        let _fun = (Js.Unsafe.coerce dummy_fs)##getRealPath in
+        let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+        Js.to_string (Js.Unsafe.coerce ret)
 
-      let err_obj = object%js
-        val start = start
-        val _end = _end
-        val line = err.perr_loc.start.line
-        val column = err.perr_loc.start.column
-        val source =
-          match err.perr_loc.source with
-          | Some source ->
-            let source_str = Format.asprintf "%a" Lichenscript_lex.File_key.pp source in
-            Js.string source_str
-          | None -> Js.string ""
-        val content = Js.string err_content
+      let ls_dir path =
+        let _fun = (Js.Unsafe.coerce dummy_fs)##lsDir in
+        let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+        let ret_arr = Js.to_array (Js.Unsafe.coerce ret) in
+        ret_arr
+        |> Array.to_list
+        |> List.map ~f:Js.to_string
 
-      end in
-      Js.array_set error_list index err_obj
-    )
-    raw_errors;
+      let mkdir_p path =
+        let _fun = (Js.Unsafe.coerce dummy_fs)##mkdirRecursive in
+        let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+        ignore ret
 
-  let js_err = new%js Js.error_constr (Js.string "ParseError") in
-  Js.Unsafe.set js_err (Js.string "errors") error_list;
-  Js_error.of_error js_err
+      let file_exists path =
+        let _fun = (Js.Unsafe.coerce dummy_fs)##fileExists in
+        let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+        Js.to_bool (Js.Unsafe.coerce ret)
 
-let create () =
+      let read_file_content path =
+        let _fun = (Js.Unsafe.coerce dummy_fs)##readFileContent in
+        let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+        Js.to_string (Js.Unsafe.coerce ret)
+
+      let write_file_content path ~data =
+        let _fun = (Js.Unsafe.coerce dummy_fs)##writeFileContent in
+        let ret = Js.Unsafe.call _fun Js.undefined [|
+          Js.Unsafe.coerce (Js.string path);
+          Js.Unsafe.coerce (Js.string data);
+        |] in
+        ignore ret
+    
+    end
+  ) in
+
   let ast_map = AstMap.create () in
   object%js
 
@@ -72,7 +88,7 @@ let create () =
       )
 
       | Result.Error raw_errors -> (
-        let err = parse_errors_to_js_error raw_errors in
+        let err = Utils.parse_errors_to_js_error raw_errors in
         Js_error.raise_ err
       )
 
