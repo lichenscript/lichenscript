@@ -82,7 +82,8 @@ let _ =
   Js.export_all
     (object%js
 
-    method createIntellisenseInstance = Intellisense.create()
+    method createIntellisenseInstance dummy_fs =
+      Intellisense.create dummy_fs
 
     method compile str =
       let module R = Resolver.S (JsFS) in
@@ -170,7 +171,7 @@ let _ =
       )
 
       | ParseError raw_errors -> (
-        let err = Intellisense.parse_errors_to_js_error raw_errors in
+        let err = Utils.parse_errors_to_js_error raw_errors in
         Js_error.raise_ err
       )
 
