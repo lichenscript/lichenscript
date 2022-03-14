@@ -82,8 +82,8 @@ let _ =
   Js.export_all
     (object%js
 
-    method createIntellisenseInstance dummy_fs =
-      Intellisense.create dummy_fs
+    method createIntellisenseInstance dummy_fs config =
+      Intellisense.create dummy_fs config
 
     method compile str =
       let module R = Resolver.S (JsFS) in

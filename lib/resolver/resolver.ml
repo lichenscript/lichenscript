@@ -56,7 +56,6 @@ module S (FS: FSProvider) = struct
   type t = {
     (* absolute path => module *)
     linker: Linker.t;
-    find_paths: string list;
     config: config;
     mutable before_eval_fun_call: string list;
   }
@@ -67,11 +66,10 @@ module S (FS: FSProvider) = struct
     profile_exe_path: string;
   }
 
-  let create ~find_paths ~prog ~config () =
+  let create ~prog ~config () =
     let linker = Linker.create ~prog () in
     {
       linker;
-      find_paths;
       config;
       before_eval_fun_call = [];
     }
@@ -223,7 +221,7 @@ module S (FS: FSProvider) = struct
     let imports_map = Hashtbl.create (module String) in
 
     let find_path source =
-      let find_paths = mod_path::(env.find_paths) in
+      let find_paths = mod_path::(env.config.find_paths) in
       List.find_map
         ~f:(fun path ->
             if Filename.is_absolute source then
@@ -459,11 +457,11 @@ module S (FS: FSProvider) = struct
   * Annotated parsed tree remain the "holes" to type check
   *)
   let rec compile_file_path ~config entry_file_path : profile list =
-    let { find_paths; build_dir; runtime_dir; platform; verbose; wasm_standalone } = config in
+    let { build_dir; runtime_dir; platform; verbose; wasm_standalone; _ } = config in
     try
       (* ctx is a typing context for all modules *)
       let prog = Lichenscript_typing.Program.create () in
-      let env = create ~find_paths ~prog ~config () in
+      let env = create ~prog ~config () in
 
       (* parse the entry dir *)
       let dir_of_entry = Filename.dirname entry_file_path in
