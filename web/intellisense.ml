@@ -17,11 +17,18 @@ open Js_of_ocaml
 open Core_kernel
 open Lichenscript_lex
 open Lichenscript_parsing
+open Lichenscript_typing
 open Lichenscript_resolver
 
 module AstMap = Hashtbl.Make(String)
 
-let create dummy_fs =
+let js_find_path config =
+  let find_path_array = (Js.Unsafe.coerce config)##findPaths |> Js.to_array in
+  find_path_array
+  |> Array.map ~f:Js.to_string
+  |> Array.to_list
+
+let create dummy_fs config =
   let module R = Resolver.S(
     struct
 
@@ -73,6 +80,21 @@ let create dummy_fs =
     
     end
   ) in
+
+  let runtime_dir = (Js.Unsafe.coerce config)##runtimedir |> Js.to_string in
+
+  let config = { R.
+    find_paths = js_find_path config;
+    build_dir = None;
+    runtime_dir;
+    platform = "native";
+    verbose = false;
+    wasm_standalone = false;
+  } in
+
+  let prog = Program.create () in
+
+  let _resolver = R.create ~prog ~config () in
 
   let ast_map = AstMap.create () in
   object%js

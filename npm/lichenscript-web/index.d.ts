@@ -10,6 +10,11 @@ export interface FSProvider {
   writeFileContent(path: string): void;
 }
 
+export interface Config {
+  findPaths: string[];
+  runtimeDir: string;
+}
+
 export interface IntellisenseInstantce {
   parseAndCacheWillThrow(path: string, content: string): void;
   deleteFile(path: string): void;
@@ -17,4 +22,5 @@ export interface IntellisenseInstantce {
 
 export function compile(content: string): string;
 
-export function createIntellisenseInstance(provider: FSProvider): IntellisenseInstantce;
+export function createIntellisenseInstance(
+  provider: FSProvider, config: Config): IntellisenseInstantce;
