@@ -21,6 +21,12 @@ open Lichenscript_resolver.Resolver
 open Lichenscript_common.Cli_utils
 open Core
 
+let env_get_runtime_path () =
+  Sys.getenv_exn "LSC_RUNTIME"
+
+let env_get_std_path () =
+  Sys.getenv_exn "LSC_STD"
+
 let help_message = {|
 |} ^ TermColor.bold ^ "Usage:" ^ TermColor.reset ^ {|
 lsc <command> [<args>]
@@ -30,7 +36,10 @@ lsc <command> [<args>]
   run
 
 |} ^ TermColor.bold ^ "Options:" ^ TermColor.reset ^ {|
-  -v, --version                    Print the version of the compiler
+  -v, --version                Print the version of the compiler
+  --search-paths               Show the search paths
+  --runtime-path               Print the path of the runtime
+  --std-path                   Print the path of the standar library
   -h, --help                   Show help message
 
 |}
@@ -48,7 +57,6 @@ lsc build <entry> [<args>]
   --platform <platform>        native/wasm32/js, default: native
   --mode <debug|release>       Choose the mode of debug/release
   --verbose, -V                Print verbose log
-  --search-paths               Show the search paths
   --standalone-wasm <executor> Build the standalone wasm, specify the executor
   -h, --help                   Show help message of build command
 
@@ -76,9 +84,31 @@ let rec main () =
   | "build" -> ignore (build_command args index)
   | "run" -> build_and_run args index
 
+  | "--search-paths" -> (
+    let current_dir = Unix.getcwd () in
+    let paths = Search_path.get_search_path_from_node current_dir in
+    List.iter
+      ~f:(fun path -> printf "%s\n" path)
+      paths;
+    ignore (exit 0)
+  )
+
+  | "--runtime-path" -> (
+    let path = env_get_runtime_path () in
+    print_endline path;
+    ignore (exit 0)
+  )
+
+  | "--std-path" -> (
+    let path = env_get_std_path () in
+    print_endline path;
+    ignore (exit 0)
+  )
+
   | "-h" | "--help" ->
     Format.printf "%s" help_message;
     ignore (exit 0)
+
   | "-v" | "--version" ->
     Format.printf "%s\n" Version.version;
     ignore (exit 0)
@@ -103,7 +133,7 @@ and build_command args index : build_result option =
     None
   ) else 
     let entry = ref None in
-    let buildDir = ref None in
+    let build_dir = ref None in
     let wasm_standalone = ref None in
     let mode = ref "debug" in
     let verbose = ref false in
@@ -133,21 +163,12 @@ and build_command args index : build_result option =
       | "-V" | "--verbose" ->
         verbose := true
 
-      | "--search-paths" -> (
-        let current_dir = Unix.getcwd () in
-        let paths = Search_path.get_search_path_from_node current_dir in
-        List.iter
-          ~f:(fun path -> printf "%s\n" path)
-          paths;
-        ignore (exit 0)
-      )
-
       | "--build-dir" | "-D" -> (
         if !index >= (Array.length args) then (
           Format.printf "not enough args for %s\n" item;
           ignore (exit 2)
         );
-        buildDir := Some (Array.get args !index);
+        build_dir := Some (Array.get args !index);
         index := !index + 1;
       )
 
@@ -187,9 +208,9 @@ and build_command args index : build_result option =
       ignore (exit 2);
       None
     ) else (
-      let std = Sys.getenv_exn "LSC_STD" in
-      let runtimeDir = Sys.getenv_exn "LSC_RUNTIME" in
-      build_entry (Option.value_exn !entry) std !buildDir runtimeDir !mode !verbose !platform !wasm_standalone
+      let std = env_get_std_path () in
+      let runtime_dir = env_get_runtime_path () in
+      build_entry (Option.value_exn !entry) std !build_dir runtime_dir !mode !verbose !platform !wasm_standalone
     )
 
 and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platform wasm_standalone: build_result option =

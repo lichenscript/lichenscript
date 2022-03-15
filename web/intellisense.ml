@@ -23,7 +23,7 @@ open Lichenscript_resolver
 module AstMap = Hashtbl.Make(String)
 
 let js_find_path config =
-  let find_path_array = (Js.Unsafe.coerce config)##findPaths |> Js.to_array in
+  let find_path_array = (Js.Unsafe.coerce config)##.findPaths |> Js.to_array in
   find_path_array
   |> Array.map ~f:Js.to_string
   |> Array.to_list
@@ -81,7 +81,7 @@ let create dummy_fs config =
     end
   ) in
 
-  let runtime_dir = (Js.Unsafe.coerce config)##runtimedir |> Js.to_string in
+  let runtime_dir = (Js.Unsafe.coerce config)##.runtimeDir |> Js.to_string in
 
   let config = { R.
     find_paths = js_find_path config;
