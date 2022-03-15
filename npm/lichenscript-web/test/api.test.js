@@ -49,7 +49,10 @@ describe('Compiler', function () {
 describe('Intellisense', function() {
 
   it('createInstance', function() {
-    const instance = lichenscript.createIntellisenseInstance();
+    const instance = lichenscript.createIntellisenseInstance({}, {
+      findPaths: [],
+      runtimeDir: "",
+    });
     assert.strictEqual(typeof instance, 'object');
   });
 
