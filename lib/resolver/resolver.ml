@@ -187,6 +187,41 @@ module S (FS: FSProvider) = struct
       failwith (Format.sprintf "unexpected: can not find mod %s" mod_path)
     )
 
+  let preclude_std_for_imports (ast: Parser.parse_result) =
+    let open Ast in
+    let collected_imports =
+    List.fold
+      ~init:[]
+      ~f:(fun acc item ->
+        let open Ast.Declaration in
+        match item.spec with
+        | Import import -> import::acc
+        | _ -> acc
+      )
+      ast.tree.pprogram_declarations
+    in
+    let preclude = { Ast.Import.
+      spec = Some ImportAll;
+      source = "std/preclude";
+      source_loc = Loc.none;
+    } in
+    List.rev (preclude::collected_imports)
+
+  let resolve_import_path env ~mod_path source =
+    let find_paths = mod_path::(env.config.find_paths) in
+    List.find_map
+      ~f:(fun path ->
+        if Filename.is_absolute source then
+          Some (source, source)
+        else (
+          let path = Filename.concat path source in
+          if FS.is_directory path then (
+            Some (FS.get_realpath path, source)
+          ) else None
+        )
+      )
+      find_paths
+
   let rec compile_file_to_path ~prog ~mod_path env _mod path =
     let file_content = FS.read_file_content path in
     let file_key = File_key.LibFile path in
@@ -197,44 +232,12 @@ module S (FS: FSProvider) = struct
         raise (ParseError errors)
     in
 
-    let imports = Ast.(
-      let collected_imports =
-      List.fold
-        ~init:[]
-        ~f:(fun acc item ->
-          let open Ast.Declaration in
-          match item.spec with
-          | Import import -> import::acc
-          | _ -> acc
-        )
-        ast.tree.pprogram_declarations
-      in
-      let preclude = { Ast.Import.
-        spec = Some ImportAll;
-        source = "std/preclude";
-        source_loc = Loc.none;
-      } in
-      List.rev (preclude::collected_imports)
-    ) in
+    let imports = preclude_std_for_imports ast in
 
     let import_star_external_modules = ref [] in
     let imports_map = Hashtbl.create (module String) in
 
-    let find_path source =
-      let find_paths = mod_path::(env.config.find_paths) in
-      List.find_map
-        ~f:(fun path ->
-            if Filename.is_absolute source then
-              Some (source, source)
-            else (
-              let path = Filename.concat path source in
-              if FS.is_directory path then (
-                Some (FS.get_realpath path, source)
-              ) else None
-            )
-        )
-        find_paths
-    in
+    let find_path = resolve_import_path env ~mod_path in
 
     let handle_import_lc_module import spec =
       let open Ast.Import in

@@ -1,7 +1,24 @@
 open Core_kernel
 open Js_of_ocaml
+open Lichenscript_parsing
 
-let parse_errors_to_js_error raw_errors =
+let parse_error_to_diagnostic err =
+  let err_content = Format.asprintf "%a" Lichenscript_parsing.Parse_error.PP.error err in
+  Js_helper.mk_diagnostic ~loc:err.perr_loc Js_helper.Error err_content
+
+let parse_errors_to_js_array (raw_errors: Parse_error.t list) =
+  let error_list = new%js Js.array_empty in
+
+  List.iteri
+    ~f:(fun index err ->
+      let d = parse_error_to_diagnostic err in
+      Js.array_set error_list index d
+    )
+    raw_errors;
+
+  error_list
+
+let parse_errors_to_js_error (raw_errors: Parse_error.t list) =
   let error_list = Js.array [||] in
 
   List.iteri

@@ -54,6 +54,24 @@ describe('Intellisense', function() {
       runtimeDir: "",
     });
     assert.strictEqual(typeof instance, 'object');
+    let arr = instance.parseAndCache("/some_path", `
+      import "xxx";
+
+      function main() {
+        print("Hello World");
+      }
+    `);
+    assert.strictEqual(Array.isArray(arr), true);
+    assert.strictEqual(arr.length === 0, true);
+    arr = instance.parseAndCache("/some_path", `
+      import "xxx;
+
+      function main() {
+        print("Hello World");
+      }
+    `);
+    assert.strictEqual(Array.isArray(arr), true);
+    assert.strictEqual(arr.length > 0, true);
   });
 
 });
