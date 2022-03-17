@@ -19,6 +19,11 @@ export interface CodeDescription {
   href: string;
 }
 
+export interface Location {
+  uri: string;
+  range: Range;
+}
+
 export interface DiagnosticRelatedInformation {
   location: Location;
   message: string;

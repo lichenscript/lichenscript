@@ -33,49 +33,38 @@ let js_find_path config =
 let create dummy_fs config =
   let module FS = struct
     let is_directory path =
-      let _fun = (Js.Unsafe.coerce dummy_fs)##isDirectory in
-      let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+      let ret = (Js.Unsafe.coerce dummy_fs)##isDirectory (Js.string path) in
       Js.to_bool (Js.Unsafe.coerce ret)
 
     let is_file path =
-      let _fun = (Js.Unsafe.coerce dummy_fs)##isFile in
-      let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+      let ret = (Js.Unsafe.coerce dummy_fs)##isFile (Js.string path) in
       Js.to_bool (Js.Unsafe.coerce ret)
 
     let get_realpath path =
-      let _fun = (Js.Unsafe.coerce dummy_fs)##getRealPath in
-      let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+      let ret = (Js.Unsafe.coerce dummy_fs)##getRealPath (Js.string path) in
       Js.to_string (Js.Unsafe.coerce ret)
 
     let ls_dir path =
-      let _fun = (Js.Unsafe.coerce dummy_fs)##lsDir in
-      let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+      let ret = (Js.Unsafe.coerce dummy_fs)##lsDir (Js.string path) in
       let ret_arr = Js.to_array (Js.Unsafe.coerce ret) in
       ret_arr
       |> Array.to_list
       |> List.map ~f:Js.to_string
 
     let mkdir_p path =
-      let _fun = (Js.Unsafe.coerce dummy_fs)##mkdirRecursive in
-      let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+      let ret = (Js.Unsafe.coerce dummy_fs)##mkdirRecursive (Js.string path) in
       ignore ret
 
     let file_exists path =
-      let _fun = (Js.Unsafe.coerce dummy_fs)##fileExists in
-      let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+      let ret = (Js.Unsafe.coerce dummy_fs)##fileExists (Js.string path) in
       Js.to_bool (Js.Unsafe.coerce ret)
 
     let read_file_content path =
-      let _fun = (Js.Unsafe.coerce dummy_fs)##readFileContent in
-      let ret = Js.Unsafe.call _fun Js.undefined [| Js.Unsafe.coerce (Js.string path); |] in
+      let ret = (Js.Unsafe.coerce dummy_fs)##readFileContent (Js.string path) in
       Js.to_string (Js.Unsafe.coerce ret)
 
     let write_file_content path ~data =
-      let _fun = (Js.Unsafe.coerce dummy_fs)##writeFileContent in
-      let ret = Js.Unsafe.call _fun Js.undefined [|
-        Js.Unsafe.coerce (Js.string path);
-        Js.Unsafe.coerce (Js.string data);
-      |] in
+      let ret = (Js.Unsafe.coerce dummy_fs)##writeFileContent (Js.string path) (Js.string data) in
       ignore ret
   end in
 
