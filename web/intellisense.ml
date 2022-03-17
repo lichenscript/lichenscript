@@ -30,51 +30,51 @@ let js_find_path config =
   |> Array.map ~f:Js.to_string
   |> Array.to_list
 
-let create dummy_fs config =
+let create dummy_fs js_config =
   let module FS = struct
     let is_directory (path: string) =
-      let ret = (Js.Unsafe.coerce dummy_fs)##isDirectory path in
+      let ret = (Js.Unsafe.coerce dummy_fs)##isDirectory (Js.string path) in
       Js.to_bool (Js.Unsafe.coerce ret)
 
     let is_file (path: string) =
-      let ret = (Js.Unsafe.coerce dummy_fs)##isFile path in
+      let ret = (Js.Unsafe.coerce dummy_fs)##isFile (Js.string path) in
       Js.to_bool (Js.Unsafe.coerce ret)
 
     let get_realpath (path: string) =
-      let ret = (Js.Unsafe.coerce dummy_fs)##getRealPath path in
+      let ret = (Js.Unsafe.coerce dummy_fs)##getRealPath (Js.string path) in
       Js.to_string (Js.Unsafe.coerce ret)
 
     let ls_dir (path: string) =
-      let ret = (Js.Unsafe.coerce dummy_fs)##lsDir path in
+      let ret = (Js.Unsafe.coerce dummy_fs)##lsDir (Js.string path) in
       let ret_arr = Js.to_array (Js.Unsafe.coerce ret) in
       ret_arr
       |> Array.to_list
       |> List.map ~f:Js.to_string
 
     let mkdir_p (path: string) =
-      let ret = (Js.Unsafe.coerce dummy_fs)##mkdirRecursive path in
+      let ret = (Js.Unsafe.coerce dummy_fs)##mkdirRecursive (Js.string path) in
       ignore ret
 
     let file_exists (path: string) =
-      let ret = (Js.Unsafe.coerce dummy_fs)##fileExists path in
+      let ret = (Js.Unsafe.coerce dummy_fs)##fileExists (Js.string path) in
       Js.to_bool (Js.Unsafe.coerce ret)
 
     let read_file_content (path: string) =
-      let ret = (Js.Unsafe.coerce dummy_fs)##readFileContent path in
+      let ret = (Js.Unsafe.coerce dummy_fs)##readFileContent (Js.string path) in
       Js.to_string (Js.Unsafe.coerce ret)
 
     let write_file_content (path: string) ~(data: string) =
-      let ret = (Js.Unsafe.coerce dummy_fs)##writeFileContent path data in
+      let ret = (Js.Unsafe.coerce dummy_fs)##writeFileContent (Js.string path) (Js.string data) in
       ignore ret
 
   end in
 
   let module R = Resolver.S(FS) in
 
-  let runtime_dir = (Js.Unsafe.coerce config)##.runtimeDir |> Js.to_string in
+  let runtime_dir = (Js.Unsafe.coerce js_config)##.runtimeDir |> Js.to_string in
 
   let config = { R.
-    find_paths = js_find_path config;
+    find_paths = js_find_path js_config;
     build_dir = None;
     runtime_dir;
     platform = "native";
@@ -82,19 +82,21 @@ let create dummy_fs config =
     wasm_standalone = false;
   } in
 
-  let prog = Program.create () in
+  let prog = ref (Program.create ()) in
 
-  let resolver = R.create ~prog ~config () in
+  let resolver = ref (R.create ~prog:!prog ~config ()) in
 
   let ast_map = AstMap.create () in
 
-  let rec annotate_module_by_dir ~diagnostics dir first_source =
+  let rec annotate_module_by_dir ~diagnostics dir _first_source =
     let iterate_file mod_path =
       let open R in
-      let module_scope = new module_scope ~prev:(Program.root_scope prog) () in
-      let is_std = String.equal first_source "std/preclude" in
+      let module_scope = new module_scope ~prev:(Program.root_scope !prog) () in
+
+      let preclude_path = (Js.Unsafe.coerce js_config)##.precludeDir |> Js.to_string in
+      let is_std = String.is_substring_at dir ~pos:0 ~substring:preclude_path in
       let _mod = Module.create ~full_path:mod_path ~is_std ~module_scope () in
-      Linker.set_module resolver.linker mod_path _mod;
+      Linker.set_module (!resolver).linker mod_path _mod;
       let children = FS.ls_dir mod_path in
       List.iter
         ~f:(fun item ->
@@ -113,7 +115,7 @@ let create dummy_fs config =
         children;
       Module.finalize_module_exports _mod;
     in
-    if not (Linker.has_module resolver.linker dir) then (
+    if not (Linker.has_module (!resolver).linker dir) then (
       iterate_file dir
     ) else ()
 
@@ -126,7 +128,7 @@ let create dummy_fs config =
       let import_star_external_modules = ref [] in
       let imports_map = Hashtbl.create (module String) in
 
-      let find_path = R.resolve_import_path resolver ~mod_path in
+      let find_path = R.resolve_import_path !resolver ~mod_path in
 
       let handle_import_lc_module import spec =
         let open Ast.Import in
@@ -205,14 +207,14 @@ let create dummy_fs config =
       let import_star_external_modules = List.rev !import_star_external_modules in
 
       let module_scope = Module.module_scope _mod in
-      let file_scope = new R.file_scope ~prev:module_scope resolver import_star_external_modules in
+      let file_scope = new R.file_scope ~prev:module_scope !resolver import_star_external_modules in
       (* parse and create env, do annotation when all files are parsed
       * because annotation stage needs all exported symbols are resolved
       *)
       let typed_env = Lichenscript_typing.Env.create
         ~file_scope
-        ~external_resolver:(R.external_resolver resolver imports_map)
-        prog
+        ~external_resolver:(R.external_resolver !resolver imports_map)
+        !prog
       in
 
       (* add all top level symbols to typed_env *)
@@ -228,7 +230,7 @@ let create dummy_fs config =
           imports_map;
         }
       in
-      R.insert_moudule_file resolver ~mod_path file
+      R.insert_moudule_file !resolver ~mod_path file
 
     in
     let ast_opt = AstMap.find ast_map path in
@@ -277,10 +279,14 @@ let create dummy_fs config =
 
     method typecheckDir dir =
       let result = ref [] in
-      try
+
+      prog := Program.create ();
+      resolver := R.create ~prog:!prog ~config ();
+
+      (try
+        let dir = Js.to_string dir in
         annotate_module_by_dir ~diagnostics:result dir dir;
-        R.typecheck_all_modules ~prog ~verbose:false resolver;
-        List.rev !result
+        R.typecheck_all_modules ~prog:!prog ~verbose:false !resolver;
       with
       | Diagnosis.Error e -> (
         let ser =
@@ -297,12 +303,14 @@ let create dummy_fs config =
         in
         let js_diagnostic = Js_helper.mk_diagnostic ~loc:(e.loc) ser content in
         result := js_diagnostic::(!result);
-        List.rev !result
       )
 
-      | Abort -> (
-        List.rev !result
-      )
+      | Abort -> ());
+
+      !result
+      |> List.rev 
+      |> List.to_array
+      |> Js.array
 
     method deleteFile path =
       AstMap.remove ast_map path

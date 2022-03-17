@@ -55,6 +55,7 @@ export interface FSProvider {
 export interface Config {
   findPaths: string[];
   runtimeDir: string;
+  precludeDir: string;
 }
 
 export interface IntellisenseInstantce {
