@@ -169,7 +169,7 @@ let js_id_continue =
   [%sedlex.regexp? '$' | '_' | 0x200C | 0x200D | id_continue | unicode_escape | codepoint_escape]
 
 let pos_at_offset env offset =
-  { Loc.line = Lex_env.line env; column = offset - Lex_env.bol_offset env }
+  { Loc.line = Lex_env.line env; column = offset - Lex_env.bol_offset env; offset }
 
 let loc_of_offsets env start_offset end_offset =
   {
@@ -238,7 +238,9 @@ let mk_comment
     (buf : Buffer.t)
     (multiline : bool) : Loc.t Comment.t =
   let open Comment in
-  let loc = { Loc.source = Lex_env.source env; start; _end } in
+  let loc = {
+    Loc.source = Lex_env.source env; start; _end
+  } in
   let text = Buffer.contents buf in
   let kind =
     if multiline then
@@ -412,10 +414,10 @@ let rec line_comment env buf lexbuf =
   match%sedlex lexbuf with
   | eof -> (env, end_pos_of_lexbuf env lexbuf)
   | line_terminator_sequence ->
-    let { Loc.line; column } = end_pos_of_lexbuf env lexbuf in
+    let { Loc.line; column; offset } = end_pos_of_lexbuf env lexbuf in
     let env = new_line env lexbuf in
     let len = Sedlexing.lexeme_length lexbuf in
-    let end_pos = { Loc.line; column = column - len } in
+    let end_pos = { Loc.line; column = column - len; offset = offset - len } in
     (env, end_pos)
   (* match multi-char substrings that don't contain the start chars of the above patterns *)
   | Plus (Compl (eof | line_terminator_sequence_start))

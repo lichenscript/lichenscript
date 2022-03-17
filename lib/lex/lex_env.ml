@@ -22,7 +22,10 @@ let empty_lex_state = { lex_errors_acc = [] }
 (* The lex_last_loc should initially be set to the beginning of the first line, so that
    comments on the first line are reported as not being on a new line. *)
 let initial_last_loc =
-  { Loc.source = None; start = { Loc.line = 1; column = 0 }; _end = { Loc.line = 1; column = 0 } }
+  { Loc.source = None;
+    start = { Loc.line = 1; column = 0; offset = 0 };
+    _end = { Loc.line = 1; column = 0; offset = 0 };
+  }
 
 let new_lex_env lex_source lex_lb ~enable_types_in_comments =
   {

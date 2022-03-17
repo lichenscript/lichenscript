@@ -16,6 +16,7 @@ type t = {
   root_scope: scope;
   declarations: (int, Typedtree.Declaration.t) Hashtbl.t;
   mutable root_class: root_class option;
+  reverse_symbol: ReverseSymbol.t option;
 }
 
 let size ctx = ResizableArray.size ctx.ty_map
@@ -55,13 +56,20 @@ let make_default_type_sym ctx scope =
     )
     names
 
-let create () =
+let create ~reverse_symbol () =
   let root_scope = new scope () in
+  let reverse_symbol =
+    if reverse_symbol then
+      Some (ReverseSymbol.create ())
+    else
+      None
+  in
   let ctx = {
     ty_map = ResizableArray.make 1024;
     external_symbol = Hashtbl.create (module Int);
     root_scope;
     declarations = Hashtbl.create (module Int);
+    reverse_symbol;
     root_class = None;
   } in
   make_default_type_sym ctx root_scope;

@@ -82,7 +82,7 @@ let create dummy_fs js_config =
     wasm_standalone = false;
   } in
 
-  let prog = ref (Program.create ()) in
+  let prog = ref (Program.create ~reverse_symbol:true ()) in
 
   let resolver = ref (R.create ~prog:!prog ~config ()) in
 
@@ -280,7 +280,7 @@ let create dummy_fs js_config =
     method typecheckDir dir =
       let result = ref [] in
 
-      prog := Program.create ();
+      prog := Program.create ~reverse_symbol:true ();
       resolver := R.create ~prog:!prog ~config ();
 
       (try

@@ -2,6 +2,7 @@
 type position = {
   line: int;
   column: int;
+  offset: int;
 }
 
 type t = {
@@ -14,7 +15,7 @@ val none : t
 
 val btwn : t -> t -> t
 
-val mk_pos: int -> int -> position
+val mk_pos: int -> int -> int -> position
 
 val source : t -> File_key.t option
 

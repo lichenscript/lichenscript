@@ -463,7 +463,7 @@ module S (FS: FSProvider) = struct
     let { build_dir; runtime_dir; platform; verbose; wasm_standalone; _ } = config in
     try
       (* ctx is a typing context for all modules *)
-      let prog = Lichenscript_typing.Program.create () in
+      let prog = Lichenscript_typing.Program.create ~reverse_symbol:false () in
       let env = create ~prog ~config () in
 
       (* parse the entry dir *)
