@@ -61,6 +61,7 @@ export interface Config {
 export interface IntellisenseInstantce {
   parseAndCache(path: string, content: string): Diagnostic[];
   typecheckDir(path: string): Diagnostic[];
+  findDefinition(path: string, offset: number): Location | undefined;
   deleteFile(path: string): void;
 }
 

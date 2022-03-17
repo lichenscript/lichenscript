@@ -39,7 +39,8 @@ let mk_diagnostic ~loc severity message =
     val source =
       match loc.source with
       | Some path ->
-        Js.def (Js.string (File_key.show path))
+        let path_str = Format.asprintf "%a" File_key.pp path in
+        Js.def (Js.string path_str)
       | None -> Js.undefined
 
     val message = Js.string message

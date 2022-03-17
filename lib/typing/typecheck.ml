@@ -341,15 +341,21 @@ and check_expression env expr =
   | Identifier (_, name_id) -> (
     let node = Program.get_node env.ctx name_id in
     let test_typedef = Check_helper.find_typedef_of env.ctx node.value in
-    Option.iter
-      ~f:(fun typedef ->
-        match typedef with
-        | { id; spec = EnumCtor { enum_ctor_params = []; _ }; _ } -> (
-          Program.update_node_type env.ctx name_id (TypeExpr.Ctor(Ref id, []))
-        )
-        | _ -> ()
+    match test_typedef with
+    | Some typedef -> (
+      match typedef with
+      | { id; spec = EnumCtor { enum_ctor_params = []; _ }; _ } -> (
+        Program.update_node_type env.ctx name_id (TypeExpr.Ctor(Ref id, []));
+        Program.log env.ctx expr_loc id
       )
-      test_typedef
+      | _ -> (
+        Program.log env.ctx expr_loc name_id
+      )
+    )
+
+    | None -> (
+      Program.log env.ctx expr_loc name_id
+    )
   )
 
   | Lambda lambda -> check_lambda env lambda
@@ -592,18 +598,22 @@ and check_expression env expr =
     let handle_member_typpe expr_node member_type_opt =
       let open Core_type.TypeExpr in
       match member_type_opt with
-      | Some (Method({ TypeDef. spec = ClassMethod { method_get_set = Some _; method_return; _ }; _ }, _params, _rt), _) -> (
-        Program.update_node_type env.ctx expr.ty_var method_return
+      | Some (Method({ TypeDef. id; spec = ClassMethod { method_get_set = Some _; method_return; _ }; _ }, _params, _rt), _) -> (
+        Program.update_node_type env.ctx expr.ty_var method_return;
+        Program.log env.ctx name.pident_loc id
       )
 
-      | Some (Method({ TypeDef. spec = ClassMethod { method_get_set = None; _ }; _ }, _params, _rt), _) -> (
+      | Some (Method({ id; TypeDef. spec = ClassMethod { method_get_set = None; _ }; _ }, _params, _rt), _) -> (
         let ty, _ = Option.value_exn member_type_opt in
-        Program.update_node_type env.ctx expr.ty_var ty
+        Program.update_node_type env.ctx expr.ty_var ty;
+        Program.log env.ctx name.pident_loc id
       )
 
       (* it's a property *) 
-      | Some (ty_expr, _) ->
-        Program.update_node_type env.ctx expr.ty_var ty_expr
+      | Some (ty_expr, id) -> (
+        Program.update_node_type env.ctx expr.ty_var ty_expr;
+        Program.log env.ctx name.pident_loc id
+      )
 
       | None ->
         let err = Diagnosis.(make_error env.ctx expr_loc (CannotReadMember(name.pident_name, expr_node.value))) in

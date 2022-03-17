@@ -72,4 +72,4 @@ let find_symbol env path offset =
     )
   in
   let find_end = Array.length sorted_symbol in
-  find_symbol_in_sorted_array sorted_symbol 0 find_end offset
+  find_symbol_in_sorted_array sorted_symbol 0 (find_end - 1) offset

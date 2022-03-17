@@ -312,6 +312,29 @@ let create dummy_fs js_config =
       |> List.to_array
       |> Js.array
 
+    method findDefinition path offset =
+      let path = Js.to_string path in
+      let reverse_map = Option.value_exn (!prog).reverse_symbol in
+      let result = ReverseSymbol.find_symbol reverse_map path offset in
+      match result with
+      | Some ty_var -> (
+        let node = Program.get_node !prog ty_var in
+        let node_loc = node.loc in
+        let path = Format.asprintf "%a" File_key.pp (Option.value_exn node_loc.source) in
+        let definition =
+          object%js
+
+            val uri = Js.string ("file://" ^ path)
+
+            val range = Js_helper.mk_range node_loc
+
+          end
+        in
+        Js.def definition
+      )
+
+      | None -> Js.undefined
+
     method deleteFile path =
       AstMap.remove ast_map path
 

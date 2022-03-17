@@ -257,3 +257,9 @@ let print ctx =
   done
 
 let root_scope ctx = ctx.root_scope
+
+let log ctx loc id =
+  match ctx.reverse_symbol with
+  | Some r ->
+    ReverseSymbol.log r loc id
+  | None -> ()
