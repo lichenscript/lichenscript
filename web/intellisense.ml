@@ -32,40 +32,41 @@ let js_find_path config =
 
 let create dummy_fs config =
   let module FS = struct
-    let is_directory path =
-      let ret = (Js.Unsafe.coerce dummy_fs)##isDirectory (Js.string path) in
+    let is_directory (path: string) =
+      let ret = (Js.Unsafe.coerce dummy_fs)##isDirectory path in
       Js.to_bool (Js.Unsafe.coerce ret)
 
-    let is_file path =
-      let ret = (Js.Unsafe.coerce dummy_fs)##isFile (Js.string path) in
+    let is_file (path: string) =
+      let ret = (Js.Unsafe.coerce dummy_fs)##isFile path in
       Js.to_bool (Js.Unsafe.coerce ret)
 
-    let get_realpath path =
-      let ret = (Js.Unsafe.coerce dummy_fs)##getRealPath (Js.string path) in
+    let get_realpath (path: string) =
+      let ret = (Js.Unsafe.coerce dummy_fs)##getRealPath path in
       Js.to_string (Js.Unsafe.coerce ret)
 
-    let ls_dir path =
-      let ret = (Js.Unsafe.coerce dummy_fs)##lsDir (Js.string path) in
+    let ls_dir (path: string) =
+      let ret = (Js.Unsafe.coerce dummy_fs)##lsDir path in
       let ret_arr = Js.to_array (Js.Unsafe.coerce ret) in
       ret_arr
       |> Array.to_list
       |> List.map ~f:Js.to_string
 
-    let mkdir_p path =
-      let ret = (Js.Unsafe.coerce dummy_fs)##mkdirRecursive (Js.string path) in
+    let mkdir_p (path: string) =
+      let ret = (Js.Unsafe.coerce dummy_fs)##mkdirRecursive path in
       ignore ret
 
-    let file_exists path =
-      let ret = (Js.Unsafe.coerce dummy_fs)##fileExists (Js.string path) in
+    let file_exists (path: string) =
+      let ret = (Js.Unsafe.coerce dummy_fs)##fileExists path in
       Js.to_bool (Js.Unsafe.coerce ret)
 
-    let read_file_content path =
-      let ret = (Js.Unsafe.coerce dummy_fs)##readFileContent (Js.string path) in
+    let read_file_content (path: string) =
+      let ret = (Js.Unsafe.coerce dummy_fs)##readFileContent path in
       Js.to_string (Js.Unsafe.coerce ret)
 
-    let write_file_content path ~data =
-      let ret = (Js.Unsafe.coerce dummy_fs)##writeFileContent (Js.string path) (Js.string data) in
+    let write_file_content (path: string) ~(data: string) =
+      let ret = (Js.Unsafe.coerce dummy_fs)##writeFileContent path data in
       ignore ret
+
   end in
 
   let module R = Resolver.S(FS) in
