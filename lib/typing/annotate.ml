@@ -1499,6 +1499,7 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
         );
         let ctor = Option.value_exn ctor_var in
         deps := List.append !deps [ctor.var_id];
+        Program.log (Env.prog env) ident.pident_loc ctor.var_id;
         (T.Pattern.Symbol (ident.pident_name, ctor.var_id))
       ) else (
         (* local var *)
@@ -1539,6 +1540,8 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
         );
 
         deps := List.append !deps [ext_id];
+        Program.log (Env.prog env) ident.pident_loc ext_id;
+
         (T.Pattern.Symbol (ident.pident_name, ext_id))
       )
 
@@ -1562,6 +1565,7 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
 
         let param_pat, param_deps = annotate_pattern env pat in
         deps := List.concat [ param_deps; !deps; [ctor_var.var_id]];
+        Program.log (Env.prog env) id.pident_loc ctor_var.var_id;
 
         (T.Pattern.EnumCtor (
           (id.pident_name, ctor_var.var_id),
@@ -1600,6 +1604,7 @@ and annotate_pattern env pat : (T.Pattern.t * int list) =
 
           let param_pat, param_deps = annotate_pattern env pat in
           deps := List.concat [ param_deps; !deps; [ext_id]];
+          Program.log (Env.prog env) id.pident_loc ext_id;
 
           (T.Pattern.EnumCtor (
             (id.pident_name, ext_id),
@@ -1776,8 +1781,8 @@ and annotate_type env ty : (TypeExpr.t * int list) =
 and annotate_function_params env params : T.Function.params * TypeExpr.params * int list = 
   let open Ast.Function in
   let annoate_param param =
-    let { param_name; param_ty; param_loc; param_rest } = param in
-    let param_name = annotate_function_param env param_name in
+    let { param_name = param_name'; param_ty; param_loc; param_rest } = param in
+    let param_name = annotate_function_param env param_name' in
     let _, param_id = param_name in
     let deps = ref [] in
     let value = ref TypeExpr.Unknown in
@@ -1790,7 +1795,7 @@ and annotate_function_params env params : T.Function.params * TypeExpr.params * 
       param_ty
     ;
     let node = {
-      loc = param_loc;
+      loc = param_name'.pident_loc;
       value = !value;
       deps = !deps;
     } in

@@ -348,8 +348,8 @@ and check_expression env expr =
         Program.update_node_type env.ctx name_id (TypeExpr.Ctor(Ref id, []));
         Program.log env.ctx expr_loc id
       )
-      | _ -> (
-        Program.log env.ctx expr_loc name_id
+      | { id; _ } -> (
+        Program.log env.ctx expr_loc id
       )
     )
 
@@ -595,7 +595,7 @@ and check_expression env expr =
   )
 
   | Member (main_expr, name) -> (
-    let handle_member_typpe expr_node member_type_opt =
+    let handle_member_type expr_node member_type_opt =
       let open Core_type.TypeExpr in
       match member_type_opt with
       | Some (Method({ TypeDef. id; spec = ClassMethod { method_get_set = Some _; method_return; _ }; _ }, _params, _rt), _) -> (
@@ -627,7 +627,7 @@ and check_expression env expr =
       let member_type_opt =
         Check_helper.find_member_of_type env.ctx ~scope:env.scope expr_node.value name.pident_name
       in
-      handle_member_typpe expr_node member_type_opt
+      handle_member_type expr_node member_type_opt
     in
 
     match main_expr with
