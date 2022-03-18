@@ -1692,6 +1692,7 @@ and annotate_type env ty : (TypeExpr.t * int list) =
         let ty_var_opt = (Env.peek_scope env)#find_type_symbol pident_name in
         match ty_var_opt with
         | Some ty_var -> (
+          Program.log (Env.prog env) pident_loc ty_var;
           TypeExpr.Ctor (Ref ty_var, params), ty_var::!deps
         )
 
@@ -1730,6 +1731,7 @@ and annotate_type env ty : (TypeExpr.t * int list) =
               raise (Diagnosis.Error err)
             );
 
+            Program.log (Env.prog env) cls_name.pident_loc ty_var;
             TypeExpr.Ctor (Ref ty_var, params), ty_var::!deps
           )
 
