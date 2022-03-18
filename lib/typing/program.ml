@@ -33,9 +33,9 @@ let make_default_type_sym ctx scope =
   let open Core_type in
   let open Core_type.TypeDef in
   let names = [|
-    ("u32", Primitive);
+    (* ("u32", Primitive); *)
     ("i32", Primitive);
-    ("u64", Primitive);
+    (* ("u64", Primitive); *)
     ("i64", Primitive);
     ("f32", Primitive);
     ("f64", Primitive);

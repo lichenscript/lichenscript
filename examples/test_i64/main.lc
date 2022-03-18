@@ -1,0 +1,5 @@
+
+function main() {
+	const null = 1;
+	print(null);
+}

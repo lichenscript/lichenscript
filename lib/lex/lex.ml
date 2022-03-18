@@ -252,67 +252,6 @@ let mk_comment
   let c = { kind; text; on_newline } in
   (loc, c)
 
-let mk_num_singleton number_type raw =
-  let (neg, num) =
-    if raw.[0] = '-' then
-      (true, String.sub raw 1 (String.length raw - 1))
-    else
-      (false, raw)
-  in
-  (* convert singleton number type into a float *)
-  let value =
-    match number_type with
-    | BINARY
-    | OCTAL ->
-      begin
-        try Int64.to_float (Int64.of_string num)
-        with Failure _ -> failwith ("Invalid binary/octal " ^ num)
-      end
-    | NORMAL ->
-      begin
-        try float_of_string num with Failure _ -> failwith ("Invalid number " ^ num)
-      end
-  in
-  let value =
-    if neg then
-      ~-.value
-    else
-      value
-  in
-  T_NUMBER_SINGLETON_TYPE { kind = number_type; value; raw }
-
-let mk_bignum_singleton kind raw =
-  let (neg, num) =
-    if raw.[0] = '-' then
-      (true, String.sub raw 1 (String.length raw - 1))
-    else
-      (false, raw)
-  in
-  (* convert singleton number type into a float *)
-  let value =
-    match kind with
-    | BIG_BINARY
-    | BIG_OCTAL ->
-      let postraw = bigint_strip_n num in
-      begin
-        try Int64.to_float (Int64.of_string postraw)
-        with Failure _ -> failwith ("Invalid (lexer) bigint binary/octal " ^ postraw)
-      end
-    | BIG_NORMAL ->
-      let postraw = bigint_strip_n num in
-      begin
-        try float_of_string postraw
-        with Failure _ -> failwith ("Invalid (lexer) bigint " ^ postraw)
-      end
-  in
-  let approx_value =
-    if neg then
-      ~-.value
-    else
-      value
-  in
-  T_BIGINT_SINGLETON_TYPE { kind; approx_value; raw }
-
 let decode_identifier =
   let assert_valid_unicode_in_identifier env loc code =
     let lexbuf = Sedlexing.from_int_array [| code |] in
@@ -861,7 +800,6 @@ let token (env : Lex_env.t) lexbuf : result =
   | "let" -> Token (env, T_LET)
   | "virtual" -> Token (env, T_VIRTUAL)
   | "override" -> Token (env, T_OVERRIDE)
-  | "null" -> Token (env, T_NULL)
   | "of" -> Token (env, T_OF)
   | "package" -> Token (env, T_PACKAGE)
   | "private" -> Token (env, T_PRIVATE)
@@ -1559,7 +1497,7 @@ let type_token env lexbuf =
   (*
    * Number literals
    *)
-  | (Opt neg, binbigint, word) ->
+  (* | (Opt neg, binbigint, word) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
         match%sedlex lexbuf with
@@ -1688,24 +1626,13 @@ let type_token env lexbuf =
         | _ -> failwith "unreachable")
   | (Opt neg, (wholenumber | floatnumber)) ->
     let num = lexeme lexbuf in
-    Token (env, mk_num_singleton NORMAL num)
+    Token (env, mk_num_singleton NORMAL num) *)
   (* Keywords *)
-  | "any" -> Token (env, T_ANY_TYPE)
-  | "bool" -> Token (env, T_BOOLEAN_TYPE BOOL)
-  | "boolean" -> Token (env, T_BOOLEAN_TYPE BOOLEAN)
-  | "empty" -> Token (env, T_EMPTY_TYPE)
   | "extends" -> Token (env, T_EXTENDS)
   | "false" -> Token (env, T_FALSE)
   | "interface" -> Token (env, T_INTERFACE)
-  | "mixed" -> Token (env, T_MIXED_TYPE)
-  | "null" -> Token (env, T_NULL)
-  | "number" -> Token (env, T_NUMBER_TYPE)
-  | "bigint" -> Token (env, T_BIGINT_TYPE)
   | "static" -> Token (env, T_STATIC)
-  | "string" -> Token (env, T_STRING_TYPE)
   | "true" -> Token (env, T_TRUE)
-  | "void" -> Token (env, T_VOID_TYPE)
-  | "symbol" -> Token (env, T_SYMBOL_TYPE)
   (* Identifiers *)
   | (js_id_start, Star js_id_continue) ->
     let loc = loc_of_lexbuf env lexbuf in

@@ -42,7 +42,6 @@ type t =
   | T_WHILE
   | T_CONST
   | T_LET
-  | T_NULL
   | T_FALSE
   | T_TRUE
   | T_BREAK
@@ -124,27 +123,6 @@ type t =
   (* JSX *)
   | T_JSX_IDENTIFIER of { raw: string }
   | T_JSX_TEXT of (Loc.t * string * string) (* loc, value, raw *)
-  (* Type primitives *)
-  | T_ANY_TYPE
-  | T_MIXED_TYPE
-  | T_EMPTY_TYPE
-  | T_BOOLEAN_TYPE of bool_or_boolean
-  | T_NUMBER_TYPE
-  | T_BIGINT_TYPE
-  | T_NUMBER_SINGLETON_TYPE of {
-      kind: number_type;
-      value: float;
-      raw: string;
-    }
-  | T_BIGINT_SINGLETON_TYPE of {
-      kind: bigint_type;
-      approx_value: float;
-      (* Warning! Might lose precision! *)
-      raw: string;
-    }
-  | T_STRING_TYPE
-  | T_VOID_TYPE
-  | T_SYMBOL_TYPE
 
 (* `bool` and `boolean` are equivalent annotations, but we need to track
    which one was used for when it might be an identifier, as in
@@ -193,7 +171,6 @@ let token_to_string = function
   | T_WHILE -> "T_WHILE"
   | T_CONST -> "T_CONST"
   | T_LET -> "T_LET"
-  | T_NULL -> "T_NULL"
   | T_FALSE -> "T_FALSE"
   | T_TRUE -> "T_TRUE"
   | T_BREAK -> "T_BREAK"
@@ -286,18 +263,6 @@ let token_to_string = function
   | T_EOF -> "T_EOF"
   | T_JSX_IDENTIFIER _ -> "T_JSX_IDENTIFIER"
   | T_JSX_TEXT _ -> "T_JSX_TEXT"
-  (* Type primitives *)
-  | T_ANY_TYPE -> "T_ANY_TYPE"
-  | T_MIXED_TYPE -> "T_MIXED_TYPE"
-  | T_EMPTY_TYPE -> "T_EMPTY_TYPE"
-  | T_BOOLEAN_TYPE _ -> "T_BOOLEAN_TYPE"
-  | T_NUMBER_TYPE -> "T_NUMBER_TYPE"
-  | T_BIGINT_TYPE -> "T_BIGINT_TYPE"
-  | T_NUMBER_SINGLETON_TYPE _ -> "T_NUMBER_SINGLETON_TYPE"
-  | T_BIGINT_SINGLETON_TYPE _ -> "T_BIGINT_SINGLETON_TYPE"
-  | T_STRING_TYPE -> "T_STRING_TYPE"
-  | T_VOID_TYPE -> "T_VOID_TYPE"
-  | T_SYMBOL_TYPE -> "T_SYMBOL_TYPE"
 
 let value_of_token = function
   | T_NUMBER { raw; _ } -> raw
@@ -330,7 +295,6 @@ let value_of_token = function
   | T_WHILE -> "while"
   | T_CONST -> "const"
   | T_LET -> "let"
-  | T_NULL -> "null"
   | T_FALSE -> "false"
   | T_TRUE -> "true"
   | T_BREAK -> "break"
@@ -410,33 +374,14 @@ let value_of_token = function
   | T_EOF -> ""
   | T_JSX_IDENTIFIER { raw } -> raw
   | T_JSX_TEXT (_, _, raw) -> raw
-  (* Type primitives *)
-  | T_ANY_TYPE -> "any"
-  | T_MIXED_TYPE -> "mixed"
-  | T_EMPTY_TYPE -> "empty"
-  | T_BOOLEAN_TYPE kind ->
-    begin
-      match kind with
-      | BOOL -> "bool"
-      | BOOLEAN -> "boolean"
-    end
-  | T_NUMBER_TYPE -> "number"
-  | T_BIGINT_TYPE -> "bigint"
-  | T_NUMBER_SINGLETON_TYPE { raw; _ } -> raw
-  | T_BIGINT_SINGLETON_TYPE { raw; _ } -> raw
-  | T_STRING_TYPE -> "string"
-  | T_VOID_TYPE -> "void"
-  | T_SYMBOL_TYPE -> "symbol"
 
 let quote_token_value value = Printf.sprintf "token `%s`" value
 
 let explanation_of_token ?(use_article = false) token =
   let (value, article) =
     match token with
-    | T_NUMBER_SINGLETON_TYPE _
     | T_NUMBER _ ->
       ("number", "a")
-    | T_BIGINT_SINGLETON_TYPE _
     | T_BIGINT _ ->
       ("bigint", "a")
     | T_JSX_TEXT _
@@ -465,7 +410,6 @@ let is_keyword = function
   | T_WHILE
   | T_CONST
   | T_LET
-  | T_NULL
   | T_FALSE
   | T_TRUE
   | T_BREAK
