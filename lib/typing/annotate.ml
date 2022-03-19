@@ -159,8 +159,12 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         | Unit ->
           [], TypeExpr.Unit
 
-        | Integer _ ->
+        | I32 _ ->
           let ty_var = Option.value_exn (root_scope#find_type_symbol "i32") in
+          [ty_var], TypeExpr.Ctor(Ref ty_var, [])
+
+        | I64 _ ->
+          let ty_var = Option.value_exn (root_scope#find_type_symbol "i64") in
           [ty_var], TypeExpr.Ctor(Ref ty_var, [])
 
         | Char _ ->

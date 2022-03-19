@@ -1435,9 +1435,12 @@ and parse_literal env =
   let start_loc = Peek.loc env in
   let next = Peek.token env in
   match next with
-  | Token.T_INTEGER { content; _ } -> (
+  | Token.T_INTEGER { content; is_long; _ } -> (
     Eat.token env;
-    Literal.Integer (Int32.of_string content)
+    if is_long then
+      Literal.I32 (Int32.of_string content)
+    else
+      Literal.I64 (Int64.of_string content)
   )
 
   | Token.T_FLOAT { content; _ } -> (

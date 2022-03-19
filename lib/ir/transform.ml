@@ -685,9 +685,8 @@ and prepend_expr env ~prepend_stmts ~append_stmts (expr: expr_result) =
 and try_folding_literals op left right original_expr =
   let open Expression in
 
-  let do_integer_folding int_op left_int right_int =
+  let do_integer_folding_i32 int_op left_int right_int =
     let new_int =
-      (* TODO: i64 support *)
       let open Int32 in
       match int_op with
       | BinaryOp.Minus -> left_int - right_int
@@ -696,7 +695,20 @@ and try_folding_literals op left right original_expr =
       | BinaryOp.Mult -> left_int * right_int
       | _ -> failwith "unsupported binary op between integer"
     in
-    Constant(Literal.Integer(new_int))
+    Constant(Literal.I32(new_int))
+  in
+
+  let do_integer_folding_i64 int_op left_int right_int =
+    let new_int =
+      let open Int64 in
+      match int_op with
+      | BinaryOp.Minus -> left_int - right_int
+      | BinaryOp.Plus -> left_int + right_int
+      | BinaryOp.Div -> left_int / right_int
+      | BinaryOp.Mult -> left_int * right_int
+      | _ -> failwith "unsupported binary op between integer"
+    in
+    Constant(Literal.I64(new_int))
   in
 
   let do_float_folding float_op left_str right_str =
@@ -715,13 +727,24 @@ and try_folding_literals op left right original_expr =
   in
 
   match (left.spec, right.spec) with
-  | (Constant(Integer left_int), Constant(Integer right_int)) -> (
+  | (Constant(I32 left_int), Constant(I32 right_int)) -> (
     match op with
     | BinaryOp.Plus
     | BinaryOp.Minus
     | BinaryOp.Div
     | BinaryOp.Mult -> (
-      let new_spec = do_integer_folding op left_int right_int in
+      let new_spec = do_integer_folding_i32 op left_int right_int in
+      Some { left with spec = new_spec }
+    )
+    | _ -> None
+  )
+  | (Constant(I64 left_int), Constant(I64 right_int)) -> (
+    match op with
+    | BinaryOp.Plus
+    | BinaryOp.Minus
+    | BinaryOp.Div
+    | BinaryOp.Mult -> (
+      let new_spec = do_integer_folding_i64 op left_int right_int in
       Some { left with spec = new_spec }
     )
     | _ -> None
@@ -792,8 +815,12 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       | String(content, _, _) -> 
         auto_release_expr env ~is_move ~append_stmts ty_var (Ir.Expr.NewString content)
 
-      | Integer content ->
+      | I32 content ->
         let int_str = Int32.to_string content in
+        Ir.Expr.NewInt int_str
+
+      | I64 content ->
+        let int_str = Int64.to_string content in
         Ir.Expr.NewInt int_str
 
       | Boolean bl ->
@@ -1006,7 +1033,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
               | String(content, _, _) -> 
                 auto_release_expr env ~is_move:false ~append_stmts ty_var (Ir.Expr.NewString content)
 
-              | Integer content ->
+              | I32 content ->
                 let int_str = Int32.to_string content in
                 Ir.Expr.NewInt int_str
 
@@ -1605,7 +1632,7 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
     | Underscore ->
       (fun genereator -> genereator ~finalizers:[] ())
 
-    | Literal (Literal.Integer i) -> (
+    | Literal (Literal.I32 i) -> (
       let i_str = Int32.to_string i in
       let if_test = Ir.Expr.IntValue(I32Binary(BinaryOp.Equal, match_expr, NewInt i_str)) in
       (fun genereator ->
