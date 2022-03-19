@@ -323,7 +323,13 @@ and transpile_expression ?(parent_expr=true) env expr =
     ps env (Int.to_string ch);
     ps env ")"
   )
-  | NewInt raw -> ps env raw
+
+  | NewI32 raw -> ps env raw
+
+  | NewI64 raw ->
+    ps env raw;
+    ps env "n"
+
   | NewFloat raw ->
     ps env "Math.fround(";
     ps env raw;
@@ -415,10 +421,17 @@ and transpile_expression ?(parent_expr=true) env expr =
     transpile_expression env expr;
     ps env ")"
 
+  | I64BitNot expr ->
+    ps env "~(";
+    transpile_expression env expr;
+    ps env ")"
+
   | F32Binary(op, left, right) ->
     transpile_f32_binary env op left right
 
-  | I64Binary _
+  | I64Binary(op, left, right) ->
+    transpile_i64_binary env op left right
+
   | F64Binary _ -> failwith "unimplemented binary2"
 
   | CallLambda(expr, params) -> (
@@ -658,6 +671,67 @@ and transpile_i32_binary env op left right =
     )
   )
 
+and transpile_i64_binary env op left right =
+  let open Asttypes.BinaryOp in
+  (match op with
+  | Plus
+  | Minus
+  | Mult
+  | Div
+  | LShift
+  | RShift
+  | Mod
+    -> (
+      ps env "(";
+      transpile_expression env left;
+
+      ps env (match op with
+      | Plus -> " + "
+      | Minus -> " - "
+      | Mult -> " * "
+      | Div -> " / "
+      | LShift -> " << "
+      | RShift -> " >> "
+      | Mod -> " % "
+      | _ -> failwith "unreachable"
+      );
+
+      transpile_expression env right;
+      ps env ")"
+    )
+
+  | Equal
+  | NotEqual
+  | LessThan
+  | LessThanEqual
+  | GreaterThan
+  | GreaterThanEqual
+  | BitOr
+  | Xor
+  | BitAnd
+  | And
+  | Or
+    -> (
+      ps env "(";
+      transpile_expression env left;
+      ps env (match op with
+      | Equal -> "==="
+      | NotEqual -> "!=="
+      | LessThan -> "<"
+      | LessThanEqual -> "<="
+      | GreaterThan -> ">"
+      | GreaterThanEqual -> ">="
+      | BitOr -> "|"
+      | Xor -> "^"
+      | BitAnd -> "&"
+      | And -> "&&"
+      | Or -> "||"
+      | _ -> failwith "unrechable binary");
+      transpile_expression env right;
+      ps env ")"
+    )
+  )
+
 and transpile_f32_binary env op left right =
   let open Asttypes.BinaryOp in
   (match op with
@@ -783,6 +857,7 @@ let transpile_program ~prog ~preclude ~init_calls declarations =
   let transform_config = { Transform.
     arc = false;
     prepend_lambda = false;
+    ptr_size = None;
   } in
   let ir_tree = Transform.transform_declarations ~config:transform_config prog declarations in
 

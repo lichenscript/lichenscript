@@ -1,5 +1,7 @@
 
 function main() {
-	const null = 1;
-	print(null);
+  const n1 = 0x100000000L;
+  print(n1);
+  const n2 = 0x100000000L;
+  print(n1 + n2);
 }

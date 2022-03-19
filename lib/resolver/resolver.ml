@@ -529,7 +529,19 @@ module S (FS: FSProvider) = struct
             external_resources
         in
 
-        let output = Lichenscript_c.codegen ~prog ~includes ~init_calls:env.before_eval_fun_call declarations in
+        let ptr_size =
+          match platform with
+          | "wasm32" -> Lichenscript_ir.Ir.Ptr32
+          | _ -> Lichenscript_ir.Ir.Ptr64
+        in
+
+        let output = Lichenscript_c.codegen
+          ~prog
+          ~includes
+          ~init_calls:env.before_eval_fun_call
+          ~ptr_size
+          declarations
+        in
         let mod_name = entry_file_path |> Filename.dirname |> last_piece_of_path in
         let build_dir = get_build_dir () in
         let output_path = write_to_file build_dir mod_name ~ext:".c" output in

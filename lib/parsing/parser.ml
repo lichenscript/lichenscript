@@ -1437,7 +1437,7 @@ and parse_literal env =
   match next with
   | Token.T_INTEGER { content; is_long; _ } -> (
     Eat.token env;
-    if is_long then
+    if not is_long then
       Literal.I32 (Int32.of_string content)
     else
       Literal.I64 (Int64.of_string content)

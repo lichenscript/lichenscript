@@ -10,6 +10,10 @@ open Lichenscript_lex
 open Lichenscript_parsing
 open Lichenscript_typing
 
+type ptr_size =
+  | Ptr32
+  | Ptr64
+
 type symbol =
   | SymLocal of string
   | SymTemp of int
@@ -160,7 +164,8 @@ and Expr : sig
   and t =
   | Null
   | NewString of string
-  | NewInt of string
+  | NewI32 of string
+  | NewI64 of string
   | NewFloat of string
   | NewChar of int
   | NewLambda of lambda_spec
@@ -180,6 +185,7 @@ and Expr : sig
   | I64Binary of Asttypes.BinaryOp.t * t * t
   | F64Binary of Asttypes.BinaryOp.t * t * t
   | I32BitNot of t
+  | I64BitNot of t
   | CallLambda of t * t list
   | Invoke of t * string * t list
   | Assign of t * t
