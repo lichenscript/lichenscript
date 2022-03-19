@@ -83,17 +83,17 @@ let wholenumber = [%sedlex.regexp? (underscored_digit, Opt '.')]
 
 let floatnumber = [%sedlex.regexp? (Opt underscored_digit, '.', underscored_decimal)]
 
-let binbigint = [%sedlex.regexp? (binnumber, 'n')]
+let binbigint = [%sedlex.regexp? (binnumber, 'L')]
 
-let octbigint = [%sedlex.regexp? (octnumber, 'n')]
+let octbigint = [%sedlex.regexp? (octnumber, 'L')]
 
-let hexbigint = [%sedlex.regexp? (hexnumber, 'n')]
+let hexbigint = [%sedlex.regexp? (hexnumber, 'L')]
 
-let scibigint = [%sedlex.regexp? (scinumber, 'n')]
+let scibigint = [%sedlex.regexp? (scinumber, 'L')]
 
-let wholebigint = [%sedlex.regexp? (underscored_digit, 'n')]
+let wholebigint = [%sedlex.regexp? (underscored_digit, 'L')]
 
-let floatbigint = [%sedlex.regexp? ((floatnumber | (underscored_digit, '.')), 'n')]
+let floatbigint = [%sedlex.regexp? ((floatnumber | (underscored_digit, '.')), 'L')]
 
 (* 2-8 alphanumeric characters. I could match them directly, but this leads to
  * ~5k more lines of generated lexer
@@ -680,95 +680,174 @@ let token (env : Lex_env.t) lexbuf : result =
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
         match%sedlex lexbuf with
-        | binbigint -> Token (env, T_BIGINT { kind = BIG_BINARY; raw = lexeme lexbuf })
+        | binbigint -> (
+          let raw = lexeme lexbuf in
+          let content = String.sub raw 0 ((String.length raw) - 1) in
+          Token (env, T_INTEGER { kind = BINARY; raw; content; is_long = true })
+        )
         | _ -> failwith "unreachable")
-  | binbigint -> Token (env, T_BIGINT { kind = BIG_BINARY; raw = lexeme lexbuf })
+  | binbigint -> (
+    let raw = lexeme lexbuf in
+    let content = String.sub raw 0 ((String.length raw) - 1) in
+    Token (env, T_INTEGER { kind = BINARY; raw; content; is_long = true })
+  )
   | (binnumber, (letter | '2' .. '9'), Star alphanumeric) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
         match%sedlex lexbuf with
-        | binnumber -> Token (env, T_NUMBER { kind = BINARY; raw = lexeme lexbuf })
+        | binnumber -> (
+          let raw = lexeme lexbuf in
+          Token (env, T_INTEGER { kind = BINARY; raw; content = raw; is_long = false })
+        )
         | _ -> failwith "unreachable")
-  | binnumber -> Token (env, T_NUMBER { kind = BINARY; raw = lexeme lexbuf })
+  | binnumber -> (
+    let raw = lexeme lexbuf in
+    Token (env, T_INTEGER { kind = BINARY; raw; content = raw; is_long = false })
+  )
   | (octbigint, word) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
         match%sedlex lexbuf with
-        | octbigint -> Token (env, T_BIGINT { kind = BIG_OCTAL; raw = lexeme lexbuf })
+        | octbigint -> (
+          let raw = lexeme lexbuf in
+          let content = String.sub raw 0 ((String.length raw) - 1) in
+          Token (env, T_INTEGER { kind = OCTAL; raw; content; is_long = true })
+        )
         | _ -> failwith "unreachable")
-  | octbigint -> Token (env, T_BIGINT { kind = BIG_OCTAL; raw = lexeme lexbuf })
+  | octbigint -> (
+    let raw = lexeme lexbuf in
+    let content = String.sub raw 0 ((String.length raw) - 1) in
+    Token (env, T_INTEGER { kind = OCTAL; raw; content; is_long = true })
+  )
   | (octnumber, (letter | '8' .. '9'), Star alphanumeric) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
         match%sedlex lexbuf with
-        | octnumber -> Token (env, T_NUMBER { kind = OCTAL; raw = lexeme lexbuf })
+        | octnumber -> (
+          let raw = lexeme lexbuf in
+          Token (env, T_INTEGER { kind = OCTAL; raw; content = raw; is_long = false })
+        )
         | _ -> failwith "unreachable")
-  | octnumber -> Token (env, T_NUMBER { kind = OCTAL; raw = lexeme lexbuf })
+  | octnumber -> (
+    let raw = lexeme lexbuf in
+    Token (env, T_INTEGER { kind = OCTAL; raw; content = raw; is_long = false })
+  )
   | (hexbigint, word) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
         match%sedlex lexbuf with
-        | hexbigint -> Token (env, T_BIGINT { kind = BIG_NORMAL; raw = lexeme lexbuf })
+        | hexbigint -> (
+          let raw = lexeme lexbuf in
+          let content = String.sub raw 0 ((String.length raw) - 1) in
+          Token (env, T_INTEGER { kind = NORMAL; raw; content; is_long = true })
+        )
         | _ -> failwith "unreachable")
-  | hexbigint -> Token (env, T_BIGINT { kind = BIG_NORMAL; raw = lexeme lexbuf })
+  | hexbigint -> (
+    let raw = lexeme lexbuf in
+    let content = String.sub raw 0 ((String.length raw) - 1) in
+    Token (env, T_INTEGER { kind = NORMAL; raw; content; is_long = true })
+  )
   | (hexnumber, non_hex_letter, Star alphanumeric) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
         match%sedlex lexbuf with
-        | hexnumber -> Token (env, T_NUMBER { kind = NORMAL; raw = lexeme lexbuf })
+        | hexnumber -> (
+          let raw = lexeme lexbuf in
+          Token (env, T_INTEGER { kind = NORMAL; raw; content = raw; is_long = false })
+        )
         | _ -> failwith "unreachable")
-  | hexnumber -> Token (env, T_NUMBER { kind = NORMAL; raw = lexeme lexbuf })
+  | hexnumber -> (
+    let raw = lexeme lexbuf in
+    Token (env, T_INTEGER { kind = NORMAL; raw; content = raw; is_long = false })
+  )
   | (scibigint, word) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
         match%sedlex lexbuf with
-        | scibigint ->
+        | scibigint -> (
           let loc = loc_of_lexbuf env lexbuf in
           let env = lex_error env loc Lex_error.InvalidSciBigInt in
-          Token (env, T_BIGINT { kind = BIG_NORMAL; raw = lexeme lexbuf })
+          let raw = lexeme lexbuf in
+          let content = String.sub raw 0 ((String.length raw) - 1) in
+          Token (env, T_INTEGER { kind = NORMAL; raw; content; is_long = true })
+        )
         | _ -> failwith "unreachable")
-  | scibigint ->
+  | scibigint -> (
     let loc = loc_of_lexbuf env lexbuf in
     let env = lex_error env loc Lex_error.InvalidSciBigInt in
-    Token (env, T_BIGINT { kind = BIG_NORMAL; raw = lexeme lexbuf })
+    let raw = lexeme lexbuf in
+    let content = String.sub raw 0 ((String.length raw) - 1) in
+    Token (env, T_INTEGER { kind = NORMAL; raw; content; is_long = true })
+  )
   | (scinumber, word) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
         match%sedlex lexbuf with
-        | scinumber -> Token (env, T_NUMBER { kind = NORMAL; raw = lexeme lexbuf })
+        | scinumber -> (
+          let raw = lexeme lexbuf in
+          Token (env, T_INTEGER { kind = NORMAL; raw; content = raw; is_long = false })
+        )
         | _ -> failwith "unreachable")
-  | scinumber -> Token (env, T_NUMBER { kind = NORMAL; raw = lexeme lexbuf })
+  | scinumber -> (
+    let raw = lexeme lexbuf in
+    Token (env, T_INTEGER { kind = NORMAL; raw; content = raw; is_long = false })
+  )
   | (floatbigint, word) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
         match%sedlex lexbuf with
-        | floatbigint ->
+        | floatbigint -> (
           let loc = loc_of_lexbuf env lexbuf in
           let env = lex_error env loc Lex_error.InvalidFloatBigInt in
-          Token (env, T_BIGINT { kind = BIG_NORMAL; raw = lexeme lexbuf })
+          let raw = lexeme lexbuf in
+          let content = String.sub raw 0 ((String.length raw) - 1) in
+          Token (env, T_FLOAT { raw; content; is_long = true })
+        )
         | _ -> failwith "unreachable")
   | (wholebigint, word) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
         match%sedlex lexbuf with
-        | wholebigint -> Token (env, T_BIGINT { kind = BIG_NORMAL; raw = lexeme lexbuf })
+        | wholebigint -> (
+          let raw = lexeme lexbuf in
+          let content = String.sub raw 0 ((String.length raw) - 1) in
+          Token (env, T_INTEGER { kind = NORMAL; raw; content; is_long = true })
+        )
         | _ -> failwith "unreachable")
+
   | floatbigint ->
     let loc = loc_of_lexbuf env lexbuf in
     let env = lex_error env loc Lex_error.InvalidFloatBigInt in
-    Token (env, T_BIGINT { kind = BIG_NORMAL; raw = lexeme lexbuf })
-  | wholebigint -> Token (env, T_BIGINT { kind = BIG_NORMAL; raw = lexeme lexbuf })
+    let raw = lexeme lexbuf in
+    let content = String.sub raw 0 ((String.length raw) - 1) in
+    Token (env, T_FLOAT { raw; content; is_long = true })
+
+  | wholebigint ->
+    let raw = lexeme lexbuf in
+    let content = String.sub raw 0 ((String.length raw) - 1) in
+    Token (env, T_INTEGER { kind = NORMAL; raw; content; is_long = true })
+
   | ((wholenumber | floatnumber), word) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
         match%sedlex lexbuf with
-        | wholenumber
+        | wholenumber -> (
+          let raw = lexeme lexbuf in
+          Token (env, T_INTEGER { kind = NORMAL; raw; content = raw; is_long = false })
+        )
         | floatnumber ->
-          Token (env, T_NUMBER { kind = NORMAL; raw = lexeme lexbuf })
+          let raw = lexeme lexbuf in
+          Token (env, T_FLOAT { raw; content = raw; is_long = false })
+
         | _ -> failwith "unreachable")
-  | wholenumber
-  | floatnumber ->
-    Token (env, T_NUMBER { kind = NORMAL; raw = lexeme lexbuf })
+  | wholenumber -> (
+    let raw = lexeme lexbuf in
+    Token (env, T_INTEGER { kind = NORMAL; raw; content = raw; is_long = false })
+  )
+  | floatnumber -> (
+    let raw = lexeme lexbuf in
+    Token (env, T_FLOAT { raw; content = raw; is_long = false })
+  )
   (* Keywords *)
   | "as" -> Token (env, T_AS)
   | "async" -> Token (env, T_ASYNC)

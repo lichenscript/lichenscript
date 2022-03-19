@@ -1,13 +1,17 @@
 
 type t =
-  | T_NUMBER of {
+  | T_INTEGER of {
       kind: number_type;
       raw: string;
+      content: string;
+      is_long: bool;
     }
-  | T_BIGINT of {
-      kind: bigint_type;
-      raw: string;
-    }
+  | T_FLOAT of {
+    raw: string;
+    content: string;
+    is_long: bool;
+  }
+
   | T_CHAR of (Loc.t * int * string)
   | T_STRING of (Loc.t * string * string * bool) (* loc, value, raw, octal *)
   | T_TEMPLATE_PART of (Loc.t * template_part * bool) (* loc, value, is_tail *)
@@ -124,23 +128,10 @@ type t =
   | T_JSX_IDENTIFIER of { raw: string }
   | T_JSX_TEXT of (Loc.t * string * string) (* loc, value, raw *)
 
-(* `bool` and `boolean` are equivalent annotations, but we need to track
-   which one was used for when it might be an identifier, as in
-   `(bool: boolean) => void`. It's lexed as two T_BOOLEAN_TYPEs, then the
-   first one is converted into an identifier. *)
-and bool_or_boolean =
-  | BOOL
-  | BOOLEAN
-
 and number_type =
   | BINARY
   | OCTAL
   | NORMAL
-
-and bigint_type =
-  | BIG_BINARY
-  | BIG_OCTAL
-  | BIG_NORMAL
 
 and template_part = {
   cooked: string;
@@ -154,8 +145,8 @@ and template_part = {
 (* Pretty printer (pretty?) *)
 (*****************************************************************************)
 let token_to_string = function
-  | T_NUMBER _ -> "T_NUMBER"
-  | T_BIGINT _ -> "T_BIGINT"
+  | T_INTEGER _ -> "T_INTEGER"
+  | T_FLOAT _ -> "T_FLOAT"
   | T_CHAR _ -> "T_CHAR"
   | T_STRING _ -> "T_STRING"
   | T_TEMPLATE_PART _ -> "T_TEMPLATE_PART"
@@ -265,8 +256,8 @@ let token_to_string = function
   | T_JSX_TEXT _ -> "T_JSX_TEXT"
 
 let value_of_token = function
-  | T_NUMBER { raw; _ } -> raw
-  | T_BIGINT { raw; _ } -> raw
+  | T_INTEGER { raw; _ } -> raw
+  | T_FLOAT { raw; _ } -> raw
   | T_CHAR (_, _, raw) -> raw
   | T_STRING (_, _, raw, _) -> raw
   | T_TEMPLATE_PART (_, { literal; _ }, _) -> literal
@@ -380,10 +371,10 @@ let quote_token_value value = Printf.sprintf "token `%s`" value
 let explanation_of_token ?(use_article = false) token =
   let (value, article) =
     match token with
-    | T_NUMBER _ ->
-      ("number", "a")
-    | T_BIGINT _ ->
-      ("bigint", "a")
+    | T_INTEGER _ ->
+      ("integer", "a")
+    | T_FLOAT _ ->
+      ("float", "a")
     | T_JSX_TEXT _
     | T_STRING _ ->
       ("string", "a")

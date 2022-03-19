@@ -1435,13 +1435,14 @@ and parse_literal env =
   let start_loc = Peek.loc env in
   let next = Peek.token env in
   match next with
-  | Token.T_NUMBER { raw; _ } -> (
+  | Token.T_INTEGER { content; _ } -> (
     Eat.token env;
-    if String.contains raw '.' then
-      Literal.Float (raw, None)
-    else
-      (* TODO: support i64 *)
-      Literal.Integer (Int32.of_string raw)
+    Literal.Integer (Int32.of_string content)
+  )
+
+  | Token.T_FLOAT { content; _ } -> (
+    Eat.token env;
+    Literal.Float (content, None)
   )
 
   | Token.T_CHAR(_, ch, _) ->
@@ -1482,7 +1483,8 @@ and parse_primary_expression env : Expression.t =
           Identifier ident
       )
 
-      | Token.T_NUMBER _
+      | Token.T_INTEGER _
+      | Token.T_FLOAT _
       | Token.T_STRING _
       | Token.T_CHAR _
       | Token.T_TRUE
@@ -1688,7 +1690,8 @@ and parse_pattern env : Pattern.t =
         Identifier ident
     )
 
-    | Token.T_NUMBER _
+    | Token.T_INTEGER _
+    | Token.T_FLOAT _
     | Token.T_STRING _
     | Token.T_CHAR _
     | Token.T_TRUE 
@@ -1696,11 +1699,9 @@ and parse_pattern env : Pattern.t =
       let l = parse_literal env in
       Literal l
 
-    | Token.T_LBRACKET -> (
+    | Token.T_LBRACKET ->
       Eat.token env;
-
       parse_array_pattern_continue []
-    )
 
     | Token.T_LPAREN -> (
       Eat.token env;
