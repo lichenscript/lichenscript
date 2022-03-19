@@ -3,4 +3,6 @@ function main() {
 	const a = 0;
 	print(~a);
 	print(~(-1));
+	const b = 0L;
+	print(~b);
 }
