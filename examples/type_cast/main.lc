@@ -1,6 +1,6 @@
 
 function returnF32(): f32 {
-	3.3
+	3.3f
 }
 
 function acceptOptionI32(a: Option<i32>) {
@@ -10,7 +10,7 @@ function acceptOptionI32(a: Option<i32>) {
 function main() {
 	const i = returnF32() as i32;
 	print(1);
-	const b = 0.3 + (3 as f32);
+	const b = 0.3f + (3 as f32);
 	print(b);
 
 	const c = b as i32;
