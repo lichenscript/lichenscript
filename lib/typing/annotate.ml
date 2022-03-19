@@ -175,8 +175,13 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
         | String _ ->
           [], TypeExpr.String
 
-        | Float _ ->
-          let ty_var = Option.value_exn (root_scope#find_type_symbol "f32") in
+        | Float(_, is_f32) ->
+          let ty_var =
+            if is_f32 then
+              Option.value_exn (root_scope#find_type_symbol "f32")
+            else
+              Option.value_exn (root_scope#find_type_symbol "f64")
+          in
           [ty_var], TypeExpr.Ctor(Ref ty_var, [])
 
         | Boolean _ -> 

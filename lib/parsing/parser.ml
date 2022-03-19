@@ -1443,9 +1443,9 @@ and parse_literal env =
       Literal.I64 (Int64.of_string content)
   )
 
-  | Token.T_FLOAT { content; _ } -> (
+  | Token.T_FLOAT { content; is_f32 ;_ } -> (
     Eat.token env;
-    Literal.Float (content, None)
+    Literal.Float (content, is_f32)
   )
 
   | Token.T_CHAR(_, ch, _) ->

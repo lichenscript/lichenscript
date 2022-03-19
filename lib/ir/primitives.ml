@@ -44,6 +44,8 @@ module Value = struct
 
   let mk_f32 = "MK_F32"
 
+  let mk_f64 = "MK_F64"
+
   let new_string = "LCNewStringFromCString"
 
   let new_string_len = "LCNewStringFromCStringLen"
@@ -133,6 +135,21 @@ module Bin = struct
     | Mult -> "LC_F32_MULT"
     | Div -> "LC_F32_DIV"
     | Mod -> "LC_I32_MOD"
+    | _ -> failwith "unsupport binary op for f32"
+
+  let prim_f64 (op: Asttypes.BinaryOp.t) =
+    match op with
+    | Equal -> "LC_F64_EQ"
+    | NotEqual -> "LC_F64_NOT_EQ"
+    | LessThan -> "LC_F64_LT"
+    | LessThanEqual -> "LC_F64_LTEQ"
+    | GreaterThan -> "LC_F64_GT"
+    | GreaterThanEqual -> "LC_F64_GTEQ"
+    | Plus -> "LC_F64_PLUS"
+    | Minus -> "LC_F64_MINUS"
+    | Mult -> "LC_F64_MULT"
+    | Div -> "LC_F64_DIV"
+    | Mod -> "LC_I64_MOD"
     | _ -> failwith "unsupport binary op for f32"
 
   let to_cmp (op: Asttypes.BinaryOp.t) =
