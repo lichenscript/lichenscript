@@ -166,7 +166,8 @@ and Expr : sig
   | NewString of string
   | NewI32 of string
   | NewI64 of string
-  | NewFloat of string
+  | NewF32 of string
+  | NewF64 of string
   | NewChar of int
   | NewLambda of lambda_spec
   | NewBoolean of bool

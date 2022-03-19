@@ -484,8 +484,15 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env value
   )
 
-  | NewFloat value -> (
+  | NewF32 value -> (
     ps env Primitives.Value.mk_f32;
+    ps env "(";
+    ps env value;
+    ps env ")"
+  )
+
+  | NewF64 value -> (
+    ps env Primitives.Value.mk_f64;
     ps env "(";
     ps env value;
     ps env ")"
@@ -727,6 +734,16 @@ and codegen_expression (env: t) (expr: Expr.t) =
   )
 
   | F64Binary(op, left, right) -> (
+    let name = Primitives.Bin.prim_f64 op in
+    ps env name;
+    ps env "(";
+    codegen_expression env left;
+    ps env ", ";
+    codegen_expression env right;
+    ps env ")"
+  )
+
+  (* | F64Binary(op, left, right) -> (
     ps env "LCF64Binary(rt, ";
     ps env (Primitives.Bin.to_arithmetic_op op);
     ps env ", ";
@@ -734,7 +751,7 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ", ";
     codegen_expression env right;
     ps env ")"
-  )
+  ) *)
 
   | I32BitNot expr -> (
     ps env "LC_I32_BITNOT(";

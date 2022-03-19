@@ -32,7 +32,7 @@ module%gen rec Literal : sig
     | Char of int
     (* 'c' *)
     | String of string * Loc.t * string option
-    | Float of string * char option
+    | Float of string * bool
     | Boolean of bool
     [@@deriving show]
 

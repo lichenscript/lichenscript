@@ -729,7 +729,7 @@ and try_folding_literals op left right original_expr =
       | BinaryOp.Mult -> left_f * right_f
       | _ -> failwith "unsupported binary op between float"
     in
-    Constant(Literal.Float(Float.to_string new_float, None))
+    Constant(Literal.Float(Float.to_string new_float, false))
   in
 
   match (left.spec, right.spec) with
@@ -755,7 +755,7 @@ and try_folding_literals op left right original_expr =
     )
     | _ -> None
   )
-  | (Constant(Float(left_f_str, _)), Constant(Float(right_f_str, _))) -> (
+  | (Constant(Float(left_f_str, false)), Constant(Float(right_f_str, false))) -> (
     match op with
     | BinaryOp.Plus
     | BinaryOp.Minus
@@ -832,8 +832,11 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       | Boolean bl ->
         Ir.Expr.NewBoolean bl
 
-      | Float (fl, _) ->
-        Ir.Expr.NewFloat fl
+      | Float (fl, is_f32) ->
+        if is_f32 then
+          Ir.Expr.NewF32 fl
+        else
+          Ir.Expr.NewF64 fl
 
       | Char ch ->
         Ir.Expr.NewChar ch

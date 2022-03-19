@@ -158,6 +158,17 @@ typedef struct LCValue {
 #define LC_I64_BIT_OR(l, r) MK_I64((l).i64_val | (r).i64_val)
 #define LC_I64_BIT_AND(l, r) MK_I64((l).i64_val & (r).i64_val)
 
+#define LC_F64_EQ(l, r) MK_BOOL((l).f64_val == (r).f64_val)
+#define LC_F64_NOT_EQ(l, r) MK_BOOL((l).f64_val != (r).f64_val)
+#define LC_F64_LT(l, r) MK_BOOL((l).f64_val < (r).f64_val)
+#define LC_F64_LTEQ(l, r) MK_BOOL((l).f64_val <= (r).f64_val)
+#define LC_F64_GT(l, r) MK_BOOL((l).f64_val > (r).f64_val)
+#define LC_F64_GTEQ(l, r) MK_BOOL((l).f64_val >= (r).f64_val)
+#define LC_F64_PLUS(l, r) MK_F64((l).f64_val + (r).f64_val)
+#define LC_F64_MINUS(l, r) MK_F64((l).f64_val - (r).f64_val)
+#define LC_F64_MULT(l, r) MK_F64((l).f64_val * (r).f64_val)
+#define LC_F64_DIV(l, r) MK_F64((l).f64_val / (r).f64_val)
+
 #else
 
 // in 64bit mode, LCValue is 128bit

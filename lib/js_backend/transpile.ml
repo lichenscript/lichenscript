@@ -330,10 +330,13 @@ and transpile_expression ?(parent_expr=true) env expr =
     ps env raw;
     ps env "n"
 
-  | NewFloat raw ->
+  | NewF32 raw ->
     ps env "Math.fround(";
     ps env raw;
     ps env ")"
+
+  | NewF64 raw ->
+    ps env raw
 
   | NewString content ->
     let content = Ir.Utils.escape_string content in
@@ -432,7 +435,8 @@ and transpile_expression ?(parent_expr=true) env expr =
   | I64Binary(op, left, right) ->
     transpile_i64_binary env op left right
 
-  | F64Binary _ -> failwith "unimplemented binary2"
+  | F64Binary(op, left, right) ->
+    transpile_f64_binary env op left right
 
   | CallLambda(expr, params) -> (
     transpile_expression env expr;
@@ -772,6 +776,63 @@ and transpile_f32_binary env op left right =
       ps env "(";
       transpile_expression env left;
       ps env ", ";
+      transpile_expression env right;
+      ps env ")"
+    )
+
+  | LShift
+  | RShift
+  | Mod -> failwith "unrechable"
+
+  | Equal
+  | NotEqual
+  | LessThan
+  | LessThanEqual
+  | GreaterThan
+  | GreaterThanEqual
+  | BitOr
+  | Xor
+  | BitAnd
+  | And
+  | Or
+    -> (
+      ps env "(";
+      transpile_expression env left;
+      ps env (match op with
+      | Equal -> "==="
+      | NotEqual -> "!=="
+      | LessThan -> "<"
+      | LessThanEqual -> "<="
+      | GreaterThan -> ">"
+      | GreaterThanEqual -> ">="
+      | BitOr -> "|"
+      | Xor -> "^"
+      | BitAnd -> "&"
+      | And -> "&&"
+      | Or -> "||"
+      | _ -> failwith "unrechable binary");
+      transpile_expression env right;
+      ps env ")"
+    )
+  )
+
+and transpile_f64_binary env op left right =
+  let open Asttypes.BinaryOp in
+  (match op with
+  | Plus
+  | Minus
+  | Mult
+  | Div
+    -> (
+      ps env "(";
+      transpile_expression env left;
+      ps env (match op with
+      | Plus -> " + "
+      | Minus -> " - "
+      | Mult -> " * "
+      | Div -> " / "
+      | _ -> failwith "unreachable"
+      );
       transpile_expression env right;
       ps env ")"
     )

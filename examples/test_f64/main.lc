@@ -1,6 +1,6 @@
 
 function main() {
-  const n1 = 0.01f;
-  const n2 = 0.02f;
+  const n1 = 0.01;
+  const n2 = 0.02;
   print(n1 + n2);
 }

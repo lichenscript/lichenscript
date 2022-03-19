@@ -1681,10 +1681,19 @@ LCValue LCToString(LCRuntime* rt, LCValue val) {
         str = buf;
         break;
 
+#ifdef LC_PTR64
+
     case LC_TY_I64:
         snprintf(buf, sizeof(buf), "%lld", val.i64_val);
         str = buf;
         break;
+
+    case LC_TY_F64:
+        snprintf(buf, sizeof(buf), "%lf", val.f64_val);
+        str = buf;
+        break;
+
+#endif
 
     case LC_TY_NULL:
         str = "()";
