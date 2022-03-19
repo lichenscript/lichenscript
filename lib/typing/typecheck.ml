@@ -699,7 +699,9 @@ and check_expression env expr =
     )
 
     | Asttypes.UnaryOp.Minus ->
-      if not (Check_helper.is_i32 env.ctx node_type) && not (Check_helper.is_f32 env.ctx node_type) then (
+      if not (Check_helper.is_i32 env.ctx node_type) &&
+        not (Check_helper.is_i64 env.ctx node_type) &&
+        not (Check_helper.is_f32 env.ctx node_type) then (
         raise_err ()
       );
       Program.update_node_type env.ctx expr.ty_var node_type

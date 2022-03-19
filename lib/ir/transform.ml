@@ -1278,7 +1278,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       | UnaryOp.Minus ->
         if Check_helper.is_i64 env.ctx node_type then
-          Ir.Expr.I64Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewI32 "-1")
+          Ir.Expr.I64Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewI64 "-1")
         else
           Ir.Expr.I32Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewI32 "-1")
 

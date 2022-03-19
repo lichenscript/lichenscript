@@ -4,4 +4,13 @@ function main() {
   print(n1);
   const n2 = 0x100000000L;
   print(n1 + n2);
+  print(n1 - n2);
+  print(n1 * n2);
+  print(n1 / n2);
+  let n3 = 0x7FFFFFFFFFFFFFFFL;
+  print(n3 + 1L);
+  const n4 = n1 * -1L;
+  print(n4 - n1);
+  n3 *= -1L;
+  print(n3 - 2L);
 }

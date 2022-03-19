@@ -1135,7 +1135,7 @@ and parse_assignment_expression env : Expression.t =
     | Token.T_ASSIGN -> None, true
     | Token.T_PLUS_ASSIGN -> (Some Asttypes.AssignOp.PlusAssign), true
     | Token.T_MINUS_ASSIGN -> (Some Asttypes.AssignOp.MinusAssign), true
-    | Token.T_MULT_ASSIGN -> (Some Asttypes.AssignOp.MinusAssign), true
+    | Token.T_MULT_ASSIGN -> (Some Asttypes.AssignOp.MultAssign), true
     | Token.T_DIV_ASSIGN -> (Some Asttypes.AssignOp.DivAssign), true
     | Token.T_MOD_ASSIGN -> (Some Asttypes.AssignOp.ModAssign), true
     | Token.T_LSHIFT_ASSIGN -> (Some Asttypes.AssignOp.LShiftAssign), true
