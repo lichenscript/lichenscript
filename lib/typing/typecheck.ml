@@ -880,8 +880,14 @@ and check_expression env expr =
           raise (Diagnosis.Error err)
         )
       )
-      | Literal (Ast.Literal.Integer _) -> (
+      | Literal (Ast.Literal.I32 _) -> (
         if not (Check_helper.is_i32 env.ctx expr_type) then (
+          let err = Diagnosis.(make_error env.ctx pat.loc (UnexpectedPatternType("number", expr_type))) in
+          raise (Diagnosis.Error err)
+        )
+      )
+      | Literal (Ast.Literal.I64 _) -> (
+        if not (Check_helper.is_i64 env.ctx expr_type) then (
           let err = Diagnosis.(make_error env.ctx pat.loc (UnexpectedPatternType("number", expr_type))) in
           raise (Diagnosis.Error err)
         )

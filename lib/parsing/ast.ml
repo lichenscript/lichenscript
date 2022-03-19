@@ -23,7 +23,8 @@ module%gen rec Literal : sig
 
   type t =
     | Unit
-    | Integer of int32 (* TODO: support i64 *)
+    | I32 of int32
+    | I64 of int64
     (*
      * `char` is representing a 8-bit char in OCaml,
      * but char is UTF-16 in LichenScript
