@@ -93,7 +93,7 @@ let scibigint = [%sedlex.regexp? (scinumber, 'L')]
 
 let wholebigint = [%sedlex.regexp? (underscored_digit, 'L')]
 
-let floatbigint = [%sedlex.regexp? ((floatnumber | (underscored_digit, '.')), 'L')]
+let f32int = [%sedlex.regexp? ((floatnumber | (underscored_digit, '.')), 'f')]
 
 (* 2-8 alphanumeric characters. I could match them directly, but this leads to
  * ~5k more lines of generated lexer
@@ -792,16 +792,14 @@ let token (env : Lex_env.t) lexbuf : result =
     let raw = lexeme lexbuf in
     Token (env, T_INTEGER { kind = NORMAL; raw; content = raw; is_long = false })
   )
-  | (floatbigint, word) ->
+  | (f32int, word) ->
     (* Numbers cannot be immediately followed by words *)
     recover env lexbuf ~f:(fun env lexbuf ->
         match%sedlex lexbuf with
-        | floatbigint -> (
-          let loc = loc_of_lexbuf env lexbuf in
-          let env = lex_error env loc Lex_error.InvalidFloatBigInt in
+        | f32int -> (
           let raw = lexeme lexbuf in
           let content = String.sub raw 0 ((String.length raw) - 1) in
-          Token (env, T_FLOAT { raw; content; is_long = true })
+          Token (env, T_FLOAT { raw; content; is_f32 = true })
         )
         | _ -> failwith "unreachable")
   | (wholebigint, word) ->
@@ -815,12 +813,10 @@ let token (env : Lex_env.t) lexbuf : result =
         )
         | _ -> failwith "unreachable")
 
-  | floatbigint ->
-    let loc = loc_of_lexbuf env lexbuf in
-    let env = lex_error env loc Lex_error.InvalidFloatBigInt in
+  | f32int ->
     let raw = lexeme lexbuf in
     let content = String.sub raw 0 ((String.length raw) - 1) in
-    Token (env, T_FLOAT { raw; content; is_long = true })
+    Token (env, T_FLOAT { raw; content; is_f32 = true })
 
   | wholebigint ->
     let raw = lexeme lexbuf in
@@ -837,7 +833,7 @@ let token (env : Lex_env.t) lexbuf : result =
         )
         | floatnumber ->
           let raw = lexeme lexbuf in
-          Token (env, T_FLOAT { raw; content = raw; is_long = false })
+          Token (env, T_FLOAT { raw; content = raw; is_f32 = false })
 
         | _ -> failwith "unreachable")
   | wholenumber -> (
@@ -846,7 +842,7 @@ let token (env : Lex_env.t) lexbuf : result =
   )
   | floatnumber -> (
     let raw = lexeme lexbuf in
-    Token (env, T_FLOAT { raw; content = raw; is_long = false })
+    Token (env, T_FLOAT { raw; content = raw; is_f32 = false })
   )
   (* Keywords *)
   | "as" -> Token (env, T_AS)
