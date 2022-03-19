@@ -1,6 +1,8 @@
 
 const i32_max = 0x7FFFFFFF;
-const i32_min = 0x7FFFFFFF * -1 + 1;
+const i32_min = -0x7FFFFFFF - 1;
+const i64_max = 0x7FFFFFFFFFFFFFFFn;
+const i64_min = -0x7FFFFFFFFFFFFFFFn - 1n;
 
 const unionSym = Symbol("union");
 const tupleSym = Symbol("tuple");
@@ -10,24 +12,52 @@ function i32_add(a, b) {
   a = a|0;  // give hinting to v8
   b = b|0;
 
-  let tmp = a + b;
-  if (tmp > i32_max) {
-    return tmp & i32_max;
+  a += b;
+  if (a > i32_max) {
+    return (a - i32_max) + i32_min - 1;
   }
 
-  return tmp|0;
+  return a|0;
+}
+
+function i64_add(a, b) {
+  a += b;
+  if (a > i64_max) {
+    return (a - i64_max) + i64_min - 1n;
+  }
+  return a;
 }
 
 function i32_sub(a, b) {
   a = a|0;  // give hinting to v8
   b = b|0;
-  return (a - b)|0;
+  a -= b;
+  if (a < i32_min) {
+    return (a - i32_min) + i32_max + 1;
+  }
+  return a|0;
+}
+
+function i64_sub(a, b) {
+  a -= b;
+  if (a < i64_min) {
+    return (a - i64_min) + i64_max + 1n;
+  }
+  return a;
 }
 
 function i32_mult(a, b) {
   a = a|0;  // give hinting to v8
   b = b|0;
   return (a * b)|0;
+}
+
+function i64_mult(a, b) {
+  a *= b;
+  if (a > i64_max) {
+    return 0;
+  }
+  return a;
 }
 
 function i32_div(a, b) {

@@ -674,9 +674,30 @@ and transpile_i32_binary env op left right =
 and transpile_i64_binary env op left right =
   let open Asttypes.BinaryOp in
   (match op with
-  | Plus
-  | Minus
-  | Mult
+  | Plus -> (
+    ps env "i64_add";
+    ps env "(";
+    transpile_expression env left;
+    ps env ", ";
+    transpile_expression env right;
+    ps env ")"
+  )
+  | Mult -> (
+    ps env "i64_mult";
+    ps env "(";
+    transpile_expression env left;
+    ps env ", ";
+    transpile_expression env right;
+    ps env ")"
+  )
+  | Minus-> (
+    ps env "i64_sub";
+    ps env "(";
+    transpile_expression env left;
+    ps env ", ";
+    transpile_expression env right;
+    ps env ")"
+  )
   | Div
   | LShift
   | RShift
