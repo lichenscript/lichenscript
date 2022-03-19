@@ -9,7 +9,7 @@ type t =
   | T_FLOAT of {
     raw: string;
     content: string;
-    is_long: bool;
+    is_f32: bool;
   }
 
   | T_CHAR of (Loc.t * int * string)
