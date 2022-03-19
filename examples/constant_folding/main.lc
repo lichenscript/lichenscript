@@ -9,7 +9,7 @@ function main() {
   const int6 = 1 - (2 - 3) - 4;
   const int7 = int1 + (int3 - int1) / 2;
   // float
-  const float1 = 0.1 + 0.2;
+  const float1 = 1.0 + 2.0;
   const float2 = float1 / 0.3 * 0.3;
   const float3 = 1.0 + 4.0 / 2.0 + 3.0;
   const float4 = 1.0 - (2.0 - 3.0) - 4.0;
@@ -26,8 +26,8 @@ function main() {
   print(int6 == -2);
   print(int7 == 12);
 
-  print(float1 == 0.3);
-  print(float1 / 0.3 == 1.0);
+  print(float1 == 3.0);
+  print(float1 / 3.0 == 1.0);
   print(float2 == float1);
   print(float3 == 6.0);
   print(float4 == -2.0);

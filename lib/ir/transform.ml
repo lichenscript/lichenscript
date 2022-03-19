@@ -717,7 +717,7 @@ and try_folding_literals op left right original_expr =
     Constant(Literal.I64(new_int))
   in
 
-  let do_float_folding float_op left_str right_str =
+  let do_f64_folding float_op left_str right_str =
     let new_float =
       let open Float in
       let left_f = Float.of_string left_str in
@@ -761,7 +761,7 @@ and try_folding_literals op left right original_expr =
     | BinaryOp.Minus
     | BinaryOp.Div
     | BinaryOp.Mult -> (
-      let new_spec = do_float_folding op left_f_str right_f_str in
+      let new_spec = do_f64_folding op left_f_str right_f_str in
       Some { left with spec = new_spec }
     )
     | _ -> None
@@ -1282,6 +1282,10 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       | UnaryOp.Minus ->
         if Check_helper.is_i64 env.ctx node_type then
           Ir.Expr.I64Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewI64 "-1")
+        else if Check_helper.is_f64 env.ctx node_type then
+          Ir.Expr.F64Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewF64 "-1")
+        else if Check_helper.is_f32 env.ctx node_type then
+          Ir.Expr.F32Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewF32 "-1")
         else
           Ir.Expr.I32Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewI32 "-1")
 
