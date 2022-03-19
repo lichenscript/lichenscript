@@ -189,6 +189,7 @@ type config = {
   (* automatic reference counting *)
   arc: bool;
   prepend_lambda: bool;
+  ptr_size: Ir.ptr_size option;
 }
 
 type t = {
@@ -213,6 +214,11 @@ type t = {
   mutable current_fun_meta: current_fun_meta option;
   mutable lambdas: Ir.Decl.t list;
 }
+
+let type_should_not_release (env: t) =
+  Transform_helper.type_should_not_release ~ptr_size:(env.config.ptr_size) env.ctx
+
+let type_is_not_gc env = Transform_helper.type_is_not_gc env.ctx
 
 let[@warning "-unused-value-declaration"] is_identifier expr =
   let open Typedtree.Expression in
@@ -589,7 +595,7 @@ and transform_statement ?ret env stmt =
     let node_type = Program.deref_node_type env.ctx name_id in
     let need_release =
       env.config.arc &&
-      not (Check_helper.type_should_not_release env.ctx node_type)
+      not (type_should_not_release env node_type)
     in
     (*
      * if a variable is captured, it will be upgraded into a RefCell.
@@ -648,7 +654,7 @@ and gen_release_temp id = Ir.Stmt.Release (Ir.Expr.Temp id)
 
 and auto_release_expr env ?(is_move=false) ~append_stmts ty_var expr =
   let node_type = Program.deref_node_type env.ctx ty_var in
-  if (not env.config.arc) || is_move || Check_helper.type_should_not_release env.ctx node_type then (
+  if (not env.config.arc) || is_move || type_should_not_release env node_type then (
     expr
   ) else (
     let tmp_id = env.tmp_vars_count in
@@ -817,11 +823,11 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       | I32 content ->
         let int_str = Int32.to_string content in
-        Ir.Expr.NewInt int_str
+        Ir.Expr.NewI32 int_str
 
       | I64 content ->
         let int_str = Int64.to_string content in
-        Ir.Expr.NewInt int_str
+        Ir.Expr.NewI64 int_str
 
       | Boolean bl ->
         Ir.Expr.NewBoolean bl
@@ -867,7 +873,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         let node_type = Program.deref_node_type env.ctx variable.var_id in
         let need_release =
           env.config.arc &&
-          not (Check_helper.type_should_not_release env.ctx node_type)
+          not (type_should_not_release env node_type)
         in
 
         if is_move && need_release then (
@@ -984,7 +990,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           Stmt.Expr (
             Expr.ArraySetValue(
               (Ident tmp_sym),
-              (NewInt (Int.to_string index)),
+              (NewI32 (Int.to_string index)),
               expr.expr
             )
           )
@@ -1035,7 +1041,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
               | I32 content ->
                 let int_str = Int32.to_string content in
-                Ir.Expr.NewInt int_str
+                Ir.Expr.NewI32 int_str
 
               | _ ->
                 failwith "unimplemented"
@@ -1258,6 +1264,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
     | Unary(op, expr) -> (
       let expr' = transform_expression ~is_borrow:true env expr in
+      let node_type = Program.deref_node_type env.ctx expr.ty_var in
 
       prepend_stmts := List.append !prepend_stmts expr'.prepend_stmts;
       append_stmts := List.append expr'.append_stmts !append_stmts;
@@ -1270,10 +1277,16 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         expr'.expr
 
       | UnaryOp.Minus ->
-        Ir.Expr.I32Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewInt "-1")
+        if Check_helper.is_i64 env.ctx node_type then
+          Ir.Expr.I64Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewI32 "-1")
+        else
+          Ir.Expr.I32Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewI32 "-1")
 
       | UnaryOp.BitNot ->
-        Ir.Expr.I32BitNot expr'.expr
+        if Check_helper.is_i64 env.ctx node_type then
+          Ir.Expr.I64BitNot expr'.expr
+        else
+          Ir.Expr.I32BitNot expr'.expr
 
     )
 
@@ -1298,7 +1311,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         let node_type = Program.deref_node_type env.ctx ty_id in
         let need_release =
           env.config.arc &&
-          not (Check_helper.type_should_not_release env.ctx node_type)
+          not (type_should_not_release env node_type)
         in
         if need_release then (
           let tmp_id = env.tmp_vars_count in
@@ -1634,7 +1647,7 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
 
     | Literal (Literal.I32 i) -> (
       let i_str = Int32.to_string i in
-      let if_test = Ir.Expr.IntValue(I32Binary(BinaryOp.Equal, match_expr, NewInt i_str)) in
+      let if_test = Ir.Expr.IntValue(I32Binary(BinaryOp.Equal, match_expr, NewI32 i_str)) in
       (fun genereator ->
         let if_stmt = Ir.Stmt.If {
           if_test;
@@ -1828,13 +1841,13 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
           Expr.I32Binary(
             BinaryOp.GreaterThanEqual,
             Expr.Call(SymLocal "lc_std_array_get_length", Some match_expr, []),
-            Expr.NewInt (Int.to_string elm_len))
+            Expr.NewI32 (Int.to_string elm_len))
 
         | None ->
           Expr.I32Binary(
             BinaryOp.Equal,
             Expr.Call(SymLocal "lc_std_array_get_length", Some match_expr, []),
-            Expr.NewInt (Int.to_string elm_len))
+            Expr.NewI32 (Int.to_string elm_len))
       )
 
       in
@@ -1848,7 +1861,7 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
             let assign_stmt = Ir.Stmt.Expr(
               Assign(
                 Temp match_tmp,
-                ArrayGetValue(match_expr, Expr.IntValue(Expr.NewInt (Int.to_string index)))
+                ArrayGetValue(match_expr, Expr.IntValue(Expr.NewI32 (Int.to_string index)))
               )
             ) in
 
@@ -1875,7 +1888,7 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
                 SymLocal "lc_std_array_slice",
                 Some match_expr,
                 [
-                  Expr.NewInt (Int.to_string elm_len);
+                  Expr.NewI32 (Int.to_string elm_len);
                   Expr.Call(SymLocal "lc_std_array_get_length", Some match_expr, [])
                 ]
               )
@@ -2414,7 +2427,7 @@ and generate_finalizer env name (type_def: Core_type.TypeDef.t) : Ir.Decl.class_
     List.filter_map
       ~f:(fun (field_name, ty_var) ->
         let field_type = Program.deref_node_type env.ctx ty_var in
-        if Check_helper.type_should_not_release env.ctx field_type then
+        if type_should_not_release env field_type then
           None
         else
           Some (
@@ -2441,7 +2454,7 @@ and generate_gc_marker env name (type_def: Core_type.TypeDef.t) : Ir.Decl.gc_mar
     List.filter_map
       ~f:(fun (field_name, ty_var) ->
         let field_type = Program.deref_node_type env.ctx ty_var in
-        if Check_helper.type_is_not_gc env.ctx field_type then
+        if type_is_not_gc env field_type then
           None
         else
           Some field_name

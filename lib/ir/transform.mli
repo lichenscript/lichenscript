@@ -10,6 +10,7 @@ type config = {
   (* automatic reference counting *)
   arc: bool;
   prepend_lambda: bool;
+  ptr_size: Ir.ptr_size option;
 }
 
 val transform_declarations: config:config -> Program.t -> Typedtree.Declaration.t list -> result

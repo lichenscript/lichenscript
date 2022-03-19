@@ -119,9 +119,9 @@ typedef void LCMarkFunc(LCRuntime *rt, LCGCObject* gc_obj);
 typedef void (*LCClassGCMark)(LCRuntime *rt, LCValue val,
                            LCMarkFunc *mark_func);
 
-// #if INTPTR_MAX >= INT64_MAX
-// #define LC_PTR64
-// #endif
+#if INTPTR_MAX >= INT64_MAX
+#define LC_PTR64
+#endif
 
 #ifdef LC_PTR64
 
@@ -129,14 +129,34 @@ typedef void (*LCClassGCMark)(LCRuntime *rt, LCValue val,
 // int64_t and double are encoded in the value
 typedef struct LCValue {
     union {
-        int32_t   i32_val;  // bool
-        float     f32_val;
-        LCObject* ptr_val;
-        double    f64_val;
-        int64_t   i64_val;
+        int     int_val;  // bool
+        float   float_val;
+        void*   ptr_val;
+        int64_t i64_val;
+        double  f64_val;
     };
-    int32_t tag;
+    int64_t tag;
 } LCValue;
+
+#define MK_I64(v) ((LCValue) { { .i64_val = v }, LC_TY_I64 })
+#define MK_F64(v) ((LCValue) { { .f64_val = v }, LC_TY_F64 })
+#define MK_BOOL(v) ((LCValue) { { .int_val = (v) }, LC_TY_BOOL })
+#define LC_I64_BITNOT(v) MK_I64(~((v).int_val))
+#define LC_I64_EQ(l, r) MK_BOOL((l).i64_val == (r).i64_val)
+#define LC_I64_NOT_EQ(l, r) MK_BOOL((l).i64_val != (r).i64_val)
+#define LC_I64_LT(l, r) MK_BOOL((l).i64_val < (r).i64_val)
+#define LC_I64_LTEQ(l, r) MK_BOOL((l).i64_val <= (r).i64_val)
+#define LC_I64_GT(l, r) MK_BOOL((l).i64_val > (r).i64_val)
+#define LC_I64_GTEQ(l, r) MK_BOOL((l).i64_val >= (r).i64_val)
+#define LC_I64_PLUS(l, r) MK_I64((l).i64_val + (r).i64_val)
+#define LC_I64_MINUS(l, r) MK_I64((l).i64_val - (r).i64_val)
+#define LC_I64_MULT(l, r) MK_I64((l).i64_val * (r).i64_val)
+#define LC_I64_DIV(l, r) MK_I64((l).i64_val / (r).i64_val)
+#define LC_I64_MOD(l, r) MK_I64((l).i64_val % (r).i64_val)
+#define LC_I64_LEFT_SHIFT(l, r) MK_I64((l).i64_val << (r).i64_val)
+#define LC_I64_RIGHT_SHIFT(l, r) MK_I64((l).i64_val >> (r).i64_val)
+#define LC_I64_BIT_OR(l, r) MK_I64((l).i64_val | (r).i64_val)
+#define LC_I64_BIT_AND(l, r) MK_I64((l).i64_val & (r).i64_val)
 
 #else
 
@@ -148,13 +168,16 @@ struct LCValue {
         float  float_val;
         void*  ptr_val;
     };
-    int64_t tag;
+    int32_t tag;
 };
+
+#define MK_BOOL(v) ((LCValue) { { .int_val = (v) }, LC_TY_BOOL })
+
+#endif
 
 #define MK_I32(v) ((LCValue) { { .int_val = v }, LC_TY_I32 })
 #define MK_CHAR(v) ((LCValue) { { .int_val = v }, LC_TY_CHAR })
 #define MK_F32(v) ((LCValue) { { .float_val = v }, LC_TY_F32 })
-#define MK_BOOL(v) ((LCValue) { { .int_val = (v) }, LC_TY_BOOL })
 #define MK_VARIANT_CLOSED(v) ((LCValue) { { .int_val = v }, (LC_TY_MAX + (v << 6)) })
 #define MK_CLASS_OBJ(obj) ((LCValue){ { .ptr_val = (LCObject*)obj }, LC_TY_CLASS_OBJECT })
 #define MK_UNION(cls_id, v) ((LCValue) { { .int_val = (cls_id << 16) | v }, LC_TY_UNION })
@@ -194,8 +217,6 @@ struct LCValue {
 #define LC_F32_DIV(l, r) MK_F32((l).float_val / (r).float_val)
 
 #define LCCast(v, CNAME) ((CNAME)((v).ptr_val))
-
-#endif
 
 typedef int32_t LCClassID;
 

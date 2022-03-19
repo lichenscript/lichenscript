@@ -40,6 +40,8 @@ module Value = struct
 
   let mk_i32 = "MK_I32"
 
+  let mk_i64 = "MK_I64"
+
   let mk_f32 = "MK_F32"
 
   let new_string = "LCNewStringFromCString"
@@ -62,7 +64,7 @@ end
 
 module Bin = struct
 
-  let prim (op: Asttypes.BinaryOp.t) =
+  let prim_i32 (op: Asttypes.BinaryOp.t) =
     match op with
     | Equal -> "LC_I32_EQ"
     | NotEqual -> "LC_I32_NOT_EQ"
@@ -80,6 +82,27 @@ module Bin = struct
     | BitOr -> "LC_I32_BIT_OR"
     | Xor -> "LC_I32_XOR"
     | BitAnd -> "LC_I32_BIT_AND"
+    | And -> "LC_AND"
+    | Or -> "LC_OR"
+
+  let prim_i64 (op: Asttypes.BinaryOp.t) =
+    match op with
+    | Equal -> "LC_I64_EQ"
+    | NotEqual -> "LC_I64_NOT_EQ"
+    | LessThan -> "LC_I64_LT"
+    | LessThanEqual -> "LC_I64_LTEQ"
+    | GreaterThan -> "LC_I64_GT"
+    | GreaterThanEqual -> "LC_I64_GTEQ"
+    | LShift -> "LC_I64_LEFT_SHIFT"
+    | RShift -> "LC_I64_RIGHT_SHIFT"
+    | Plus -> "LC_I64_PLUS"
+    | Minus -> "LC_I64_MINUS"
+    | Mult -> "LC_I64_MULT"
+    | Div -> "LC_I64_DIV"
+    | Mod -> "LC_I64_MOD"
+    | BitOr -> "LC_I64_BIT_OR"
+    | Xor -> "LC_I64_XOR"
+    | BitAnd -> "LC_I64_BIT_AND"
     | And -> "LC_AND"
     | Or -> "LC_OR"
 

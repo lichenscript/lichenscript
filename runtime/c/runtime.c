@@ -1659,7 +1659,7 @@ LCValue LCUnionObjectToString(LCRuntime* rt, LCValue val) {
 }
 
 LCValue LCToString(LCRuntime* rt, LCValue val) {
-    const char *str;
+    const char *str = NULL;
     char buf[32];
 
     switch (val.tag) {
@@ -1678,6 +1678,11 @@ LCValue LCToString(LCRuntime* rt, LCValue val) {
 
     case LC_TY_I32:
         snprintf(buf, sizeof(buf), "%d", val.int_val);
+        str = buf;
+        break;
+
+    case LC_TY_I64:
+        snprintf(buf, sizeof(buf), "%lld", val.i64_val);
         str = buf;
         break;
 
