@@ -1451,7 +1451,7 @@ LCValue LCNewF64(LCRuntime* rt, double val) {
     ptr->header.count = 1;
     ptr->u.f64 = val;
 
-    return (LCValue) { { .ptr_val = (LCObject*)ptr }, LC_TY_BOXED_I64 };
+    return (LCValue) { { .ptr_val = (LCObject*)ptr }, LC_TY_BOXED_F64 };
 }
 
 LCValue LCF64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue right) {
@@ -1482,6 +1482,82 @@ LCValue LCF64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue ri
     }
 
     return LCNewF64(rt, result);
+}
+
+LCValue LCI64BitNot(LCRuntime* rt, LCValue val) {
+    LCBox64* ptr = (LCBox64*)val.ptr_val;
+    int64_t v = ~(ptr->u.i64);
+    return LCNewI64(rt, v);
+}
+
+LCValue LCI64Cmp(LCRuntime* rt, LCCmpType op, LCValue left, LCValue right) {
+    LCBox64* left_ptr = (LCBox64*)left.ptr_val;
+    LCBox64* right_ptr = (LCBox64*)right.ptr_val;
+    int result;
+
+    switch (op) {
+        case LC_CMP_EQ:
+            result = left_ptr->u.i64 == right_ptr->u.i64;
+            break;
+
+        case LC_CMP_NEQ:
+            result = left_ptr->u.i64 != right_ptr->u.i64;
+            break;
+
+        case LC_CMP_LT:
+            result = left_ptr->u.i64 < right_ptr->u.i64;
+            break;
+
+        case LC_CMP_LTEQ:
+            result = left_ptr->u.i64 <= right_ptr->u.i64;
+            break;
+
+        case LC_CMP_GT:
+            result = left_ptr->u.i64 > right_ptr->u.i64;
+            break;
+
+        case LC_CMP_GTEQ:
+            result = left_ptr->u.i64 >= right_ptr->u.i64;
+            break;
+
+    }
+
+    return MK_BOOL(result);
+}
+
+LCValue LCF64Cmp(LCRuntime* rt, LCCmpType op, LCValue left, LCValue right) {
+    LCBox64* left_ptr = (LCBox64*)left.ptr_val;
+    LCBox64* right_ptr = (LCBox64*)right.ptr_val;
+    int result;
+
+    switch (op) {
+        case LC_CMP_EQ:
+            result = left_ptr->u.f64 == right_ptr->u.f64;
+            break;
+
+        case LC_CMP_NEQ:
+            result = left_ptr->u.f64 != right_ptr->u.f64;
+            break;
+
+        case LC_CMP_LT:
+            result = left_ptr->u.f64 < right_ptr->u.f64;
+            break;
+
+        case LC_CMP_LTEQ:
+            result = left_ptr->u.f64 <= right_ptr->u.f64;
+            break;
+
+        case LC_CMP_GT:
+            result = left_ptr->u.f64 > right_ptr->u.f64;
+            break;
+
+        case LC_CMP_GTEQ:
+            result = left_ptr->u.f64 >= right_ptr->u.f64;
+            break;
+
+    }
+
+    return MK_BOOL(result);
 }
 
 #endif

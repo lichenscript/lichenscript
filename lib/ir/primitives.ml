@@ -120,7 +120,9 @@ module Bin = struct
     | BitOr -> "LC_ARTH_BIT_OR"
     | Xor -> "LC_ARTH_BIT_XOR"
     | BitAnd -> "LC_I32_BIT_AND"
-    | _ -> failwith "unsupport binary op for f32"
+    | _ ->
+      let name = Format.asprintf "%a" Asttypes.BinaryOp.pp op in
+      failwith ("unsupport binary op: " ^ name)
 
   let prim_f32 (op: Asttypes.BinaryOp.t) =
     match op with

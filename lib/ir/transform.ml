@@ -843,8 +843,14 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       | Float (fl, is_f32) ->
         if is_f32 then
           Ir.Expr.NewF32 fl
-        else
-          Ir.Expr.NewF64 fl
+        else (
+          match env.config.ptr_size with
+          | Some Ir.Ptr32 ->
+            let result = Ir.Expr.NewF64 fl in
+            auto_release_expr env ~is_move ~append_stmts ty_var result
+          | _ ->
+            Ir.Expr.NewF64 fl
+        )
 
       | Char ch ->
         Ir.Expr.NewChar ch
@@ -1298,17 +1304,31 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           )
           | _ ->
             Ir.Expr.I64Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewI64 "-1")
-        ) else if Check_helper.is_f64 env.ctx node_type then
-          Ir.Expr.F64Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewF64 "-1")
-        else if Check_helper.is_f32 env.ctx node_type then
+        ) else if Check_helper.is_f64 env.ctx node_type then (
+          match env.config.ptr_size with
+          | Some Ir.Ptr32 -> (
+            let n1 = Ir.Expr.NewF64 "-1" in
+            let n1 = auto_release_expr env ~is_move ~append_stmts expr.ty_var n1 in
+            let tmp = Ir.Expr.F64Binary(BinaryOp.Mult, expr'.expr, n1) in
+            auto_release_expr env ~is_move ~append_stmts expr.ty_var tmp
+          )
+          | _ ->
+            Ir.Expr.F64Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewF64 "-1")
+        ) else if Check_helper.is_f32 env.ctx node_type then
           Ir.Expr.F32Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewF32 "-1")
         else
           Ir.Expr.I32Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewI32 "-1")
 
       | UnaryOp.BitNot ->
-        if Check_helper.is_i64 env.ctx node_type then
-          Ir.Expr.I64BitNot expr'.expr
-        else
+        if Check_helper.is_i64 env.ctx node_type then (
+          match env.config.ptr_size with
+          | Some Ir.Ptr32 -> (
+            let tmp = Ir.Expr.I64BitNot expr'.expr in
+            auto_release_expr env ~is_move ~append_stmts expr.ty_var tmp
+          )
+          | _ ->
+            Ir.Expr.I64BitNot expr'.expr
+        ) else
           Ir.Expr.I32BitNot expr'.expr
 
     )
@@ -2082,9 +2102,15 @@ and transform_binary_expr env ~is_move ~append_stmts ~prepend_stmts expr op left
         )
         | _ ->
           Ir.Expr.I64Binary(op, left'.expr, right'.expr)
-      ) else if Check_helper.is_f64 env.ctx left_type then
-        Ir.Expr.F64Binary(op, left'.expr, right'.expr)
-      else if Check_helper.is_f32 env.ctx left_type then
+      ) else if Check_helper.is_f64 env.ctx left_type then (
+        match env.config.ptr_size with
+        | Some Ir.Ptr32 -> (
+          let tmp = Ir.Expr.F64Binary(op, left'.expr, right'.expr) in
+          auto_release_expr env ~is_move ~append_stmts expr.ty_var tmp
+        )
+        | _ ->
+          Ir.Expr.F64Binary(op, left'.expr, right'.expr)
+      ) else if Check_helper.is_f32 env.ctx left_type then
         Ir.Expr.F32Binary(op, left'.expr, right'.expr)
       else
         Ir.Expr.I32Binary(op, left'.expr, right'.expr)
@@ -2137,7 +2163,10 @@ and transform_binary_expr env ~is_move ~append_stmts ~prepend_stmts expr op left
         | None -> temp_expr
         | Some(folded_expr) -> folded_expr
       in
-      let result = transform_expression ~is_borrow:true env expr in
+      let result = transform_expression ~is_move env expr in
+
+      append_stmts := List.append !append_stmts result.append_stmts;
+
       result.expr
     )
   )

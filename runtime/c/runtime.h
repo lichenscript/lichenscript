@@ -305,6 +305,12 @@ LCValue LCNewF64(LCRuntime* rt, double val);
 
 LCValue LCF64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue right);
 
+LCValue LCI64BitNot(LCRuntime* rt, LCValue val);
+
+LCValue LCI64Cmp(LCRuntime* rt, LCCmpType op, LCValue left, LCValue right);
+
+LCValue LCF64Cmp(LCRuntime* rt, LCCmpType op, LCValue left, LCValue right);
+
 #endif
 
 LCValue LCRunMain(LCProgram* program, int argc, char** argv);

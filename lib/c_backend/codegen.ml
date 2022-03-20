@@ -500,10 +500,16 @@ and codegen_expression (env: t) (expr: Expr.t) =
   )
 
   | NewF64 value -> (
-    ps env Primitives.Value.mk_f64;
-    ps env "(";
-    ps env value;
-    ps env ")"
+    match env.ptr_size with
+    | Ir.Ptr64 ->
+      ps env Primitives.Value.mk_f64;
+      ps env "(";
+      ps env value;
+      ps env ")"
+    | Ir.Ptr32 ->
+      ps env "LCNewF64(rt, ";
+      ps env value;
+      ps env ")"
   )
 
   | NewBoolean true ->
@@ -715,8 +721,9 @@ and codegen_expression (env: t) (expr: Expr.t) =
   )
 
   | I64Binary(op, left, right) -> (
-    match env.ptr_size with
-    | Ir.Ptr64 ->
+    let open Lichenscript_parsing.Asttypes.BinaryOp in
+    match (op, env.ptr_size) with
+    | (_, Ir.Ptr64) ->
       let name = Primitives.Bin.prim_i64 op in
       ps env name;
       ps env "(";
@@ -724,9 +731,30 @@ and codegen_expression (env: t) (expr: Expr.t) =
       ps env ", ";
       codegen_expression env right;
       ps env ")"
-    | Ir.Ptr32 ->
+
+    | (Plus, Ir.Ptr32)
+    | (Minus, Ir.Ptr32)
+    | (Mult, Ir.Ptr32)
+    | (Div, Ir.Ptr32)
+    | (Mod, Ir.Ptr32)
+    | (LShift, Ir.Ptr32)
+    | (RShift, Ir.Ptr32)
+    | (BitOr, Ir.Ptr32)
+    | (Xor, Ir.Ptr32)
+    | (BitAnd, Ir.Ptr32)
+      ->
       ps env "LCI64Binary(rt, ";
       ps env (Primitives.Bin.to_arithmetic_op op);
+      ps env ", ";
+      codegen_expression env left;
+      ps env ", ";
+      codegen_expression env right;
+      ps env ")"
+
+    | (cmp_op, Ir.Ptr32)
+      ->
+      ps env "LCI64Cmp(rt, ";
+      ps env (Primitives.Bin.to_cmp cmp_op);
       ps env ", ";
       codegen_expression env left;
       ps env ", ";
@@ -745,24 +773,44 @@ and codegen_expression (env: t) (expr: Expr.t) =
   )
 
   | F64Binary(op, left, right) -> (
-    let name = Primitives.Bin.prim_f64 op in
-    ps env name;
-    ps env "(";
-    codegen_expression env left;
-    ps env ", ";
-    codegen_expression env right;
-    ps env ")"
-  )
+    match (op, env.ptr_size) with
+    | (_, Ir.Ptr64) ->
+      let name = Primitives.Bin.prim_f64 op in
+      ps env name;
+      ps env "(";
+      codegen_expression env left;
+      ps env ", ";
+      codegen_expression env right;
+      ps env ")"
+    | (Plus, Ir.Ptr32)
+    | (Minus, Ir.Ptr32)
+    | (Mult, Ir.Ptr32)
+    | (Div, Ir.Ptr32)
+    | (Mod, Ir.Ptr32)
+    | (LShift, Ir.Ptr32)
+    | (RShift, Ir.Ptr32)
+    | (BitOr, Ir.Ptr32)
+    | (Xor, Ir.Ptr32)
+    | (BitAnd, Ir.Ptr32)
+      ->
+      ps env "LCF64Binary(rt, ";
+      ps env (Primitives.Bin.to_arithmetic_op op);
+      ps env ", ";
+      codegen_expression env left;
+      ps env ", ";
+      codegen_expression env right;
+      ps env ")"
 
-  (* | F64Binary(op, left, right) -> (
-    ps env "LCF64Binary(rt, ";
-    ps env (Primitives.Bin.to_arithmetic_op op);
-    ps env ", ";
-    codegen_expression env left;
-    ps env ", ";
-    codegen_expression env right;
-    ps env ")"
-  ) *)
+    | (cmp_op, Ir.Ptr32)
+      ->
+      ps env "LCF64Cmp(rt, ";
+      ps env (Primitives.Bin.to_cmp cmp_op);
+      ps env ", ";
+      codegen_expression env left;
+      ps env ", ";
+      codegen_expression env right;
+      ps env ")"
+  )
 
   | I32BitNot expr -> (
     ps env "LC_I32_BITNOT(";
@@ -771,9 +819,15 @@ and codegen_expression (env: t) (expr: Expr.t) =
   )
 
   | I64BitNot expr -> (
-    ps env "LC_I64_BITNOT(";
-    codegen_expression env expr;
-    ps env ")"
+    match env.ptr_size with
+    | Ir.Ptr64 ->
+      ps env "LC_I64_BITNOT(";
+      codegen_expression env expr;
+      ps env ")"
+    | Ir.Ptr32 ->
+      ps env "LCI64BitNot(rt, ";
+      codegen_expression env expr;
+      ps env ")"
   )
 
   | Assign(Expr.Ident name, right) -> (

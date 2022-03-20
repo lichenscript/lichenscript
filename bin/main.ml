@@ -266,6 +266,8 @@ and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platf
     let build_executor =
       if String.equal platform "js" then
         Some "node"
+      else if String.equal platform "native" then
+        None
       else (
         match wasm_standalone with
         | Some v -> Some v
