@@ -480,7 +480,11 @@ static void LCFreeObject(LCRuntime* rt, LCValue val) {
         break;
     
     default:
+#ifdef LC_PTR64
         fprintf(stderr, "[LichenScript] internal error, unkown tag: %" PRId64 "\n", val.tag);
+#else
+        fprintf(stderr, "[LichenScript] internal error, unkown tag: %d\n", val.tag);
+#endif
         lc_panic_internal();
 
     }
@@ -1379,6 +1383,8 @@ LCValue LCNewTuple(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args) 
     return (LCValue) { { .ptr_val = (LCObject*)tuple }, LC_TY_TUPLE };
 }
 
+#ifndef LC_PTR64
+
 LCValue LCNewI64(LCRuntime* rt, int64_t val) {
     LCBox64* ptr = (LCBox64*)lc_malloc(rt, sizeof(LCBox64));
 
@@ -1477,6 +1483,8 @@ LCValue LCF64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue ri
 
     return LCNewF64(rt, result);
 }
+
+#endif
 
 LCValue LCRunMain(LCProgram* program, int argc, char** argv) {
     if (program->main_fun == NULL) {

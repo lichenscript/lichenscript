@@ -295,6 +295,8 @@ typedef struct LCProgram {
     LCCFunction main_fun;
 } LCProgram;
 
+#ifndef LC_PTR64
+
 LCValue LCNewI64(LCRuntime* rt, int64_t val);
 
 LCValue LCI64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue right);
@@ -302,6 +304,8 @@ LCValue LCI64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue ri
 LCValue LCNewF64(LCRuntime* rt, double val);
 
 LCValue LCF64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue right);
+
+#endif
 
 LCValue LCRunMain(LCProgram* program, int argc, char** argv);
 

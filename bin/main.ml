@@ -263,13 +263,18 @@ and build_entry (entry: string) std_dir build_dir runtime_dir mode verbose platf
     if not (String.equal platform "js") then (
       run_make_in_dir profile.profile_dir
     );
+    let build_executor =
+      if String.equal platform "js" then
+        Some "node"
+      else (
+        match wasm_standalone with
+        | Some v -> Some v
+        | None -> Some "node"
+      )
+    in
     Some {
       build_exe = profile.profile_exe_path;
-      build_executor =
-        if String.equal platform "js" then
-          Some "node"
-        else
-          wasm_standalone;
+      build_executor;
     }
   with
     | Unix.Unix_error (_, err, err_s) -> (
