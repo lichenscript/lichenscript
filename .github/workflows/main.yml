@@ -40,6 +40,15 @@ jobs:
         run: |
           opam install .
 
+      - name: Setup emsdk
+        uses: mymindstorm/setup-emsdk@v11
+        with:
+          version: 2.0.27
+          actions-cache-folder: 'emsdk-cache'
+
+      - name: Verify emsdk
+        run: emcc -v
+
       - name: Run Tests
         run: |
           eval $(opam env)
