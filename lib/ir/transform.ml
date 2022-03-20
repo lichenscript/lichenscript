@@ -1653,11 +1653,15 @@ and transform_pattern_matching env ~prepend_stmts:out_prepend_stmts ~append_stmt
   let match_expr =
     if (is_identifier match_expr) || (is_this match_expr) then
       transformed_expr.expr
-    else
-      prepend_expr env
+    else (
+      let t = prepend_expr env
         ~prepend_stmts:out_prepend_stmts
         ~append_stmts:out_append_stmts
         (transform_expression ~is_borrow:true env match_expr)
+      in
+      out_append_stmts := List.append !out_append_stmts transformed_expr.append_stmts;
+      t
+    )
   in
   let result_tmp = env.tmp_vars_count in
   env.tmp_vars_count <- env.tmp_vars_count + 1;

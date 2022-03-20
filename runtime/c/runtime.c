@@ -2835,9 +2835,9 @@ LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
             return LC_NULL;
         }
     } else {  // found in hashmap, replace exist value
-        LCRelease(rt, tuple->value);
+        LCRelease(rt, found_tuple->value);
         LCRetain(args[1]);
-        tuple->value = args[1];
+        found_tuple->value = args[1];
         return LC_NULL;
     }
 }
