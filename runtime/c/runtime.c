@@ -1768,7 +1768,7 @@ LCValue LCToString(LCRuntime* rt, LCValue val) {
 #ifdef LC_PTR64
 
     case LC_TY_I64:
-        snprintf(buf, sizeof(buf), "%lld", val.i64_val);
+        snprintf(buf, sizeof(buf), "%" PRId64, val.i64_val);
         str = buf;
         break;
 
