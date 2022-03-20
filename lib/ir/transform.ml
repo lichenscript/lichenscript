@@ -825,9 +825,17 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         let int_str = Int32.to_string content in
         Ir.Expr.NewI32 int_str
 
-      | I64 content ->
-        let int_str = Int64.to_string content in
-        Ir.Expr.NewI64 int_str
+      | I64 content -> (
+        match env.config.ptr_size with
+        | Some Ir.Ptr32 -> (
+          let int_str = Int64.to_string content in
+          let result = Ir.Expr.NewI64 int_str in
+          auto_release_expr env ~is_move ~append_stmts ty_var result
+        )
+        | _ ->
+          let int_str = Int64.to_string content in
+          Ir.Expr.NewI64 int_str
+      )
 
       | Boolean bl ->
         Ir.Expr.NewBoolean bl
@@ -1280,9 +1288,17 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         expr'.expr
 
       | UnaryOp.Minus ->
-        if Check_helper.is_i64 env.ctx node_type then
-          Ir.Expr.I64Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewI64 "-1")
-        else if Check_helper.is_f64 env.ctx node_type then
+        if Check_helper.is_i64 env.ctx node_type then (
+          match env.config.ptr_size with
+          | Some Ir.Ptr32 -> (
+            let n1 = Ir.Expr.NewI64 "-1" in
+            let n1 = auto_release_expr env ~is_move ~append_stmts expr.ty_var n1 in
+            let tmp = Ir.Expr.I64Binary(BinaryOp.Mult, expr'.expr, n1) in
+            auto_release_expr env ~is_move ~append_stmts expr.ty_var tmp
+          )
+          | _ ->
+            Ir.Expr.I64Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewI64 "-1")
+        ) else if Check_helper.is_f64 env.ctx node_type then
           Ir.Expr.F64Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewF64 "-1")
         else if Check_helper.is_f32 env.ctx node_type then
           Ir.Expr.F32Binary(BinaryOp.Mult, expr'.expr, Ir.Expr.NewF32 "-1")
@@ -2058,9 +2074,15 @@ and transform_binary_expr env ~is_move ~append_stmts ~prepend_stmts expr op left
 
     | _ -> (
       (* let node_type = Program.deref_node_type env.ctx ty_var in *)
-      if Check_helper.is_i64 env.ctx left_type then
-        Ir.Expr.I64Binary(op, left'.expr, right'.expr)
-      else if Check_helper.is_f64 env.ctx left_type then
+      if Check_helper.is_i64 env.ctx left_type then (
+        match env.config.ptr_size with
+        | Some Ir.Ptr32 -> (
+          let tmp = Ir.Expr.I64Binary(op, left'.expr, right'.expr) in
+          auto_release_expr env ~is_move ~append_stmts expr.ty_var tmp
+        )
+        | _ ->
+          Ir.Expr.I64Binary(op, left'.expr, right'.expr)
+      ) else if Check_helper.is_f64 env.ctx left_type then
         Ir.Expr.F64Binary(op, left'.expr, right'.expr)
       else if Check_helper.is_f32 env.ctx left_type then
         Ir.Expr.F32Binary(op, left'.expr, right'.expr)
