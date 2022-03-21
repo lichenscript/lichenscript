@@ -1248,18 +1248,21 @@ and annotate_class env cls attributes =
             }
           )
         )
+
+        | Cls_static_property _ -> failwith "not implemented"
+
         | Cls_property prop -> (
-          let { cls_property_visibility; cls_property_loc; cls_property_name; cls_property_type; _ } = prop in
-          let type_visibility = annotate_visibility cls_property_visibility in
-          let property_ty, deps = annotate_type env cls_property_type in
+          let { cls_prop_visibility; cls_prop_loc; cls_prop_name; cls_prop_type; _ } = prop in
+          let type_visibility = annotate_visibility cls_prop_visibility in
+          let property_ty, deps = annotate_type env cls_prop_type in
           let node = {
             value = property_ty;
             deps;
-            loc = cls_property_loc;
+            loc = cls_prop_loc;
           } in
           let node_id = Program.new_id ctx node in
           let ty_elm = Core_type.TypeDef.Cls_elm_prop (type_visibility, node_id, property_ty) in
-          add_tcls_element (cls_property_name.pident_name, ty_elm) cls_property_loc;
+          add_tcls_element (cls_prop_name.pident_name, ty_elm) cls_prop_loc;
 
           (*
           * the class itself depends on all the properties
@@ -1269,16 +1272,16 @@ and annotate_class env cls attributes =
 
           class_scope#insert_cls_element
             { Scope.ClsElm.
-              name = (cls_property_name.pident_name, node_id);
+              name = (cls_prop_name.pident_name, node_id);
               spec = Property;
-              visibility = cls_property_visibility;
+              visibility = cls_prop_visibility;
             };
 
           T.Declaration.Cls_property {
             T.Declaration.
-            cls_property_loc;
-            cls_property_visibility;
-            cls_property_name;
+            cls_prop_loc;
+            cls_prop_visibility;
+            cls_prop_name;
           }
         )
 

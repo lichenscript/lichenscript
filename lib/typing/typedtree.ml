@@ -263,9 +263,9 @@ and Declaration : sig
   }
 
   and class_property = {
-    cls_property_visibility: Asttypes.visibility option;
-    cls_property_loc: Loc.t;
-    cls_property_name: Identifier.t;
+    cls_prop_visibility: Asttypes.visibility option;
+    cls_prop_loc: Loc.t;
+    cls_prop_name: Identifier.t;
   }
 
   and class_method = {
