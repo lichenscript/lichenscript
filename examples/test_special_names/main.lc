@@ -1,0 +1,7 @@
+
+function main() {
+  const null = "null";
+  print(null);
+  const undefined = "undefined";
+  print(undefined);
+}

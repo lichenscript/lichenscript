@@ -177,7 +177,10 @@ type current_fun_meta = {
   mutable def_local_names: string list;
 }
 
-let preserved_name = [ "ret"; "rt"; "this"; "argc"; "argv"; "t" ]
+let preserved_name = [
+  "ret"; "rt"; "this"; "argc"; "argv"; "t";
+  "null"; "function"; "undefined"; "window"
+]
 
 let create_current_fun_meta fun_name = {
   fun_name;
