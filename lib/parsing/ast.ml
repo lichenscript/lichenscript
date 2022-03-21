@@ -310,12 +310,21 @@ and Declaration : sig
     cls_body_loc: Loc.t;
   }
 
-  and class_property = {
-    cls_property_attributes: attributes;
-    cls_property_visibility: Asttypes.visibility option;
-    cls_property_loc: Loc.t;
-    cls_property_name: Identifier.t;
-    cls_property_type: Type.t;
+  and class_prop = {
+    cls_prop_attributes: attributes;
+    cls_prop_visibility: Asttypes.visibility option;
+    cls_prop_loc: Loc.t;
+    cls_prop_name: Identifier.t;
+    cls_prop_type: Type.t;
+  }
+
+  and class_static_prop = {
+    cls_static_prop_attributes: attributes;
+    cls_static_prop_visibility: Asttypes.visibility option;
+    cls_static_prop_loc: Loc.t;
+    cls_static_prop_name: Identifier.t;
+    cls_static_prop_type: Type.t option;
+    cls_static_prop_init: Expression.t;
   }
 
   and class_method = {
@@ -350,7 +359,8 @@ and Declaration : sig
     | Cls_modifier_override
 
   and class_body_element =
-    | Cls_property of class_property
+    | Cls_property of class_prop
+    | Cls_static_property of class_static_prop
     | Cls_method of class_method
     | Cls_declare of class_declare_method
 

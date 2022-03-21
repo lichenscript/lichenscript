@@ -1,0 +1,8 @@
+
+class TermColor {
+
+  static Bold = "\x1b[1m";
+
+  static Underline = "\x1b[4m";
+
+}

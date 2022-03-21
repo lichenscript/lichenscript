@@ -1005,19 +1005,63 @@ and parse_class_body env: Declaration.class_body =
         end
       else
         begin
-          Expect.token env Token.T_COLON;
-          let cls_property_type = parse_type env in
+          match cls_method_modifier with
+          | Some Ast.Declaration.Cls_modifier_static -> (
+            let cls_static_prop_type =
+              if Peek.token env = Token.T_COLON then (
+                Eat.token env;
+                let t = parse_type env in
+                Some t
+              ) else
+                None
+            in
 
-          if (Peek.token env) = Token.T_SEMICOLON then (
-            Eat.token env;
-          );
-          Cls_property {
-            cls_property_attributes = attributes;
-            cls_property_visibility = v;
-            cls_property_loc = with_start_loc env start_pos;
-            cls_property_name = id;
-            cls_property_type;
-          }
+            Expect.token env Token.T_ASSIGN;
+
+            let cls_static_prop_init = parse_expression env in
+
+            if (Peek.token env) = Token.T_SEMICOLON then (
+              Eat.token env;
+            );
+
+            Cls_static_property {
+              cls_static_prop_attributes = attributes;
+              cls_static_prop_visibility = v;
+              cls_static_prop_loc = with_start_loc env start_pos;
+              cls_static_prop_name = id;
+              cls_static_prop_type;
+              cls_static_prop_init;
+            }
+          )
+
+          | Some _ ->
+            begin
+              let tok = Token.value_of_token (Peek.token env) in
+              let perr_loc = Peek.loc env in
+              let lex_error = Lichenscript_lex.Lex_error.Unexpected tok in
+              let perr_spec = Parse_error.LexError lex_error in
+              let err =
+                { Parse_error.
+                  perr_loc;
+                  perr_spec;
+                }
+                in
+              Parse_error.error err
+            end
+          | None ->
+            Expect.token env Token.T_COLON;
+            let cls_prop_type = parse_type env in
+
+            if (Peek.token env) = Token.T_SEMICOLON then (
+              Eat.token env;
+            );
+            Cls_property {
+              cls_prop_attributes = attributes;
+              cls_prop_visibility = v;
+              cls_prop_loc = with_start_loc env start_pos;
+              cls_prop_name = id;
+              cls_prop_type;
+            }
       end
   in
 
