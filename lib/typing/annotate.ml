@@ -1249,7 +1249,9 @@ and annotate_class env cls attributes =
           )
         )
 
-        | Cls_static_property _ -> failwith "not implemented"
+        | Cls_static_property _ -> (
+          failwith "not implemented"
+        )
 
         | Cls_property prop -> (
           let { cls_prop_visibility; cls_prop_loc; cls_prop_name; cls_prop_type; _ } = prop in
