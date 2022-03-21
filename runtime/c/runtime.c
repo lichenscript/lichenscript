@@ -1360,8 +1360,8 @@ void LCArraySetValue(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
         fprintf(stderr, "[LichenScript] index %d out of range, size: %d\n", index, arr->len);
         lc_panic_internal();
     }
-    LCRelease(rt, arr->data[index]);
     LCRetain(args[1]);
+    LCRelease(rt, arr->data[index]);
     arr->data[index] = args[1];
 }
 
@@ -2647,15 +2647,16 @@ LCValue lc_std_map_new(LCRuntime* rt, int key_ty, int init_size) {
     init_gc_object(rt, (LCGCObject*)map, LC_GC_MAP);
 
     map->key_ty = key_ty;
-    if (init_size >= 0 && init_size < 8) {
-        map->is_small = 1;
-    } else {
-        map->is_small = 0;
-    }
+    map->is_small = 1;
+    // if (init_size >= 0 && init_size < 8) {
+    //     map->is_small = 1;
+    // } else {
+    //     map->is_small = 0;
+    // }
 
-    if (key_ty == LC_TY_BOOL) {
-        map->is_small = 1;
-    }
+    // if (key_ty == LC_TY_BOOL) {
+    //     map->is_small = 1;
+    // }
 
     map->buckets = NULL;
 
@@ -2835,8 +2836,10 @@ LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
             return LC_NULL;
         }
     } else {  // found in hashmap, replace exist value
-        LCRelease(rt, found_tuple->value);
+        // retain the args firstly, because they args[1] may equals to found_tuple->value
+        // incase the value are freed
         LCRetain(args[1]);
+        LCRelease(rt, found_tuple->value);
         found_tuple->value = args[1];
         return LC_NULL;
     }
