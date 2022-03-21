@@ -2410,6 +2410,7 @@ and transform_class env cls loc: Ir.Decl.t list =
           List.append stmts acc
         )
         | Cls_property _
+        | Cls_static_property _
         | Cls_declare _ -> acc
       )
       cls_body.cls_body_elements;

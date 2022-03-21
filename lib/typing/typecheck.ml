@@ -1421,6 +1421,7 @@ and check_class env cls =
         check_method_content env _method
       )
 
+      | Cls_static_property _
       | Cls_property _
       | Cls_declare _ -> ()
     )

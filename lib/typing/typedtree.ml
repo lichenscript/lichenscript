@@ -262,10 +262,17 @@ and Declaration : sig
     cls_body_loc: Loc.t;
   }
 
-  and class_property = {
+  and class_prop = {
     cls_prop_visibility: Asttypes.visibility option;
     cls_prop_loc: Loc.t;
     cls_prop_name: Identifier.t;
+  }
+
+  and class_static_prop = {
+    cls_static_prop_visibility: Asttypes.visibility option;
+    cls_static_prop_loc: Loc.t;
+    cls_static_prop_name: Identifier.t;
+    cls_static_prop_init: Expression.t;
   }
 
   and class_method = {
@@ -287,7 +294,8 @@ and Declaration : sig
   }
 
   and class_body_element =
-    | Cls_property of class_property
+    | Cls_property of class_prop
+    | Cls_static_property of class_static_prop
     | Cls_method of class_method
     | Cls_declare of class_declare_method
 
