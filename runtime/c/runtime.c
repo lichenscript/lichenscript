@@ -652,6 +652,27 @@ void LCFreeRuntime(LCRuntime* rt) {
     lc_raw_free(rt);
 }
 
+LCValue LCGetStaticValue(LCRuntime* rt, LCClassID cls_id, int idx) {
+#ifdef LSC_DEBUG
+    if (cls_id >= rt->obj_meta_size) {
+        fprintf(stderr, "[LichenScript] access class id out of range, class id: %d, size: %d\n", cls_id, rt->obj_meta_size);
+        lc_panic_internal();
+    }
+#endif
+    LCObjectMeta* meta = &rt->obj_meta_data[cls_id];
+    if (unlikely(meta->is_enum)) {
+        return LC_NULL;
+    }
+#ifdef LSC_DEBUG
+    if (idx >= meta->v.cls.cls_static_value_size) {
+        fprintf(stderr, "[LichenScript] access static value id out of range, value id: %d, size: %zu\n", idx, meta->v.cls.cls_static_value_size);
+        lc_panic_internal();
+    }
+#endif
+
+    return LCRetaining(meta->v.cls.cls_static_value[idx]);
+}
+
 static void lc_deref_child(LCRuntime* rt, LCGCObject* gc_obj) {
     gc_obj->header.count--;
     if (gc_obj->header.count == 0 && gc_obj->header.mark == 1) {
@@ -1226,7 +1247,7 @@ LCValue LCNewRefCell(LCRuntime* rt, LCValue value) {
     init_gc_object(rt, (LCGCObject*)cell, LC_GC_REFCELL);
     LCRetain(value);
     cell->value = value;
-    return (LCValue){ { .ptr_val = (LCObject*)cell }, LC_TY_REFCELL };
+    return MK_PTR(cell, LC_TY_REFCELL);
 }
 
 void LCRefCellSetValue(LCRuntime* rt, LCValue cell, LCValue value) {
@@ -1256,7 +1277,7 @@ LCValue LCNewUnionObject(LCRuntime* rt, LCClassID cls_id, int tag, int size, LCV
         union_obj->value[i] = args[i];
     }
     
-    return (LCValue){ { .ptr_val = (LCObject*)union_obj }, LC_TY_UNION_OBJECT };
+    return MK_PTR(union_obj, LC_TY_UNION_OBJECT);
 }
 
 LCValue LCUnionObjectGet(LCRuntime* rt, LCValue this, int index) {
@@ -1293,7 +1314,7 @@ LCValue LCNewLambda(LCRuntime* rt, LCCFunction c_fun, LCValue this, int argc, LC
         lambda->captured_values[i] = args[i];
     }
 
-    return (LCValue){ { .ptr_val = (LCObject*)lambda }, LC_TY_LAMBDA };
+    return MK_PTR(lambda, LC_TY_LAMBDA);
 }
 
 LCValue LCLambdaGetValue(LCRuntime* rt, LCValue lambda_val, int index) {
@@ -1345,7 +1366,7 @@ LCArray* LCNewArrayWithCap(LCRuntime* rt, size_t cap) {
 
 LCValue LCNewArray(LCRuntime* rt) {
     LCArray* arr = LCNewArrayWithCap(rt, 8);
-    return (LCValue) { { .ptr_val = (LCObject*)arr },  LC_TY_ARRAY };
+    return MK_PTR(arr,  LC_TY_ARRAY);
 }
 
 LCValue LCNewArrayLen(LCRuntime* rt, size_t size) {
@@ -1357,7 +1378,7 @@ LCValue LCNewArrayLen(LCRuntime* rt, size_t size) {
     }
     LCArray* arr = LCNewArrayWithCap(rt, cap);
     arr->len = size;
-    return (LCValue) { { .ptr_val = (LCObject*)arr },  LC_TY_ARRAY };
+    return MK_PTR(arr,  LC_TY_ARRAY);
 }
 
 LCValue LCArrayGetValue(LCRuntime* rt, LCValue this, int index) {
@@ -1399,7 +1420,7 @@ LCValue LCNewTuple(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args) 
         tuple->data[i] = args[i];
     }
 
-    return (LCValue) { { .ptr_val = (LCObject*)tuple }, LC_TY_TUPLE };
+    return MK_PTR(tuple, LC_TY_TUPLE);
 }
 
 #ifndef LC_PTR64
@@ -1410,7 +1431,7 @@ LCValue LCNewI64(LCRuntime* rt, int64_t val) {
     ptr->header.count = 1;
     ptr->u.i64 = val;
 
-    return (LCValue) { { .ptr_val = (LCObject*)ptr }, LC_TY_BOXED_I64 };
+    return MK_PTR(ptr, LC_TY_BOXED_I64);
 }
 
 LCValue LCI64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue right) {
@@ -1470,7 +1491,7 @@ LCValue LCNewF64(LCRuntime* rt, double val) {
     ptr->header.count = 1;
     ptr->u.f64 = val;
 
-    return (LCValue) { { .ptr_val = (LCObject*)ptr }, LC_TY_BOXED_F64 };
+    return MK_PTR(ptr, LC_TY_BOXED_F64);
 }
 
 LCValue LCF64Binary(LCRuntime* rt, LCArithmeticType op, LCValue left, LCValue right) {
@@ -2355,7 +2376,7 @@ LCValue lc_std_array_slice(LCRuntime* rt, LCValue this, int arg_len, LCValue* ar
 
     new_arr->len = len;
 
-    return (LCValue) { { .ptr_val = (LCObject*)new_arr },  LC_TY_ARRAY };
+    return MK_PTR(new_arr,  LC_TY_ARRAY);
 }
 
 LCValue lc_std_array_map(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
@@ -2369,7 +2390,7 @@ LCValue lc_std_array_map(LCRuntime* rt, LCValue this, int arg_len, LCValue* args
 
     new_arr->len = arr->len;
 
-    return (LCValue) { { .ptr_val = (LCObject*)new_arr },  LC_TY_ARRAY };
+    return MK_PTR(new_arr,  LC_TY_ARRAY);
 }
 
 LCValue lc_std_array_filter(LCRuntime* rt, LCValue this, int arg_len, LCValue* args) {
