@@ -70,6 +70,7 @@ module%gen rec Decl : sig
     gc_marker: gc_marker option;
     properties: (string * int) list;
     init: class_init;
+    static_fields: string list;
   }
   [@@deriving show]
 
@@ -202,6 +203,7 @@ and Expr : sig
   | StringCmp of Asttypes.BinaryOp.t * t * t
   | StringEqUtf8 of t * string
   | Retaining of Expr.t
+  | GetStaticValue of string * string * int  (* classname fieldname*)
   [@@deriving show]
 
 end
