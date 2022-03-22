@@ -323,6 +323,8 @@ and codegen_declaration env decl =
       | None -> ps env "NULL"
       );
       ps env ",\n";
+      print_indents env;
+      ps env "0,\n"
     );
     ps env "};\n";
 

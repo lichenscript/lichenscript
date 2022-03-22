@@ -979,10 +979,31 @@ and parse_class_body env: Declaration.class_body =
         | _ -> None
       in
 
+      let const_loc = Peek.loc env in
+      let has_const =
+        match Peek.token env with
+        | Token.T_CONST ->
+          Eat.token env;
+          true
+        | _ -> false
+
+      in
+
       let id = parse_identifier env in
 
       if Peek.token env = Token.T_LPAREN then
         begin
+          if has_const then (
+              let lex_error = Lichenscript_lex.Lex_error.Unexpected (Token.value_of_token Token.T_CONST) in
+              let perr_spec = Parse_error.LexError lex_error in
+              let err =
+                { Parse_error.
+                  perr_loc = const_loc;
+                  perr_spec;
+                }
+                in
+              Parse_error.error err
+          );
           let params = parse_params env in
           let cls_method_return_ty =
             if Peek.token env = Token.T_COLON then (
@@ -1028,6 +1049,7 @@ and parse_class_body env: Declaration.class_body =
               cls_static_prop_attributes = attributes;
               cls_static_prop_visibility = v;
               cls_static_prop_loc = with_start_loc env start_pos;
+              cls_static_prop_const = has_const;
               cls_static_prop_name = id;
               cls_static_prop_type;
               cls_static_prop_init;
@@ -1049,6 +1071,17 @@ and parse_class_body env: Declaration.class_body =
               Parse_error.error err
             end
           | None ->
+            if has_const then (
+                let lex_error = Lichenscript_lex.Lex_error.Unexpected (Token.value_of_token Token.T_CONST) in
+                let perr_spec = Parse_error.LexError lex_error in
+                let err =
+                  { Parse_error.
+                    perr_loc = const_loc;
+                    perr_spec;
+                  }
+                  in
+                Parse_error.error err
+            );
             Expect.token env Token.T_COLON;
             let cls_prop_type = parse_type env in
 
