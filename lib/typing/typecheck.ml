@@ -239,13 +239,23 @@ and check_statement env stmt =
   )
 
   | Binding binding -> (
-    let { binding_pat; binding_init; _ } = binding in
+    let { binding_pat; binding_init; binding_ty; binding_loc; _ } = binding in
     check_expression env binding_init;
     match binding_pat.spec with
     | T.Pattern.Underscore -> ()
     | T.Pattern.Symbol(_, ty_var) -> (
       let expr_node = Program.get_node env.ctx binding_init.ty_var in
-      Program.update_node_type env.ctx ty_var expr_node.value
+      match binding_ty with
+      | Some binding_ty' -> (
+        Program.update_node_type env.ctx ty_var binding_ty';
+        if not (Check_helper.type_assinable env.ctx binding_ty' expr_node.value) then (
+          let err = Diagnosis.(make_error env.ctx binding_loc (NotAssignable(binding_ty', expr_node.value))) in
+          raise (Diagnosis.Error err)
+        )
+      )
+
+      | None ->
+        Program.update_node_type env.ctx ty_var expr_node.value
     )
     | _ -> failwith "unreachable"
   )
@@ -808,7 +818,8 @@ and check_expression env expr =
         ~init:(PropMap.empty, PropMap.empty)
         ~f:(fun (type_map, init_map) (prop_name, elm) ->
           match elm with
-          | Cls_elm_prop (_, _id, elm_node) ->
+          | Cls_elm_prop (_, id) ->
+            let elm_node = Program.deref_node_type env.ctx id in
             PropMap.set type_map ~key:prop_name ~data:elm_node,
             PropMap.set init_map ~key:prop_name ~data:(ref false)
 
@@ -1421,7 +1432,23 @@ and check_class env cls =
         check_method_content env _method
       )
 
-      | Cls_static_property _
+      | Cls_static_property prop -> (
+        let { cls_static_prop_name = _, name_id; cls_static_prop_type; cls_static_prop_init; cls_static_prop_loc; _ } = prop in
+        check_expression env cls_static_prop_init;
+        let expr_type = Program.deref_node_type env.ctx cls_static_prop_init.ty_var in
+        match cls_static_prop_type with
+        | Some ty -> (
+          Program.update_node_type env.ctx name_id ty;
+          if not (Check_helper.type_assinable env.ctx ty expr_type) then (
+            let err = Diagnosis.(make_error env.ctx cls_static_prop_loc (NotAssignable(ty, expr_type))) in
+            raise (Diagnosis.Error err)
+          )
+        )
+        | None -> (
+          Program.update_node_type env.ctx name_id expr_type
+        )
+      )
+
       | Cls_property _
       | Cls_declare _ -> ()
     )

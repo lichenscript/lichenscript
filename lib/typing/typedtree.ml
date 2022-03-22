@@ -154,6 +154,7 @@ and Statement : sig
     binding_kind: Ast.var_kind;
     binding_loc: Loc.t;
     binding_pat: Pattern.t;
+    binding_ty: Core_type.TypeExpr.t option;
     binding_init: Expression.t;
   }
 
@@ -271,7 +272,8 @@ and Declaration : sig
   and class_static_prop = {
     cls_static_prop_visibility: Asttypes.visibility option;
     cls_static_prop_loc: Loc.t;
-    cls_static_prop_name: Identifier.t;
+    cls_static_prop_name: identifier;
+    cls_static_prop_type: Core_type.TypeExpr.t option;
     cls_static_prop_init: Expression.t;
   }
 

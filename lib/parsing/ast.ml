@@ -322,6 +322,7 @@ and Declaration : sig
     cls_static_prop_attributes: attributes;
     cls_static_prop_visibility: Asttypes.visibility option;
     cls_static_prop_loc: Loc.t;
+    cls_static_prop_const: bool;
     cls_static_prop_name: Identifier.t;
     cls_static_prop_type: Type.t option;
     cls_static_prop_init: Expression.t;

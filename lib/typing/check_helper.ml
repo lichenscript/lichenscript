@@ -74,6 +74,7 @@ let rec type_assinable_with_maps ctx var_maps left right =
   match (left, right) with
   | (Any, _) -> var_maps, true
   | (_, Any) -> var_maps, false
+  | (_, Unknown) -> var_maps, false
   | (Unit, Unit) -> var_maps, true
   | (Method _, _)
   | (_, Method _) -> var_maps, false
@@ -479,7 +480,7 @@ and replace_params_with_type ctx type_map params =
 let get_visibility_of_class_elm class_elm =
   let open Core_type.TypeDef in
   match class_elm with
-  | Cls_elm_prop (v, _, _) -> v
+  | Cls_elm_prop (v, _) -> v
   | Cls_elm_method(v, _) -> v
   | Cls_elm_get_set(v, _, _) -> v
 
@@ -586,7 +587,8 @@ let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
         Some (expr, member_id)
       )
 
-      | Cls_elm_prop (_, member_id, value) ->
+      | Cls_elm_prop (_, member_id) ->
+        let value = Program.deref_node_type ctx member_id in
         Some (replace_type_vars_with_maps ctx types_map value, member_id)
 
       | _ -> None
@@ -669,8 +671,9 @@ and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) op
       let node = Program.get_node ctx member_id in
       Some (node.value, member_id)
 
-    | Some (_, Cls_elm_prop(_, id, prop)) ->
-      Some (prop, id)
+    | Some (_, Cls_elm_prop(_, id)) ->
+      let value = Program.deref_node_type ctx id in
+      Some (value, id)
 
     | _ -> None
   )

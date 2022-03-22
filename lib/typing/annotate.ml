@@ -78,11 +78,24 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
     )
 
     | Binding binding -> (
-      let { binding_kind; binding_pat; binding_init; binding_loc; _ } = binding in
+      let { binding_kind; binding_pat; binding_init; binding_loc; binding_ty; _ } = binding in
 
       let binding_init = annotate_expression ~prev_deps env binding_init in
 
       let binding_pat, pat_deps = annotate_pattern env binding_pat in
+
+      let deps = ref [] in
+
+      let binding_ty =
+        Option.map
+        ~f:(fun ty -> 
+          let t, ty_deps = annotate_type env ty in
+          deps := ty_deps;
+          t
+        )
+        binding_ty
+      in
+
       let open T.Pattern in
       match binding_pat.spec with
       | Underscore -> (
@@ -90,6 +103,7 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
           binding_kind;
           binding_pat;
           binding_init;
+          binding_ty;
           binding_loc;
         }
       )
@@ -102,11 +116,12 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
           deps = List.concat [node.deps; [binding_init.ty_var]; prev_deps ];
         };
 
-        let deps = List.append pat_deps [sym_id] in
+        let deps = List.concat [ pat_deps; [sym_id]; !deps ] in
         deps, T.Statement.Binding { T.Statement.
           binding_kind;
           binding_pat;
           binding_init;
+          binding_ty;
           binding_loc;
         }
       )
@@ -1249,8 +1264,46 @@ and annotate_class env cls attributes =
           )
         )
 
-        | Cls_static_property _ -> (
-          failwith "not implemented"
+        | Cls_static_property prop -> (
+          let { cls_static_prop_visibility; cls_static_prop_loc; cls_static_prop_name; cls_static_prop_type; cls_static_prop_init; _ } = prop in
+
+          let first_char = String.get cls_static_prop_name.pident_name 0 in
+          if not (Char.is_uppercase first_char) then (
+            let err = Diagnosis.(make_error ctx cls_static_prop_name.pident_loc (CapitalizedStaticField cls_static_prop_name.pident_name)) in
+            raise (Diagnosis.Error err)
+          );
+
+          let type_visibility = annotate_visibility cls_static_prop_visibility in
+
+          let cls_static_prop_type =
+            Option.map
+            ~f:(fun t ->
+              let t, _ = annotate_type env t in
+              t
+            )
+            cls_static_prop_type
+          in
+
+          let cls_static_prop_init = annotate_expression ~prev_deps:[] env cls_static_prop_init in
+          let node = {
+            value = TypeExpr.Unknown;
+            deps = [cls_static_prop_init.ty_var];
+            loc = cls_static_prop_name.pident_loc;
+          } in
+
+          let node_id = Program.new_id ctx node in
+
+          let ty_elm = Core_type.TypeDef.Cls_elm_prop (type_visibility, node_id) in
+
+          add_tcls_static_element (cls_static_prop_name.pident_name, ty_elm) cls_static_prop_loc;
+
+          T.Declaration.Cls_static_property {
+            cls_static_prop_visibility;
+            cls_static_prop_loc;
+            cls_static_prop_name = (cls_static_prop_name.pident_name, node_id);
+            cls_static_prop_type;
+            cls_static_prop_init;
+          }
         )
 
         | Cls_property prop -> (
@@ -1263,7 +1316,7 @@ and annotate_class env cls attributes =
             loc = cls_prop_loc;
           } in
           let node_id = Program.new_id ctx node in
-          let ty_elm = Core_type.TypeDef.Cls_elm_prop (type_visibility, node_id, property_ty) in
+          let ty_elm = Core_type.TypeDef.Cls_elm_prop (type_visibility, node_id) in
           add_tcls_element (cls_prop_name.pident_name, ty_elm) cls_prop_loc;
 
           (*

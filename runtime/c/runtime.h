@@ -371,6 +371,7 @@ typedef struct LCClassDef {
     const char*   name;  // class name
     LCFinalizer   finalizer;
     LCClassGCMark gc_mark;
+    size_t        static_fields_size;
 } LCClassDef;
 
 typedef struct LCEnumMemberDef {

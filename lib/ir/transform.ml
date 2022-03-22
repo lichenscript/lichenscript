@@ -2266,7 +2266,7 @@ and generate_cls_meta env cls_id gen_name =
       List.filter_map
         ~f:(fun (elm_name, elm) ->
           match elm with
-          | Cls_elm_prop (_, ty_var, _) -> 
+          | Cls_elm_prop (_, ty_var) -> 
             Some (elm_name, ty_var)
           | _ -> None
         )

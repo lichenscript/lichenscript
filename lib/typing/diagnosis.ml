@@ -136,6 +136,13 @@ module PP = struct
       Format.fprintf formatter "The name of the enum member '%s' must be capitalized, try '%s'" name new_name
     )
 
+    | CapitalizedStaticField name -> (
+      let first_char = String.get name 0 in
+      let upper_char = Char.uppercase_ascii first_char in
+      let new_name = String.mapi (fun index ch -> if index = 0 then upper_char else ch) name in
+      Format.fprintf formatter "The name of the static field '%s' must be capitalized, try '%s'" name new_name
+    )
+
     | LowercaseTheImportName import_name ->
       Format.fprintf formatter "Lowercase the first char of the import name '%s'" import_name
 

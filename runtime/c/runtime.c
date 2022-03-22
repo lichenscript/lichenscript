@@ -204,6 +204,8 @@ typedef struct LCClassMeta {
     LCClassDef*       cls_def;
     LCClassMethodDef* cls_method;
     size_t            cls_method_size;
+    LCValue*          cls_static_value;
+    size_t            cls_static_value_size;
 } LCClassMeta;
 
 typedef struct LCEnumMeta {
@@ -615,12 +617,29 @@ LCRuntime* LCNewRuntime() {
     return runtime;
 }
 
+// release the static values
+static void LCFreeRuntimeMeta(LCRuntime* rt) {
+    LCObjectMeta* meta;
+    for (uint32_t i = 0; i < rt->obj_meta_size; i++) {
+        meta = &rt->obj_meta_data[i];
+        if (meta->is_enum) {
+            continue;
+        }
+        size_t static_value_size = meta->v.cls.cls_static_value_size;
+        for (size_t j = 0; j < static_value_size; j++) {
+            LCRelease(rt, meta->v.cls.cls_static_value[i]);
+        }
+    }
+
+    lc_free(rt, rt->obj_meta_data);
+}
+
 void LCFreeRuntime(LCRuntime* rt) {
     uint32_t i;
 
     free_i64_pool(rt);
 
-    lc_free(rt, rt->obj_meta_data);
+    LCFreeRuntimeMeta(rt);
 
 #ifdef LSC_DEBUG
     if (rt->malloc_state.malloc_count != 1) {
@@ -1587,6 +1606,15 @@ LCClassID LCDefineClass(LCRuntime* rt, LCClassID ancester_id, LCClassDef* cls_de
     meta->is_enum = 0;
     meta->v.cls.ancester_id = ancester_id;
     meta->v.cls.cls_def = cls_def;
+
+    if (cls_def->static_fields_size <= 0) {
+        meta->v.cls.cls_static_value = NULL;
+        meta->v.cls.cls_static_value_size = 0;
+    } else {
+        size_t static_poll_size = sizeof(LCValue) * cls_def->static_fields_size;
+        meta->v.cls.cls_static_value = (LCValue*)lc_mallocz(rt, static_poll_size);
+        meta->v.cls.cls_static_value_size = cls_def->static_fields_size;
+    }
 
     return id;
 }
