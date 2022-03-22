@@ -320,6 +320,7 @@ LCRuntime* LCNewRuntime();
 void LCFreeRuntime(LCRuntime* rt);
 
 LCValue LCGetStaticValue(LCRuntime* rt, LCClassID cls_id, int idx);
+void LCSetStaticValue(LCRuntime* rt, LCClassID cls_id, int idx, LCValue value);
 
 void LCRunGC(LCRuntime* rt);
 
@@ -330,7 +331,7 @@ void* lc_realloc2(LCRuntime *ctx, void *ptr, size_t size, size_t *pslack);
 void lc_free(LCRuntime* rt, void *);
 
 void LCRetain(LCValue obj);
-static inline LCValue LCRetaining(LCValue obj) {
+static force_inline LCValue LCRetaining(LCValue obj) {
     LCRetain(obj);
     return obj;
 }
