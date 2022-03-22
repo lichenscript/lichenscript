@@ -555,6 +555,8 @@ void lc_free(LCRuntime* rt, void* ptr) {
 static LCClassDef Object_def = {
     "Object",
     NULL,
+    NULL,
+    0
 };
 
 static LCValue LC_Object_toString(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
@@ -628,6 +630,10 @@ static void LCFreeRuntimeMeta(LCRuntime* rt) {
         size_t static_value_size = meta->v.cls.cls_static_value_size;
         for (size_t j = 0; j < static_value_size; j++) {
             LCRelease(rt, meta->v.cls.cls_static_value[i]);
+        }
+        if (meta->v.cls.cls_static_value != NULL) {
+            lc_free(rt, meta->v.cls.cls_static_value);
+            meta->v.cls.cls_static_value = NULL;
         }
     }
 

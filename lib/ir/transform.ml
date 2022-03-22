@@ -1224,9 +1224,9 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
     )
 
     | Member(main_expr, id) -> (
-      let node = Program.get_node env.ctx main_expr.ty_var in
+      let node_type = Program.deref_node_type env.ctx main_expr.ty_var in
       let open Core_type.TypeDef in
-      match node.value with
+      match node_type with
       | Core_type.TypeExpr.TypeDef { spec = Namespace _; _ } -> (
         let expr_node_type = Program.deref_node_type env.ctx expr.ty_var in
         let open Core_type in
@@ -1242,13 +1242,39 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       )
 
+      | Core_type.TypeExpr.TypeDef { spec = Class cls ; id = cls_id; _ } -> (
+        let static_props =
+          List.filter_map
+          ~f:(fun (name, elm) ->
+            match elm with
+            | Cls_elm_prop (_, prop_ty_int) -> Some (name, prop_ty_int)
+            | _ -> None
+          )
+          cls.tcls_static_elements
+        in
+
+        let field_id =
+          List.find_mapi_exn
+          ~f:(fun idx (field_name, _) ->
+            if String.equal field_name id.pident_name then
+              Some idx
+            else
+              None
+          )
+          static_props
+        in
+
+        let cls_meta = Hashtbl.find_exn env.cls_meta_map cls_id in
+        Ir.Expr.GetStaticValue(cls_meta.cls_gen_name, id.pident_name, field_id)
+      )
+
       | _ ->
         let expr_result = transform_expression ~is_borrow:true env main_expr in
         prepend_stmts := List.append !prepend_stmts expr_result.prepend_stmts;
         append_stmts := List.append expr_result.append_stmts !append_stmts;
 
 
-        let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) node.value id.pident_name in
+        let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) node_type id.pident_name in
         (* could be a property of a getter *)
         match member with
         | Some (Method ({ Core_type.TypeDef. id = def_int; spec = ClassMethod { method_get_set = Some _; _ }; _ }, _params, _rt), _) -> (
@@ -1265,8 +1291,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
         (* it's a property *) 
         | Some _ -> (
-          let expr_type = Program.deref_type env.ctx node.value in
-          let expr_ctor_opt = Check_helper.find_construct_of env.ctx expr_type in
+          let expr_ctor_opt = Check_helper.find_construct_of env.ctx node_type in
           match expr_ctor_opt with
           | Some({ id = expr_id; _ }, _) -> (
             let cls_meta = Hashtbl.find_exn env.cls_meta_map expr_id in
@@ -1275,7 +1300,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           )
 
           | _ ->
-            Format.eprintf "%s expr_type: %a\n" id.pident_name Core_type.TypeExpr.pp expr_type;
+            Format.eprintf "%s expr_type: %a\n" id.pident_name Core_type.TypeExpr.pp node_type;
             failwith "can not find ctor of expr, maybe it's a property"
         )
 
@@ -2391,6 +2416,7 @@ and transform_class env cls loc: Ir.Decl.t list =
     cls_body.cls_body_elements;
 
   let class_methods = ref [] in
+  let static_fields = ref [] in
 
   let methods: Ir.Decl.t list = 
     List.fold
@@ -2409,8 +2435,12 @@ and transform_class env cls loc: Ir.Decl.t list =
           (* will be reversed in the future *)
           List.append stmts acc
         )
+        | Cls_static_property prop -> (
+          let name, _ = prop.cls_static_prop_name in
+          static_fields := name::(!static_fields);
+          acc
+        )
         | Cls_property _
-        | Cls_static_property _
         | Cls_declare _ -> acc
       )
       cls_body.cls_body_elements;
@@ -2474,6 +2504,7 @@ and transform_class env cls loc: Ir.Decl.t list =
     gc_marker;
     properties = cls_meta.cls_fields;
     init = class_init;
+    static_fields = List.rev !static_fields;
   } in
 
   List.append

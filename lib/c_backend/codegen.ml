@@ -242,7 +242,7 @@ and codegen_declaration env decl =
   )
 
   | Class cls -> (
-    let { name; properties; original_name; finalizer; gc_marker; _ } = cls in
+    let { name; properties; original_name; finalizer; gc_marker; static_fields; _ } = cls in
     let class_id_var_name = name ^ "_class_id" in
     ps env (Format.sprintf "static LCClassID %s;\n" class_id_var_name);
     ps env (Format.sprintf "typedef struct %s {" name);
@@ -324,7 +324,8 @@ and codegen_declaration env decl =
       );
       ps env ",\n";
       print_indents env;
-      ps env "0,\n"
+      let static_fields_size = List.length static_fields in
+      ps env ((Int.to_string static_fields_size) ^ ",\n")
     );
     ps env "};\n";
 
@@ -936,11 +937,16 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ")"
   )
 
-  | Retaining expr -> (
-    ps env "(LCRetain(";
+  | Retaining expr ->
+    ps env "LCRetaining(";
     codegen_expression env expr;
-    ps env "), ";
-    codegen_expression env expr;
+    ps env ")"
+
+  | GetStaticValue(classname, _fieldname, field_id) -> (
+    ps env "LCGetStaticValue(rt, ";
+    ps env (classname ^ "_class_id");
+    ps env ", ";
+    ps env (Int.to_string field_id);
     ps env ")"
   )
 
