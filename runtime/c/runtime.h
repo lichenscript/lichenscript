@@ -192,6 +192,7 @@ struct LCValue {
 #define MK_VARIANT_CLOSED(v) ((LCValue) { { .int_val = v }, (LC_TY_MAX + (v << 6)) })
 #define MK_CLASS_OBJ(obj) ((LCValue){ { .ptr_val = (LCObject*)obj }, LC_TY_CLASS_OBJECT })
 #define MK_UNION(cls_id, v) ((LCValue) { { .int_val = (cls_id << 16) | v }, LC_TY_UNION })
+#define MK_PTR(v, t) ((LCValue){ { .ptr_val = (LCObject*)v }, t })
 #define LC_NULL ((LCValue) { { .int_val = 0 }, LC_TY_NULL })
 #define LC_TRUE ((LCValue) { { .int_val = 1 }, LC_TY_BOOL })
 #define LC_FALSE ((LCValue) { { .int_val = 0 }, LC_TY_BOOL })
@@ -318,6 +319,8 @@ LCValue LCRunMain(LCProgram* program, int argc, char** argv);
 LCRuntime* LCNewRuntime();
 void LCFreeRuntime(LCRuntime* rt);
 
+LCValue LCGetStaticValue(LCRuntime* rt, LCClassID cls_id, int idx);
+
 void LCRunGC(LCRuntime* rt);
 
 void* lc_malloc(LCRuntime* rt, size_t size);
@@ -327,6 +330,10 @@ void* lc_realloc2(LCRuntime *ctx, void *ptr, size_t size, size_t *pslack);
 void lc_free(LCRuntime* rt, void *);
 
 void LCRetain(LCValue obj);
+static inline LCValue LCRetaining(LCValue obj) {
+    LCRetain(obj);
+    return obj;
+}
 void LCRelease(LCRuntime* rt, LCValue obj);
 typedef struct LCLambda {
     LCGCObjectHeader header;
