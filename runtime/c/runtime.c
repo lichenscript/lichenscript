@@ -673,6 +673,29 @@ LCValue LCGetStaticValue(LCRuntime* rt, LCClassID cls_id, int idx) {
     return LCRetaining(meta->v.cls.cls_static_value[idx]);
 }
 
+void LCSetStaticValue(LCRuntime* rt, LCClassID cls_id, int idx, LCValue value) {
+#ifdef LSC_DEBUG
+    if (cls_id >= rt->obj_meta_size) {
+        fprintf(stderr, "[LichenScript] access class id out of range, class id: %d, size: %d\n", cls_id, rt->obj_meta_size);
+        lc_panic_internal();
+    }
+#endif
+    LCObjectMeta* meta = &rt->obj_meta_data[cls_id];
+    if (unlikely(meta->is_enum)) {
+        return;
+    }
+#ifdef LSC_DEBUG
+    if (idx >= meta->v.cls.cls_static_value_size) {
+        fprintf(stderr, "[LichenScript] access static value id out of range, value id: %d, size: %zu\n", idx, meta->v.cls.cls_static_value_size);
+        lc_panic_internal();
+    }
+#endif
+
+    LCRetain(value);
+    LCRelease(rt, meta->v.cls.cls_static_value[idx]);
+    meta->v.cls.cls_static_value[idx] = value;
+}
+
 static void lc_deref_child(LCRuntime* rt, LCGCObject* gc_obj) {
     gc_obj->header.count--;
     if (gc_obj->header.count == 0 && gc_obj->header.mark == 1) {
