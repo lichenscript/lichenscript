@@ -1278,6 +1278,15 @@ and annotate_class env cls attributes =
         | Cls_static_property prop -> (
           let { cls_static_prop_visibility; cls_static_prop_loc; cls_static_prop_name; cls_static_prop_type; cls_static_prop_init; _ } = prop in
 
+          (match cls_static_prop_init.spec with
+          | Ast.Expression.Constant _ -> ()
+          | _ -> (
+            let err = Diagnosis.(make_error ctx cls_static_prop_init.loc (
+              StaticFieldCanOnlyInitializedWithConstant cls_static_prop_name.pident_name)
+            ) in
+            raise (Diagnosis.Error err)
+          ));
+
           let first_char = String.get cls_static_prop_name.pident_name 0 in
           if not (Char.is_uppercase first_char) then (
             let err = Diagnosis.(make_error ctx cls_static_prop_name.pident_loc (CapitalizedStaticField cls_static_prop_name.pident_name)) in

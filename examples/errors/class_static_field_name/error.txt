@@ -1,0 +1,1 @@
+4:8 The name of the static field 'b' must be capitalized, try 'B'

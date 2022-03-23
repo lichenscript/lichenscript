@@ -213,6 +213,9 @@ module PP = struct
     | InvalidMainFunctionDefinition ->
       Format.fprintf formatter "Invalid main function definition"
 
+    | StaticFieldCanOnlyInitializedWithConstant field_name ->
+      Format.fprintf formatter "Static field '%s' can only be initialized with constant." field_name
+
   let error ~ctx formatter diagnosis =
     let { spec; loc; _ } = diagnosis in
     match spec with
