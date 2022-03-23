@@ -65,7 +65,23 @@ export interface IntellisenseInstantce {
   deleteFile(path: string): void;
 }
 
-export function compile(content: string): string;
+export interface LichenFile {
+  name: string;
+  content: string;
+}
+
+export interface LichenModule {
+  name: string;
+  files: LichenFile[];
+}
+
+export function registerModule(mod: LichenModule): void;
+
+export interface Program {
+  execute(args: string[]): void;
+}
+
+export function compile(content: string): Program;
 
 export function createIntellisenseInstance(
   provider: FSProvider, config: Config): IntellisenseInstantce;
