@@ -8,7 +8,7 @@ class MyError {
 
 function test2(content: string): Result<i32, MyError> {
   if content.length == 0 {
-    const err: Result<i32, Error> = Error(MyError{
+    const err: Result<i32, MyError> = Error(MyError{
       msg: "null string"
     });
     err
