@@ -1,0 +1,6 @@
+
+class A {
+
+	static b = 3
+
+}

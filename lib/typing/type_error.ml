@@ -53,3 +53,4 @@ type t =
   | OverrideFunctionNotMatch of (TypeExpr.t * TypeExpr.t)  (* parent method, this method *)
   | AnyTypeIsOnlyAllowedInDeclare
   | InvalidMainFunctionDefinition
+  | StaticFieldCanOnlyInitializedWithConstant of string
