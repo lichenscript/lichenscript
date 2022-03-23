@@ -1,13 +1,14 @@
 
 class TermColor {
 
-  static const Bold = "\x1b[1m";
+  static const Bold = "Bold";
 
   static const Underline = "\x1b[4m";
+
+  static const Reset = "Reset";
 
 }
 
 function main() {
-  const b: string = TermColor.Bold;
-  print(b);
+  print(TermColor.Bold, "Hello", TermColor.Reset);
 }

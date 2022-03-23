@@ -242,7 +242,7 @@ and codegen_declaration env decl =
   )
 
   | Class cls -> (
-    let { name; properties; original_name; finalizer; gc_marker; static_fields; _ } = cls in
+    let { name; properties; original_name; finalizer; gc_marker; init; _ } = cls in
     let class_id_var_name = name ^ "_class_id" in
     ps env (Format.sprintf "static LCClassID %s;\n" class_id_var_name);
     ps env (Format.sprintf "typedef struct %s {" name);
@@ -324,7 +324,7 @@ and codegen_declaration env decl =
       );
       ps env ",\n";
       print_indents env;
-      let static_fields_size = List.length static_fields in
+      let static_fields_size = List.length init.class_static_fields in
       ps env ((Int.to_string static_fields_size) ^ ",\n")
     );
     ps env "};\n";
@@ -406,7 +406,7 @@ and codegen_declaration env decl =
       ~f:(fun entry ->
         match entry with
         | Ir.Decl.InitClass cls_entry -> (
-          let { class_ancester; class_name; class_id_name; class_def_name; class_methods; _ } = cls_entry in
+          let { class_ancester; class_name; class_id_name; class_def_name; class_methods; class_static_fields; _ } = cls_entry in
           let ancester_id =
             match class_ancester with
             | Some (SymLocal name) -> name ^ "_class_id"
@@ -415,6 +415,29 @@ and codegen_declaration env decl =
           ps env (Format.sprintf "    %s = LCDefineClass(rt, %s, &%s);\n" class_id_name ancester_id class_def_name);
           if not (List.is_empty class_methods) then (
             ps env (Format.sprintf "    LCDefineClassMethod(rt, %s, %s_methods, countof(%s_methods));\n" class_id_name class_name class_name)
+          );
+          with_indent env (fun () ->
+            if (List.length class_static_fields) > 0 then (
+              print_indents env;
+              ps env "LCValue t;\n";
+              List.iteri
+              ~f:(fun idx (_name, init_expr) ->
+                print_indents env;
+                ps env "t = ";
+                codegen_expression env init_expr;
+                ps env ";\n";
+
+                print_indents env;
+                ps env "LCSetStaticValue(rt, ";
+                ps env (class_id_name ^ ", ");
+                ps env (Int.to_string idx);
+                ps env ", t);\n";
+
+                print_indents env;
+                ps env "LCRelease(rt, t);\n";
+              )
+              class_static_fields
+            )
           )
         )
 

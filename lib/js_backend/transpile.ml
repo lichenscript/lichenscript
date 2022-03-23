@@ -161,6 +161,16 @@ and transpile_class env (cls: Ir.Decl._class) =
     )
     cls.init.class_methods;
 
+  List.iter
+    ~f:(fun (name, expr) ->
+      ps env "  ";
+      ps env name;
+      ps env ": ";
+      transpile_expression env expr;
+      ps env ",\n"
+    )
+    cls.init.class_static_fields;
+
   ps env "}\n"
 
 and transpile_if env if_spec =
