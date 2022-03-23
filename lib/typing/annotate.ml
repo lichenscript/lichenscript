@@ -230,7 +230,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
          *)
         if is_name_enum_or_class id.pident_name then (
           let node = {
-            value = TypeExpr.Ref variable.var_id;
+            value = TypeExpr.(Ref variable.var_id);
             loc = loc;
             deps = [variable.var_id];
           } in
@@ -389,14 +389,25 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
             let resolver = Env.external_resolver env in
             let resolve_result = resolver ns_path ~name:name.pident_name in
             match resolve_result with
-            | Some ty_int ->
-              let id_expr = { T.Expression.
-                spec = Identifier(id.pident_name, variable.var_id);
-                attributes = [];
-                ty_var = variable.var_id;
-                loc = id.pident_loc;
-              } in
-              ty_int, T.Expression.Member(id_expr, name)
+            | Some ty_int -> (
+              if is_name_enum_or_class name.pident_name then (
+                let node = {
+                  value = TypeExpr.Ref(ty_int);
+                  loc = loc;
+                  deps = [ty_int];
+                } in
+                let ty_id = Program.new_id (Env.prog env) node in
+                ty_id, (T.Expression.Identifier (name.pident_name, ty_id))
+              ) else (
+                let id_expr = { T.Expression.
+                  spec = Identifier(id.pident_name, variable.var_id);
+                  attributes = [];
+                  ty_var = variable.var_id;
+                  loc = id.pident_loc;
+                } in
+                ty_int, T.Expression.Member(id_expr, name)
+              )
+            )
 
             | None ->
               let err_spec = Type_error.CannotFindNameForImport(id.pident_name, name.pident_name) in
