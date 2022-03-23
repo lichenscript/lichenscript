@@ -85,99 +85,141 @@ let _ =
     method createIntellisenseInstance dummy_fs config =
       Intellisense.create dummy_fs config
 
+    method registerModule _mod =
+      let mod_name = Js.to_string _mod##.name in
+      let files_arr = Js.to_array _mod##.files in
+      let mod_paths = "/std/" ^ mod_name in
+      let filenames =
+        Array.map
+        ~f:(fun obj ->
+          Js.to_string obj##.name
+        )
+        files_arr
+      in
+      Hashtbl.set
+        global_fs
+        ~key:mod_paths
+        ~data:(FS_dir (Array.to_list filenames));
+
+      Array.map
+        ~f:(fun obj ->
+          let name = Js.to_string obj##.name in
+          let content = Js.to_string obj##.content in
+          let file_path = mod_paths ^ "/" ^ name in
+          Hashtbl.set global_fs ~key:file_path ~data:(FS_file content)
+        )
+        files_arr
+
     method compile str =
-      let module R = Resolver.S (JsFS) in
-      try
-        let dummy_path = "/usr/admin/main.lc" in
-        let oc_string = Js.to_string str in
-        JsFS.write_file_content dummy_path ~data:oc_string;
+      let code_content =
+        let module R = Resolver.S (JsFS) in
+        try
+          let dummy_path = "/usr/admin/main.lc" in
+          let oc_string = Js.to_string str in
+          JsFS.write_file_content dummy_path ~data:oc_string;
 
-        Hashtbl.set
-          global_fs
-          ~key:"/usr/admin"
-          ~data:(FS_dir [
-            "main.lc";
-          ]);
+          Hashtbl.set
+            global_fs
+            ~key:"/usr/admin"
+            ~data:(FS_dir [
+              "main.lc";
+            ]);
 
-        let config = { R.
-          find_paths = ["/std"];
-          runtime_dir = "/runtime";
-          build_dir = Some "/usr/build";
-          platform = "js";
-          verbose = false;
-          wasm_standalone = false;
-        } in
-        let profiles = R.compile_file_path ~config dummy_path
-        in
-        let profile = List.hd_exn profiles in
-        let profile_path = profile.profile_exe_path in
-        let js_content = JsFS.read_file_content profile_path in
-        Js.string js_content
-      with
-      | ResolveError err -> (
-        let err_content = Format.asprintf "%a" Resolve_error.pp_spec err.spec in
+          let config = { R.
+            find_paths = ["/std"];
+            runtime_dir = "/runtime";
+            build_dir = Some "/usr/build";
+            platform = "js";
+            verbose = false;
+            wasm_standalone = false;
+          } in
+          let profiles = R.compile_file_path ~config dummy_path
+          in
+          let profile = List.hd_exn profiles in
+          let profile_path = profile.profile_exe_path in
+          let js_content = JsFS.read_file_content profile_path in
+          Js.string js_content
+        with
+        | ResolveError err -> (
+          let err_content = Format.asprintf "%a" Resolve_error.pp_spec err.spec in
 
-        let err_obj = object%js
-          val line = err.loc.start.line
-          val column = err.loc.start.column
-          val source =
-            match err.loc.source with
-            | Some source ->
-              let source_str = Format.asprintf "%a" Lichenscript_lex.File_key.pp source in
-              Js.string source_str
-            | None -> Js.string ""
-          val content = Js.string err_content
+          let err_obj = object%js
+            val line = err.loc.start.line
+            val column = err.loc.start.column
+            val source =
+              match err.loc.source with
+              | Some source ->
+                let source_str = Format.asprintf "%a" Lichenscript_lex.File_key.pp source in
+                Js.string source_str
+              | None -> Js.string ""
+            val content = Js.string err_content
 
-        end in
+          end in
 
-        let error_list = Js.array [| err_obj |] in
+          let error_list = Js.array [| err_obj |] in
 
-        let js_err = new%js Js.error_constr (Js.string "TypeCheckError") in
-        Js.Unsafe.set js_err (Js.string "errors") error_list;
-        Js_error.raise_ (Js_error.of_error js_err)
-      )
+          let js_err = new%js Js.error_constr (Js.string "TypeCheckError") in
+          Js.Unsafe.set js_err (Js.string "errors") error_list;
+          Js_error.raise_ (Js_error.of_error js_err)
+        )
 
-      | TypeCheckError raw_errors -> (
-        let open Lichenscript_typing in
-        let error_list = Js.array [||] in
+        | TypeCheckError raw_errors -> (
+          let open Lichenscript_typing in
+          let error_list = Js.array [||] in
 
-        List.iteri
-          ~f:(fun index err ->
-            let err_content =
-              match err.spec with
-              | Diagnosis.Dg_error dg_err ->
-                Format.asprintf "%a" (Diagnosis.PP.error_spec ~ctx:err.ctx) dg_err
-              | _ -> ""
-            in
-            let err_obj = object%js
-              val line = err.loc.start.line
-              val column = err.loc.start.column
-              val source =
-                match err.loc.source with
-                | Some source ->
-                  let source_str = Format.asprintf "%a" Lichenscript_lex.File_key.pp source in
-                  Js.string source_str
-                | None -> Js.string ""
-              val content = Js.string err_content
+          List.iteri
+            ~f:(fun index err ->
+              let err_content =
+                match err.spec with
+                | Diagnosis.Dg_error dg_err ->
+                  Format.asprintf "%a" (Diagnosis.PP.error_spec ~ctx:err.ctx) dg_err
+                | _ -> ""
+              in
+              let err_obj = object%js
+                val line = err.loc.start.line
+                val column = err.loc.start.column
+                val source =
+                  match err.loc.source with
+                  | Some source ->
+                    let source_str = Format.asprintf "%a" Lichenscript_lex.File_key.pp source in
+                    Js.string source_str
+                  | None -> Js.string ""
+                val content = Js.string err_content
 
-            end in
-            Js.array_set error_list index err_obj
-          )
-          raw_errors;
+              end in
+              Js.array_set error_list index err_obj
+            )
+            raw_errors;
 
-        let js_err = new%js Js.error_constr (Js.string "TypeCheckError") in
-        Js.Unsafe.set js_err (Js.string "errors") error_list;
-        Js_error.raise_ (Js_error.of_error js_err)
-      )
+          let js_err = new%js Js.error_constr (Js.string "TypeCheckError") in
+          Js.Unsafe.set js_err (Js.string "errors") error_list;
+          Js_error.raise_ (Js_error.of_error js_err)
+        )
 
-      | ParseError raw_errors -> (
-        let err = Utils.parse_errors_to_js_error raw_errors in
-        Js_error.raise_ err
-      )
+        | ParseError raw_errors -> (
+          let err = Utils.parse_errors_to_js_error raw_errors in
+          Js_error.raise_ err
+        )
 
-      | e ->
-        let msg = (Exn.to_string e) |> Js.string in
-        let js_err = new%js Js.error_constr msg in
-        Js_error.raise_ (Js_error.of_error js_err)
+        | e ->
+          let msg = (Exn.to_string e) |> Js.string in
+          let js_err = new%js Js.error_constr msg in
+          Js_error.raise_ (Js_error.of_error js_err)
+      in
+      let _fun = Js.Unsafe.new_obj (Js.Unsafe.js_expr "Function") [|
+        Js.Unsafe.coerce (Js.string "process");
+        Js.Unsafe.coerce code_content;
+      |] in
+      object%js
+
+        method execute argv =
+          let process = object%js
+
+            val argv = argv
+
+          end in
+          Js.Unsafe.call _fun Js.undefined [| (Js.Unsafe.coerce process) |]
+
+      end
 
     end)

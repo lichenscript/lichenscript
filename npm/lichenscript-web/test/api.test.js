@@ -3,24 +3,22 @@ const lichenscript = require('..');
 
 describe('Compiler', function () {
   it('compile api', function () {
-    const result = lichenscript.compile(`
+    const program = lichenscript.compile(`
     function main() {
       print("Hello World");
     }
     `);
-    const fun = new Function(result)
-    fun();
+    program.execute();
   });
 
   it('parse error', function () {
     try {
-      const result = lichenscript.compile(`
+      const program = lichenscript.compile(`
       function main() {
         print("Hello World;
       }
       `);
-      const fun = new Function(result)
-      fun();
+      program.execute();
     } catch (err) {
       assert.strictEqual(Array.isArray(err.errors), true)
       console.log(JSON.stringify(err.errors));
@@ -29,19 +27,28 @@ describe('Compiler', function () {
 
   it('resolve error', function () {
     try {
-      const result = lichenscript.compile(`
+      const program = lichenscript.compile(`
       import "xxx";
 
       function main() {
         print("Hello World");
       }
       `);
-      const fun = new Function(result)
-      fun();
+      program.execute();
     } catch (err) {
       assert.strictEqual(Array.isArray(err.errors), true)
       console.log(JSON.stringify(err.errors));
     }
+  });
+
+  it('get arguments', function () {
+    const program = lichenscript.compile(`
+    function main() {
+      const args = getArgs();
+      print(args[0]);
+    }
+    `);
+    program.execute(["Hello"]);
   });
 
 });
