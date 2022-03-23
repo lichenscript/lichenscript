@@ -11,8 +11,8 @@ depends: [
   "js_of_ocaml-ppx" {>= "4.0.0"}
   "ppx_deriving"
   "ppx_gen_rec"
-  "core"
-  "core_kernel"
+  "core" { = "v0.14.1" & < "v0.15.0" }
+  "core_kernel" { = "v0.14.1" & < "v0.15.0" }
   "sedlex"
   "re"
   "wtf8"
