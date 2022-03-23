@@ -629,7 +629,7 @@ static void LCFreeRuntimeMeta(LCRuntime* rt) {
         }
         size_t static_value_size = meta->v.cls.cls_static_value_size;
         for (size_t j = 0; j < static_value_size; j++) {
-            LCRelease(rt, meta->v.cls.cls_static_value[i]);
+            LCRelease(rt, meta->v.cls.cls_static_value[j]);
         }
         if (meta->v.cls.cls_static_value != NULL) {
             lc_free(rt, meta->v.cls.cls_static_value);

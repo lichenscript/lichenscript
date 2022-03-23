@@ -1265,7 +1265,8 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         in
 
         let cls_meta = Hashtbl.find_exn env.cls_meta_map cls_id in
-        Ir.Expr.GetStaticValue(cls_meta.cls_gen_name, id.pident_name, field_id)
+        let t = Ir.Expr.GetStaticValue(cls_meta.cls_gen_name, id.pident_name, field_id) in
+        auto_release_expr env ~is_move ~append_stmts ty_var t
       )
 
       | _ ->
@@ -2416,7 +2417,7 @@ and transform_class env cls loc: Ir.Decl.t list =
     cls_body.cls_body_elements;
 
   let class_methods = ref [] in
-  let static_fields = ref [] in
+  let class_static_fields = ref [] in
 
   let methods: Ir.Decl.t list = 
     List.fold
@@ -2437,7 +2438,8 @@ and transform_class env cls loc: Ir.Decl.t list =
         )
         | Cls_static_property prop -> (
           let name, _ = prop.cls_static_prop_name in
-          static_fields := name::(!static_fields);
+          let init_expr = transform_expression ~is_move:true env prop.cls_static_prop_init in
+          class_static_fields := (name, init_expr.expr)::(!class_static_fields);
           acc
         )
         | Cls_property _
@@ -2489,6 +2491,7 @@ and transform_class env cls loc: Ir.Decl.t list =
     class_id_name = fun_name ^ "_class_id";
     class_def_name = fun_name ^ "_def";
     class_methods = List.rev !class_methods;
+    class_static_fields = List.rev !class_static_fields;
   } in
 
   env.class_inits <- (Ir.Decl.InitClass class_init)::env.class_inits;
@@ -2504,7 +2507,6 @@ and transform_class env cls loc: Ir.Decl.t list =
     gc_marker;
     properties = cls_meta.cls_fields;
     init = class_init;
-    static_fields = List.rev !static_fields;
   } in
 
   List.append

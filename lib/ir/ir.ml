@@ -60,6 +60,7 @@ module%gen rec Decl : sig
     class_id_name: string;
     class_def_name: string;
     class_methods: class_method_tuple list;
+    class_static_fields: (string * Expr.t) list;
   }
   [@@deriving show]
 
@@ -70,7 +71,6 @@ module%gen rec Decl : sig
     gc_marker: gc_marker option;
     properties: (string * int) list;
     init: class_init;
-    static_fields: string list;
   }
   [@@deriving show]
 
