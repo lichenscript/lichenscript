@@ -14,9 +14,10 @@ type t = {
   mutable in_lambda: bool;
   mutable in_declare: bool;
   mutable before_eval_fun_call: string list;
+  mutable allow_external: bool;
 }
 
-let create ~external_resolver ~file_scope prog =
+let create ~external_resolver ~file_scope ~allow_external prog =
   {
     prog;
     external_resolver;
@@ -27,9 +28,12 @@ let create ~external_resolver ~file_scope prog =
     in_lambda = false;
     in_declare = false;
     before_eval_fun_call = [];
+    allow_external;
   }
 
 let prog env = env.prog
+
+let allow_external env = env.allow_external
 
 let in_lambda env = env.in_lambda
 

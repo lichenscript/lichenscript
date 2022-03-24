@@ -2,7 +2,7 @@ const lichenscript = require('..');
 
 describe("Module", function () {
 
-	it("provider", function () {
+  it("provider", function () {
     lichenscript.registerModule({
       name: "my-module",
       files: [
@@ -27,6 +27,6 @@ describe("Module", function () {
     }
     `);
     program.execute([]);
-	});
+  });
 
 });

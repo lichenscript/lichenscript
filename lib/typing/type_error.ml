@@ -54,3 +54,4 @@ type t =
   | AnyTypeIsOnlyAllowedInDeclare
   | InvalidMainFunctionDefinition
   | StaticFieldCanOnlyInitializedWithConstant of string
+  | IllegalExternalName of string

@@ -216,6 +216,9 @@ module PP = struct
     | StaticFieldCanOnlyInitializedWithConstant field_name ->
       Format.fprintf formatter "Static field '%s' can only be initialized with constant." field_name
 
+    | IllegalExternalName name ->
+      Format.fprintf formatter "The name '%s' of external function is illegal." name
+
   let error ~ctx formatter diagnosis =
     let { spec; loc; _ } = diagnosis in
     match spec with

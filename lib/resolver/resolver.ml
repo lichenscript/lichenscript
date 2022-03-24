@@ -306,12 +306,14 @@ module S (FS: FSProvider) = struct
 
     let module_scope = Module.module_scope _mod in
     let file_scope = new file_scope ~prev:module_scope env import_star_external_modules in
+
     (* parse and create env, do annotation when all files are parsed
     * because annotation stage needs all exported symbols are resolved
     *)
     let typed_env = Lichenscript_typing.Env.create
       ~file_scope
       ~external_resolver:(external_resolver env imports_map)
+      ~allow_external:true
       prog
     in
 

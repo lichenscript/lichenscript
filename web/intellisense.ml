@@ -214,6 +214,7 @@ let create dummy_fs js_config =
       let typed_env = Lichenscript_typing.Env.create
         ~file_scope
         ~external_resolver:(R.external_resolver !resolver imports_map)
+        ~allow_external:true
         !prog
       in
 
