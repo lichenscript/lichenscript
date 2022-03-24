@@ -27,6 +27,13 @@ open Lichenscript_parsing
 
 module T = Typedtree
 
+let set_external_symbol ~loc env declare_id ext_name =
+  if not (Env.allow_external env) then (
+    let err = Diagnosis.(make_error (Env.prog env) loc (IllegalExternalName ext_name)) in
+    raise (Diagnosis.Error err)
+  );
+  Program.set_external_symbol (Env.prog env) declare_id ext_name
+
 let annotate_visibility (visibility: Asttypes.visibility option): Core_type.Visibility.t =
   let open Asttypes in
   match visibility with
@@ -959,8 +966,8 @@ and annotate_declaration env decl : T.Declaration.t =
           };
 
           (match List.last attributes with
-          | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; _ } ->
-            Program.set_external_symbol (Env.prog env) ty_id ext_name
+          | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; attr_loc; _ } ->
+            set_external_symbol ~loc:attr_loc env ty_id ext_name
 
           | _ ->
             let open Diagnosis in
@@ -1375,8 +1382,8 @@ and annotate_class env cls attributes =
 
           if not method_is_virtual then (
             (match List.last cls_decl_method_attributes with
-            | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; _ } ->
-              Program.set_external_symbol (Env.prog env) declare_id ext_name
+            | Some { Ast. attr_name = { txt = "external"; _ }; attr_payload = ext_name::_; attr_loc; _ } ->
+              set_external_symbol ~loc:attr_loc env declare_id ext_name
 
             | _ ->
               let open Diagnosis in
