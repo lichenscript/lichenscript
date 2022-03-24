@@ -1,17 +1,4 @@
-
-@platform("js")
-@init("ext_init")
-import "./foo.js";
-
-@platform("native", "wasm32")
-@init("ext_init")
-import "./foo.h";
-
-@platform("native", "wasm32")
-import "./foo.c";
-
-@external("ext_foo")
-public declare function foo(content: string);
+import * from "./foo";
 
 function main() {
 	foo("江");
