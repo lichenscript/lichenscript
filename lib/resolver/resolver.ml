@@ -222,7 +222,7 @@ module S (FS: FSProvider) = struct
       )
       find_paths
 
-  let rec compile_file_to_path ~prog ~mod_path env _mod path =
+  let rec compile_file_to_path ~prog ~mod_path ~is_entry_module env _mod path =
     let file_content = FS.read_file_content path in
     let file_key = File_key.LibFile path in
     let ast =
@@ -245,7 +245,7 @@ module S (FS: FSProvider) = struct
       let result = find_path source in
       match result with
       | Some (path, source) -> (
-        ignore (parse_module_by_dir ~prog env ~real_path:path source);
+        ignore (parse_module_by_dir ~prog env ~is_entry_module:false ~real_path:path source);
         Hashtbl.set imports_map ~key:source ~data:path;
         match spec with
         | ImportAll ->
@@ -313,7 +313,7 @@ module S (FS: FSProvider) = struct
     let typed_env = Lichenscript_typing.Env.create
       ~file_scope
       ~external_resolver:(external_resolver env imports_map)
-      ~allow_external:true
+      ~allow_external:(not is_entry_module)
       prog
     in
 
@@ -337,7 +337,7 @@ module S (FS: FSProvider) = struct
    *
    * @param real_path must be an absolute path
    *)
-  and parse_module_by_dir ~prog env ~real_path:dir_path first_source : string option =
+  and parse_module_by_dir ~prog env ~real_path:dir_path ~is_entry_module first_source : string option =
     let iterate_parse_file mod_path =
       let module_scope = new module_scope ~prev:(Program.root_scope prog) () in
       let is_std = String.equal first_source "std/preclude" in
@@ -352,7 +352,7 @@ module S (FS: FSProvider) = struct
             try[@alert "-deprecated"]  (* disable the deprecated alert *)
               let test_result = Re.exec allow_suffix child_path |> Re.Group.all in
               if Array.length test_result > 1 then ((* is a .lc file *)
-                compile_file_to_path ~prog ~mod_path env _mod child_path
+                compile_file_to_path ~prog ~mod_path ~is_entry_module env _mod child_path
               )
             with
             | Not_found -> ()
@@ -470,7 +470,7 @@ module S (FS: FSProvider) = struct
 
       (* parse the entry dir *)
       let dir_of_entry = Filename.dirname entry_file_path in
-      let entry_full_path = parse_module_by_dir ~prog env ~real_path:(FS.get_realpath dir_of_entry) dir_of_entry  in
+      let entry_full_path = parse_module_by_dir ~prog env ~is_entry_module:true ~real_path:(FS.get_realpath dir_of_entry) dir_of_entry  in
 
       typecheck_all_modules ~prog ~verbose env;
 
