@@ -1,5 +1,6 @@
 
 [![npm version](https://img.shields.io/npm/v/lichenscript.svg)](https://www.npmjs.com/package/lichenscript)
+![Discord](https://img.shields.io/discord/956834113288011816)
 
 
 # LichenScript
