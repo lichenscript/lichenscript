@@ -1,6 +1,8 @@
 
+![GitHub Workflow Status](https://img.shields.io/github/workflow/status/lichenscript/lichenscript/CI)
 [![npm version](https://img.shields.io/npm/v/lichenscript.svg)](https://www.npmjs.com/package/lichenscript)
 ![Discord](https://img.shields.io/discord/956834113288011816)
+![GitHub](https://img.shields.io/github/license/lichenscript/lichenscript)
 
 
 # LichenScript
