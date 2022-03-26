@@ -43,6 +43,7 @@ LichenScript is a thin layer of the existing ecosystem.
 - [Get Started](https://docs.lichenscript.com/get-started)
 - [Installation](https://docs.lichenscript.com/get-started#install)
 - [VSCode Extension](https://docs.lichenscript.com/advanced/syntax-highlighting)
+- [中文版文档](https://docs.lichenscript.com/zh)
 
 # Syntaxes
 
