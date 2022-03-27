@@ -55,3 +55,4 @@ type t =
   | InvalidMainFunctionDefinition
   | StaticFieldCanOnlyInitializedWithConstant of string
   | IllegalExternalName of string
+  | AssignmentToConstantField of (TypeExpr.t * string)

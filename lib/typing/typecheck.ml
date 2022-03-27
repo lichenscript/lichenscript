@@ -608,19 +608,19 @@ and check_expression env expr =
     let handle_member_type expr_node member_type_opt =
       let open Core_type.TypeExpr in
       match member_type_opt with
-      | Some (Method({ TypeDef. id; spec = ClassMethod { method_get_set = Some _; method_return; _ }; _ }, _params, _rt), _) -> (
+      | Some (Method({ TypeDef. id; spec = ClassMethod { method_get_set = Some _; method_return; _ }; _ }, _params, _rt), _, _) -> (
         Program.update_node_type env.ctx expr.ty_var method_return;
         Program.log env.ctx name.pident_loc id
       )
 
-      | Some (Method({ id; TypeDef. spec = ClassMethod { method_get_set = None; _ }; _ }, _params, _rt), _) -> (
-        let ty, _ = Option.value_exn member_type_opt in
+      | Some (Method({ id; TypeDef. spec = ClassMethod { method_get_set = None; _ }; _ }, _params, _rt), _, _) -> (
+        let ty, _, _ = Option.value_exn member_type_opt in
         Program.update_node_type env.ctx expr.ty_var ty;
         Program.log env.ctx name.pident_loc id
       )
 
       (* it's a property *) 
-      | Some (ty_expr, id) -> (
+      | Some (ty_expr, id, _) -> (
         Program.update_node_type env.ctx expr.ty_var ty_expr;
         Program.log env.ctx name.pident_loc id
       )
@@ -763,7 +763,12 @@ and check_expression env expr =
       let main_expr_type = Program.deref_node_type ctx main_expr.ty_var in
       let member_opt = Check_helper.find_member_of_type ctx ~scope:env.scope main_expr_type name.pident_name in
       match member_opt with
-      | Some _ -> ()
+      | Some (_, _, is_const) -> (
+        if is_const then (
+          let err = Diagnosis.(make_error ctx expr_loc (AssignmentToConstantField(main_expr_type, name.pident_name))) in
+          raise (Diagnosis.Error err)
+        )
+      )
       | None -> (
         let err = Diagnosis.(make_error ctx expr_loc (CannotReadMember(name.pident_name, main_expr_type))) in
         raise (Diagnosis.Error err)
@@ -818,7 +823,7 @@ and check_expression env expr =
         ~init:(PropMap.empty, PropMap.empty)
         ~f:(fun (type_map, init_map) (prop_name, elm) ->
           match elm with
-          | Cls_elm_prop (_, id) ->
+          | Cls_elm_prop (_, id, _) ->
             let elm_node = Program.deref_node_type env.ctx id in
             PropMap.set type_map ~key:prop_name ~data:elm_node,
             PropMap.set init_map ~key:prop_name ~data:(ref false)
@@ -1543,7 +1548,7 @@ and check_method_for_class env cls_type _method =
         method_opt
     in
     match method_opt with
-    | Some (found_type_expr, _) -> (
+    | Some (found_type_expr, _, _) -> (
       let this_type_expr = TypeExpr.Method(method_def, unwrap_method.method_params, unwrap_method.method_return) in
       if not (Check_helper.method_sig_type_equal env.ctx this_type_expr found_type_expr) then (
         let open Diagnosis in

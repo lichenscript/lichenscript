@@ -1,0 +1,9 @@
+
+class A {
+	static const F = "F"
+}
+
+function main() {
+	A.F = "B";
+	print(A.F);
+}

@@ -1,0 +1,1 @@
+7:1 Assignment to constant field 'F' of 'class A { ... }'

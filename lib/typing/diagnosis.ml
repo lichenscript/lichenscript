@@ -219,6 +219,9 @@ module PP = struct
     | IllegalExternalName name ->
       Format.fprintf formatter "The name '%s' of external function is illegal." name
 
+    | AssignmentToConstantField (ty, field_name) ->
+      Format.fprintf formatter "Assignment to constant field '%s' of '%s'" field_name (pp_ty ty)
+
   let error ~ctx formatter diagnosis =
     let { spec; loc; _ } = diagnosis in
     match spec with

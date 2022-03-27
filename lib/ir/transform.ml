@@ -273,7 +273,7 @@ let find_static_field_id_of_class (cls: Core_type.TypeDef.class_type) name =
     List.filter_map
     ~f:(fun (name, elm) ->
       match elm with
-      | Cls_elm_prop (_, prop_ty_int) -> Some (name, prop_ty_int)
+      | Cls_elm_prop (_, prop_ty_int, _) -> Some (name, prop_ty_int)
       | _ -> None
     )
     cls.tcls_static_elements
@@ -1190,7 +1190,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
               let expr_type = Program.deref_node_type env.ctx expr.ty_var in
               let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) expr_type id.pident_name in
               match member with
-              | Some ((Method ({ spec = ClassMethod { method_is_virtual = true; _ }; _ }, _, _)), _) -> (
+              | Some ((Method ({ spec = ClassMethod { method_is_virtual = true; _ }; _ }, _, _)), _, _) -> (
                 let this_expr = transform_expression ~is_borrow:true env expr in
 
                 prepend_stmts := List.append !prepend_stmts this_expr.prepend_stmts;
@@ -1198,7 +1198,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
                 Ir.Expr.Invoke(this_expr.expr, id.pident_name, params)
               )
-              | Some ((Method ({ id = method_id; spec = ClassMethod { method_get_set = None; _ }; _ }, _, _)), _) -> (
+              | Some ((Method ({ id = method_id; spec = ClassMethod { method_get_set = None; _ }; _ }, _, _)), _, _) -> (
                 (* only class method needs a this_expr, this is useless for a static function *)
                 let this_expr = transform_expression ~is_borrow:true env expr in
 
@@ -1220,7 +1220,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
               )
 
               (* it's a static function *)
-              | Some (TypeDef { id = fun_id; spec = Function _; _ }, _) -> (
+              | Some (TypeDef { id = fun_id; spec = Function _; _ }, _, _) -> (
                 let callee_node = Program.get_node env.ctx fun_id in
                 let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
                 let ctor = Option.value_exn ctor_opt in
@@ -1282,13 +1282,13 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         let member = Check_helper.find_member_of_type env.ctx ~scope:(Option.value_exn env.scope.raw) node_type id.pident_name in
         (* could be a property of a getter *)
         match member with
-        | Some (Method ({ Core_type.TypeDef. id = def_int; spec = ClassMethod { method_get_set = Some _; _ }; _ }, _params, _rt), _) -> (
+        | Some (Method ({ Core_type.TypeDef. id = def_int; spec = ClassMethod { method_get_set = Some _; _ }; _ }, _params, _rt), _, _) -> (
           let ext_sym_opt = Program.find_external_symbol env.ctx def_int in
           let ext_sym = Option.value_exn ext_sym_opt in
           Ir.Expr.Call(SymLocal ext_sym, Some expr_result.expr, [])
         )
 
-        | Some (Core_type.TypeExpr.TypeDef { id = method_id; spec = ClassMethod { method_get_set = Some Getter; _ }; _ }, _) -> (
+        | Some (Core_type.TypeExpr.TypeDef { id = method_id; spec = ClassMethod { method_get_set = Some Getter; _ }; _ }, _, _) -> (
           let ext_sym_opt = Program.find_external_symbol env.ctx method_id in
           let ext_sym = Option.value_exn ext_sym_opt in
           Ir.Expr.Call(SymLocal ext_sym, Some expr_result.expr, [])
@@ -2319,7 +2319,7 @@ and generate_cls_meta env cls_id gen_name =
       List.filter_map
         ~f:(fun (elm_name, elm) ->
           match elm with
-          | Cls_elm_prop (_, ty_var) -> 
+          | Cls_elm_prop (_, ty_var, _) -> 
             Some (elm_name, ty_var)
           | _ -> None
         )

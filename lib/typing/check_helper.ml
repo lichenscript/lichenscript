@@ -480,7 +480,7 @@ and replace_params_with_type ctx type_map params =
 let get_visibility_of_class_elm class_elm =
   let open Core_type.TypeDef in
   match class_elm with
-  | Cls_elm_prop (v, _) -> v
+  | Cls_elm_prop (v, _, _) -> v
   | Cls_elm_method(v, _) -> v
   | Cls_elm_get_set(v, _, _) -> v
 
@@ -532,7 +532,7 @@ let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
         let params = replace_params_with_type ctx types_map method_params in
         let rt = replace_type_vars_with_maps ctx types_map method_return in
         let expr = TypeExpr.Method(def, params, rt) in
-        Some (expr, member_id)
+        Some (expr, member_id, false)
     )
 
     | _ -> None
@@ -577,19 +577,19 @@ let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
         let params = replace_params_with_type ctx types_map method_params in
         let rt = replace_type_vars_with_maps ctx types_map method_return in
         let expr = TypeExpr.Method(def, params, rt) in
-        Some (expr, member_id)
+        Some (expr, member_id, true)
       )
 
       | Cls_elm_get_set(_, Some ({ TypeDef. id = member_id; spec = ClassMethod { method_params; method_return; _ }; _ } as def), _) -> (
         let params = replace_params_with_type ctx types_map method_params in
         let rt = replace_type_vars_with_maps ctx types_map method_return in
         let expr = TypeExpr.Method(def, params, rt) in
-        Some (expr, member_id)
+        Some (expr, member_id, false)
       )
 
-      | Cls_elm_prop (_, member_id) ->
+      | Cls_elm_prop (_, member_id, _) ->
         let value = Program.deref_node_type ctx member_id in
-        Some (replace_type_vars_with_maps ctx types_map value, member_id)
+        Some (replace_type_vars_with_maps ctx types_map value, member_id, false)
 
       | _ -> None
     )
@@ -613,7 +613,7 @@ let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
   *    share the member of String
   *
   *)
-and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) option =
+and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int * bool) option =
   let type_expr' = Program.deref_type ctx type_expr in
   match type_expr' with
   | Ctor(type_expr, type_vars) -> (
@@ -636,7 +636,7 @@ and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) op
         (* let params = replace_params_with_type ctx types_map method_params in
         let rt = replace_type_vars_with_maps ctx types_map method_return in *)
         let expr = TypeExpr.Method(def, method_params, method_return) in
-        Some (expr, member_id)
+        Some (expr, member_id, true)
       )
       | _ -> None
     )
@@ -669,11 +669,11 @@ and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int) op
     | Some (_, Cls_elm_method(_, _method)) ->
       let member_id = _method.id in
       let node = Program.get_node ctx member_id in
-      Some (node.value, member_id)
+      Some (node.value, member_id, true)
 
-    | Some (_, Cls_elm_prop(_, id)) ->
+    | Some (_, Cls_elm_prop(_, id, is_const)) ->
       let value = Program.deref_node_type ctx id in
-      Some (value, id)
+      Some (value, id, is_const)
 
     | _ -> None
   )

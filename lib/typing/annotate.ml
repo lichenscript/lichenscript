@@ -1283,7 +1283,7 @@ and annotate_class env cls attributes =
         )
 
         | Cls_static_property prop -> (
-          let { cls_static_prop_visibility; cls_static_prop_loc; cls_static_prop_name; cls_static_prop_type; cls_static_prop_init; _ } = prop in
+          let { cls_static_prop_visibility; cls_static_prop_loc; cls_static_prop_const; cls_static_prop_name; cls_static_prop_type; cls_static_prop_init; _ } = prop in
 
           (match cls_static_prop_init.spec with
           | Ast.Expression.Constant _ -> ()
@@ -1320,12 +1320,13 @@ and annotate_class env cls attributes =
 
           let node_id = Program.new_id ctx node in
 
-          let ty_elm = Core_type.TypeDef.Cls_elm_prop (type_visibility, node_id) in
+          let ty_elm = Core_type.TypeDef.Cls_elm_prop (type_visibility, node_id, cls_static_prop_const) in
 
           add_tcls_static_element (cls_static_prop_name.pident_name, ty_elm) cls_static_prop_loc;
 
           T.Declaration.Cls_static_property {
             cls_static_prop_visibility;
+            cls_static_prop_const;
             cls_static_prop_loc;
             cls_static_prop_name = (cls_static_prop_name.pident_name, node_id);
             cls_static_prop_type;
@@ -1343,7 +1344,7 @@ and annotate_class env cls attributes =
             loc = cls_prop_loc;
           } in
           let node_id = Program.new_id ctx node in
-          let ty_elm = Core_type.TypeDef.Cls_elm_prop (type_visibility, node_id) in
+          let ty_elm = Core_type.TypeDef.Cls_elm_prop (type_visibility, node_id, false) in
           add_tcls_element (cls_prop_name.pident_name, ty_elm) cls_prop_loc;
 
           (*

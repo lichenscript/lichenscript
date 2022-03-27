@@ -189,7 +189,7 @@ and TypeDef : sig
   }
 
   and class_elm =
-    | Cls_elm_prop of Visibility.t * int
+    | Cls_elm_prop of Visibility.t * int * bool (* is_const *)
     | Cls_elm_method of Visibility.t * t
     | Cls_elm_get_set of Visibility.t * t option * t option
 
@@ -274,7 +274,7 @@ end = struct
   }
 
   and class_elm =
-    | Cls_elm_prop of Visibility.t * int
+    | Cls_elm_prop of Visibility.t * int * bool
     | Cls_elm_method of Visibility.t * t
     | Cls_elm_get_set of Visibility.t * t option * t option
 
