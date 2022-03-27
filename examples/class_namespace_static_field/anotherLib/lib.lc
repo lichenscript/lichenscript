@@ -1,0 +1,6 @@
+
+public class Color {
+
+	static const Red = "#FF0000"
+
+}
