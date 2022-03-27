@@ -973,6 +973,16 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env ")"
   )
 
+  | SetStaticValue(classname, _fieldname, field_id, value) -> (
+    ps env "LCSetStaticValue(rt, ";
+    ps env (classname ^ "_class_id");
+    ps env ", ";
+    ps env (Int.to_string field_id);
+    ps env ", ";
+    codegen_expression env value;
+    ps env ")"
+  )
+
   | Invoke (expr, name, params) -> (
     ps env "LCInvokeStr(rt, ";
     codegen_expression env expr;

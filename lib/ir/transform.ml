@@ -268,6 +268,29 @@ type expr_result = {
   append_stmts: Ir.Stmt.t list;
 }
 
+let find_static_field_id_of_class (cls: Core_type.TypeDef.class_type) name =
+  let static_props =
+    List.filter_map
+    ~f:(fun (name, elm) ->
+      match elm with
+      | Cls_elm_prop (_, prop_ty_int) -> Some (name, prop_ty_int)
+      | _ -> None
+    )
+    cls.tcls_static_elements
+  in
+
+  let field_id =
+    List.find_mapi_exn
+    ~f:(fun idx (field_name, _) ->
+      if String.equal field_name name then
+        Some idx
+      else
+        None
+    )
+    static_props
+  in
+  field_id
+
 let create ~config ctx =
   let scope = TScope.create None in
   let global_name_map = Hashtbl.create (module Int) in
@@ -1243,26 +1266,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       )
 
       | Core_type.TypeExpr.TypeDef { spec = Class cls ; id = cls_id; _ } -> (
-        let static_props =
-          List.filter_map
-          ~f:(fun (name, elm) ->
-            match elm with
-            | Cls_elm_prop (_, prop_ty_int) -> Some (name, prop_ty_int)
-            | _ -> None
-          )
-          cls.tcls_static_elements
-        in
-
-        let field_id =
-          List.find_mapi_exn
-          ~f:(fun idx (field_name, _) ->
-            if String.equal field_name id.pident_name then
-              Some idx
-            else
-              None
-          )
-          static_props
-        in
+        let field_id = find_static_field_id_of_class cls id.pident_name in
 
         let cls_meta = Hashtbl.find_exn env.cls_meta_map cls_id in
         let t = Ir.Expr.GetStaticValue(cls_meta.cls_gen_name, id.pident_name, field_id) in
@@ -1385,6 +1389,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           env.config.arc &&
           not (type_should_not_release env node_type)
         in
+        (* save the previous value *)
         if need_release then (
           let tmp_id = env.tmp_vars_count in
           env.tmp_vars_count <- tmp_id + 1;
@@ -1434,30 +1439,52 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
       (* TODO: maybe it's a setter? *)
       | ({ spec = Typedtree.Expression.Member (main_expr, id); _ }, _) -> (
-        let transform_main_expr = transform_expression ~is_borrow:true env main_expr in
-
-        prepend_stmts := List.concat [ !prepend_stmts; transform_main_expr.prepend_stmts ];
-        append_stmts := List.concat [ !append_stmts; transform_main_expr.append_stmts ];
-
-        (* let boxed_main_expr = prepend_expr ~is_borrow env ~prepend_stmts ~append_stmts transform_main_expr.expr in *)
-
         let main_expr_ty = Program.deref_node_type env.ctx main_expr.ty_var in
-        let classname_opt = Check_helper.find_classname_of_type env.ctx main_expr_ty in
-        let classname = Option.value_exn ~message:"can not find member of class" classname_opt in
-        let gen_classname = find_variable env classname in
-        let unwrap_name =
-          match gen_classname with
-          | Ir.SymLocal name -> name
-          | _ -> failwith "unrechable"
-        in
+        match main_expr_ty with
+        | Core_type.TypeExpr.TypeDef { spec = Class cls ; id = cls_id; _ } -> (
+          match op_opt with
+          | None -> (
+            let field_id = find_static_field_id_of_class cls id.pident_name in
 
-        assign_or_update
-          (Ir.Expr.GetField(
-            transform_main_expr.expr,
-            unwrap_name,
-            id.pident_name)
+            let cls_meta = Hashtbl.find_exn env.cls_meta_map cls_id in
+
+            let expr' = transform_expression ~is_move:false env right_expr in
+
+            prepend_stmts := List.concat [ !prepend_stmts; expr'.prepend_stmts ];
+            append_stmts := List.concat [ !append_stmts; expr'.append_stmts ];
+
+            Ir.Expr.SetStaticValue(cls_meta.cls_gen_name, id.pident_name, field_id, expr'.expr)
           )
-          main_expr.ty_var
+
+          | _ ->
+            failwith "unimplemented: update static value"
+
+        )
+
+        | _ ->
+          let transform_main_expr = transform_expression ~is_borrow:true env main_expr in
+
+          prepend_stmts := List.concat [ !prepend_stmts; transform_main_expr.prepend_stmts ];
+          append_stmts := List.concat [ !append_stmts; transform_main_expr.append_stmts ];
+
+          (* let boxed_main_expr = prepend_expr ~is_borrow env ~prepend_stmts ~append_stmts transform_main_expr.expr in *)
+
+          let classname_opt = Check_helper.find_classname_of_type env.ctx main_expr_ty in
+          let classname = Option.value_exn ~message:"can not find member of class" classname_opt in
+          let gen_classname = find_variable env classname in
+          let unwrap_name =
+            match gen_classname with
+            | Ir.SymLocal name -> name
+            | _ -> failwith "unrechable"
+          in
+
+          assign_or_update
+            (Ir.Expr.GetField(
+              transform_main_expr.expr,
+              unwrap_name,
+              id.pident_name)
+            )
+            main_expr.ty_var
       )
 
       | ({ spec = Typedtree.Expression.Index (main_expr, value); _ }, None) -> (

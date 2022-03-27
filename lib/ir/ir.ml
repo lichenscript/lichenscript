@@ -203,7 +203,8 @@ and Expr : sig
   | StringCmp of Asttypes.BinaryOp.t * t * t
   | StringEqUtf8 of t * string
   | Retaining of Expr.t
-  | GetStaticValue of string * string * int  (* classname fieldname*)
+  | GetStaticValue of string * string * int  (* classname fieldname index *)
+  | SetStaticValue of string * string * int * t (* classname fieldname index value *)
   [@@deriving show]
 
 end

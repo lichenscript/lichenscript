@@ -1,0 +1,12 @@
+
+class Foo {
+
+	static Name = "Foo"
+
+}
+
+function main() {
+	print(Foo.Name);
+	Foo.Name = "Bar";
+	print(Foo.Name);
+}

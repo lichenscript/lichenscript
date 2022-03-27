@@ -629,6 +629,13 @@ and transpile_expression ?(parent_expr=true) env expr =
     ps env ".";
     ps env fieldname
 
+  | SetStaticValue (classname, fieldname, _, value) ->
+    ps env classname;
+    ps env ".";
+    ps env fieldname;
+    ps env " = ";
+    transpile_expression env value
+
 and transpile_i32_binary env op left right =
   let open Asttypes.BinaryOp in
   (match op with
