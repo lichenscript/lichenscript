@@ -1,7 +1,7 @@
 {
   "name": "lichenscript-web",
   "description": "The compiler of LichenScript",
-  "version": "0.5.1",
+  "version": "0.5.2",
   "homepage": "https://lichenscript.com/",
   "license": "Apache-2.0",
   "author": {

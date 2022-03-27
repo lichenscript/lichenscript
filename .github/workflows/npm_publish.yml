@@ -30,8 +30,14 @@ jobs:
           dune build
           ./test.sh
           ./prepublish.sh
+          make release-linux-x64
 
       - uses: JS-DevTools/npm-publish@v1
         with:
           package: ./npm/lichenscript-web/package.json
+          token: ${{ secrets.NPM_TOKEN }}
+
+      - uses: JS-DevTools/npm-publish@v1
+        with:
+          package: ./npm/lichenscript-linux-x64/package.json
           token: ${{ secrets.NPM_TOKEN }}
