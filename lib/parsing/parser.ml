@@ -900,9 +900,9 @@ and parse_class_body env: Declaration.class_body =
 
       let cls_decl_method_modifier =
         match Peek.token env with
-        (* | Token.T_STATIC ->
+        | Token.T_STATIC ->
           Eat.token env;
-          Some Ast.Declaration.Cls_modifier_static *)
+          Some Ast.Declaration.Cls_modifier_static
 
         | Token.T_VIRTUAL ->
           Eat.token env;

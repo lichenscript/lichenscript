@@ -128,3 +128,11 @@ public class Map<K, V> {
     declare get size(): i32;
 
 }
+
+@builtin()
+public class Buffer {
+
+    @external("lc_new_buffer")
+    declare static new();
+
+}

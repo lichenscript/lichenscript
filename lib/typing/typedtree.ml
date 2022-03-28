@@ -292,6 +292,7 @@ and Declaration : sig
   and class_declare_method = {
     cls_decl_method_attributes: Ast.attributes;
     cls_decl_method_name: identifier;
+    cls_decl_method_modifier: Ast.Declaration.class_modifier option;
     cls_decl_method_params: Function.params;
     cls_decl_method_loc: Loc.t;
   }
