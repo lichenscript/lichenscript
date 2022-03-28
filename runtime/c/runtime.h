@@ -427,23 +427,16 @@ LCValue lc_std_string_get_char(LCRuntime* rt, LCValue this, int arg_len, LCValue
 typedef struct LCMapTuple LCMapTuple;
 typedef struct LCMapBucket LCMapBucket;
 
-typedef struct LCMap {
-    LCGCObjectHeader header;
-    int key_ty;
-    int size: 31;
-    int is_small: 1;
-    // keep the order of key/value pairs
-    LCMapTuple* head;
-    LCMapTuple* last;
-    LCMapBucket** buckets;
-    int bucket_size;
-} LCMap;
+typedef struct LCMap LCMap;
 
 LCValue lc_std_map_new(LCRuntime* rt, int key_ty, int init_size);
 LCValue lc_std_map_set(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 LCValue lc_std_map_get(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 LCValue lc_std_map_size(LCRuntime* rt, LCValue this, int argc, LCValue* args);
+
+typedef struct LCBuffer LCBuffer;
+LCValue lc_new_buffer(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
 LCValue lc_std_exit(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 LCValue lc_std_panic(LCRuntime* rt, LCValue this, int argc, LCValue* args);
@@ -452,5 +445,6 @@ LCValue lc_std_get_args(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
 #define LC_STD_CLS_ID_OPTION 1
 #define LC_STD_CLS_ID_RESULT 2
+#define LC_STD_CLS_ID_BUFFER 3
 
 #endif

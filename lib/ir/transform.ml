@@ -1225,8 +1225,16 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
                 let ctor_opt = Check_helper.find_typedef_of env.ctx callee_node.value in
                 let ctor = Option.value_exn ctor_opt in
                 let ctor_ty_id = ctor.id in
-                let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
-                Ir.Expr.Call(global_name, None, params)
+
+                let ext_sym_opt = Program.find_external_symbol env.ctx fun_id in
+                match ext_sym_opt with
+                | Some ext_sym ->
+                  Ir.Expr.Call(SymLocal ext_sym, None, params)
+
+                | _ ->
+                  let global_name = Hashtbl.find_exn env.global_name_map ctor_ty_id in
+                  Ir.Expr.Call(global_name, None, params)
+
               )
 
               | _ ->

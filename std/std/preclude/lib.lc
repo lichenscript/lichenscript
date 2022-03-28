@@ -133,6 +133,6 @@ public class Map<K, V> {
 public class Buffer {
 
     @external("lc_new_buffer")
-    declare static new();
+    declare static new(): Buffer;
 
 }

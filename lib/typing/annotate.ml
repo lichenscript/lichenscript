@@ -1419,6 +1419,10 @@ and annotate_class env cls attributes =
                 }
               in
 
+              let cls_elm = Core_type.TypeDef.Cls_elm_method(type_visibility, new_type) in
+
+              add_tcls_static_element (cls_decl_method_name.pident_name, cls_elm) cls_decl_method_loc;
+
               ignore (Program.new_id ctx
                 { Core_type.
                   deps = (List.append cls_method_params_deps return_ty_deps)
