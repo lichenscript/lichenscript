@@ -51,6 +51,25 @@ describe('Compiler', function () {
     program.execute(["Hello"]);
   });
 
+  it('static field', function () {
+    const program = lichenscript.compile(`
+
+class Foo {
+
+  static Name = "Foo"
+
+}
+
+function main() {
+  print(Foo.Name);
+  Foo.Name = "Bar";
+  print(Foo.Name);
+}
+
+    `);
+    program.execute(["Hello"]);
+  });
+
 });
 
 describe('Intellisense', function() {
