@@ -256,6 +256,18 @@ typedef struct LCMapBucket {
     LCMapTuple* data;
 } LCMapBucket;
 
+typedef struct LCMap {
+    LCGCObjectHeader header;
+    int key_ty;
+    int size: 31;
+    int is_small: 1;
+    // keep the order of key/value pairs
+    LCMapTuple* head;
+    LCMapTuple* last;
+    LCMapBucket** buckets;
+    int bucket_size;
+} LCMap;
+
 static inline uint32_t hash_int(int i, uint32_t seed) {
     return seed * 263 + i;
 }
@@ -588,6 +600,28 @@ static LCEnumMemberDef Result_members[] = {
     { "Error", 1 },
 };
 
+typedef struct LCBuffer {
+    LCGCObjectHeader header;
+    uint32_t length;
+    uint32_t capacity;
+    unsigned char* data;
+} LCBuffer;
+
+void Buffer_finalizer(LCRuntime* rt, LCGCObject* obj) {
+    LCBuffer* buffer = (LCBuffer*)obj;
+    lc_free(rt, buffer->data);
+#ifdef LSC_DEBUG
+    buffer->data = NULL;
+#endif
+}
+
+static LCClassDef Buffer_def = {
+    "Buffer",
+    Buffer_finalizer,
+    NULL,
+    0
+};
+
 LCRuntime* LCNewRuntime() {
     LCRuntime* runtime = (LCRuntime*)lc_raw_malloc(sizeof(LCRuntime));
     memset(runtime, 0, sizeof(LCRuntime));
@@ -615,6 +649,8 @@ LCRuntime* LCNewRuntime() {
 
     LCDefineEnum(runtime, Option_members, countof(Option_members));
     LCDefineEnum(runtime, Result_members, countof(Result_members));
+
+    LCDefineClass(runtime, 0, &Buffer_def);
 
     return runtime;
 }
@@ -2738,7 +2774,7 @@ LCValue lc_std_map_new(LCRuntime* rt, int key_ty, int init_size) {
 
     map->buckets = NULL;
 
-    return (LCValue){ { .ptr_val = (LCObject*)map }, LC_TY_MAP };
+    return MK_PTR(map, LC_TY_MAP);
 }
 
 static uint32_t LCGetStringHash(LCRuntime*rt, LCValue val) {
@@ -3095,6 +3131,20 @@ LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args) 
 LCValue lc_std_map_size(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     LCMap* map = (LCMap*)this.ptr_val;
     return MK_I32(map->size);
+}
+
+LCValue lc_new_buffer(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCBuffer* buffer = (LCBuffer*)lc_malloc(rt, sizeof (LCBuffer));
+    buffer->header.count = 1;
+    buffer->header.class_id  = LC_STD_CLS_ID_BUFFER;
+    buffer->header.gc_ty = LC_GC_CLASS_OBJECT;
+
+    buffer->length = 0;
+    buffer->capacity = 32;
+
+    buffer->data = (unsigned char*)lc_malloc(rt, buffer->capacity);
+
+    return MK_PTR(buffer, LC_TY_CLASS_OBJECT);
 }
 
 LCValue lc_std_exit(LCRuntime* rt, LCValue this, int argc, LCValue* args) {

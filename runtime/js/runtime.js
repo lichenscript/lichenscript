@@ -307,3 +307,17 @@ function lc_std_get_args() {
   }
   return [...process.argv];
 }
+
+const LCC_Buffer = {
+  __proto__: LCC_Object,
+  [clsNameSym]: "Buffer"
+}
+
+function lc_new_buffer() {
+  const content = new ArrayBuffer(32);
+  return {
+    __proto__: LCC_Buffer,
+    content,
+    size: 0,
+  };
+}
