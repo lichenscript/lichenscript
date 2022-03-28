@@ -26,8 +26,11 @@ jobs:
           # Set an output parameter `uname` for use in subsequent steps
           install: |
             apt-get update -q -y
-            apt-get install -q -y git opam mccs
-            opam init --auto-setup --bare --solver=mccs
+            apt-get install -q -y git curl unzip bubblewrap build-essential
+            curl -L https://github.com/ocaml/opam/releases/download/2.1.2/opam-2.1.2-arm64-linux --output opam
+            install ./opam /usr/local/bin/opam
+            opam init --disable-sandboxing --auto-setup --bare
+            opam switch -y create 4.13.1
             eval $(opam env)
 
           run: |
