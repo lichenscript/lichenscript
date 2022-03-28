@@ -1379,7 +1379,7 @@ and annotate_class env cls attributes =
             | Some Ast.Declaration.Cls_modifier_virtual
             | Some Ast.Declaration.Cls_modifier_override -> false, true
             | Some Ast.Declaration.Cls_modifier_static -> true, false
-            | _ -> false, true
+            | _ -> false, false 
           in
 
           let parent_scope = Env.peek_scope env in
