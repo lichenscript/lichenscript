@@ -1,0 +1,37 @@
+name: NPM Publish Aarch64
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: uraimo/run-on-arch-action@v2
+        name: Run commands
+        id: runcmd
+        with:
+          arch: aarch64
+          distro: ubuntu20.04
+
+          # Not required, but speeds up builds by storing container images in
+          # a GitHub package registry.
+          githubToken: ${{ github.token }}
+
+          dockerRunArgs: |
+            --volume "${PWD}:/admin"
+
+          # Set an output parameter `uname` for use in subsequent steps
+          install: |
+            apt-get update -q -y
+            apt-get install -q -y git opam mccs
+            opam init --auto-setup --bare --solver=mccs
+            eval $(opam env)
+
+          run: |
+            uname -a
+            cd /admin
+            opam install .
+            dune build
