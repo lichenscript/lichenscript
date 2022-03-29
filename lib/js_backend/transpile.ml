@@ -29,6 +29,8 @@ type t = {
   mutable indents: int;
   mutable line: int;
   mutable col: int;
+
+  mutable while_id: int;
 }
 
 let ps env str =
@@ -56,6 +58,7 @@ let create ~prog () =
     indents = 0;
     line = 1;
     col = 0;
+    while_id = 0;
   }
 
 let with_indents env f =
@@ -225,6 +228,13 @@ and transpile_statement env decl =
   | If if_spec -> transpile_if env if_spec
 
   | While (while_test, while_block) -> (
+    let while_id = env.while_id in
+    env.while_id <- while_id + 1;
+    ps env "\n";
+    ps env ("while_" ^ (Int.to_string while_id));
+    ps env ":\n";
+
+    print_indents env;
     ps env "while (";
     transpile_expression env while_test;
     ps env ") {\n";
@@ -258,7 +268,12 @@ and transpile_statement env decl =
     )
   )
 
-  | Break -> ps env "break;\n"
+  | Break ->
+    let while_id = env.while_id - 1 in
+    ps env "break ";
+    ps env ("while_" ^ (Int.to_string while_id));
+    ps env ";\n"
+
   | Continue -> ps env "continue;\n"
   (* | Debugger -> ps env "debugger;\n" *)
 
