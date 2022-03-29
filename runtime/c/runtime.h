@@ -284,8 +284,6 @@ typedef struct LCTuple {
 
 LCValue LCNewTuple(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args);
 
-#define LC_TUPLE_GET(v, index) (((LCTuple*)((v).ptr_val))->data[index])
-
 typedef struct LCArray LCArray;
 
 typedef LCValue (*LCCFunction)(LCRuntime* rt, LCValue this, int32_t arg_len, LCValue* args);
@@ -336,6 +334,9 @@ static force_inline LCValue LCRetaining(LCValue obj) {
     return obj;
 }
 void LCRelease(LCRuntime* rt, LCValue obj);
+
+#define LC_TUPLE_GET(v, index) LCRetaining(((LCTuple*)((v).ptr_val))->data[index])
+
 typedef struct LCLambda {
     LCGCObjectHeader header;
     LCCFunction c_fun;

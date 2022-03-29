@@ -3,5 +3,5 @@ found: Vincent Chan
 found: Roger Leung
 not found
 not found
-iterate: (name, Vincent Chan)
-iterate: (age, 18)
+key: name value: Vincent Chan
+key: age value: 18
