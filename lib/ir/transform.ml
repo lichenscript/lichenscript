@@ -1309,7 +1309,13 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
           | Some({ id = expr_id; _ }, _) -> (
             let cls_meta = Hashtbl.find_exn env.cls_meta_map expr_id in
             let prop_name = Hashtbl.find_exn cls_meta.cls_fields_map id.pident_name in
-            Ir.Expr.GetField(expr_result.expr, cls_meta.cls_gen_name, prop_name)
+            let get_field_expr = Ir.Expr.GetField(expr_result.expr, cls_meta.cls_gen_name, prop_name) in
+            if is_borrow then
+              get_field_expr
+            else
+              Ir.Expr.(
+                Retaining(get_field_expr)
+              )
           )
 
           | _ ->
