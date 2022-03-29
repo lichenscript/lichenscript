@@ -711,7 +711,9 @@ static LCValue LC_MapIterator_next(LCRuntime* rt, LCValue this, int argc, LCValu
         return /* None */MK_UNION(LC_STD_CLS_ID_OPTION, 1);
     }
 
-    LCValue result = LCNewUnionObject(rt, LC_STD_CLS_ID_OPTION, 0, 1, (LCValue[]) { iterator->tuple->value });
+    LCValue tuple = LCNewTuple(rt, LC_NULL, 2, (LCValue[]) { iterator->tuple->key, iterator->tuple->value });
+    LCValue result = LCNewUnionObject(rt, LC_STD_CLS_ID_OPTION, 0, 1, (LCValue[]) { tuple });
+    LCRelease(rt, tuple);
 
     iterator->tuple = iterator->tuple->next;
 

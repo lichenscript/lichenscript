@@ -293,7 +293,8 @@ function LCC_MapIterator_next() {
   }
   const nextItem = rawIter.next();
   if (!nextItem.done) {
-    return [LCC_Option, 0, nextItem.value];
+    const [key, value] = nextItem.value;
+    return [LCC_Option, 0, [tupleSym, key, value]];
   }
   delete this.rawIter;
   return [LCC_Option, 1];

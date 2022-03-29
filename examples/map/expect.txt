@@ -3,5 +3,5 @@ found: Vincent Chan
 found: Roger Leung
 not found
 not found
-iterate: Vincent Chan
-iterate: 18
+iterate: (name, Vincent Chan)
+iterate: (age, 18)
