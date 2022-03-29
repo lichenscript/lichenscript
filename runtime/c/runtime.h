@@ -458,6 +458,7 @@ LCValue lc_std_get_args(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
 #define LC_STD_CLS_ID_OPTION 1
 #define LC_STD_CLS_ID_RESULT 2
-#define LC_STD_CLS_ID_BUFFER 3
+#define LC_STD_CLS_ID_MAP 3
+#define LC_STD_CLS_ID_BUFFER 5
 
 #endif

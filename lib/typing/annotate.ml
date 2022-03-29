@@ -1158,15 +1158,6 @@ and annotate_class env cls attributes =
     )
   in
 
-  let tcls_implements =
-    List.map
-    ~f:(fun impl ->
-      let impl_type, _deps = annotate_type env impl in
-      (impl_type, impl.loc)
-    )
-    cls.cls_implements
-  in
-
   let annotate_class_body body =
     let { cls_body_elements; cls_body_loc; } = body in
     let cls_body_elements =
@@ -1554,10 +1545,20 @@ and annotate_class env cls attributes =
     { T.Declaration. cls_body_elements; cls_body_loc}
   in
 
-  Env.with_new_scope env class_scope (fun _env ->
+  Env.with_new_scope env class_scope (fun env ->
     let { cls_id; cls_visibility; cls_type_vars; cls_loc; cls_body; cls_comments; _ } = cls in
     let tcls_name = cls_id.pident_name in
     let cls_id = tcls_name, cls_var.var_id in
+
+    let tcls_implements =
+      List.map
+      ~f:(fun impl ->
+        let impl_type, _deps = annotate_type env impl in
+        (impl_type, impl.loc)
+      )
+      cls.cls_implements
+    in
+
     let cls_body = annotate_class_body cls_body in
 
     (* reduced all method and elements here *)
@@ -2292,6 +2293,15 @@ and annotate_interface env intf: T.Declaration.intf =
   let deps = ref [] in
   let intf_method_tuples = ref [] in
 
+  let this_expr = TypeExpr.Ctor(Ref intf_id, List.map ~f:Identifier.(fun id -> TypeExpr.TypeSymbol id.pident_name) intf_type_vars) in
+  let class_scope = new class_scope ~prev:scope intf_id this_expr in
+
+  List.iter
+    ~f:(fun ident ->
+      class_scope#insert_generic_type_symbol ident.pident_name;
+    )
+    intf_type_vars;
+
   let annotate_method (_method: Ast.Declaration.intf_method) =
     let { Ast.Declaration. intf_method_name; intf_method_loc; intf_method_params; intf_method_return_ty; _ } = _method in
     let intf_method_params, type_params, params_deps = annotate_function_params env intf_method_params in
@@ -2340,32 +2350,34 @@ and annotate_interface env intf: T.Declaration.intf =
     }
   in
 
-  let intf_methods = List.map ~f:annotate_method intf_methods in
+  Env.with_new_scope env class_scope (fun env ->
+    let intf_methods = List.map ~f:annotate_method intf_methods in
 
-  let typedef = { Core_type.TypeDef.
-    id = intf_id;
-    builtin = false;
-    name = intf_name.pident_name;
-    spec = Interface {
-      intf_methods = List.rev !intf_method_tuples;
-    };
-  } in
+    let typedef = { Core_type.TypeDef.
+      id = intf_id;
+      builtin = false;
+      name = intf_name.pident_name;
+      spec = Interface {
+        intf_methods = List.rev !intf_method_tuples;
+      };
+    } in
 
-  Program.map_node
-    (Env.prog env)
-    ~f:(fun _ -> {
-      deps = List.rev !deps;
-      loc = intf_name.pident_loc;
-      value = TypeExpr.TypeDef typedef;
-    })
-    intf_id;
+    Program.map_node
+      (Env.prog env)
+      ~f:(fun _ -> {
+        deps = List.rev !deps;
+        loc = intf_name.pident_loc;
+        value = TypeExpr.TypeDef typedef;
+      })
+      intf_id;
 
-  { T.Declaration.
-    intf_visibility;
-    intf_name = intf_name_tuple;
-    intf_type_vars;
-    intf_methods;
-  }
+    { T.Declaration.
+      intf_visibility;
+      intf_name = intf_name_tuple;
+      intf_type_vars;
+      intf_methods;
+    }
+  )
 
 and annotate_import env ~attributes import =
   let open Ast.Import in

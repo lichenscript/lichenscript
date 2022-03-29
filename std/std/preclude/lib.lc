@@ -23,32 +23,6 @@ public class Object {
 }
 
 @builtin()
-public class Array<T> {
-
-    @external("lc_std_array_push")
-    declare push(item: T);
-
-    @external("lc_std_array_resize")
-    declare resize(newLen: i32, item: T);
-
-    @external("lc_std_array_sort")
-    declare sort(cmp: (a: T, b: T) => i32);
-
-    @external("lc_std_array_slice")
-    declare slice(begin: i32, end: i32): T[];
-
-    @external("lc_std_array_map")
-    declare map<V>(f: (element: T) => V): V[];
-
-    @external("lc_std_array_filter")
-    declare filter(f: (element: T) => boolean): T[];
-
-    @external("lc_std_array_get_length")
-    declare get length(): i32;
-
-}
-
-@builtin()
 public class Char {
 
     @external("lc_std_char_code")
@@ -112,8 +86,46 @@ public enum Result<A, B> {
 
 }
 
+public interface Iterator<T> {
+
+    next(): Option<T>;
+
+}
+
+public interface Iteratable<T> {
+
+    getIterator(): Iterator<T>;
+
+}
+
 @builtin()
-public class Map<K, V> {
+public class Array<T> {
+
+    @external("lc_std_array_push")
+    declare push(item: T);
+
+    @external("lc_std_array_resize")
+    declare resize(newLen: i32, item: T);
+
+    @external("lc_std_array_sort")
+    declare sort(cmp: (a: T, b: T) => i32);
+
+    @external("lc_std_array_slice")
+    declare slice(begin: i32, end: i32): T[];
+
+    @external("lc_std_array_map")
+    declare map<V>(f: (element: T) => V): V[];
+
+    @external("lc_std_array_filter")
+    declare filter(f: (element: T) => boolean): T[];
+
+    @external("lc_std_array_get_length")
+    declare get length(): i32;
+
+}
+
+@builtin()
+public class Map<K, V> implements Iteratable<(K, V)> {
 
     @external("lc_std_map_set")
     declare set(key: K, value: V);
@@ -126,6 +138,8 @@ public class Map<K, V> {
 
     @external("lc_std_map_size")
     declare get size(): i32;
+
+    declare override getIterator(): Iterator<(K, V)>;
 
 }
 

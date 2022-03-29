@@ -256,8 +256,51 @@ function lc_std_array_sort(cmp) {
   return Array.prototype.sort.call(this, cmp);
 }
 
+const LCC_Map = {
+  __proto__: LCC_Object,
+  [clsNameSym]: "Map",
+  getIterator: LCC_Map_getIterator
+}
+
+const LCC_MapIterator = {
+  __proto__: LCC_Object,
+  [clsNameSym]: "MapIterator",
+  next: LCC_MapIterator_next
+}
+
+function lc_std_map_new() {
+  const data = new Map();
+  return {
+    __proto__: LCC_Map,
+    data,
+  };
+}
+
+function LCC_Map_getIterator() {
+  const map = this.data;
+  const rawIter = map[Symbol.iterator]();
+  return {
+    __proto__: LCC_MapIterator,
+    map,
+    rawIter,
+  };
+}
+
+function LCC_MapIterator_next() {
+  const rawIter = this.rawIter;
+  if (typeof rawIter === 'undefined') {
+    return [LCC_Option, 1];
+  }
+  const nextItem = rawIter.next();
+  if (!nextItem.done) {
+    return [LCC_Option, 0, nextItem.value];
+  }
+  delete this.rawIter;
+  return [LCC_Option, 1];
+}
+
 function lc_std_map_get(key, value) {
-  const tmp = Map.prototype.get.call(this, key, value);
+  const tmp = Map.prototype.get.call(this.data, key, value);
   if (tmp) {
     return [LCC_Option, 0, tmp];
   }
@@ -265,11 +308,11 @@ function lc_std_map_get(key, value) {
 }
 
 function lc_std_map_set(key, value) {
-  Map.prototype.set.call(this, key, value);
+  Map.prototype.set.call(this.data, key, value);
 }
 
 function lc_std_map_remove(key, value) {
-  const tmp = Map.prototype.delete.call(this, key, value);
+  const tmp = Map.prototype.delete.call(this.data, key, value);
   if (tmp) {
     return [LCC_Option, 0, tmp];
   }
@@ -277,7 +320,7 @@ function lc_std_map_remove(key, value) {
 }
 
 function lc_std_map_size() {
-  return this.size;
+  return this.data.size;
 }
 
 function lc_std_string_slice() {
