@@ -1,4 +1,11 @@
 
+
+enum MyError {
+
+    case MyError1(i32, i32, i32)
+
+}
+
 function main() {
     let a = Some(1);
     print(a);
@@ -13,4 +20,5 @@ function main() {
     }
     print(a.isSome());
     print(a.isNone());
+    print(MyError1(0, 0, 0));
 }

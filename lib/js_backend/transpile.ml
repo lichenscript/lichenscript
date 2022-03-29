@@ -133,6 +133,9 @@ let rec transpile_declaration env (delcaration: Ir.Decl.t) =
     if enum_ctor.enum_ctor_params_size > 0 then (
       ps env ", ";
       for i = 0 to (enum_ctor.enum_ctor_params_size - 1) do (
+        if i > 0 then (
+          ps env ", ";
+        );
         ps env "arguments[";
         ps env (Int.to_string i);
         ps env "]"

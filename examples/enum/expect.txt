@@ -3,3 +3,4 @@ None
 Some
 true
 false
+MyError1(0, 0, 0)

@@ -19,16 +19,16 @@ function insertData(map: Map<string, string>) {
 }
 
 function testIterator() {
-    let a = #{
+    let a: Map<string, string> = #{
         "name": "Vincent Chan",
         "age": "18"
     };
-    const iterator = a.getIterator();
+    const iterator: Iterator<(string, string)> = a.getIterator();
     while true {
-        const next = iterator.next();
+        const next: Option<(string, string)> = iterator.next();
         match next {
-            case Some(value) => {
-                print("iterate:", value);
+            case Some((key, value)) => {
+                print("key:", key, " value:", value);
             }
             case None => {
                 break;
