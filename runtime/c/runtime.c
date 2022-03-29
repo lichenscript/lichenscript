@@ -1901,6 +1901,7 @@ LCValue LCToString(LCRuntime* rt, LCValue val) {
         break;
 
     case LC_TY_CHAR:
+        // TODO: handler char > 127
         snprintf(buf, sizeof(buf), "%c", val.int_val);
         str = buf;
         break;
@@ -3136,25 +3137,30 @@ LCValue lc_std_map_size(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     return MK_I32(map->size);
 }
 
-LCValue lc_std_new_buffer(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+LCBuffer* lc_std_new_buffer_with_cap(LCRuntime* rt, size_t cap) {
     LCBuffer* buffer = (LCBuffer*)lc_malloc(rt, sizeof (LCBuffer));
     buffer->header.count = 1;
     buffer->header.class_id  = LC_STD_CLS_ID_BUFFER;
     buffer->header.gc_ty = LC_GC_CLASS_OBJECT;
 
     buffer->length = 0;
-    buffer->capacity = 32;
+    buffer->capacity = cap;
 
     buffer->data = (unsigned char*)lc_malloc(rt, buffer->capacity);
 
-    return MK_PTR(buffer, LC_TY_CLASS_OBJECT);
+    return buffer;
 }
 
-static void lc_std_buffer_add_memory(LCRuntime* rt, LCBuffer* buffer, size_t size) {
-    if (likely(buffer->length + size <= buffer->capacity)) {
+void lc_std_buffer_extend(LCRuntime* rt, LCBuffer* buffer, size_t size) {
+    if (likely(size <= buffer->capacity)) {
         return;
     }
-    size_t new_cap = buffer->capacity * 2;
+
+    size_t new_cap = buffer->capacity;
+
+    do {
+        new_cap *= 2;
+    } while (new_cap < size);
 
     buffer->data = lc_realloc(rt, buffer->data, new_cap);
 
@@ -3166,7 +3172,7 @@ LCValue lc_std_buffer_add_string(LCRuntime* rt, LCValue this, int argc, LCValue*
     size_t len;
     const char* content = LCToUTF8Len(rt, &len, args[0]);
 
-    lc_std_buffer_add_memory(rt, buffer, len);
+    lc_std_buffer_extend(rt, buffer, buffer->length + len);
 
     memcpy(buffer->data + buffer->length, content, len);
 
@@ -3182,7 +3188,7 @@ LCValue lc_std_buffer_add_any(LCRuntime* rt, LCValue this, int argc, LCValue* ar
     size_t len;
     const char* content = LCToUTF8Len(rt, &len, args[0]);
 
-    lc_std_buffer_add_memory(rt, buffer, len);
+    lc_std_buffer_extend(rt, buffer, buffer->length + len);
 
     memcpy(buffer->data + buffer->length, content, len);
 

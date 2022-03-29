@@ -3,4 +3,6 @@ function main() {
 	const buffer = Buffer.new();
 	buffer.addString("content");
 	print(buffer.toString());
+	buffer.addString("123456789012345678901234567890");
+	print(buffer.toString());
 }

@@ -437,12 +437,17 @@ LCValue lc_std_map_size(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
 typedef struct LCBuffer {
     LCGCObjectHeader header;
-    uint32_t length;
-    uint32_t capacity;
+    size_t length;
+    size_t capacity;
     unsigned char* data;
 } LCBuffer;
 
-LCValue lc_std_new_buffer(LCRuntime* rt, LCValue this, int argc, LCValue* args);
+LCBuffer* lc_std_new_buffer_with_cap(LCRuntime* rt, size_t cap);
+void lc_std_buffer_extend(LCRuntime* rt, LCBuffer* buffer, size_t size);
+static inline LCValue lc_std_new_buffer(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCBuffer* buffer = lc_std_new_buffer_with_cap(rt, 32);
+    return MK_PTR(buffer, LC_TY_CLASS_OBJECT);
+}
 LCValue lc_std_buffer_add_string(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 LCValue lc_std_buffer_add_any(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
