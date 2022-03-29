@@ -1370,6 +1370,7 @@ and annotate_class env cls attributes =
 
         | Cls_declare declare -> (
           let { cls_decl_method_attributes; cls_decl_method_modifier; cls_decl_method_name; cls_decl_method_type_vars; cls_decl_method_params; cls_decl_method_loc; cls_decl_method_return_ty; cls_decl_method_get_set; _ } = declare in
+          Env.set_in_declare env true;
           let type_visibility = Visibility.Public in
 
           let declare_id = Program.size ctx in
@@ -1433,6 +1434,7 @@ and annotate_class env cls attributes =
                   loc = cls_decl_method_loc;
                 });
 
+              Env.set_in_declare env false;
               T.Declaration.Cls_declare {
                 cls_decl_method_attributes;
                 cls_decl_method_loc;
@@ -1535,6 +1537,7 @@ and annotate_class env cls attributes =
                   }
               );
 
+              Env.set_in_declare env false;
               T.Declaration.Cls_declare {
                 cls_decl_method_attributes;
                 cls_decl_method_loc;
