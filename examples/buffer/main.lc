@@ -1,4 +1,6 @@
 
 function main() {
 	const buffer = Buffer.new();
+	buffer.addString("content");
+	print(buffer.toString());
 }

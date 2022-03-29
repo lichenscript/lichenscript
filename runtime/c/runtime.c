@@ -600,13 +600,6 @@ static LCEnumMemberDef Result_members[] = {
     { "Error", 1 },
 };
 
-typedef struct LCBuffer {
-    LCGCObjectHeader header;
-    uint32_t length;
-    uint32_t capacity;
-    unsigned char* data;
-} LCBuffer;
-
 void Buffer_finalizer(LCRuntime* rt, LCGCObject* obj) {
     LCBuffer* buffer = (LCBuffer*)obj;
     lc_free(rt, buffer->data);
@@ -620,6 +613,15 @@ static LCClassDef Buffer_def = {
     Buffer_finalizer,
     NULL,
     0
+};
+
+static LCValue LC_Buffer_toString(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCBuffer* buffer = (LCBuffer*)this.ptr_val;
+    return LCNewStringFromCStringLen(rt, buffer->data, buffer->length);
+}
+
+static LCClassMethodDef Buffer_methods[] = {
+    { "toString", 0, LC_Buffer_toString }
 };
 
 LCRuntime* LCNewRuntime() {
@@ -650,7 +652,8 @@ LCRuntime* LCNewRuntime() {
     LCDefineEnum(runtime, Option_members, countof(Option_members));
     LCDefineEnum(runtime, Result_members, countof(Result_members));
 
-    LCDefineClass(runtime, 0, &Buffer_def);
+    LCClassID buffer_cls_id = LCDefineClass(runtime, 0, &Buffer_def);
+    LCDefineClassMethod(runtime, buffer_cls_id, Buffer_methods, countof(Buffer_methods));
 
     return runtime;
 }
@@ -3133,7 +3136,7 @@ LCValue lc_std_map_size(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     return MK_I32(map->size);
 }
 
-LCValue lc_new_buffer(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+LCValue lc_std_new_buffer(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     LCBuffer* buffer = (LCBuffer*)lc_malloc(rt, sizeof (LCBuffer));
     buffer->header.count = 1;
     buffer->header.class_id  = LC_STD_CLS_ID_BUFFER;
@@ -3145,6 +3148,49 @@ LCValue lc_new_buffer(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     buffer->data = (unsigned char*)lc_malloc(rt, buffer->capacity);
 
     return MK_PTR(buffer, LC_TY_CLASS_OBJECT);
+}
+
+static void lc_std_buffer_add_memory(LCRuntime* rt, LCBuffer* buffer, size_t size) {
+    if (likely(buffer->length + size <= buffer->capacity)) {
+        return;
+    }
+    size_t new_cap = buffer->capacity * 2;
+
+    buffer->data = lc_realloc(rt, buffer->data, new_cap);
+
+    buffer->capacity = new_cap;
+}
+
+LCValue lc_std_buffer_add_string(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCBuffer* buffer = (LCBuffer*)this.ptr_val;
+    size_t len;
+    const char* content = LCToUTF8Len(rt, &len, args[0]);
+
+    lc_std_buffer_add_memory(rt, buffer, len);
+
+    memcpy(buffer->data + buffer->length, content, len);
+
+    buffer->length += len;
+
+    LCFreeUTF8(rt, content);
+
+    return LC_NULL;
+}
+
+LCValue lc_std_buffer_add_any(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCBuffer* buffer = (LCBuffer*)this.ptr_val;
+    size_t len;
+    const char* content = LCToUTF8Len(rt, &len, args[0]);
+
+    lc_std_buffer_add_memory(rt, buffer, len);
+
+    memcpy(buffer->data + buffer->length, content, len);
+
+    buffer->length += len;
+
+    LCFreeUTF8(rt, content);
+
+    return LC_NULL;
 }
 
 LCValue lc_std_exit(LCRuntime* rt, LCValue this, int argc, LCValue* args) {

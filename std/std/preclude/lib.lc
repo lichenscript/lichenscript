@@ -132,7 +132,15 @@ public class Map<K, V> {
 @builtin()
 public class Buffer {
 
-    @external("lc_new_buffer")
+    @external("lc_std_new_buffer")
     declare static new(): Buffer;
+
+    @external("lc_std_buffer_add_string")
+    declare addString(str: string);
+
+    @external("lc_std_buffer_add_any")
+    declare addAny(val: any);
+
+    declare override toString(): string;
 
 }

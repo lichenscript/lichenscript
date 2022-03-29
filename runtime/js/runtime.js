@@ -313,11 +313,44 @@ const LCC_Buffer = {
   [clsNameSym]: "Buffer"
 }
 
-function lc_new_buffer() {
-  const content = new ArrayBuffer(32);
+function lc_std_new_buffer() {
+  const content = new Uint8Array(32);
   return {
     __proto__: LCC_Buffer,
     content,
     size: 0,
+    toString: lc_buffer_to_string,
   };
+}
+
+
+function lc_buffer_extends_if_need(len) {
+  while ((this.size + len) > this.content.length) {
+    const newLen = (this.content.length | 0) * 2;
+    const newArray = new Uint8Array(newLen);
+    newArray.set(this.content, 0);
+    this.content = newArray;
+  }
+}
+
+function lc_buffer_concat(buf) {
+  lc_buffer_extends_if_need.call(this, buf.length);
+  this.content.set(buf, this.size);
+  this.size += buf.length;
+}
+
+function lc_buffer_to_string() {
+  const decoder = new TextDecoder();
+  return decoder.decode(new Uint8Array(this.content.buffer, 0, this.size));
+}
+
+function lc_std_buffer_add_string(str) {
+  const buffer = new TextEncoder();
+  const u8Str = buffer.encode(str);
+  lc_buffer_concat.call(this, u8Str);
+}
+
+function lc_std_buffer_add_any(obj) {
+  const str = obj.toString();
+  lc_std_buffer_add_string.call(this, str);
 }

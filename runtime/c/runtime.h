@@ -435,8 +435,16 @@ LCValue lc_std_map_get(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 LCValue lc_std_map_remove(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 LCValue lc_std_map_size(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
-typedef struct LCBuffer LCBuffer;
-LCValue lc_new_buffer(LCRuntime* rt, LCValue this, int argc, LCValue* args);
+typedef struct LCBuffer {
+    LCGCObjectHeader header;
+    uint32_t length;
+    uint32_t capacity;
+    unsigned char* data;
+} LCBuffer;
+
+LCValue lc_std_new_buffer(LCRuntime* rt, LCValue this, int argc, LCValue* args);
+LCValue lc_std_buffer_add_string(LCRuntime* rt, LCValue this, int argc, LCValue* args);
+LCValue lc_std_buffer_add_any(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
 LCValue lc_std_exit(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 LCValue lc_std_panic(LCRuntime* rt, LCValue this, int argc, LCValue* args);
