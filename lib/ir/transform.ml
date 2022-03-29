@@ -994,7 +994,7 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       let children_expr =
         List.map
           ~f:(fun expr ->
-            let tmp = transform_expression env expr in
+            let tmp = transform_expression ~is_borrow:true env expr in
 
             prepend_stmts := List.append !prepend_stmts tmp.prepend_stmts;
             append_stmts := List.append tmp.append_stmts !append_stmts;
