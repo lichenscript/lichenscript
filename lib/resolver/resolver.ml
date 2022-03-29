@@ -680,7 +680,7 @@ module S (FS: FSProvider) = struct
           entry_name = "all";
           deps = List.concat [ ["runtime"]; (List.map ~f:(fun (m, _, _) -> m) mods)];
           content = [
-            Format.sprintf "$(CC) $(FLAGS) %s -o %s" c_srcs bin_name
+            Format.sprintf "$(CC) $(FLAGS) $(LD_FLAGS) %s -o %s" c_srcs bin_name
           ];
         };
         {
@@ -723,9 +723,17 @@ module S (FS: FSProvider) = struct
       | "wasm32" -> "emcc"
       | _ -> failwith  ("unsupport platform: " ^ platform)
     in
+
+    let link_flags =
+      match (platform, mode) with
+      | ("wasm32", "debug") -> "-s SAFE_HEAP=1 -s EXIT_RUNTIME=1"
+      | _ -> ""
+    in
+
     let data =
       "CC=" ^ cc ^ "\n" ^
       flags ^
+      "LD_FLAGS=" ^ link_flags ^ "\n" ^
       to_string entries in
     write_file_content_if_changed output_path ~data
 
