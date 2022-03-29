@@ -390,7 +390,7 @@ and transpile_expression ?(parent_expr=true) env expr =
     ps env "]"
   )
 
-  | NewMap _ -> ps env "new Map()"
+  | NewMap _ -> ps env "lc_std_map_new()"
 
   | Not expr ->
     ps env "!";

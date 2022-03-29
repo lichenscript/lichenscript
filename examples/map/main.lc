@@ -18,6 +18,25 @@ function insertData(map: Map<string, string>) {
     }
 }
 
+function testIterator() {
+    let a = #{
+        "name": "Vincent Chan",
+        "age": "18"
+    };
+    const iterator = a.getIterator();
+    while true {
+        const next = iterator.next();
+        match next {
+            case Some(value) => {
+                print("iterate:", value);
+            }
+            case None => {
+                break;
+            }
+        }
+    }
+}
+
 function main() {
     let a = #{
         "name": "Vincent Chan"
@@ -45,4 +64,5 @@ function main() {
         case Some(name) => print("found:", name)
         case None => print("not found")
     }
+    testIterator();
 }

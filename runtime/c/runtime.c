@@ -256,6 +256,8 @@ typedef struct LCMapBucket {
     LCMapTuple* data;
 } LCMapBucket;
 
+struct LCMapIterator;
+
 typedef struct LCMap {
     LCGCObjectHeader header;
     int key_ty;
@@ -266,6 +268,8 @@ typedef struct LCMap {
     LCMapTuple* last;
     LCMapBucket** buckets;
     int bucket_size;
+    struct LCMapIterator* iterator_hd;
+    struct LCMapIterator* iterator_lst;
 } LCMap;
 
 static inline uint32_t hash_int(int i, uint32_t seed) {
@@ -608,6 +612,78 @@ void Buffer_finalizer(LCRuntime* rt, LCGCObject* obj) {
 #endif
 }
 
+typedef struct LCMapIterator {
+    LCGCObjectHeader header;
+    LCMap* map;
+    struct LCMapIterator* prev;
+    struct LCMapIterator* next;
+    LCMapTuple* tuple;
+    int invalid;
+} LCMapIterator;
+
+void LCMapIterator_finalizer(LCRuntime* rt, LCGCObject* obj) {
+    LCMapIterator *iterator = (LCMapIterator*)obj;
+    if (iterator->prev) {
+        iterator->prev->next = iterator->next;
+    }
+    if (iterator->next) {
+        iterator->next->prev = iterator->prev;
+    }
+    LCRelease(rt, MK_PTR(iterator->map, LC_TY_MAP));
+}
+
+static void LCMapIterator_marker(LCRuntime *rt, LCValue val, LCMarkFunc *mark_func) {
+    LCMapIterator *iterator = (LCMapIterator*)val.ptr_val;
+    mark_func(rt, (LCGCObject*)iterator->map);
+}
+
+static LCClassDef MapIterator_def = {
+    "MapIterator",
+    LCMapIterator_finalizer,
+    LCMapIterator_marker,
+    0
+};
+
+static LCClassDef Map_def = {
+    "Map",
+    NULL,
+    NULL,
+    0
+};
+
+static LCClassID map_iterator_cls_id;
+
+static LCValue LC_Map_getIterator(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCMap* map = (LCMap*)this.ptr_val;
+
+    LCMapIterator* itereator = (LCMapIterator*)lc_mallocz(rt, sizeof(LCMapIterator));
+
+    lc_init_object(rt, map_iterator_cls_id, (LCGCObject*)itereator);
+
+    LCRetain(this);
+    itereator->map = (LCMap*)this.ptr_val;
+
+    if (map->iterator_hd == NULL) {
+        map->iterator_hd = itereator;
+    }
+
+    if (map->iterator_lst) {
+        map->iterator_lst->next = itereator;
+        itereator->prev = map->iterator_lst;
+    }
+
+    itereator->tuple = map->head;
+
+    itereator->prev = map->iterator_lst;
+    map->iterator_lst = itereator;
+
+    return MK_PTR(itereator, LC_TY_CLASS_OBJECT);
+}
+
+static LCClassMethodDef Map_methods[] = {
+    { "getIterator", 0, LC_Map_getIterator }
+};
+
 static LCClassDef Buffer_def = {
     "Buffer",
     Buffer_finalizer,
@@ -622,6 +698,28 @@ static LCValue LC_Buffer_toString(LCRuntime* rt, LCValue this, int argc, LCValue
 
 static LCClassMethodDef Buffer_methods[] = {
     { "toString", 0, LC_Buffer_toString }
+};
+
+static LCValue LC_MapIterator_next(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCMapIterator* iterator = (LCMapIterator*)this.ptr_val;
+    if (unlikely(iterator->invalid)) {
+        fprintf(stderr, "[LichenScript] the iterator of map is invalid\n");
+        lc_panic_internal();
+    }
+
+    if (iterator->tuple == NULL) {
+        return /* None */MK_UNION(LC_STD_CLS_ID_OPTION, 1);
+    }
+
+    LCValue result = LCNewUnionObject(rt, LC_STD_CLS_ID_OPTION, 0, 1, (LCValue[]) { iterator->tuple->value });
+
+    iterator->tuple = iterator->tuple->next;
+
+    return result;
+}
+
+static LCClassMethodDef MapIterator_methods[] = {
+    { "next", 0, LC_MapIterator_next }
 };
 
 LCRuntime* LCNewRuntime() {
@@ -651,6 +749,12 @@ LCRuntime* LCNewRuntime() {
 
     LCDefineEnum(runtime, Option_members, countof(Option_members));
     LCDefineEnum(runtime, Result_members, countof(Result_members));
+
+    LCClassID map_cls_id = LCDefineClass(runtime, 0, &Map_def);
+    LCDefineClassMethod(runtime, map_cls_id, Map_methods, countof(Map_methods));
+
+    map_iterator_cls_id = LCDefineClass(runtime, 0, &MapIterator_def);
+    LCDefineClassMethod(runtime, map_iterator_cls_id, MapIterator_methods, countof(MapIterator_methods));
 
     LCClassID buffer_cls_id = LCDefineClass(runtime, 0, &Buffer_def);
     LCDefineClassMethod(runtime, buffer_cls_id, Buffer_methods, countof(Buffer_methods));
@@ -2763,6 +2867,7 @@ LCValue lc_std_map_new(LCRuntime* rt, int key_ty, int init_size) {
     LCMap* map = (LCMap*)lc_mallocz(rt, sizeof (LCMap));
 
     init_gc_object(rt, (LCGCObject*)map, LC_GC_MAP);
+    map->header.class_id = LC_STD_CLS_ID_MAP;
 
     map->key_ty = key_ty;
     map->is_small = 1;
