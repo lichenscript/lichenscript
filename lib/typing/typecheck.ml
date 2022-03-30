@@ -238,6 +238,8 @@ and check_statement env stmt =
     List.iter ~f:(check_statement env) while_block.body
   )
 
+  | For _ -> failwith "unimplemented for"
+
   | Binding binding -> (
     let { binding_pat; binding_init; binding_ty; binding_loc; _ } = binding in
     check_expression env binding_init;
