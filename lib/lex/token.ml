@@ -57,6 +57,7 @@ type t =
   | T_FOR
   | T_CLASS
   | T_EXTENDS
+  | T_OBJECT
   | T_STATIC
   | T_ELSE
   | T_VIRTUAL
@@ -70,7 +71,6 @@ type t =
   | T_SUPER
   | T_IMPLEMENTS
   | T_INTERFACE
-  | T_PACKAGE
   | T_PRIVATE
   | T_PROTECTED
   | T_PUBLIC
@@ -173,6 +173,7 @@ let token_to_string = function
   | T_FOR -> "T_FOR"
   | T_CLASS -> "T_CLASS"
   | T_EXTENDS -> "T_EXTENDS"
+  | T_OBJECT -> "T_OBJECT"
   | T_STATIC -> "T_STATIC"
   | T_ELSE -> "T_ELSE"
   | T_VIRTUAL -> "T_VIRTUAL"
@@ -186,7 +187,6 @@ let token_to_string = function
   | T_SUPER -> "T_SUPER"
   | T_IMPLEMENTS -> "T_IMPLEMENTS"
   | T_INTERFACE -> "T_INTERFACE"
-  | T_PACKAGE -> "T_PACKAGE"
   | T_PRIVATE -> "T_PRIVATE"
   | T_PROTECTED -> "T_PROTECTED"
   | T_PUBLIC -> "T_PUBLIC"
@@ -297,6 +297,7 @@ let value_of_token = function
   | T_FOR -> "for"
   | T_CLASS -> "class"
   | T_EXTENDS -> "extends"
+  | T_OBJECT -> "object"
   | T_STATIC -> "static"
   | T_ELSE -> "else"
   | T_VIRTUAL -> "virtual"
@@ -310,7 +311,6 @@ let value_of_token = function
   | T_SUPER -> "super"
   | T_IMPLEMENTS -> "implements"
   | T_INTERFACE -> "interface"
-  | T_PACKAGE -> "package"
   | T_PRIVATE -> "private"
   | T_PROTECTED -> "protected"
   | T_PUBLIC -> "public"
@@ -421,7 +421,6 @@ let is_keyword = function
   | T_SUPER
   | T_IMPLEMENTS
   | T_INTERFACE
-  | T_PACKAGE
   | T_PRIVATE
   | T_PROTECTED
   | T_PUBLIC
