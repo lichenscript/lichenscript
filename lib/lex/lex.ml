@@ -876,7 +876,7 @@ let token (env : Lex_env.t) lexbuf : result =
   | "virtual" -> Token (env, T_VIRTUAL)
   | "override" -> Token (env, T_OVERRIDE)
   | "of" -> Token (env, T_OF)
-  | "package" -> Token (env, T_PACKAGE)
+  | "object" -> Token (env, T_OBJECT)
   | "private" -> Token (env, T_PRIVATE)
   | "protected" -> Token (env, T_PROTECTED)
   | "public" -> Token (env, T_PUBLIC)
