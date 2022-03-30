@@ -224,8 +224,10 @@ typedef struct LCObjectMeta {
 typedef struct LCRuntime {
     LCMallocState malloc_state;
     uint32_t seed;
+#ifndef LC_PTR64
     LCValue* i64_pool;
     LCBox64* i64_pool_space;
+#endif
     uint32_t obj_meta_cap;
     uint32_t obj_meta_size;
     LCObjectMeta* obj_meta_data;
@@ -309,6 +311,7 @@ void lc_init_object(LCRuntime* rt, LCClassID cls_id, LCGCObject* obj) {
     lc_gc_objs_list_add(&rt->gc_objs, obj);
 }
 
+#ifndef LC_PTR64
 // -511 - 512 is the range in the pool
 static LCValue* init_i64_pool(LCRuntime* rt) {
     LCValue* result = (LCValue*)lc_malloc(rt, sizeof(LCValue) * I64_POOL_SIZE);
@@ -332,6 +335,8 @@ static void free_i64_pool(LCRuntime* rt) {
     lc_free(rt, rt->i64_pool_space);
     lc_free(rt, rt->i64_pool);
 }
+
+#endif
 
 static force_inline void lc_panic_internal() {
 #if defined(__APPLE__) || defined(__linux__)
@@ -612,6 +617,51 @@ void Buffer_finalizer(LCRuntime* rt, LCGCObject* obj) {
 #endif
 }
 
+typedef struct LCArrayIterator {
+    LCGCObjectHeader header;
+    LCArray* arr;
+    int index;
+} LCArrayIterator;
+
+static LCClassID array_iterator_cls_id;
+
+void LCArrayIterator_finalizer(LCRuntime* rt, LCGCObject* obj) {
+    LCArrayIterator *iterator = (LCArrayIterator*)obj;
+    LCRelease(rt, MK_PTR(iterator->arr, LC_TY_ARRAY));
+}
+
+static void LCArrayIterator_marker(LCRuntime *rt, LCValue val, LCMarkFunc *mark_func) {
+    LCArrayIterator *iterator = (LCArrayIterator*)val.ptr_val;
+    mark_func(rt, (LCGCObject*)iterator->arr);
+}
+
+static LCClassDef ArrayIterator_def = {
+    "ArrayIterator",
+    LCArrayIterator_finalizer,
+    LCArrayIterator_marker,
+    0
+};
+
+static LCClassDef Array_def = {
+    "Array",
+    NULL,
+    NULL,
+    0
+};
+
+static LCValue LC_Array_getIterator(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCArray* arr = (LCArray*)this.ptr_val;
+    LCArrayIterator* itereator = (LCArrayIterator*)lc_mallocz(rt, sizeof(LCArrayIterator));
+    lc_init_object(rt, array_iterator_cls_id, (LCGCObject*)itereator);
+    LCRetain(this);
+    itereator->arr = arr;
+    return MK_PTR(itereator, LC_TY_CLASS_OBJECT);
+}
+
+static LCClassMethodDef Array_methods[] = {
+    { "getIterator", 0, LC_Array_getIterator }
+};
+
 typedef struct LCMapIterator {
     LCGCObjectHeader header;
     LCMap* map;
@@ -700,6 +750,21 @@ static LCClassMethodDef Buffer_methods[] = {
     { "toString", 0, LC_Buffer_toString }
 };
 
+static LCValue LC_ArrayIterator_next(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
+    LCArrayIterator* iterator = (LCArrayIterator*)this.ptr_val;
+    LCArray* arr = iterator->arr;
+    if (iterator->index >= arr->len) {
+        return /* None */MK_UNION(LC_STD_CLS_ID_OPTION, 1);
+    }
+    LCValue result = LCNewUnionObject(rt, LC_STD_CLS_ID_OPTION, 0, 1, (LCValue[]) { arr->data[iterator->index] });
+    iterator->index++;
+    return result;
+}
+
+static LCClassMethodDef ArrayIterator_methods[] = {
+    { "next", 0, LC_ArrayIterator_next }
+};
+
 static LCValue LC_MapIterator_next(LCRuntime* rt, LCValue this, int argc, LCValue* args) {
     LCMapIterator* iterator = (LCMapIterator*)this.ptr_val;
     if (unlikely(iterator->invalid)) {
@@ -731,7 +796,9 @@ LCRuntime* LCNewRuntime() {
 
     runtime->seed = time(NULL);
 
+#ifndef LC_PTR64
     runtime->i64_pool = init_i64_pool(runtime);
+#endif
 
     runtime->obj_meta_cap = LC_INIT_CLASS_META_CAP;
     runtime->obj_meta_size = 0;
@@ -751,6 +818,12 @@ LCRuntime* LCNewRuntime() {
 
     LCDefineEnum(runtime, Option_members, countof(Option_members));
     LCDefineEnum(runtime, Result_members, countof(Result_members));
+
+    LCClassID array_cls_id = LCDefineClass(runtime, 0, &Array_def);
+    LCDefineClassMethod(runtime, array_cls_id, Array_methods, countof(Array_methods));
+
+    array_iterator_cls_id = LCDefineClass(runtime, 0, &ArrayIterator_def);
+    LCDefineClassMethod(runtime, array_iterator_cls_id, ArrayIterator_methods, countof(ArrayIterator_methods));
 
     LCClassID map_cls_id = LCDefineClass(runtime, 0, &Map_def);
     LCDefineClassMethod(runtime, map_cls_id, Map_methods, countof(Map_methods));
@@ -788,7 +861,9 @@ static void LCFreeRuntimeMeta(LCRuntime* rt) {
 void LCFreeRuntime(LCRuntime* rt) {
     uint32_t i;
 
+#ifndef LC_PTR64
     free_i64_pool(rt);
+#endif
 
     LCFreeRuntimeMeta(rt);
 
@@ -1532,6 +1607,7 @@ void LCLambdaSetRefValue(LCRuntime* rt, LCValue lambda_val, int index, LCValue v
 LCArray* LCNewArrayWithCap(LCRuntime* rt, size_t cap) {
     LCArray* result = (LCArray*)lc_malloc(rt, sizeof(LCArray));
     init_gc_object(rt, (LCGCObject*)result, LC_GC_ARRAY);
+    result->header.class_id = LC_STD_CLS_ID_ARRAY;
     result->capacity = cap;
     result->len = 0;
     result->data = (LCValue*)lc_mallocz(rt, sizeof(LCValue) * cap);
