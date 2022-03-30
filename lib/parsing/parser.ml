@@ -585,7 +585,7 @@ and parse_statement env : Statement.t =
         Eat.token env;
         let for_pat = parse_pattern env in
         Expect.token env T_IN;
-        let for_expr = parse_expression env in
+        let for_expr = Parser_env.with_allow_init env false parse_expression in
         let for_block = parse_block env in
         let for_loc = with_start_loc env start_loc in
         ForIn {

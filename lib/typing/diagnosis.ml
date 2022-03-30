@@ -222,6 +222,9 @@ module PP = struct
     | AssignmentToConstantField (ty, field_name) ->
       Format.fprintf formatter "Assignment to constant field '%s' of '%s'" field_name (pp_ty ty)
 
+    | TypeIsNotIterable ty ->
+      Format.fprintf formatter "Type '%s' is not iterable" (pp_ty ty)
+
   let error ~ctx formatter diagnosis =
     let { spec; loc; _ } = diagnosis in
     match spec with

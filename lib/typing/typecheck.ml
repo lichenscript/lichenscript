@@ -241,7 +241,22 @@ and check_statement env stmt =
   | ForIn for_in -> (
     let { for_expr; for_block; _ } = for_in in
     check_expression env for_expr;
-    let _for_expr_type = Program.deref_node_type env.ctx for_expr.ty_var in
+    let scope = env.scope in
+    let iterator_opt = scope#find_type_symbol "Iteratable" in
+    let iterator_id = Option.value_exn ~message:"can not find 'Iteratable'" iterator_opt in
+    let iterator_type = Program.deref_node_type env.ctx iterator_id in
+    let iterator_def =
+      match iterator_type with
+      | TypeExpr.TypeDef type_def -> type_def
+      | _ -> failwith "unrechable"
+    in
+    let for_expr_type = Program.deref_node_type env.ctx for_expr.ty_var in
+    if not (Check_helper.is_type_implement_interface env.ctx for_expr_type iterator_def) then (
+      let open Diagnosis in
+      let spec = Type_error.TypeIsNotIterable for_expr_type in
+      let err = make_error env.ctx for_expr.loc spec in
+      raise (Error err)
+    );
     List.iter ~f:(check_statement env) for_block.body
   )
 

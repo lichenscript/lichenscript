@@ -56,3 +56,4 @@ type t =
   | StaticFieldCanOnlyInitializedWithConstant of string
   | IllegalExternalName of string
   | AssignmentToConstantField of (TypeExpr.t * string)
+  | TypeIsNotIterable of TypeExpr.t
