@@ -579,6 +579,23 @@ and parse_statement env : Statement.t =
         }
       end
 
+    | Token.T_FOR ->
+      begin
+        let start_loc = Peek.loc env in
+        Eat.token env;
+        let for_pat = parse_pattern env in
+        Expect.token env T_IN;
+        let for_expr = parse_expression env in
+        let for_block = parse_block env in
+        let for_loc = with_start_loc env start_loc in
+        For {
+          for_pat;
+          for_expr;
+          for_block;
+          for_loc;
+        }
+      end
+
     | Token.T_BREAK ->
       Eat.token env;
       let next = Peek.token env in

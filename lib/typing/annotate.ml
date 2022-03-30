@@ -84,6 +84,18 @@ let rec annotate_statement ~(prev_deps: int list) env (stmt: Ast.Statement.t) =
       next_deps, T.Statement.While { while_test; while_block; while_loc }
     )
 
+    | For for_in -> (
+      let { for_pat; for_expr; for_block; for_loc } = for_in in
+      let for_pat, pat_deps = annotate_pattern env for_pat in
+      let for_expr = annotate_expression ~prev_deps:(List.append prev_deps pat_deps) env for_expr in
+      let while_scope = new while_scope ~prev:(Env.peek_scope env) () in
+      let for_block = annotate_block_expr
+        ~prev_deps:[for_expr.ty_var] ~scope:while_scope env for_block
+      in
+      let next_deps = [ for_block.return_ty ] in
+      next_deps, T.Statement.For { for_pat; for_expr; for_block; for_loc }
+    )
+
     | Binding binding -> (
       let { binding_kind; binding_pat; binding_init; binding_loc; binding_ty; _ } = binding in
 

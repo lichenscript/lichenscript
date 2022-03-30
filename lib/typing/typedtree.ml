@@ -143,12 +143,20 @@ and Statement : sig
     | Expr of Expression.t
     | Semi of Expression.t
     | While of while_desc
+    | For of for_in
     | Binding of var_binding
     | Break of Identifier.t option
     | Continue of Identifier.t option
     | Debugger
     | Return of Expression.t option
     | Empty
+
+  and for_in = {
+    for_pat: Pattern.t;
+    for_expr: Expression.t;
+    for_block: Block.t;
+    for_loc: Loc.t;
+  }
 
   and var_binding = {
     binding_kind: Ast.var_kind;
