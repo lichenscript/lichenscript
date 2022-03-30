@@ -30,15 +30,16 @@
 #endif
 
 typedef enum LCObjectType {
-    LC_TY_F64 = -9,
-    LC_TY_F32 = -8,
-    LC_TY_U64 = -7,
-    LC_TY_I64 = -6,
-    LC_TY_U32 = -5,
-    LC_TY_I32 = -4,
-    LC_TY_CHAR = -3,
-    LC_TY_BOOL = -2,
-    LC_TY_UNION = -1,
+    LC_TY_F64 = -10,
+    LC_TY_F32 = -9,
+    LC_TY_U64 = -8,
+    LC_TY_I64 = -7,
+    LC_TY_U32 = -6,
+    LC_TY_I32 = -5,
+    LC_TY_CHAR = -4,
+    LC_TY_BOOL = -3,
+    LC_TY_UNION = -2,
+    LC_TY_ATOM = -1,
     LC_TY_NULL = 0,
     LC_TY_UNION_OBJECT = 1,
     LC_TY_STRING,
@@ -459,7 +460,8 @@ LCValue lc_std_get_args(LCRuntime* rt, LCValue this, int argc, LCValue* args);
 
 #define LC_STD_CLS_ID_OPTION 1
 #define LC_STD_CLS_ID_RESULT 2
-#define LC_STD_CLS_ID_MAP 3
-#define LC_STD_CLS_ID_BUFFER 5
+#define LC_STD_CLS_ID_ARRAY 3
+#define LC_STD_CLS_ID_MAP 5 
+#define LC_STD_CLS_ID_BUFFER 7
 
 #endif

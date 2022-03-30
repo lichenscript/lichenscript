@@ -99,7 +99,7 @@ public interface Iteratable<T> {
 }
 
 @builtin()
-public class Array<T> {
+public class Array<T> implements Iteratable<T> {
 
     @external("lc_std_array_push")
     declare push(item: T);
@@ -121,6 +121,8 @@ public class Array<T> {
 
     @external("lc_std_array_get_length")
     declare get length(): i32;
+
+    declare override getIterator(): Iterator<T>;
 
 }
 
