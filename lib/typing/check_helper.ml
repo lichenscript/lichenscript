@@ -704,6 +704,47 @@ and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int * b
 
   | _ -> None
 
+let rec is_class_implement_interface ctx (cls: TypeDef.t) (intf: TypeDef.t) =
+  let unwarp_class =
+    match cls.spec with
+    | TypeDef.Class cls -> cls
+    | _ -> failwith "unrechable"
+  in
+  let found_implement =
+    List.find
+    ~f:(fun (implement_expr, _loc) ->
+      let ctor_opt = find_construct_of ctx implement_expr in
+      match ctor_opt with
+      | Some ({ TypeDef. spec = Interface _ ; id= def_id; _ }, _args) -> (
+        let open Int in
+        def_id = intf.id
+      )
+      | _ -> false
+    )
+    unwarp_class.tcls_implements
+  in
+  match found_implement with
+  | Some _ -> true
+  | None -> (
+    match unwarp_class.tcls_extends with
+    | Some ancester -> is_type_implement_interface ctx ancester intf
+    | None -> false
+  )
+
+and is_type_implement_interface ctx (ty: TypeExpr.t) (intf: TypeDef.t) =
+  let ctor_opt = find_construct_of ctx ty in
+  match ctor_opt with
+  | Some ({ TypeDef. spec = Interface _ ; id= def_id; _ }, _args) -> (
+    let open Int in
+    def_id = intf.id
+  )
+
+  | Some (({ TypeDef. spec = Class _ ; _ } as cls_def), _args) -> (
+    is_class_implement_interface ctx cls_def intf
+  )
+
+  | _ -> false
+
 type pattern_exhausted =
   | Pat_exausted
   | Pat_begin

@@ -20,9 +20,7 @@ function main() {
     a.resize(10, 6);
     print("length:", a.length);
 
-    i = 0;
-    while i < a.length {
-        print("index:", i, "item:", a[i]);
-        i += 1;
+    for item in a {
+        print("item:", a[i]);
     }
 }

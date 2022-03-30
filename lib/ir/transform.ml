@@ -585,11 +585,9 @@ and transform_statement ?ret env stmt =
     let while_test' = transform_expression env while_test in
 
     let bodys = transform_block ?ret env while_block in
-    let body = {
-      Ir.Block.
-      body =
-        List.append while_test'.append_stmts bodys;
-        loc = while_block.loc;
+    let body = { Ir.Block.
+      body = List.append while_test'.append_stmts bodys;
+      loc = while_block.loc;
     } in
 
     List.concat [
@@ -601,7 +599,7 @@ and transform_statement ?ret env stmt =
     ]
   )
 
-  | ForIn _ -> failwith "unimplemented for"
+  | ForIn for_in -> transform_for_in env ?ret for_in
 
   | Binding binding -> (
     let original_name, name_id =
@@ -677,6 +675,83 @@ and transform_statement ?ret env stmt =
   )
 
   | Empty -> []
+
+and transform_for_in env ?ret for_in =
+  let iterator_id = env.tmp_vars_count in
+  env.tmp_vars_count <- env.tmp_vars_count + 1;
+
+  let next_item_id = env.tmp_vars_count in
+  env.tmp_vars_count <- env.tmp_vars_count + 1;
+
+  let transformed_for_expr = transform_expression env for_in.for_expr in
+
+  let get_iterator_stmt =
+    Ir.(
+      Stmt.Expr(
+        Expr.Assign(
+          Expr.Ident (SymTemp iterator_id),
+          Expr.Invoke(transformed_for_expr.expr, "getIterator", [])
+        )
+      )
+    )
+  in
+
+  let get_next_stmt =
+    Ir.(
+      Stmt.Expr(
+        Expr.Assign(
+          Expr.Ident(SymTemp next_item_id),
+          Expr.Invoke(Expr.Ident(SymTemp iterator_id), "next", [])
+        )
+      )
+    )
+  in
+
+  let transformed_block =
+    transform_block env ?ret
+    ~map_scope:(fun scope ->
+      TScope.add_vars_to_release scope (Ir.SymTemp next_item_id);
+      scope
+    )
+    for_in.for_block
+  in
+
+  let exit_if =
+    Ir.(
+      Stmt.If {
+        if_test = Expr.TagEqual(Expr.Ident (SymTemp next_item_id), 1);
+        if_consequent = [
+          Stmt.Release (Expr.Ident(SymTemp next_item_id));
+          Stmt.Break;
+        ];
+        if_alternate = None;
+      }
+    )
+  in
+
+  let while_loop =
+    Ir.Stmt.While (Ir.Expr.NewBoolean true, {
+      Ir.Block.
+      loc = for_in.for_loc;
+      body =
+        List.append
+          [
+            get_next_stmt;
+            exit_if;
+          ]
+          transformed_block;
+    })
+  in
+
+  List.concat [
+    transformed_for_expr.prepend_stmts;
+    [
+      get_iterator_stmt;
+      while_loop;
+      Ir.(Stmt.Release (Ident (SymTemp iterator_id)));
+    ];
+    transformed_for_expr.append_stmts
+  ]
 
 and gen_release_temp id = Ir.Stmt.Release (Ir.Expr.Temp id)
 
@@ -2277,8 +2352,13 @@ and transform_expression_if env ?ret ~prepend_stmts ~append_stmts loc if_desc =
   append_stmts := List.append test.append_stmts !append_stmts;
   spec
 
-and transform_block env ?ret (block: Typedtree.Block.t): Ir.Stmt.t list =
+and transform_block env ?ret ?map_scope (block: Typedtree.Block.t): Ir.Stmt.t list =
   let block_scope = create_scope_and_distribute_vars env block.scope in
+  let block_scope =
+    match map_scope with
+    | Some map -> map block_scope
+    | None -> block_scope
+  in
   with_scope env block_scope (fun env ->
     let stmts = List.map ~f:(transform_statement ?ret env) block.body |> List.concat in
 
