@@ -143,7 +143,7 @@ and Statement : sig
     | Expr of Expression.t
     | Semi of Expression.t
     | While of while_desc
-    | For of for_in
+    | ForIn of for_in
     | Binding of var_binding
     | Break of Identifier.t option
     | Continue of Identifier.t option

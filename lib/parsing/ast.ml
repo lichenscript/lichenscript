@@ -156,7 +156,7 @@ and Statement : sig
     | Expr of Expression.t (* Expr without trailing semi-colon. *)
     | Semi of Expression.t (* Expr with a trailing semi-colon. *)
     | While of while_desc
-    | For of for_in
+    | ForIn of for_in
     | Binding of var_binding
     | Break of Identifier.t option
     | Continue of Identifier.t option
