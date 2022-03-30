@@ -601,7 +601,7 @@ and transform_statement ?ret env stmt =
     ]
   )
 
-  | For _ -> failwith "unimplemented for"
+  | ForIn _ -> failwith "unimplemented for"
 
   | Binding binding -> (
     let original_name, name_id =

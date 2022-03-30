@@ -588,7 +588,7 @@ and parse_statement env : Statement.t =
         let for_expr = parse_expression env in
         let for_block = parse_block env in
         let for_loc = with_start_loc env start_loc in
-        For {
+        ForIn {
           for_pat;
           for_expr;
           for_block;

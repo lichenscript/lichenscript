@@ -238,7 +238,12 @@ and check_statement env stmt =
     List.iter ~f:(check_statement env) while_block.body
   )
 
-  | For _ -> failwith "unimplemented for"
+  | ForIn for_in -> (
+    let { for_expr; for_block; _ } = for_in in
+    check_expression env for_expr;
+    let _for_expr_type = Program.deref_node_type env.ctx for_expr.ty_var in
+    List.iter ~f:(check_statement env) for_block.body
+  )
 
   | Binding binding -> (
     let { binding_pat; binding_init; binding_ty; binding_loc; _ } = binding in
