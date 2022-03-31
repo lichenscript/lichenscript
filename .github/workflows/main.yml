@@ -52,6 +52,7 @@ jobs:
         run: |
           eval $(opam env)
           dune build
+          dune runtest
           ./test.sh
           echo "Test JavaScript"
           FLAGS="--platform js" ./test.sh

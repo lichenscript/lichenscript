@@ -16,4 +16,5 @@ depends: [
   "sedlex"
   "re"
   "wtf8"
+  "ppx_inline_test"
 ]
