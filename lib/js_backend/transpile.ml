@@ -603,6 +603,12 @@ and transpile_expression ?(parent_expr=true) env expr =
     ps env ")"
   )
 
+  | IntValue(NewBoolean true) ->
+    ps env "true"
+
+  | IntValue(NewBoolean false) ->
+    ps env "false"
+
   | IntValue expr -> transpile_expression env expr
 
   | GetField(expr, _, field_name) -> (

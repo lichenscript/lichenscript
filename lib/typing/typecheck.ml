@@ -239,7 +239,10 @@ and check_statement env stmt =
   )
 
   | ForIn for_in -> (
-    let { for_expr; for_block; _ } = for_in in
+    let { for_expr; for_block; for_pat; _ } = for_in in
+
+    check_patterns_exhausted ~loc:for_pat.loc env [for_pat];
+
     check_expression env for_expr;
     let scope = env.scope in
     let iterator_opt = scope#find_type_symbol "Iteratable" in
@@ -251,7 +254,7 @@ and check_statement env stmt =
       | _ -> failwith "unrechable"
     in
     let for_expr_type = Program.deref_node_type env.ctx for_expr.ty_var in
-    if not (Check_helper.is_type_implement_interface env.ctx for_expr_type iterator_def) then (
+    if not (Check_helper.is_type_implement_interface env.ctx ~scope for_expr_type iterator_def) then (
       let open Diagnosis in
       let spec = Type_error.TypeIsNotIterable for_expr_type in
       let err = make_error env.ctx for_expr.loc spec in
@@ -1206,8 +1209,8 @@ and check_binary_op env op expr left right =
       );
   )
 
-and check_match_exhausted env _match =
-  let open T.Expression in
+and check_patterns_exhausted ~loc env patterns =
+  let open Check_helper in
 
   let check_tuples_exausted slots patterns =
     let open Check_helper in
@@ -1221,139 +1224,139 @@ and check_match_exhausted env _match =
     Pat_tuple slots
   in
 
-  let rec check_patterns_exhausted patterns =
-    let open Check_helper in
-    let result =
-      List.fold
-        ~init:Pat_begin
-        ~f:(fun acc pattern ->
-          let open T.Pattern in
-          match pattern.spec with
-          | Underscore
-          | Symbol _ -> (
-            Pat_exausted
-          )
+  let result =
+    List.fold
+      ~init:Pat_begin
+      ~f:(fun acc pattern ->
+        let open T.Pattern in
+        match pattern.spec with
+        | Underscore
+        | Symbol _ -> (
+          Pat_exausted
+        )
 
-          | Literal (Ast.Literal.Boolean v) -> (
-            match acc with
-            | Pat_begin ->
-              if v then
-                Pat_boolean(true, false)
-              else
-                Pat_boolean(false, true)
+        | Literal (Ast.Literal.Boolean v) -> (
+          match acc with
+          | Pat_begin ->
+            if v then
+              Pat_boolean(true, false)
+            else
+              Pat_boolean(false, true)
 
-            | Pat_boolean(has_true, has_false) ->
-              if v then
-                Pat_boolean(true, has_false)
-              else
-                Pat_boolean(has_true, true)
-
-            | _ -> acc
-          )
-
-          | EnumCtor (id, child_pat) -> (
-            match acc with
-            | Pat_begin ->
-              Pat_enum_branch [(id, child_pat)]
-
-            | Pat_enum_branch exist ->
-              Pat_enum_branch ((id, child_pat)::exist)
-
-            | _ -> acc
-          )
-
-          | Tuple children -> (
-            let children_len = List.length children in
-            match acc with
-            | Pat_begin -> (
-              let slots = Array.create ~len:children_len [] in
-              check_tuples_exausted slots children
-            )
-
-            | Pat_tuple slots when (Array.length slots) = children_len ->
-              check_tuples_exausted slots children
-
-            | _ -> acc
-          )
+          | Pat_boolean(has_true, has_false) ->
+            if v then
+              Pat_boolean(true, has_false)
+            else
+              Pat_boolean(has_true, true)
 
           | _ -> acc
         )
-        patterns
-    in
-    match result with
-    | Pat_boolean(true, true)
-    | Pat_exausted -> ()
-    | Pat_enum_branch items -> (
-      let branches_map = Hashtbl.create (module String) in
 
-      List.iter
-        ~f:(fun item ->
-          let ((name, _), _) = item in
-          match Hashtbl.find branches_map name with
-          | Some list ->
-            Hashtbl.set branches_map ~key:name ~data:(item::list)
-          | None ->
-            Hashtbl.set branches_map ~key:name ~data:[item]
+        | EnumCtor (id, child_pat) -> (
+          match acc with
+          | Pat_begin ->
+            Pat_enum_branch [(id, child_pat)]
+
+          | Pat_enum_branch exist ->
+            Pat_enum_branch ((id, child_pat)::exist)
+
+          | _ -> acc
         )
-        items;
 
-      Hashtbl.iter
-        ~f:(fun items ->
-          let patterns = List.map ~f:(fun (_, pat) -> pat) items in
-          check_patterns_exhausted patterns
-        )
-        branches_map;
-
-      let (_ctor_name, ctor_id), _ = List.hd_exn items in
-
-      let def = Program.deref_node_type env.ctx ctor_id in
-      let first_enum_ctor =
-        match def with
-        | TypeExpr.TypeDef { Core_type.TypeDef. spec = EnumCtor ctor;_ } -> ctor
-        | _ -> failwith "unrechable"
-      in
-
-      let enum_super_id = first_enum_ctor.enum_ctor_super_id in
-      let super_def = Program.deref_node_type env.ctx enum_super_id in
-      let unwrap_super_def =
-        match super_def with
-        | TypeExpr.TypeDef { Core_type.TypeDef. spec = Enum enum;_ } -> enum
-        | _ -> failwith "unrechable"
-      in
-
-      let visited_map =
-        unwrap_super_def.enum_members
-        |> List.map
-          ~f:(fun (member_name, _) ->
-            member_name
+        | Tuple children -> (
+          let children_len = List.length children in
+          match acc with
+          | Pat_begin -> (
+            let slots = Array.create ~len:children_len [] in
+            check_tuples_exausted slots children
           )
-        |> Hash_set.of_list (module String)
-      in
 
-      List.iter
-        ~f:(fun item ->
-          let ((name, _), _) = item in
-          Hash_set.remove visited_map name
+          | Pat_tuple slots when (Array.length slots) = children_len ->
+            check_tuples_exausted slots children
+
+          | _ -> acc
         )
-        items;
 
-      if not (Hash_set.is_empty visited_map) then (
-        let err = Diagnosis.(make_error env.ctx _match.match_loc PatternNotExausted) in
-        raise (Diagnosis.Error err)
+        | _ -> acc
       )
-    )
+      patterns
+  in
+  match result with
+  | Pat_boolean(true, true)
+  | Pat_exausted -> ()
+  | Pat_enum_branch items -> (
+    let branches_map = Hashtbl.create (module String) in
 
-    | Pat_tuple tuples -> (
-      Array.iter
-        ~f:(check_patterns_exhausted)
-        tuples;
-    )
+    List.iter
+      ~f:(fun item ->
+        let ((name, _), _) = item in
+        match Hashtbl.find branches_map name with
+        | Some list ->
+          Hashtbl.set branches_map ~key:name ~data:(item::list)
+        | None ->
+          Hashtbl.set branches_map ~key:name ~data:[item]
+      )
+      items;
 
-    | _ -> (
-      let err = Diagnosis.(make_error env.ctx _match.match_loc PatternNotExausted) in
+    Hashtbl.iter
+      ~f:(fun items ->
+        let patterns = List.map ~f:(fun (_, pat) -> pat) items in
+        check_patterns_exhausted ~loc env patterns
+      )
+      branches_map;
+
+    let (_ctor_name, ctor_id), _ = List.hd_exn items in
+
+    let def = Program.deref_node_type env.ctx ctor_id in
+    let first_enum_ctor =
+      match def with
+      | TypeExpr.TypeDef { Core_type.TypeDef. spec = EnumCtor ctor;_ } -> ctor
+      | _ -> failwith "unrechable"
+    in
+
+    let enum_super_id = first_enum_ctor.enum_ctor_super_id in
+    let super_def = Program.deref_node_type env.ctx enum_super_id in
+    let unwrap_super_def =
+      match super_def with
+      | TypeExpr.TypeDef { Core_type.TypeDef. spec = Enum enum;_ } -> enum
+      | _ -> failwith "unrechable"
+    in
+
+    let visited_map =
+      unwrap_super_def.enum_members
+      |> List.map
+        ~f:(fun (member_name, _) ->
+          member_name
+        )
+      |> Hash_set.of_list (module String)
+    in
+
+    List.iter
+      ~f:(fun item ->
+        let ((name, _), _) = item in
+        Hash_set.remove visited_map name
+      )
+      items;
+
+    if not (Hash_set.is_empty visited_map) then (
+      let err = Diagnosis.(make_error env.ctx loc PatternNotExausted) in
       raise (Diagnosis.Error err)
     )
-  in
+  )
+
+  | Pat_tuple tuples -> (
+    Array.iter
+      ~f:(check_patterns_exhausted ~loc env)
+      tuples;
+  )
+
+  | _ -> (
+    let err = Diagnosis.(make_error env.ctx loc PatternNotExausted) in
+    raise (Diagnosis.Error err)
+  )
+
+and check_match_exhausted env _match =
+  let open T.Expression in
 
   let { match_clauses; _ } = _match in
 
@@ -1363,7 +1366,7 @@ and check_match_exhausted env _match =
     match_clauses
   in
 
-  check_patterns_exhausted patterns
+  check_patterns_exhausted ~loc:_match.match_loc env patterns
 
 and check_lambda env lambda =
   let { T.Expression. lambda_return_ty; lambda_body; _ } = lambda in
