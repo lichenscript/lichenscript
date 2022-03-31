@@ -704,7 +704,7 @@ and find_member_of_type ctx ~scope type_expr member_name : (TypeExpr.t * int * b
 
   | _ -> None
 
-let rec is_class_implement_interface ctx (cls: TypeDef.t) (intf: TypeDef.t) =
+let rec is_class_implement_interface ctx ~scope (cls: TypeDef.t) (intf: TypeDef.t) =
   let unwarp_class =
     match cls.spec with
     | TypeDef.Class cls -> cls
@@ -727,23 +727,37 @@ let rec is_class_implement_interface ctx (cls: TypeDef.t) (intf: TypeDef.t) =
   | Some _ -> true
   | None -> (
     match unwarp_class.tcls_extends with
-    | Some ancester -> is_type_implement_interface ctx ancester intf
+    | Some ancester -> is_type_implement_interface ctx ~scope ancester intf
     | None -> false
   )
 
-and is_type_implement_interface ctx (ty: TypeExpr.t) (intf: TypeDef.t) =
-  let ctor_opt = find_construct_of ctx ty in
-  match ctor_opt with
-  | Some ({ TypeDef. spec = Interface _ ; id= def_id; _ }, _args) -> (
-    let open Int in
-    def_id = intf.id
+and is_type_implement_interface ctx ~scope (ty: TypeExpr.t) (intf: TypeDef.t) =
+  match ty with
+  | Array t -> (
+    let ty_int_opt = scope#find_type_symbol "Array" in
+    match ty_int_opt with
+    | Some ty_int -> (
+      let array_node = Program.get_node ctx ty_int in
+      (* building type Array<T> *)
+      let ctor_type = TypeExpr.Ctor(array_node.value, [t]) in
+      is_type_implement_interface ctx ~scope ctor_type intf
+    )
+    | None -> failwith "Can not find Array type in current scope"
   )
 
-  | Some (({ TypeDef. spec = Class _ ; _ } as cls_def), _args) -> (
-    is_class_implement_interface ctx cls_def intf
-  )
+  | _ ->
+    let ctor_opt = find_construct_of ctx ty in
+    match ctor_opt with
+    | Some ({ TypeDef. spec = Interface _ ; id= def_id; _ }, _args) -> (
+      let open Int in
+      def_id = intf.id
+    )
 
-  | _ -> false
+    | Some (({ TypeDef. spec = Class _ ; _ } as cls_def), _args) -> (
+      is_class_implement_interface ctx ~scope cls_def intf
+    )
+
+    | _ -> false
 
 type pattern_exhausted =
   | Pat_exausted

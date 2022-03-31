@@ -124,8 +124,16 @@ let rec codegen_statement (env: t) stmt =
 
   | While (expr, block) -> (
     ps env "while (";
-    codegen_expression env expr;
-    ps env ".int_val) {\n";
+    (match expr with
+    | NewBoolean true ->
+      ps env "1"
+    | NewBoolean false ->
+      ps env "0"
+    | _ ->
+      codegen_expression env expr;
+      ps env ".int_val";
+    );
+    ps env ") {\n";
     with_indent env (fun () -> 
       List.iter
         ~f:(fun stmt ->
@@ -915,6 +923,12 @@ and codegen_expression (env: t) (expr: Expr.t) =
     ps env (Int.to_string index);
     ps env ")"
   )
+
+  | IntValue(NewBoolean true) ->
+    ps env "1"
+
+  | IntValue(NewBoolean false) ->
+    ps env "0"
 
   | IntValue(NewI32 str_val) ->
     ps env str_val

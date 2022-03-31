@@ -21,6 +21,6 @@ function main() {
     print("length:", a.length);
 
     for item in a {
-        print("item:", a[i]);
+        print("item:", item);
     }
 }
