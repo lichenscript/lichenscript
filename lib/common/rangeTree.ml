@@ -140,3 +140,53 @@ let rec find_value root_node pos =
       find_value right pos
 
   | Leaf leaf_node -> leaf_node.data
+
+let%test _ =
+  let test_node = ref (create_root_node {
+    left = 0;
+    right = 100;
+    data = "black";
+  }) in
+
+  test_node := insert_value !test_node {
+    left = 10;
+    right = 20;
+    data = "white";
+  };
+
+  test_node := insert_value !test_node {
+    left = 70;
+    right = 80;
+    data = "white";
+  };
+
+  let test1 = find_value !test_node 5 in
+  let test2 = find_value !test_node 15 in
+  let test3 = find_value !test_node 25 in
+
+  test1 = "black" &&
+  test2 = "white" &&
+  test3 = "black"
+
+let%test _ =
+  let test_node = ref (create_root_node {
+    left = 0;
+    right = 100;
+    data = "black";
+  }) in
+
+  test_node := insert_value !test_node {
+    left = 10;
+    right = 20;
+    data = "white";
+  };
+
+  test_node := insert_value !test_node {
+    left = 15;
+    right = 20;
+    data = "red";
+  };
+
+  let test1 = find_value !test_node 20 in
+
+  test1 = "red"

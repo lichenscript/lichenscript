@@ -1,4 +1,6 @@
 (library
  (name lichenscript_common)
  (libraries core_kernel)
+ (inline_tests)
+ (preprocess (pps ppx_inline_test))
 )
