@@ -700,7 +700,7 @@ and transform_destructing_pattern env (pattern: Typedtree.Pattern.t) expr =
         ~f:(fun index item ->
           let tmp = env.tmp_vars_count in
           env.tmp_vars_count <- env.tmp_vars_count + 1;
-          let assign = Ir.(Stmt.Expr(Expr.Assign(Expr.Ident (SymTemp tmp), Expr.UnionGet(expr, index)))) in
+          let assign = Ir.(Stmt.Expr(Expr.Assign(Expr.Ident (SymTemp tmp), Expr.TupleGetValue(expr, index)))) in
           let child_stmts = transform_destructing_pattern env item (Ir.Expr.Ident (Ir.SymTemp tmp)) in
           List.concat
           [
@@ -1150,29 +1150,43 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         )
       in
 
-      let inits_exprs = List.map ~f:(transform_expression env) arr_list in
-
-      let init_prepends = List.map ~f:(fun e -> e.prepend_stmts) inits_exprs in
-      let init_appends = List.map ~f:(fun e -> e.append_stmts) inits_exprs in
+      let max_tmp = ref env.tmp_vars_count in
 
       let init_stmts =
-        List.mapi
-        ~f:(fun index expr ->
-          let open Ir in
-          Stmt.Expr (
-            Expr.ArraySetValue(
-              (Ident tmp_sym),
-              (NewI32 (Int.to_string index)),
-              expr.expr
-            )
+        arr_list
+        |> List.mapi
+          ~f:(fun index expr ->
+            let saved_tmp = env.tmp_vars_count in
+            let transformed_expr = transform_expression env expr in
+
+            if env.tmp_vars_count > !max_tmp then (
+              max_tmp := env.tmp_vars_count;
+            );
+
+            env.tmp_vars_count <- saved_tmp;
+            let open Ir in
+            let assign_stmt =
+              Stmt.Expr (
+                Expr.ArraySetValue(
+                  (Ident tmp_sym),
+                  (NewI32 (Int.to_string index)),
+                  transformed_expr.expr
+                )
+              )
+            in
+            List.concat [
+              transformed_expr.prepend_stmts;
+              [assign_stmt];
+              transformed_expr.append_stmts;
+            ]
           )
-        )
-        inits_exprs
+        |> List.concat
       in
+
+      env.tmp_vars_count <- !max_tmp;
 
       prepend_stmts := List.concat [
         !prepend_stmts;
-        List.concat init_prepends;
         [init_stmt];
         init_stmts;
       ];
@@ -1180,7 +1194,6 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       append_stmts := List.concat [
         if not is_move then [ gen_release_temp tmp_id ] else [];
         !append_stmts;
-        List.concat init_appends;
       ];
 
       Ir.Expr.Temp tmp_id
