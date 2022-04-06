@@ -676,7 +676,7 @@ and transform_statement ?ret env stmt =
 
   | Empty -> []
 
-and transform_destructing_pattern _env (pattern: Typedtree.Pattern.t) expr =
+and transform_destructing_pattern env (pattern: Typedtree.Pattern.t) expr =
   let open Typedtree.Pattern in
   match pattern.spec with
   | Underscore -> []
@@ -690,9 +690,30 @@ and transform_destructing_pattern _env (pattern: Typedtree.Pattern.t) expr =
       ))
     ]
 
-  | Literal _
   | EnumCtor _
-  | Tuple _
+  | Literal _ -> failwith "unrechable"
+
+  | Tuple tuple_list -> (
+    let stmts =
+      tuple_list
+      |> List.mapi
+        ~f:(fun index item ->
+          let tmp = env.tmp_vars_count in
+          env.tmp_vars_count <- env.tmp_vars_count + 1;
+          let assign = Ir.(Stmt.Expr(Expr.Assign(Expr.Ident (SymTemp tmp), Expr.UnionGet(expr, index)))) in
+          let child_stmts = transform_destructing_pattern env item (Ir.Expr.Ident (Ir.SymTemp tmp)) in
+          List.concat
+          [
+            [assign];
+            child_stmts;
+            [Ir.Stmt.Release(Ir.Expr.Ident (Ir.SymTemp tmp))];
+          ]
+        )
+      |> List.concat
+    in
+    stmts
+  )
+
   | Array _ -> failwith "unimplemented"
 
 and transform_for_in env ?ret for_in =
@@ -748,8 +769,11 @@ and transform_for_in env ?ret for_in =
     )
   in
 
+  let expr_value_tmp = env.tmp_vars_count in
+  env.tmp_vars_count <- env.tmp_vars_count + 1;
   let get_value_expr = Ir.(Expr.UnionGet(Expr.Ident (SymTemp next_item_id), 0)) in
-  let destructing_assignments = transform_destructing_pattern env for_in.for_pat get_value_expr in
+  let assign_value = Ir.(Expr.Assign(Expr.Ident (SymTemp expr_value_tmp), get_value_expr)) in
+  let destructing_assignments = transform_destructing_pattern env for_in.for_pat Ir.(Expr.Ident (SymTemp expr_value_tmp)) in
 
   let while_loop =
     Ir.Stmt.While (Ir.Expr.NewBoolean true, {
@@ -760,9 +784,13 @@ and transform_for_in env ?ret for_in =
           [
             get_next_stmt;
             exit_if;
+            Ir.Stmt.Expr assign_value;
           ];
           destructing_assignments;
           transformed_block;
+          [
+            Ir.(Stmt.Release (Ident (SymTemp expr_value_tmp)));  (* optimize: don't need release if primitive *)
+          ]
         ]
     })
   in
