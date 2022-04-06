@@ -389,7 +389,7 @@ and transpile_expression ?(parent_expr=true) env expr =
     ps env original_name
 
   | NewArray len -> (
-    ps env "Array(";
+    ps env "lc_new_array(";
     ps env (Int.to_string len);
     ps env ")"
   )

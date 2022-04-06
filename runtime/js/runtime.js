@@ -240,6 +240,39 @@ function lc_std_array_resize(size, value) {
   }
 }
 
+const LCC_ArrayIterator = {
+  __proto__: LCC_Object,
+  [clsNameSym]: "ArrayIterator",
+  next: lc_std_array_iterator_next
+}
+
+const LCC_Array = {
+  __proto__: Array.prototype,
+  getIterator: lc_std_array_getIterator
+}
+
+function lc_std_array_iterator_next() {
+  if (this.index >= this.content.length) {
+    return [LCC_Option, 1];
+  }
+  const t = this.content[this.index++];
+  return [LCC_Option, 0, t];
+}
+
+function lc_std_array_getIterator() {
+  return {
+    __proto__: LCC_ArrayIterator,
+    content: this,
+    index: 0
+  }
+}
+
+function lc_new_array(len) {
+  const tmp = Array(len)
+  tmp.__proto__ = LCC_Array;
+  return tmp;
+}
+
 function lc_std_array_filter(filter) {
   return Array.prototype.filter.call(this, filter);
 }

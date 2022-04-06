@@ -676,6 +676,25 @@ and transform_statement ?ret env stmt =
 
   | Empty -> []
 
+and transform_destructing_pattern _env (pattern: Typedtree.Pattern.t) expr =
+  let open Typedtree.Pattern in
+  match pattern.spec with
+  | Underscore -> []
+  | Symbol (sym_name, _) ->
+    [
+      Ir.(Stmt.Expr(
+        Expr.Assign(
+          Expr.Ident (SymLocal sym_name),
+          expr
+        )
+      ))
+    ]
+
+  | Literal _
+  | EnumCtor _
+  | Tuple _
+  | Array _ -> failwith "unimplemented"
+
 and transform_for_in env ?ret for_in =
   let iterator_id = env.tmp_vars_count in
   env.tmp_vars_count <- env.tmp_vars_count + 1;
@@ -683,7 +702,7 @@ and transform_for_in env ?ret for_in =
   let next_item_id = env.tmp_vars_count in
   env.tmp_vars_count <- env.tmp_vars_count + 1;
 
-  let transformed_for_expr = transform_expression env for_in.for_expr in
+  let transformed_for_expr = transform_expression ~is_borrow:true env for_in.for_expr in
 
   let get_iterator_stmt =
     Ir.(
@@ -729,17 +748,22 @@ and transform_for_in env ?ret for_in =
     )
   in
 
+  let get_value_expr = Ir.(Expr.UnionGet(Expr.Ident (SymTemp next_item_id), 0)) in
+  let destructing_assignments = transform_destructing_pattern env for_in.for_pat get_value_expr in
+
   let while_loop =
     Ir.Stmt.While (Ir.Expr.NewBoolean true, {
       Ir.Block.
       loc = for_in.for_loc;
       body =
-        List.append
+        List.concat [
           [
             get_next_stmt;
             exit_if;
-          ]
+          ];
+          destructing_assignments;
           transformed_block;
+        ]
     })
   in
 
