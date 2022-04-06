@@ -2469,6 +2469,11 @@ and annotate_import env ~attributes import =
 let annotate_program env (program: Ast.program) =
   let { Ast. pprogram_declarations; pprogram_top_level = _; pprogram_loc; _; } = program in
 
+  let file_scope = Env.file_scope env in
+
+  let path = Format.asprintf "%a" Lichenscript_lex.File_key.pp (Option.value_exn pprogram_loc.source) in
+  Program.create_log_for_file (Env.prog env) path file_scope pprogram_loc._end.line;
+
   let tprogram_declarations = List.map ~f:(annotate_declaration env) pprogram_declarations in
 
   let deps =
@@ -2524,7 +2529,7 @@ let annotate_program env (program: Ast.program) =
 
   let tree = { T.
     tprogram_declarations;
-    tprogram_scope = Env.file_scope env;
+    tprogram_scope = file_scope;
     tprogram_before_eval_fun_call;
     ty_var;
   } in

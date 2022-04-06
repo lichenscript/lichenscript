@@ -3,5 +3,6 @@
  (libraries
   lichenscript_lex
   lichenscript_parsing
+  lichenscript_common
   core_kernel)
  (preprocess (pps ppx_gen_rec ppx_deriving.show)))

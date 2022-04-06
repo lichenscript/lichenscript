@@ -1,11 +1,29 @@
+(*
+ * Copyright 2022 Vincent Chan
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ *)
 open Lichenscript_lex
+open Lichenscript_common
 open Core_kernel
+open Scope
 
 type symbol_log_item = (Loc.t * int)
 
 type file = {
   mutable symbol_log: symbol_log_item list;
   mutable sorted_symbol: symbol_log_item array option;
+  mutable scope_range: scope RangeTree.node;
 }
 
 type t = {
@@ -16,10 +34,13 @@ let create () = {
   file_map = Hashtbl.create (module String);
 }
 
-let create_file () = {
-  symbol_log = [];
-  sorted_symbol = None;
-}
+let create_file scope total_lines =
+  let scope_range = RangeTree.create_root_node { left = 1; right = total_lines; data = scope } in
+  {
+    symbol_log = [];
+    sorted_symbol = None;
+    scope_range;
+  }
 
 let sort_log file =
   let arr = List.to_array file.symbol_log in
@@ -34,16 +55,15 @@ let sort_log file =
 let log_file file (loc: Loc.t) id =
   file.symbol_log <- (loc, id)::(file.symbol_log)
 
+let create_log_for_file env path scope total_lines =
+  let file = create_file scope total_lines in
+  Hashtbl.set env.file_map ~key:path ~data:file
+
 let log env (loc: Loc.t) id =
   let source = Option.value_exn loc.source in
   let path = Format.asprintf "%a" File_key.pp source in
-  match Hashtbl.find env.file_map path with
-  | Some file -> log_file file loc id
-  | None -> (
-    let file = create_file () in
-    log_file file loc id;
-    ignore (Hashtbl.add env.file_map ~key:path ~data:file)
-  )
+  let file = Hashtbl.find_exn env.file_map path in
+  log_file file loc id
 
 let rec find_symbol_in_sorted_array arr find_start find_end offset =
   if find_start > find_end then

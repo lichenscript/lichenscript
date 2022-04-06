@@ -263,3 +263,9 @@ let log ctx loc id =
   | Some r ->
     ReverseSymbol.log r loc id
   | None -> ()
+
+let create_log_for_file ctx path scope total_lines =
+  match ctx.reverse_symbol with
+  | Some r ->
+    ReverseSymbol.create_log_for_file r path scope total_lines
+  | None -> ()
