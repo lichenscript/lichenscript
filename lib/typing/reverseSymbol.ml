@@ -65,6 +65,12 @@ let log env (loc: Loc.t) id =
   let file = Hashtbl.find_exn env.file_map path in
   log_file file loc id
 
+let log_range env (loc: Loc.t) scope =
+  let source = Option.value_exn loc.source in
+  let path = Format.asprintf "%a" File_key.pp source in
+  let file = Hashtbl.find_exn env.file_map path in
+  file.scope_range <- RangeTree.insert_value file.scope_range { data = scope; left = loc.start.offset; right = loc._end.offset }
+
 let rec find_symbol_in_sorted_array arr find_start find_end offset =
   if find_start > find_end then
     None

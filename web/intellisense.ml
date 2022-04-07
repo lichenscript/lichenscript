@@ -30,6 +30,48 @@ let js_find_path config =
   |> Array.map ~f:Js.to_string
   |> Array.to_list
 
+let get_keywords_completions_by_scope (scope_type: Scope.scope_type): Auto_complete.CompletionItem.t array =
+  let open Scope in
+  let keywords =
+    match scope_type with
+    | ST_Class _ -> [|
+      "static";
+      "protected";
+      "public";
+      "private";
+      "virtual";
+      "declare";
+    |]
+    | ST_Root
+    | ST_Module
+    | ST_File ->
+      [|
+        "import";
+        "interface";
+        "function";
+        "class";
+        "enum";
+        "public";
+        "declare";
+      |]
+    | ST_Normal
+    | ST_Function
+    | ST_While
+    | ST_Lambda ->
+      [|
+        "let"; "const";
+        "while"; "for"; "if";
+        "in";
+        "match"; "case";
+      |]
+  in
+  Array.map
+    ~f:(fun keyword -> { Auto_complete.CompletionItem.
+      label = keyword;
+      kind = Auto_complete.CompletionItemKind.Keyword;
+    })
+    keywords
+
 let create dummy_fs js_config =
   let module FS = struct
     let is_directory (path: string) =
@@ -344,7 +386,10 @@ let create dummy_fs js_config =
       | Some scope -> (
         let open Core_type in
         let open Auto_complete in
-        let vars = scope#vars in
+        let scope_type = scope#scope_type in
+        Format.printf "find completion in scope: %a\n" Scope.pp_scope_type scope_type;
+        let keywords = get_keywords_completions_by_scope scope_type in
+        let vars = scope#vars_to_root in
         vars
         |> List.to_array
         |> Array.map
@@ -359,6 +404,10 @@ let create dummy_fs js_config =
                 CompletionItemKind.Class
               | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Interface _ ; _ } ->
                 CompletionItemKind.Interface
+              | TypeExpr.TypeDef { TypeDef. spec = TypeDef.ClassMethod _ ; _ } ->
+                CompletionItemKind.Method
+              | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Function _ ; _ } ->
+                CompletionItemKind.Function
               | _ ->
                 CompletionItemKind.Variable;
             in
@@ -367,6 +416,7 @@ let create dummy_fs js_config =
               kind
             }
           )
+        |> Array.append keywords
         |> Array.map ~f:Js_helper.completion_item_to_js
         |> Js.array
       )

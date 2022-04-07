@@ -919,7 +919,7 @@ and annotate_declaration env decl : T.Declaration.t =
     )
 
     | Interface intf -> (
-      let intf = annotate_interface env intf in
+      let intf = annotate_interface env ~loc intf in
       let _, ty_int = intf.intf_name in
       ty_int, T.Declaration.Interface intf
     )
@@ -1082,6 +1082,8 @@ and annotate_class env cls attributes =
   let this_expr = TypeExpr.Ctor(Ref cls_var.var_id, List.map ~f:Identifier.(fun id -> TypeExpr.TypeSymbol id.pident_name) cls.cls_type_vars) in
   let class_scope = new class_scope ~prev:prev_scope cls_var.var_id this_expr in
 
+  Program.log_range (Env.prog env) cls.cls_loc class_scope;
+
   List.iter
     ~f:(fun ident ->
       class_scope#insert_generic_type_symbol ident.pident_name;
@@ -1182,6 +1184,9 @@ and annotate_class env cls attributes =
         match elm with
         | Cls_method _method -> (
           let method_scope = new function_scope ~prev:(Env.peek_scope env) () in
+
+          Program.log_range (Env.prog env) cls_body_loc method_scope;
+
           let { cls_method_attributes; cls_method_visibility; cls_method_modifier; cls_method_name; cls_method_params; cls_method_loc; cls_method_body; cls_method_return_ty; _ } = _method in
 
           let first_char = String.get cls_method_name.pident_name 0 in
@@ -2009,6 +2014,8 @@ and annotate_function env fun_ =
   let prev_scope = Env.peek_scope env in
   let fun_scope = new function_scope ~prev:prev_scope () in
 
+  Program.log_range (Env.prog env) fun_.loc fun_scope;
+
   Env.with_new_scope env fun_scope (fun env ->
     let { visibility = _visibility; header; body; loc; comments; } = fun_ in
 
@@ -2096,6 +2103,8 @@ and annotate_enum env enum =
   let this_expr = TypeExpr.Ctor(Ref variable.var_id, List.map ~f:Identifier.(fun id -> TypeExpr.TypeSymbol id.pident_name) type_vars) in
   let scope = new class_scope ~prev:scope variable.var_id this_expr in
 
+  Program.log_range (Env.prog env) loc scope;
+
   let type_vars_names =
     List.map
       ~f:(fun ident ->
@@ -2172,6 +2181,9 @@ and annotate_enum env enum =
     let annotate_method _method : (T.Declaration.class_method * int) =
       let open Ast.Declaration in
       let method_scope = new function_scope ~prev:(Env.peek_scope env) () in
+
+      Program.log_range (Env.prog env) _method.cls_method_loc method_scope;
+
       let { cls_method_attributes; cls_method_visibility; cls_method_modifier; cls_method_name; cls_method_params; cls_method_loc; cls_method_body; cls_method_return_ty; _ } = _method in
 
       let first_char = String.get cls_method_name.pident_name 0 in
@@ -2296,10 +2308,12 @@ and annotate_enum env enum =
     }
   )
 
-and annotate_interface env intf: T.Declaration.intf =
+and annotate_interface env ~loc intf: T.Declaration.intf =
   let { Ast.Declaration. intf_visibility; intf_name; intf_type_vars; intf_methods; _ } = intf in
   let type_visibility = annotate_visibility intf_visibility in
   let scope = Env.peek_scope env in
+
+  Program.log_range (Env.prog env) loc scope;
 
   let intf_id_opt = scope#find_var_symbol intf_name.pident_name in
   if Option.is_none intf_id_opt then (

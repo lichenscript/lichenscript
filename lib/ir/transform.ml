@@ -399,7 +399,7 @@ and find_or_distribute_name env id name =
  *)
 and transform_function env _fun =
   let open Function in
-  let { body; comments; header; scope; _ } = _fun in
+  let { body; comments; header; scope;  _ } = _fun in
   let original_name, original_name_id = header.name in
 
   env.current_fun_meta <- Some (create_current_fun_meta original_name);

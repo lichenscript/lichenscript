@@ -23,6 +23,7 @@ type scope_type =
   | ST_Module
   | ST_While
   | ST_Lambda
+[@@deriving show]
 
 module ClsElm = struct
 
@@ -154,6 +155,12 @@ class scope ?prev () = object(self)
 
   method vars =
     SymbolTable.to_alist var_symbols
+
+  method vars_to_root =
+    match prev with
+    | Some prev_scope ->
+      List.append prev_scope#vars_to_root self#vars
+    | None -> self#vars
 
   method set_visibility name (visibility: Lichenscript_parsing.Asttypes.visibility option): unit =
     export_map <- ExportTable.set export_map ~key:name ~data:visibility
