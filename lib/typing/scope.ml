@@ -14,6 +14,16 @@ type variable = {
   var_loc: Loc.t;
 }
 
+type scope_type =
+  | ST_Root
+  | ST_Normal
+  | ST_Class of int
+  | ST_Function
+  | ST_File
+  | ST_Module
+  | ST_While
+  | ST_Lambda
+
 module ClsElm = struct
 
   type spec =
@@ -43,6 +53,8 @@ class scope ?prev () = object(self)
   val mutable capturing_variables = CapturingVarMap.empty
   val mutable var_counter = 0
   val mutable children = []
+
+  method scope_type = ST_Normal
 
   (* only add blocks, do NOT add a lambda *)
   method add_child (child: scope) =
@@ -160,15 +172,12 @@ class scope ?prev () = object(self)
     | Some prev -> prev#this_expr
     | None -> failwith "only allowed in class scope"
 
-  method test_class_scope: int option =
-    let open Option in
-    prev >>= (fun prev -> prev#test_class_scope)
-
-  method test_function_scope = false
-
-  method test_while_scope = false
-
-  method test_lambda_scope = false
+  method test_in_class: int option =
+    match self#scope_type with
+    | ST_Class id -> Some id
+    | _ ->
+      let open Option in
+      prev >>= (fun prev -> prev#test_in_class)
 
 end
 
@@ -193,28 +202,28 @@ class class_scope ?prev cls_id this_expr = object
 
   method! this_expr = this_expr
 
-  method! test_class_scope = Some cls_id
+  method! scope_type = ST_Class cls_id
 
 end
 
 class function_scope ?prev () = object
   inherit scope ?prev ()
 
-  method! test_function_scope = true
+  method! scope_type = ST_Function
 
 end
 
 class while_scope ?prev () = object
   inherit scope ?prev ()
 
-  method! test_while_scope = true
+  method! scope_type = ST_While
 
 end
 
 class lambda_scope ?prev () = object
   inherit function_scope ?prev ()
 
-  method! test_lambda_scope = true
+  method! scope_type = ST_Lambda
 
 end
 

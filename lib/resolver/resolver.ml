@@ -77,6 +77,8 @@ module S (FS: FSProvider) = struct
   class module_scope ~prev () = object
     inherit Scope.scope ~prev ()
 
+    method! scope_type = Scope.ST_Module
+
   end
 
   (*
@@ -85,6 +87,8 @@ module S (FS: FSProvider) = struct
    *)
   class file_scope ~prev env extern_modules = object
     inherit Scope.scope ~prev () as super
+
+    method! scope_type = Scope.ST_File
 
     method! set_variable_captured _level (_name: string) = false
 

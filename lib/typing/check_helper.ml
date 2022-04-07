@@ -493,7 +493,7 @@ let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
   let open TypeDef in
   match type_expr with
   | TypeDef { id = enum_id; spec = Enum enum; _ } -> (
-    let test_scope = scope#test_class_scope in
+    let test_scope = scope#test_in_class in
     let outside_finder = (
       fun (elm_name, visibility, _) ->
         String.equal elm_name member_name && (Visibility.access_in_module visibility)
@@ -539,7 +539,7 @@ let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
   )
 
   | TypeDef { id = cls_id; spec = Class cls; _ } -> (
-    let test_scope = scope#test_class_scope in
+    let test_scope = scope#test_in_class in
     let outside_finder = (
       fun (elm_name, elm) ->
         let visibility = get_visibility_of_class_elm elm in

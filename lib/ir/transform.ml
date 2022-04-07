@@ -82,9 +82,10 @@ module TScope = struct
   let rec get_symbols_to_release_til_function acc scope =
     let acc = List.append acc !(scope.local_vars_to_release) in
     let raw = Option.value_exn scope.raw in
-    if raw#test_function_scope then
+    match raw#scope_type with
+    | Scope.ST_Function ->
       acc
-    else (
+    | _ -> (
       let prev_scope = Option.value_exn scope.prev in
       get_symbols_to_release_til_function acc prev_scope
     )
@@ -92,9 +93,9 @@ module TScope = struct
   let rec get_symbols_to_release_til_while acc scope =
     let acc = List.append acc !(scope.local_vars_to_release) in
     let raw = Option.value_exn scope.raw in
-    if raw#test_while_scope then
-      acc
-    else (
+    match raw#scope_type with
+    | Scope.ST_While -> acc
+    | _ -> (
       let prev_scope = Option.value_exn scope.prev in
       get_symbols_to_release_til_while acc prev_scope
     )
@@ -102,7 +103,7 @@ module TScope = struct
   let rec is_in_class scope =
     match scope.raw with
     | Some raw -> (
-      if Option.is_some raw#test_class_scope then
+      if Option.is_some raw#test_in_class then
         true
       else (
         match scope.prev with
@@ -115,9 +116,9 @@ module TScope = struct
   let rec is_in_lambda scope =
     match scope.raw with
     | Some raw -> (
-      if raw#test_lambda_scope then
-        true
-      else (
+      match raw#scope_type with
+      | Scope.ST_Lambda -> true
+      | _ -> (
         match scope.prev with
         | Some prev -> is_in_lambda prev
         | None -> false
