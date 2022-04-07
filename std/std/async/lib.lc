@@ -1,0 +1,5 @@
+
+@builtin()
+public class Promise<T, E> {
+
+}
