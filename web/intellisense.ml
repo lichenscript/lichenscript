@@ -336,6 +336,44 @@ let create dummy_fs js_config =
 
       | None -> Js.undefined
 
+    method findCompletion path offset =
+      let path = Js.to_string path in
+      let reverse_map = Option.value_exn (!prog).reverse_symbol in
+      let scope_opt = ReverseSymbol.find_scope_in_range reverse_map path offset in
+      match scope_opt with
+      | Some scope -> (
+        let open Core_type in
+        let open Auto_complete in
+        let vars = scope#vars in
+        vars
+        |> List.to_array
+        |> Array.map
+          ~f:(fun (name, var) ->
+            let open Scope in
+            let ty_expr = Program.deref_node_type !prog var.var_id in
+            let kind =
+              match ty_expr with
+              | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Enum _ ; _ } ->
+                CompletionItemKind.Enum
+              | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Class _ ; _ } ->
+                CompletionItemKind.Class
+              | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Interface _ ; _ } ->
+                CompletionItemKind.Interface
+              | _ ->
+                CompletionItemKind.Variable;
+            in
+            { CompletionItem.
+              label = name;
+              kind
+            }
+          )
+        |> Array.map ~f:Js_helper.completion_item_to_js
+        |> Js.array
+      )
+
+      | _ ->
+        new%js Js.array_empty
+
     method deleteFile path =
       AstMap.remove ast_map path
 

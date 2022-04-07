@@ -58,10 +58,18 @@ export interface Config {
   precludeDir: string;
 }
 
+export declare type CompletionItemKind = 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14 | 15 | 16 | 17 | 18 | 19 | 20 | 21 | 22 | 23 | 24 | 25;
+
+export interface CompletionItem {
+  label: string;
+  kind?: CompletionItemKind;
+}
+
 export interface IntellisenseInstantce {
   parseAndCache(path: string, content: string): Diagnostic[];
   typecheckDir(path: string): Diagnostic[];
   findDefinition(path: string, offset: number): Location | undefined;
+  findCompletion(path: string, offset: number): CompletionItem[];
   deleteFile(path: string): void;
 }
 

@@ -1,5 +1,6 @@
 open Js_of_ocaml
 open Lichenscript_lex
+open Lichenscript_typing
 
 type severity =
 | Error
@@ -48,3 +49,12 @@ let mk_diagnostic ~loc severity message =
     val severity = severity_to_code severity
 
   end
+
+  let completion_item_to_js (_val: Auto_complete.CompletionItem.t) =
+    let open Js_of_ocaml in
+    object%js
+      val label = Js.string _val.label
+      val kind = Auto_complete.CompletionItemKind.to_num _val.kind
+
+    end
+  

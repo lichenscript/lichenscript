@@ -93,3 +93,11 @@ let find_symbol env path offset =
   in
   let find_end = Array.length sorted_symbol in
   find_symbol_in_sorted_array sorted_symbol 0 (find_end - 1) offset
+
+let find_scope_in_range env path offset : Scope.scope option =
+  Hashtbl.find env.file_map path
+  |> Option.map
+  ~f:(fun file ->
+    let scope = RangeTree.find_value file.scope_range offset in
+    scope
+  )
