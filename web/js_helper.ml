@@ -55,6 +55,10 @@ let mk_diagnostic ~loc severity message =
     object%js
       val label = Js.string _val.label
       val kind = Auto_complete.CompletionItemKind.to_num _val.kind
+      val detail =
+        match _val.detail with
+        | Some detail -> Js.def (Js.string detail)
+        | None -> Js.undefined
 
     end
   

@@ -85,7 +85,7 @@ module S (FS: FSProvider) = struct
    * extern_modules are absolute path of external modules
    * the absolute path of module's folder is the unique id of the module
    *)
-  class file_scope ~prev env extern_modules = object
+  class file_scope ~prev env extern_modules = object(self)
     inherit Scope.scope ~prev () as super
 
     method! scope_type = Scope.ST_File
@@ -107,6 +107,8 @@ module S (FS: FSProvider) = struct
     method! next_var_id = prev#next_var_id
 
     method! vars = prev#vars
+
+    method! vars_to_root = self#vars
 
     method! set_visibility name v =
       prev#set_visibility name v

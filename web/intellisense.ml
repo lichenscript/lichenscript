@@ -69,6 +69,7 @@ let get_keywords_completions_by_scope (scope_type: Scope.scope_type): Auto_compl
     ~f:(fun keyword -> { Auto_complete.CompletionItem.
       label = keyword;
       kind = Auto_complete.CompletionItemKind.Keyword;
+      detail = None;
     })
     keywords
 
@@ -411,9 +412,11 @@ let create dummy_fs js_config =
               | _ ->
                 CompletionItemKind.Variable;
             in
+            let detail = Program.print_type_value !prog ty_expr in
             { CompletionItem.
               label = name;
-              kind
+              kind;
+              detail = Some detail;
             }
           )
         |> Array.append keywords
