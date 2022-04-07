@@ -1491,6 +1491,18 @@ LCValue LCNewStringFromCString(LCRuntime* rt, const unsigned char* content) {
     return LCNewStringFromCStringLen(rt, content, strlen((const char*)content));
 }
 
+LCValue LCNewStringFromWideChar(LCRuntime* rt, int char_val) {
+    uint32_t acquire_len = sizeof(LCString) + 2;
+    LCString* result = lc_mallocz(rt, acquire_len);
+
+    result->header.count = 1;
+    result->is_wide_char = 1;
+    result->length = 1;
+    result->u.str16[0] = char_val;
+
+    return MK_PTR(result, LC_TY_STRING);
+}
+
 LCValue LCNewRefCell(LCRuntime* rt, LCValue value) {
     LCRefCell* cell = (LCRefCell*)lc_mallocz(rt, sizeof(LCRefCell));
     init_gc_object(rt, (LCGCObject*)cell, LC_GC_REFCELL);
@@ -2083,7 +2095,9 @@ LCValue LCToString(LCRuntime* rt, LCValue val) {
         break;
 
     case LC_TY_CHAR:
-        // TODO: handler char > 127
+        if (val.int_val > 127) {
+            return LCNewStringFromWideChar(rt, val.int_val);
+        }
         snprintf(buf, sizeof(buf), "%c", val.int_val);
         str = buf;
         break;
@@ -2183,7 +2197,7 @@ const char* LCToUTF8Len(LCRuntime* rt, size_t* plen, LCValue val) {
     *q = '\0';
     str_new->length = q - str_new->u.str8;
 
-    LCRelease(rt, val);
+    LCRelease(rt, str_val);
 
     if (plen) {
         *plen = str_new->length;
