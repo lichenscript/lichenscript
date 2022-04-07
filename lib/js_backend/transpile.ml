@@ -436,14 +436,6 @@ and transpile_expression ?(parent_expr=true) env expr =
     transpile_expression env value;
   )
 
-  | I32Binary(Asttypes.BinaryOp.Plus, left, right) -> (
-    ps env "i32_add(";
-    transpile_expression env left;
-    ps env ", ";
-    transpile_expression env right;
-    ps env ")"
-  )
-
   | I32Binary(op, left, right) ->
     transpile_i32_binary env op left right
 
@@ -663,30 +655,34 @@ and transpile_expression ?(parent_expr=true) env expr =
 and transpile_i32_binary env op left right =
   let open Asttypes.BinaryOp in
   (match op with
+  | Mult -> (
+    ps env "i32_mult(";
+      transpile_expression env left;
+      ps env ", ";
+      transpile_expression env right;
+    ps env ")"
+  )
+
   | Plus
   | Minus
-  | Mult
   | Div
   | LShift
   | RShift
   | Mod
     -> (
-      ps env (match op with
-      | Plus -> "i32_add"
-      | Minus -> "i32_sub"
-      | Mult -> "i32_mult"
-      | Div -> "i32_div"
-      | LShift -> "i32_lshift"
-      | RShift -> "i32_rshift"
-      | Mod -> "i32_mod"
-      | _ -> failwith "unreachable"
-      );
-
       ps env "(";
       transpile_expression env left;
-      ps env ", ";
+      ps env (match op with
+      | Plus -> " + "
+      | Minus -> " - "
+      | Div -> " / "
+      | LShift -> " << "
+      | RShift -> " >> "
+      | Mod -> " % "
+      | _ -> failwith "unreachable"
+      );
       transpile_expression env right;
-      ps env ")"
+      ps env " | 0)"
     )
 
   | Equal

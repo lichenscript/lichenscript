@@ -8,34 +8,12 @@ const unionSym = Symbol("union");
 const tupleSym = Symbol("tuple");
 const clsNameSym = Symbol("clsName");
 
-function i32_add(a, b) {
-  a = a|0;  // give hinting to v8
-  b = b|0;
-
-  a += b;
-  if (a > i32_max) {
-    return (a - i32_max) + i32_min - 1;
-  }
-
-  return a|0;
-}
-
 function i64_add(a, b) {
   a += b;
   if (a > i64_max) {
     return (a - i64_max) + i64_min - 1n;
   }
   return a;
-}
-
-function i32_sub(a, b) {
-  a = a|0;  // give hinting to v8
-  b = b|0;
-  a -= b;
-  if (a < i32_min) {
-    return (a - i32_min) + i32_max + 1;
-  }
-  return a|0;
 }
 
 function i64_sub(a, b) {
@@ -46,11 +24,7 @@ function i64_sub(a, b) {
   return a;
 }
 
-function i32_mult(a, b) {
-  a = a|0;  // give hinting to v8
-  b = b|0;
-  return (a * b)|0;
-}
+var i32_mult = Math.imul;
 
 function i64_mult(a, b) {
   a *= b;
@@ -58,36 +32,6 @@ function i64_mult(a, b) {
     return 0;
   }
   return a;
-}
-
-function i32_div(a, b) {
-  a = a|0;  // give hinting to v8
-  b = b|0;
-  return (a / b)|0;
-}
-
-function i32_lshift(a, b) {
-  a = a|0;  // give hinting to v8
-  b = b|0;
-  return (a << b)|0;
-}
-
-function i32_rshift(a, b) {
-  a = a|0;  // give hinting to v8
-  b = b|0;
-  return (a >> b)|0;
-}
-
-function i32_mod(a, b) {
-  a = a|0;  // give hinting to v8
-  b = b|0;
-  return (a % b)|0;
-}
-
-function i32_mod(a, b) {
-  a = a|0;  // give hinting to v8
-  b = b|0;
-  return (a % b)|0;
 }
 
 function i32_bit_not(e) {
