@@ -83,6 +83,7 @@ module TScope = struct
     let acc = List.append acc !(scope.local_vars_to_release) in
     let raw = Option.value_exn scope.raw in
     match raw#scope_type with
+    | Scope.ST_Lambda
     | Scope.ST_Function ->
       acc
     | _ -> (
