@@ -18,14 +18,12 @@ jobs:
           name: "Install Deps"
           command: "opam install ."
       - run:
-          name: "Eval Env"
-          command: "eval $(opam env)"
-      - run:
           name: "Tests"
           command: |
             eval $(opam env)
             dune build
             dune runtest
+            ./test.sh
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
