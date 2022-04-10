@@ -1321,7 +1321,10 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
 
         )
 
-        | { spec = Member(expr, id); _ } ->
+        | { spec = Member(_expr, None); _ } ->
+          failwith "unrechable"
+
+        | { spec = Member(expr, Some id); _ } ->
           begin
             if test_namespace expr then (
               (* let callee_node = Program.get_node env.prog ty_var in
@@ -1398,7 +1401,10 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
       auto_release_expr ~is_move env ~append_stmts ty_var call_expr
     )
 
-    | Member(main_expr, id) -> (
+    | Member(_main_expr, None) ->
+      failwith "unrechable"
+
+    | Member(main_expr, Some id) -> (
       let node_type = Program.deref_node_type env.prog main_expr.ty_var in
       let open Core_type.TypeDef in
       match node_type with
@@ -1595,8 +1601,11 @@ and transform_expression ?(is_move=false) ?(is_borrow=false) env expr =
         assign_or_update (Ir.Expr.Ident name) name_id
       )
 
+      | ({ spec = Typedtree.Expression.Member (_main_expr, None); _ }, _) ->
+        failwith "unrechable"
+
       (* TODO: maybe it's a setter? *)
-      | ({ spec = Typedtree.Expression.Member (main_expr, id); _ }, _) -> (
+      | ({ spec = Typedtree.Expression.Member (main_expr, Some id); _ }, _) -> (
         let main_expr_ty = Program.deref_node_type env.prog main_expr.ty_var in
         match main_expr_ty with
         | Core_type.TypeExpr.TypeDef { spec = Class cls ; id = cls_id; _ } -> (

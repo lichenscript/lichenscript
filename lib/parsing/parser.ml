@@ -1194,7 +1194,7 @@ and parse_expression env : Expression.t =
       | Expression.Identifier id ->
         Some (id::acc)
 
-      | Expression.Member(expr, name) ->
+      | Expression.Member(expr, Some name) ->
         let next = name::acc in
         try_cast_member_into_id_list next expr
 
@@ -1454,18 +1454,27 @@ and parse_left_handside_expression_allow_call env : Expression.t =
     let start_pos = Peek.loc env in
     let next = Peek.token env in
     match next with
-    | Token.T_PERIOD ->  (* . *)
+    | Token.T_PERIOD -> ( (* . *)
       Eat.token env;
-      let id = parse_identifier env in
-      let spec = Member(expr, id) in
-      let expr =
+      match (Peek.token env) with
+      | Token.T_IDENTIFIER _ ->
+        let id = parse_identifier env in
+        let spec = Member(expr, Some id) in
+        let expr =
+          {
+            spec;
+            loc = with_start_loc env start_pos;
+            attributes = [];
+          }
+        in
+        loop env expr
+      | _ ->
         {
-          spec;
+          spec = Member(expr, None);
           loc = with_start_loc env start_pos;
           attributes = [];
         }
-      in
-      loop env expr
+    )
 
     | Token.T_LBRACKET -> (* [] *)
       begin
