@@ -378,7 +378,19 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       id, T.Expression.Tuple expressions
     )
 
-    | Member (expr, name) -> (
+    | Member (expr, None) -> (
+      let expr = annotate_expression ~prev_deps env expr in
+      let ctx = Env.prog env in
+      let node = {
+        value = TypeExpr.Unknown;
+        loc;
+        deps = List.append prev_deps [expr.ty_var];
+      } in
+      let id = Program.new_id ctx node in
+      id, T.Expression.Member(expr, None)
+    )
+
+    | Member (expr, Some name) -> (
       let default_clause () =
         let expr = annotate_expression ~prev_deps env expr in
         let ctx = Env.prog env in
@@ -388,7 +400,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
           deps = List.append prev_deps [expr.ty_var];
         } in
         let id = Program.new_id ctx node in
-        id, T.Expression.Member(expr, name)
+        id, T.Expression.Member(expr, Some name)
       in
 
       match expr with
@@ -429,7 +441,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
                   ty_var = variable.var_id;
                   loc = id.pident_loc;
                 } in
-                ty_int, T.Expression.Member(id_expr, name)
+                ty_int, T.Expression.Member(id_expr, Some name)
               )
             )
 

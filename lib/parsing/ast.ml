@@ -106,7 +106,7 @@ and Expression : sig
     | Array of t list
     | Map of map_entry list
     | Call of call
-    | Member of t * Identifier.t
+    | Member of t * Identifier.t option
     | Index of t * t
     | Tuple of t list
     | Unary of Asttypes.UnaryOp.t * t

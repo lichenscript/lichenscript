@@ -629,7 +629,11 @@ and check_expression env expr =
 
   )
 
-  | Member (main_expr, name) -> (
+  | Member (main_expr, None) -> (
+    check_expression env main_expr;
+  )
+
+  | Member (main_expr, Some name) -> (
     let handle_member_type expr_node member_type_opt =
       let open Core_type.TypeExpr in
       match member_type_opt with
@@ -784,7 +788,13 @@ and check_expression env expr =
       | _ -> ());
     )
 
-    | { spec = Member(main_expr, name) ; _ } -> (
+    | { spec = Member(main_expr, None) ; _ } -> (
+      let main_expr_type = Program.deref_node_type ctx main_expr.ty_var in
+      let err = Diagnosis.(make_error ctx expr_loc (CannotReadMember("", main_expr_type))) in
+      raise (Diagnosis.Error err)
+    )
+
+    | { spec = Member(main_expr, Some name) ; _ } -> (
       let main_expr_type = Program.deref_node_type ctx main_expr.ty_var in
       let member_opt = Check_helper.find_member_of_type ctx ~scope:env.scope main_expr_type name.pident_name in
       match member_opt with

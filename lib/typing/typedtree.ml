@@ -94,7 +94,7 @@ module%gen rec Expression : sig
     | Map of map_entry list
     | Call of call
     | Tuple of t list
-    | Member of t * Identifier.t
+    | Member of t * Identifier.t option
     | Index of t * t
     | Unary of
       Asttypes.UnaryOp.t *
