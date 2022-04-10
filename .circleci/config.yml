@@ -24,6 +24,8 @@ jobs:
             dune build
             dune runtest
             ./test.sh
+            echo "Test JavaScript"
+            FLAGS="--platform js" ./test.sh
 
 # Invoke jobs via workflows
 # See: https://circleci.com/docs/2.0/configuration-reference/#workflows
