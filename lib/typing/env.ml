@@ -9,7 +9,7 @@ type t = {
   file_scope: scope;
   external_resolver: external_resolver;
   mutable current_scope: scope;
-  mutable errors: Type_error.t list;
+  mutable errors: Diagnosis.t list;
   mutable scope_counter: int;
   mutable in_lambda: bool;
   mutable in_declare: bool;
@@ -58,7 +58,10 @@ let file_scope env = env.file_scope
 let add_error env err =
   env.errors <- err::env.errors
 
-let errors env = List.rev env.errors
+let errors env =
+  let result = List.rev env.errors in
+  env.errors <- [];
+  result
 
 let with_new_scope env scope callback =
   let prev_scope = env.current_scope in

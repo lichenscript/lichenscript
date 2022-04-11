@@ -30,9 +30,9 @@ val peek_scope: t -> scope
 
 val file_scope: t -> scope
 
-val add_error: t -> Type_error.t -> unit
+val add_error: t -> Diagnosis.t -> unit
 
-val errors: t -> Type_error.t list
+val errors: t -> Diagnosis.t list
 
 val with_new_scope: t -> scope -> (t -> 'a) -> 'a
 

@@ -246,7 +246,7 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       | Some variable -> (
         if not !(variable.var_init) then (
           let err = Diagnosis.(make_error (Env.prog env) expr.loc (CannotAccessBeforeInit id.pident_name)) in
-          raise (Diagnosis.Error err)
+          Env.add_error env err;
         );
         (*
          * it's class or enum, create a ref to it,
@@ -269,7 +269,15 @@ and annotate_expression ~prev_deps env expr : T.Expression.t =
       | _ ->
         let err_spec = Type_error.CannotFindName id.pident_name in
         let err = Diagnosis.make_error (Env.prog env) id.pident_loc err_spec in
-        raise (Diagnosis.Error err)
+        Env.add_error env err;
+
+        let node = {
+          value = TypeExpr.Unknown;
+          loc = loc;
+          deps = [];
+        } in
+        let ty_id = Program.new_id (Env.prog env) node in
+        ty_id, (T.Expression.Identifier (id.pident_name, ty_id))
     )
 
     | Lambda lambda -> (
@@ -2493,70 +2501,79 @@ and annotate_import env ~attributes import =
   )
 
 let annotate_program env (program: Ast.program) =
-  let { Ast. pprogram_declarations; pprogram_top_level = _; pprogram_loc; _; } = program in
+  try
+    let { Ast. pprogram_declarations; pprogram_top_level = _; pprogram_loc; _; } = program in
 
-  let file_scope = Env.file_scope env in
+    let file_scope = Env.file_scope env in
 
-  let path = Format.asprintf "%a" Lichenscript_lex.File_key.pp (Option.value_exn pprogram_loc.source) in
-  Program.create_log_for_file (Env.prog env) path file_scope pprogram_loc._end.line;
+    let path = Format.asprintf "%a" Lichenscript_lex.File_key.pp (Option.value_exn pprogram_loc.source) in
+    Program.create_log_for_file (Env.prog env) path file_scope pprogram_loc._end.line;
 
-  let tprogram_declarations = List.map ~f:(annotate_declaration env) pprogram_declarations in
+    let tprogram_declarations = List.map ~f:(annotate_declaration env) pprogram_declarations in
 
-  let deps =
-    List.fold
-      ~init:[]
-      ~f:(fun acc decl -> 
-        let open T.Declaration in
-        let { spec; _ } = decl in
-        match spec with
-        | Class cls -> (
-          let { cls_id = (_, ty_var); _} = cls in
-          ty_var::acc
+    let deps =
+      List.fold
+        ~init:[]
+        ~f:(fun acc decl -> 
+          let open T.Declaration in
+          let { spec; _ } = decl in
+          match spec with
+          | Class cls -> (
+            let { cls_id = (_, ty_var); _} = cls in
+            ty_var::acc
+          )
+
+          | Interface intf -> (
+            let _, ty_var = intf.intf_name in
+            ty_var::acc
+          )
+
+          | Function_ _fun -> (
+            let open T.Function in
+            let { ty_var; _ } = _fun in
+            ty_var::acc
+          )
+
+          | Declare declare -> (
+            let { decl_ty_var; _ } = declare in
+            decl_ty_var::acc
+          )
+
+          | Enum enum -> (
+            let open T.Enum in
+            let { name = (_, ty_var); _ } = enum in
+            ty_var::acc
+          )
+
+          | Import _ -> acc
+          
         )
+        tprogram_declarations
+    in
 
-        | Interface intf -> (
-          let _, ty_var = intf.intf_name in
-          ty_var::acc
-        )
+    let val_ =
+      {
+        value = TypeExpr.Unknown;
+        loc = pprogram_loc;
+        deps;
+      }
+    in
+    let ty_var = Program.new_id (Env.prog env) val_ in
 
-        | Function_ _fun -> (
-          let open T.Function in
-          let { ty_var; _ } = _fun in
-          ty_var::acc
-        )
+    let tprogram_before_eval_fun_call = Env.before_eval_fun_call env in
 
-        | Declare declare -> (
-          let { decl_ty_var; _ } = declare in
-          decl_ty_var::acc
-        )
+    let tree = { T.
+      tprogram_declarations;
+      tprogram_scope = file_scope;
+      tprogram_before_eval_fun_call;
+      ty_var;
+    } in
 
-        | Enum enum -> (
-          let open T.Enum in
-          let { name = (_, ty_var); _ } = enum in
-          ty_var::acc
-        )
-
-        | Import _ -> acc
-        
-      )
-      tprogram_declarations
-  in
-
-  let val_ =
-    {
-      value = TypeExpr.Unknown;
-      loc = pprogram_loc;
-      deps;
-    }
-  in
-  let ty_var = Program.new_id (Env.prog env) val_ in
-
-  let tprogram_before_eval_fun_call = Env.before_eval_fun_call env in
-
-  let tree = { T.
-    tprogram_declarations;
-    tprogram_scope = file_scope;
-    tprogram_before_eval_fun_call;
-    ty_var;
-  } in
-  tree
+    let env_errors = Env.errors env in
+    if List.is_empty env_errors then
+      Ok tree
+    else
+      Error (Some tree, env_errors)
+  with
+  | Diagnosis.Error e ->
+    Error (None, [e])

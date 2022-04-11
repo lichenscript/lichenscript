@@ -330,25 +330,29 @@ let create dummy_fs js_config =
       (try
         let dir = Js.to_string dir in
         annotate_module_by_dir ~diagnostics:result dir dir;
-        R.typecheck_all_modules ~prog:!prog ~verbose:false !resolver;
+        let typecheck_result = R.typecheck_all_modules ~prog:!prog ~verbose:false !resolver in
+        (match typecheck_result with
+        | Ok () -> ()
+        | Error errors ->
+          List.iter ~f:(fun e ->
+            let ser =
+              match e.spec with
+              | Diagnosis.Dg_error _ -> Js_helper.Error
+              | Diagnosis.Dg_warning _ -> Js_helper.Warning
+            in
+            let content =
+              match e.spec with
+              | Diagnosis.Dg_error err ->
+                Format.asprintf "%a" (Diagnosis.PP.error_spec ~ctx:e.ctx) err
+              | Diagnosis.Dg_warning _ ->
+                "Warning"
+            in
+            let js_diagnostic = Js_helper.mk_diagnostic ~loc:(e.loc) ser content in
+            result := js_diagnostic::(!result);
+          )
+          errors
+        )
       with
-      | Diagnosis.Error e -> (
-        let ser =
-          match e.spec with
-          | Diagnosis.Dg_error _ -> Js_helper.Error
-          | Diagnosis.Dg_warning _ -> Js_helper.Warning
-        in
-        let content =
-          match e.spec with
-          | Diagnosis.Dg_error err ->
-            Format.asprintf "%a" (Diagnosis.PP.error_spec ~ctx:e.ctx) err
-          | Diagnosis.Dg_warning _ ->
-            "Warning"
-        in
-        let js_diagnostic = Js_helper.mk_diagnostic ~loc:(e.loc) ser content in
-        result := js_diagnostic::(!result);
-      )
-
       | Abort -> ());
 
       !result
@@ -399,10 +403,21 @@ let create dummy_fs js_config =
                 CompletionItemKind.Variable
 
             in
+            let detail =
+              match item with
+              | TypeDef.Cls_elm_prop(_, id, _)
+              | TypeDef.Cls_elm_method(_, { id; _ }) -> (
+                let name = Program.print_type_by_id !prog id in
+                Some name
+              )
+
+              | _ -> None
+            in
+
             { CompletionItem.
               label = name;
               kind;
-              detail = None;
+              detail;
             }
           )
         |> Array.map ~f:Js_helper.completion_item_to_js

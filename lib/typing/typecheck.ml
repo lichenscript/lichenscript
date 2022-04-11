@@ -82,7 +82,7 @@ let with_scope env scope cb =
   env.scope <- prev;
   result
 
-let rec typecheck_module ctx ~import_checker ~verbose (typedtree: T.program) =
+let rec typecheck_module ctx ~import_checker ~verbose (typedtree: T.program): (unit, Diagnosis.t list) result =
   try
     let { T. tprogram_declarations; tprogram_scope; _ } = typedtree in
     let env = {
@@ -95,11 +95,14 @@ let rec typecheck_module ctx ~import_checker ~verbose (typedtree: T.program) =
     if verbose then (
       Program.print ctx
     );
-  with e ->
-    if verbose then (
-      Program.print ctx
-    );
-    raise e
+    Ok()
+  with
+    | Diagnosis.Error e -> (
+      if verbose then (
+        Program.print ctx
+      );
+      Error [e]
+    )
 
 and check_declaration env decl =
   let open T.Declaration in

@@ -384,34 +384,56 @@ module S (FS: FSProvider) = struct
     export_opt >>| fun export ->
     export.export_var.var_id
 
-  let annotate_all_modules env =
+  let annotate_all_modules env : (unit, Diagnosis.t list) result =
+    let errors = ref [] in
     Linker.iter_modules
       ~f:(fun m ->
         let files = Module.files m in
         let files =
-          List.map
+          List.filter_map
             ~f:(fun file -> 
               let { Module. typed_env; ast; _ } = file in
-              let typed_tree = Lichenscript_typing.Annotate.annotate_program
+              let typed_tree_result = Lichenscript_typing.Annotate.annotate_program
                 typed_env
                 (Option.value_exn ast)
               in
 
-              env.before_eval_fun_call <- List.append env.before_eval_fun_call typed_tree.tprogram_before_eval_fun_call;
+              let handle_typed_tree (typed_tree: Typedtree.program) = 
+                env.before_eval_fun_call <- List.append env.before_eval_fun_call typed_tree.tprogram_before_eval_fun_call;
 
-              { file with
-                (* clear the ast to released memory,
-                * but don't know if there are other references
-                *)
-                ast = None;
-                typed_tree = Some typed_tree;
-              }
+                Some { file with
+                  (* clear the ast to released memory,
+                  * but don't know if there are other references
+                  *)
+                  ast = None;
+                  typed_tree = Some typed_tree;
+                }
+              in
+
+              match typed_tree_result with
+              | Ok typed_tree -> handle_typed_tree typed_tree
+              | Error (Some typed_tree, t_errors) ->
+                errors := t_errors::(!errors);
+                handle_typed_tree typed_tree
+
+              | Error (None, t_errors) ->
+                errors := t_errors::(!errors);
+                None
+
             )
             files
         in
         Module.set_files m files
       )
-      env.linker
+      env.linker;
+    if List.is_empty !errors then
+      Ok()
+    else
+      Error (
+        !errors
+        |> List.rev
+        |> List.concat
+      )
 
   let import_checker env _mod file (import: Ast.Import.t) =
     match import.spec with
@@ -439,8 +461,13 @@ module S (FS: FSProvider) = struct
       )
     | _ -> ()
 
-  let typecheck_all_modules ~prog ~verbose env =
-    annotate_all_modules env;
+  let typecheck_all_modules ~prog ~verbose env : (unit, Diagnosis.t list) result =
+    let error_list = ref [] in
+    (match annotate_all_modules env with
+    | Ok () -> ()
+    | Error errors ->
+      error_list := errors::(!error_list)
+    );
     Linker.iter_modules
       ~f:(fun m ->
         let files = Module.files m in
@@ -448,15 +475,28 @@ module S (FS: FSProvider) = struct
         ~f:(fun file ->
           let open Module in
           let tree = Option.value_exn file.typed_tree in
-          Typecheck.typecheck_module
+          let check_result = Typecheck.typecheck_module
             ~verbose prog
             ~import_checker:(import_checker env m file)
             tree
+          in
+          match check_result with
+          | Ok () -> ()
+          | Error errors ->
+            error_list := errors::(!error_list)
         )
         files;
         (* Typecheck.typecheck_module ctx m. *)
       )
-      env.linker
+      env.linker;
+    if List.is_empty !error_list then
+      Ok()
+    else
+      Error (
+        !error_list
+        |> List.rev
+        |> List.concat
+      )
 
   (*
   * 1. parse all in the entry dir
@@ -478,7 +518,10 @@ module S (FS: FSProvider) = struct
       let dir_of_entry = Filename.dirname entry_file_path in
       let entry_full_path = parse_module_by_dir ~prog env ~is_entry_module:true ~real_path:(FS.get_realpath dir_of_entry) dir_of_entry  in
 
-      typecheck_all_modules ~prog ~verbose env;
+      (match typecheck_all_modules ~prog ~verbose env with
+      | Ok () -> ()
+      | Error errors -> raise (TypeCheckError errors)
+      );
 
       let main_mod = Option.value_exn (Linker.get_module env.linker (Option.value_exn entry_full_path)) in
       if List.is_empty (Module.files main_mod) then (
