@@ -26,6 +26,11 @@ jobs:
             ./test.sh
             echo "Test JavaScript"
             FLAGS="--platform js" ./test.sh
+            source /emsdk/emsdk_env.sh
+            emcc -v
+            rm -rf _test
+            echo "Test Wasm32"
+            FLAGS="--platform wasm32" ./test.sh
             ./prepublish.sh
             npm install -g pnpm
             cd npm/lichenscript-web
