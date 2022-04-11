@@ -24,6 +24,7 @@ type file = {
   mutable symbol_log: symbol_log_item list;
   mutable sorted_symbol: symbol_log_item array option;
   mutable scope_range: scope RangeTree.node;
+  member_access: (int, Core_type.TypeExpr.t) Hashtbl.t;
 }
 
 type t = {
@@ -40,6 +41,7 @@ let create_file scope total_lines =
     symbol_log = [];
     sorted_symbol = None;
     scope_range;
+    member_access = Hashtbl.create (module Int);
   }
 
 let sort_log file =
@@ -70,6 +72,12 @@ let log_range env (loc: Loc.t) scope =
   let path = Format.asprintf "%a" File_key.pp source in
   let file = Hashtbl.find_exn env.file_map path in
   file.scope_range <- RangeTree.insert_value file.scope_range { data = scope; left = loc.start.offset; right = loc._end.offset }
+
+let log_member_access env (loc: Loc.t) ty =
+  let source = Option.value_exn loc.source in
+  let path = Format.asprintf "%a" File_key.pp source in
+  let file = Hashtbl.find_exn env.file_map path in
+  Hashtbl.set file.member_access ~key:loc._end.offset ~data:ty
 
 let rec find_symbol_in_sorted_array arr find_start find_end offset =
   if find_start > find_end then
@@ -107,3 +115,8 @@ let find_scope_in_range env path offset : Scope.scope option =
     let scope = RangeTree.find_value file.scope_range offset in
     scope
   )
+
+let find_member_access env path offset : Core_type.TypeExpr.t option =
+  let open Option in
+  Hashtbl.find env.file_map path >>= fun file ->
+  Hashtbl.find file.member_access offset

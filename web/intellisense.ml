@@ -382,50 +382,78 @@ let create dummy_fs js_config =
     method findCompletion path offset =
       let path = Js.to_string path in
       let reverse_map = Option.value_exn (!prog).reverse_symbol in
-      let scope_opt = ReverseSymbol.find_scope_in_range reverse_map path offset in
-      match scope_opt with
-      | Some scope -> (
-        let open Core_type in
-        let open Auto_complete in
-        let scope_type = scope#scope_type in
-        Format.printf "find completion in scope: %a\n" Scope.pp_scope_type scope_type;
-        let keywords = get_keywords_completions_by_scope scope_type in
-        let vars = scope#vars_to_root in
-        vars
+      let member_access_opt = ReverseSymbol.find_member_access reverse_map path offset in
+      let open Core_type in
+      let open Auto_complete in
+      match member_access_opt with
+      | Some (TypeExpr.TypeDef { TypeDef. spec = TypeDef.Class cls; _ }) ->
+        cls.tcls_static_elements
         |> List.to_array
         |> Array.map
-          ~f:(fun (name, var) ->
-            let open Scope in
-            let ty_expr = Program.deref_node_type !prog var.var_id in
+          ~f:(fun (name, item) ->
             let kind =
-              match ty_expr with
-              | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Enum _ ; _ } ->
-                CompletionItemKind.Enum
-              | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Class _ ; _ } ->
-                CompletionItemKind.Class
-              | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Interface _ ; _ } ->
-                CompletionItemKind.Interface
-              | TypeExpr.TypeDef { TypeDef. spec = TypeDef.ClassMethod _ ; _ } ->
-                CompletionItemKind.Method
-              | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Function _ ; _ } ->
+              match item with
+              | TypeDef.Cls_elm_method _ ->
                 CompletionItemKind.Function
               | _ ->
-                CompletionItemKind.Variable;
+                CompletionItemKind.Variable
+
             in
-            let detail = Program.print_type_value !prog ty_expr in
             { CompletionItem.
               label = name;
               kind;
-              detail = Some detail;
+              detail = None;
             }
           )
-        |> Array.append keywords
         |> Array.map ~f:Js_helper.completion_item_to_js
         |> Js.array
-      )
 
-      | _ ->
+      | Some _ ->
         new%js Js.array_empty
+
+      | None -> (
+        let scope_opt = ReverseSymbol.find_scope_in_range reverse_map path offset in
+        match scope_opt with
+        | Some scope -> (
+          let scope_type = scope#scope_type in
+          let keywords = get_keywords_completions_by_scope scope_type in
+          let vars = scope#vars_to_root in
+          vars
+          |> List.to_array
+          |> Array.map
+            ~f:(fun (name, var) ->
+              let open Scope in
+              let ty_expr = Program.deref_node_type !prog var.var_id in
+              let kind =
+                match ty_expr with
+                | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Enum _ ; _ } ->
+                  CompletionItemKind.Enum
+                | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Class _ ; _ } ->
+                  CompletionItemKind.Class
+                | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Interface _ ; _ } ->
+                  CompletionItemKind.Interface
+                | TypeExpr.TypeDef { TypeDef. spec = TypeDef.ClassMethod _ ; _ } ->
+                  CompletionItemKind.Method
+                | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Function _ ; _ } ->
+                  CompletionItemKind.Function
+                | _ ->
+                  CompletionItemKind.Variable;
+              in
+              let detail = Program.print_type_value !prog ty_expr in
+              { CompletionItem.
+                label = name;
+                kind;
+                detail = Some detail;
+              }
+            )
+          |> Array.append keywords
+          |> Array.map ~f:Js_helper.completion_item_to_js
+          |> Js.array
+        )
+
+        | _ ->
+          new%js Js.array_empty
+      )
 
     method deleteFile path =
       AstMap.remove ast_map path

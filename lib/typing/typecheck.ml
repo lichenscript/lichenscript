@@ -631,6 +631,8 @@ and check_expression env expr =
 
   | Member (main_expr, None) -> (
     check_expression env main_expr;
+    let node_type = Program.deref_node_type env.ctx main_expr.ty_var in
+    Program.log_member_access env.ctx expr_loc node_type
   )
 
   | Member (main_expr, Some name) -> (

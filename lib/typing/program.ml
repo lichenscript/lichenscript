@@ -275,3 +275,9 @@ let log_range ctx loc scope =
   | Some r ->
     ReverseSymbol.log_range r loc scope
   | None -> ()
+
+let log_member_access ctx loc ty =
+  match ctx.reverse_symbol with
+  | Some r ->
+    ReverseSymbol.log_member_access r loc ty
+  | None -> ()

@@ -1455,23 +1455,34 @@ and parse_left_handside_expression_allow_call env : Expression.t =
     let next = Peek.token env in
     match next with
     | Token.T_PERIOD -> ( (* . *)
+      let period_loc = Peek.loc env in
       Eat.token env;
       match (Peek.token env) with
       | Token.T_IDENTIFIER _ ->
-        let id = parse_identifier env in
-        let spec = Member(expr, Some id) in
-        let expr =
+        let id_loc = Peek.loc env in
+        if id_loc.start.line != period_loc._end.line || id_loc.start.column <> period_loc._end.column then (
+          (* Format.printf "id_loc: %a, peroid_loc: %a\n" Loc.pp id_loc Loc.pp period_loc; *)
           {
-            spec;
-            loc = with_start_loc env start_pos;
+            spec = Member(expr, None);
+            loc = Loc.btwn start_pos period_loc;
             attributes = [];
           }
-        in
-        loop env expr
+        ) else
+          let id = parse_identifier env in
+          let spec = Member(expr, Some id) in
+          let expr =
+            {
+              spec;
+              loc = with_start_loc env start_pos;
+              attributes = [];
+            }
+          in
+          loop env expr
+
       | _ ->
         {
           spec = Member(expr, None);
-          loc = with_start_loc env start_pos;
+          loc = Loc.btwn start_pos period_loc;
           attributes = [];
         }
     )
