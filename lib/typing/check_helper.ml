@@ -600,6 +600,206 @@ let rec find_member_of_class ctx ~scope type_expr member_name type_vars =
   )
   | _ -> None
 
+and get_members_of_class ctx ~scope type_expr type_vars : (string * TypeExpr.t * int * bool) list =
+  let type_expr = Program.deref_type ctx type_expr in
+  let open TypeDef in
+  match type_expr with
+  | TypeDef { id = enum_id; spec = Enum enum; _ } -> (
+    let test_scope = scope#test_in_class in
+    let outside_filter = (
+      fun (_elm_name, visibility, _) ->
+        (Visibility.access_in_module visibility)
+      )
+    in
+    let filter =
+      match test_scope with
+      | Some id -> (
+        (* in the current class *)
+        if id = enum_id then
+          (fun _ -> true)
+        else
+          outside_filter
+      )
+      | None -> outside_filter
+    in
+    let result = List.filter ~f:filter enum.enum_methods in
+
+    let types_map =
+      List.fold2_exn
+        ~init:TypeVarMap.empty
+        ~f:(fun acc def_var given_var ->
+          TypeVarMap.set acc ~key:def_var ~data:given_var
+        )
+        enum.enum_params type_vars
+    in
+    let open List in
+
+    result >>= fun (name, _vis, elm) ->
+    match elm with
+    | { TypeDef. id = _member_id; spec = Namespace _ns_path; _ } -> (
+      []
+    )
+
+    | ({ TypeDef. id = member_id; spec = ClassMethod { method_params; method_return; _ }; _ } as def) -> (
+        let params = replace_params_with_type ctx types_map method_params in
+        let rt = replace_type_vars_with_maps ctx types_map method_return in
+        let expr = TypeExpr.Method(def, params, rt) in
+        [ (name, expr, member_id, false) ]
+    )
+
+    | _ -> []
+  )
+
+  | TypeDef { id = cls_id; spec = Class cls; _ } -> (
+    let test_scope = scope#test_in_class in
+    let outside_filter = (
+      fun (_elm_name, elm) ->
+        let visibility = get_visibility_of_class_elm elm in
+        (Visibility.access_in_module visibility)
+      )
+    in
+    let filter =
+      match test_scope with
+      | Some id -> (
+        (* in the current class *)
+        if id = cls_id then
+          (fun _ -> true)
+        else
+          outside_filter
+      )
+      | None -> outside_filter
+    in
+    let result = List.filter ~f:filter cls.tcls_elements in
+
+    let types_map =
+      List.fold2_exn
+        ~init:TypeVarMap.empty
+        ~f:(fun acc def_var given_var ->
+          TypeVarMap.set acc ~key:def_var ~data:given_var
+        )
+        cls.tcls_vars type_vars
+    in
+
+    let ancesters_methods =
+      match cls.tcls_extends with
+      | Some ancester -> get_members_of_type ctx ~scope ancester
+      | None -> []
+    in
+
+    let open List in
+    let open Core_type in
+    append (
+      result >>= function
+      | (name, cls_elm) -> (
+        match cls_elm with
+        | Cls_elm_method (_, ({ TypeDef. id = member_id; spec = ClassMethod { method_params; method_return; _ }; _ } as def)) -> (
+          let params = replace_params_with_type ctx types_map method_params in
+          let rt = replace_type_vars_with_maps ctx types_map method_return in
+          let expr = TypeExpr.Method(def, params, rt) in
+          [ (name, expr, member_id, true) ]
+        )
+
+        | Cls_elm_get_set(_, Some ({ TypeDef. id = member_id; spec = ClassMethod { method_params; method_return; _ }; _ } as def), _) -> (
+          let params = replace_params_with_type ctx types_map method_params in
+          let rt = replace_type_vars_with_maps ctx types_map method_return in
+          let expr = TypeExpr.Method(def, params, rt) in
+          [ (name, expr, member_id, false) ]
+        )
+
+        | Cls_elm_prop (_, member_id, _) ->
+          let value = Program.deref_node_type ctx member_id in
+          [ (name, replace_type_vars_with_maps ctx types_map value, member_id, false) ]
+
+        | _ -> []
+      )
+    )
+    ancesters_methods
+  )
+  | _ -> []
+
+and get_members_of_type ctx ~scope type_expr : (string * TypeExpr.t * int * bool) list =
+  let type_expr' = Program.deref_type ctx type_expr in
+  match type_expr' with
+  | Ctor(type_expr, type_vars) -> (
+    let type_expr = Program.deref_type ctx type_expr in
+    let open TypeDef in
+    match type_expr with
+    | TypeDef { spec = Enum _; _ }
+    | TypeDef { spec = Class _; _ } ->
+      get_members_of_class ctx ~scope type_expr type_vars
+
+    | TypeDef { spec = Interface intf; _ } -> (
+      let open List in
+      intf.intf_methods >>= fun (name, intf_elm) ->
+      match intf_elm with
+      | Cls_elm_method (_, ({ TypeDef. id = member_id; spec = ClassMethod { method_params; method_return; _ }; _ } as def)) -> (
+        (* let params = replace_params_with_type ctx types_map method_params in
+        let rt = replace_type_vars_with_maps ctx types_map method_return in *)
+        let expr = TypeExpr.Method(def, method_params, method_return) in
+        [ (name, expr, member_id, true) ]
+      )
+      | _ -> []
+    )
+
+    | _ -> (
+      if is_char ctx type_expr' then (
+        let ty_int_opt = scope#find_type_symbol "Char" in
+        match ty_int_opt with
+        | Some ty_int -> (
+          let array_node = Program.get_node ctx ty_int in
+          (* building type Array<T> *)
+          let ctor_type = TypeExpr.Ctor(array_node.value, []) in
+          get_members_of_type ctx ~scope ctor_type
+        )
+        | None -> failwith "Can not find Char type in current scope"
+      ) else
+        []
+    )
+  )
+
+  (* it's type def itself, find the static member *)
+  | TypeDef { spec = Class { tcls_static_elements; _ }; _ } -> (
+    let open List in
+    let open Core_type.TypeDef in
+    tcls_static_elements >>= function
+    | (name, Cls_elm_method(_, _method)) ->
+      let member_id = _method.id in
+      let node = Program.get_node ctx member_id in
+      [ (name, node.value, member_id, true) ]
+
+    | (name, Cls_elm_prop(_, id, is_const)) ->
+      let value = Program.deref_node_type ctx id in
+      [ (name, value, id, is_const) ]
+
+    | _ -> []
+  )
+
+  | Array t -> (
+    let ty_int_opt = scope#find_type_symbol "Array" in
+    match ty_int_opt with
+    | Some ty_int -> (
+      let array_node = Program.get_node ctx ty_int in
+      (* building type Array<T> *)
+      let ctor_type = TypeExpr.Ctor(array_node.value, [t]) in
+      get_members_of_type ctx ~scope ctor_type
+    )
+    | None -> failwith "Can not find Array type in current scope"
+  )
+
+  | String -> (
+    let ty_int_opt = scope#find_type_symbol "String" in
+    match ty_int_opt with
+    | Some ty_int -> (
+      let array_node = Program.get_node ctx ty_int in
+      (* building type Array<T> *)
+      let ctor_type = TypeExpr.Ctor(array_node.value, []) in
+      get_members_of_type ctx ~scope ctor_type
+    )
+    | None -> failwith "Can not find String type in current scope"
+  )
+
+  | _ -> []
+
 (*
   * TODO: namespace
   * class/enum static function

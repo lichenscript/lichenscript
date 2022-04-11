@@ -306,6 +306,24 @@ let create dummy_fs js_config =
 
   in
 
+  let ty_to_completion_kind ty_expr = 
+    let open Core_type in
+    let open Auto_complete in
+    match ty_expr with
+    | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Enum _ ; _ } ->
+      CompletionItemKind.Enum
+    | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Class _ ; _ } ->
+      CompletionItemKind.Class
+    | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Interface _ ; _ } ->
+      CompletionItemKind.Interface
+    | TypeExpr.TypeDef { TypeDef. spec = TypeDef.ClassMethod _ ; _ } ->
+      CompletionItemKind.Method
+    | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Function _ ; _ } ->
+      CompletionItemKind.Function
+    | _ ->
+      CompletionItemKind.Variable
+  in
+
   object%js
 
     method parseAndCache path content =
@@ -423,8 +441,28 @@ let create dummy_fs js_config =
         |> Array.map ~f:Js_helper.completion_item_to_js
         |> Js.array
 
-      | Some _ ->
-        new%js Js.array_empty
+      | Some ty -> (
+        let scope_opt = ReverseSymbol.find_scope_in_range reverse_map path offset in
+        match scope_opt with
+        | Some scope ->
+          let members = Check_helper.get_members_of_type !prog ~scope ty in
+          members
+          |> List.to_array
+          |> Array.map
+            ~f:(fun (name, ty_expr, _, _) ->
+              let detail = Program.print_type_value !prog ty_expr in
+              let kind = ty_to_completion_kind ty_expr in
+              { CompletionItem.
+                label = name;
+                kind;
+                detail = Some detail;
+              }
+            )
+          |> Array.map ~f:Js_helper.completion_item_to_js
+          |> Js.array
+
+        | None -> new%js Js.array_empty
+      )
 
       | None -> (
         let scope_opt = ReverseSymbol.find_scope_in_range reverse_map path offset in
@@ -439,21 +477,7 @@ let create dummy_fs js_config =
             ~f:(fun (name, var) ->
               let open Scope in
               let ty_expr = Program.deref_node_type !prog var.var_id in
-              let kind =
-                match ty_expr with
-                | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Enum _ ; _ } ->
-                  CompletionItemKind.Enum
-                | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Class _ ; _ } ->
-                  CompletionItemKind.Class
-                | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Interface _ ; _ } ->
-                  CompletionItemKind.Interface
-                | TypeExpr.TypeDef { TypeDef. spec = TypeDef.ClassMethod _ ; _ } ->
-                  CompletionItemKind.Method
-                | TypeExpr.TypeDef { TypeDef. spec = TypeDef.Function _ ; _ } ->
-                  CompletionItemKind.Function
-                | _ ->
-                  CompletionItemKind.Variable;
-              in
+              let kind = ty_to_completion_kind ty_expr in
               let detail = Program.print_type_value !prog ty_expr in
               { CompletionItem.
                 label = name;
